@@ -1,0 +1,76 @@
+{
+  "keel_version": "0.9.0",
+  "schema_version": 1,
+  "project": {
+    "name": "keel",
+    "kind": "plugin",
+    "description": "GBi standard operating procedure for AI-assisted delivery"
+  },
+  "stack": {
+    "language": "bash",
+    "runtime": "posix-sh",
+    "framework": "claude-code-plugin",
+    "package_manager": "none",
+    "also": [],
+    "datastores": [],
+    "has_ui": false
+  },
+  "verify": {
+    "test": "tests/run-tests.sh",
+    "test_one": "tests/{name}",
+    "test_integration": null,
+    "lint": "shellcheck -x bin/keel lib/*.sh tests/*.sh tests/evals/run.sh hooks/session-start hooks/context-watch hooks/sensitive-guard hooks/done-guard",
+    "format": null,
+    "format_fix": null,
+    "typecheck": null,
+    "build": null,
+    "e2e": null,
+    "security": null
+  },
+  "gates": {
+    "tdd": "required",
+    "coding_standards": "required",
+    "review": "required",
+    "security_audit": "warn",
+    "observability": "required",
+    "docs_updated": "required",
+    "commit_guard": "off",
+    "done_verified": "required",
+    "context_window": 1000000
+  },
+  "observability": {
+    "backend": "signoz",
+    "otlp_endpoint_var": "OTEL_EXPORTER_OTLP_ENDPOINT",
+    "log_shipping": "otlp"
+  },
+  "conventions": {
+    "commit_style": "conventional",
+    "default_branch": "main",
+    "protect_default_branch": true,
+    "response_style": "terse",
+    "no_attribution_footers": true,
+    "no_em_dashes": true
+  },
+  "deploy": {
+    "target": "claude-code-plugin-marketplace",
+    "ci": "github-actions",
+    "envs": [],
+    "note": "Distribution is `/plugin marketplace add gbi-solutions-ltd/keel`. No server."
+  },
+  "docs_root": "docs",
+  "artifacts": {
+    "_note": "Set any of these to a path when the artifact already exists elsewhere. Skills read the mapped path instead of the default under docs_root, so a repo with its own naming convention is not duplicated.",
+    "snapshot": null,
+    "prd": null,
+    "stories": null,
+    "architecture": null,
+    "decisions": null,
+    "plans": null
+  },
+  "_note": "keel dogfoods itself. Written by hand until `keel init` exists (plan task 1.6).",
+  "verify_notes": {
+    "test": "Plain bash. No test framework, by design: the CLI has no runtime dependency and neither do its tests.",
+    "lint": "shellcheck at default severity, so info and style findings fail too. CI runs this exact string. Running a narrower severity locally is how the pipeline went red on 52 findings that had never been seen on a laptop.",
+    "build": "None. Skills are markdown and the CLI is bash, so there is nothing to compile."
+  }
+}

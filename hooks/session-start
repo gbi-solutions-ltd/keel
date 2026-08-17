@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# SessionStart hook. Injects a static pointer to the router and nothing else.
+#
+# STATIC IS THE POINT. Prompt caching holds only while the front of the request is byte-identical,
+# so this must print the same bytes on every run, forever. No date, no branch, no git status, no
+# counter, no reading of any file that changes. One volatile byte here costs the cache on every
+# request in every session.
+#
+# THE ONE EXCEPTION, AND ITS BOUND. It reads `conventions.response_style` from the project profile.
+# That is a file that changes, which the rule above forbids, so the bound matters: the output has
+# exactly two forms, and it moves between them only when a person deliberately edits the key. That
+# costs one cache miss on the session after the edit, the same as editing CLAUDE.md, rather than one
+# per request. A key read for its value would be volatile; a key read for which of two paragraphs to
+# print is not.
+#
+# NO python3 HERE. This runs before every session, so it must not depend on an interpreter being
+# present or pay its startup. The profile is matched with a builtin `case`, which also means the
+# match is textual: `"response_style": "verbose"` and `"response_style":"verbose"` are both
+# recognised and an exotic formatting of the same key is not. A missed match yields terse, which is
+# the default, so the failure mode is the documented behaviour rather than a broken session.
+#
+# Budget: under 250 tokens, 400 hard, enforced by tests/validate-skills.sh.
+
+set -euo pipefail
+
+read -r -d '' CONTEXT <<'TXT' || true
+This project uses keel. Before starting substantive work, pick a skill.
+
+Discover and define: repo-snapshot, shape-idea, write-prd, write-user-stories, design-architecture.
+Build: write-plan, execute-plan, tdd, debug, coding-standards.
+Verify: review-code, security-audit, refactor, optimize-performance.
+Ship: setup-deployment, ship, write-docs. Production is down now: incident-response, before debug.
+Porting: port-assess, or apex-export then apex-port-plan for Oracle APEX.
+Meta: create-skill, context-budget. Unsure which fits: use the keel skill to route.
+
+Rules: process skills come first and may invoke others (debug before tdd for a bug, shape-idea
+before write-prd for a rough idea). Announce the skill in one line, then follow it.
+Answer directly when no skill fits; forcing one is worse.
+
+Project facts, verify commands, and gates are in .keel/profile.json. Read it before running any
+test, lint, or build command rather than assuming the stack's usual one.
+TXT
+
+read -r -d '' BREVITY <<'TXT' || true
+
+Replies stay brief; artifacts stay full. Say what changed, where it is, and what needs a decision.
+Never omit which checks ran or were skipped, assumptions, deviations, or a Done when command's output.
+TXT
+
+# Walk up for the profile, the way sensitive-guard does. A session started in a subdirectory is
+# ordinary, and looking only in the current directory silently loses the project's choice.
+profile=""
+d="$PWD"
+while [ -n "$d" ]; do
+    if [ -f "$d/.keel/profile.json" ]; then profile="$d/.keel/profile.json"; break; fi
+    [ "$d" = "/" ] && break
+    d="$(dirname "$d")"
+done
+
+# Terse unless the project asked for verbose. Absent profile, absent key and unreadable file all
+# mean terse, because that is the default and a hook is not the place to report a bad profile.
+#
+# The `-r` test is load bearing and was added after review caught it. This script runs under
+# `set -e`, and the assignment is the last command in the chain, so a read that fails takes the
+# whole hook down: exit 1, nothing on stdout, and the session loses the router pointer entirely
+# rather than just the brevity rule. A 000-mode profile is rare; a session that silently looks
+# like keel is not installed is expensive.
+style_text=""
+[ -n "$profile" ] && [ -r "$profile" ] && style_text="$(<"$profile")"
+case "$style_text" in
+    *'"response_style": "verbose"'*|*'"response_style":"verbose"'*) ;;
+    *) CONTEXT="$CONTEXT$BREVITY" ;;
+esac
+
+escape() { local s="$1"; s="${s//\\/\\\\}"; s="${s//\"/\\\"}"; s="${s//$'\n'/\\n}"; printf '%s' "$s"; }
+
+printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$(escape "$CONTEXT")"

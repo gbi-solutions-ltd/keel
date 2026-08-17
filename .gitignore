@@ -1,0 +1,44 @@
+# macOS
+.DS_Store
+
+# Editor and local agent state
+.vscode/
+.idea/
+.claude/settings.local.json
+
+# Session state written by the context watchdog. It is stale the moment work resumes, and inside a
+# committed tree the next `git add -A` sweeps it into a commit. Anything durable in it is promoted to
+# an ADR or docs/07-open-decisions.md before it is discarded. `git add -f` covers sharing one.
+.keel/handoff.md
+
+# Node, once bin/ and tests/ arrive
+node_modules/
+*.log
+
+# Build output
+dist/
+build/
+
+# Python bytecode. lib/ gained two python modules with apex-export.
+__pycache__/
+*.pyc
+
+# Never commit these. keel handles secrets for other repos; it must not leak its own.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*.jks
+
+# apex-export inputs and intermediates. The targets file holds database passwords; a capture
+# directory holds an application's SQL and PL/SQL verbatim, before redaction. tests/fixtures/apex
+# is deliberately not covered: it is synthetic and committed on purpose.
+.keel/apex-targets.json
+apex-capture/
+
+# NOTE: do not add `docs/` here. The artifact chain reads from the docs root, and a
+# gitignored docs root silently breaks every skill downstream of repo-snapshot.
+# See docs/03-install-and-distribution.md, "The gitignored-docs trap".

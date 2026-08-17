@@ -1,0 +1,1689 @@
+#!/usr/bin/env bash
+# keel: per-project setup and health checks for the keel plugin.
+#
+# Plain bash. python3 is used where it is present, for JSON only, and its absence degrades
+# honestly rather than silently: doctor reports what it could not check.
+#
+#   keel init [-y] [--team] [--force]   configure this project
+#   keel doctor                         check this project, non-zero on any problem
+#   keel version
+
+# The `condition && good || fail` idiom in doctor is safe because every reporting helper returns 0
+# explicitly; see cmd_doctor. Single quotes in printf strings are deliberate where they appear.
+# shellcheck disable=SC2015,SC2016
+# shellcheck source-path=SCRIPTDIR/..
+
+set -uo pipefail
+
+# Resolve through symlinks: the documented install is a symlink into a directory on PATH, and
+# plain dirname would resolve HERE to that directory, losing lib/, templates/ and VERSION.
+# Done by hand rather than with `readlink -f`, which is absent on older macOS.
+SELF="${BASH_SOURCE[0]}"
+while [ -L "$SELF" ]; do
+    _link="$(readlink "$SELF")"
+    case "$_link" in
+        /*) SELF="$_link" ;;
+        *)  SELF="$(dirname "$SELF")/$_link" ;;
+    esac
+done
+HERE="$(cd "$(dirname "$SELF")/.." && pwd)"
+
+# The profile schema's own version, deliberately separate from VERSION. `keel_version` answers
+# "which keel wrote this file". This answers "does this file have the fields the installed keel
+# expects", which is the only version of that question worth warning about. Bump it only when a
+# field is added, removed, renamed or moved. 0.7.0 and 0.7.1 changed none, and a warning that fires
+# on releases like those is one nobody reads by the time it matters.
+SCHEMA_VERSION=1
+
+# Fail loudly on a broken install. Without this the sources below print to stderr and execution
+# continues into undefined functions, which reads as a bug in the project being configured.
+for _need in lib/detect-stack.sh lib/merge-claude-md.sh lib/apex-export.sh VERSION; do
+    [ -e "$HERE/$_need" ] || {
+        printf 'keel: incomplete install: %s not found under %s\n' "$_need" "$HERE" >&2
+        exit 1
+    }
+done
+
+# shellcheck source=lib/detect-stack.sh
+. "$HERE/lib/detect-stack.sh"
+# shellcheck source=lib/merge-claude-md.sh
+. "$HERE/lib/merge-claude-md.sh"
+# shellcheck source=lib/apex-export.sh
+. "$HERE/lib/apex-export.sh"
+
+DEFAULT_DOCS_ROOT="docs/keel"
+
+have_python() { command -v python3 >/dev/null 2>&1; }
+say()  { printf '%s\n' "$1"; }
+err()  { printf 'keel: %s\n' "$1" >&2; }
+die()  { err "$1"; exit 1; }
+
+# The whole file, flattened to one dotted.path=value line per scalar, read once per process.
+#
+# One interpreter start per field meant doctor paid thirteen of them to read one small file. The
+# cache is keyed on the path because more than one file is never read in a single command today,
+# and a second one would otherwise silently serve the first one's values.
+JSON_CACHE=""
+JSON_CACHE_FILE=""
+
+json_cache_clear() { JSON_CACHE=""; JSON_CACHE_FILE=""; }
+
+json_load() {  # json_load <file>
+    [ "$JSON_CACHE_FILE" = "$1" ] && return 0
+    have_python || return 1
+    # No apostrophe anywhere below. bash 3.2 does not treat a quoted heredoc body as literal when
+    # the heredoc is inside a $( ), so one ' opens a quote that swallows the rest of this file and
+    # the parse error is reported hundreds of lines away. shellcheck does not see it.
+    JSON_CACHE="$(python3 - "$1" <<'PY' 2>/dev/null
+import json, sys
+
+def render(v):
+    # JSON spelling, not the Python spelling. The profile holds `true`, and printing `True` meant
+    # the value could not be fed back to `profile set` and no shell comparison against `true` worked.
+    if v is None:  return ""
+    if v is True:  return "true"
+    if v is False: return "false"
+    return str(v)
+
+def walk(d, prefix):
+    for k, v in d.items():
+        k = str(k)
+        # A key holding a dot is indistinguishable from a nested path once the segments are joined,
+        # so it is left out along with anything under it. json_get then falls back to the
+        # interpreter, which walks the real structure and refuses it, which is what profile set does.
+        if "." in k:
+            continue
+        p = prefix + k
+        if isinstance(v, dict):
+            walk(v, p + ".")
+        else:
+            s = render(v)
+            # A value spanning lines cannot be held in a line-per-field cache. It is left out, and
+            # json_get falls back to reading that one field with an interpreter, which is correct
+            # and merely slow. Emitting it would corrupt every field after it.
+            if "\n" not in p and "\n" not in s:
+                print(p + "=" + s)
+
+try:
+    walk(json.load(open(sys.argv[1])), "")
+except Exception:
+    sys.exit(1)
+PY
+)" || { json_cache_clear; return 1; }
+    JSON_CACHE_FILE="$1"
+    return 0
+}
+
+json_get() {  # json_get <file> <dotted.path>
+    have_python || return 1
+    if json_load "$1"; then
+        local line
+        while IFS= read -r line; do
+            case "$line" in
+              "$2="*) printf '%s\n' "${line#*=}"; return 0 ;;
+            esac
+        done <<< "$JSON_CACHE"
+    fi
+    # Not in the cache: either the key is absent, or its value spans lines and the flattener left
+    # it out. One interpreter start tells the two apart, and both are rare.
+    python3 - "$1" "$2" <<'PY' 2>/dev/null
+import json,sys
+d=json.load(open(sys.argv[1]))
+for k in sys.argv[2].split("."):
+    if not isinstance(d,dict) or k not in d: sys.exit(1)
+    d=d[k]
+if   d is None:  print("")
+elif d is True:  print("true")
+elif d is False: print("false")
+else:            print(d)
+PY
+}
+
+# Prints "missing:<plugin>" per recommended plugin that is not enabled. Silent when there is nothing
+# to say. Conflicts moved to boundary_report below, which sees more than this file does.
+plugin_report() {
+    have_python || return 0
+    python3 - <<'PY' 2>/dev/null
+import json
+try:
+    enabled = set(json.load(open(".claude/settings.json")).get("enabledPlugins", {}))
+except Exception:
+    raise SystemExit(0)
+try:
+    rec = json.load(open(".keel/profile.json")).get("plugins", {}).get("recommended")
+except Exception:
+    rec = None
+if not rec:
+    rec = ["security-guidance@claude-plugins-official",
+           "code-review@claude-plugins-official",
+           "skill-creator@claude-plugins-official"]
+for r in rec:
+    if r not in enabled:
+        print("missing:" + r)
+PY
+}
+
+# Where keel ends and another plugin begins.
+#
+# Two kinds of collision, and the second is the one no hardcoded list can catch:
+#
+#   conflict:<plugin>|<why>   a plugin known to ship a competing end-to-end methodology
+#   dup:<skill>|<plugin>      any enabled plugin shipping a skill name keel also ships
+#
+# The duplicate check reads the installed plugin cache rather than a registry, so a plugin nobody
+# anticipated surfaces the moment it ships its own `tdd` or `review-code`. Two skills under one name
+# is not an error in Claude Code, which is what makes it worth reporting: the model picks one, and
+# neither the session nor the transcript records which.
+#
+# It reports and stops there. Disabling somebody's plugin from a tool they ran to configure a
+# repository would be a larger decision than this command is entitled to make, and the conflicting
+# plugin may be the deliberate choice.
+boundary_report() {
+    have_python || return 0
+    KEEL_HERE="$HERE" python3 - <<'PY' 2>/dev/null
+import json, os, glob
+
+dirs = [d for d in (os.environ.get("CLAUDE_CONFIG_DIR"), os.path.expanduser("~/.claude")) if d]
+
+# Each reason is a sentence a reader can act on. A label ("conflicts") tells nobody what to do.
+KNOWN = {
+    "feature-dev": "it ships its own explorer, architect and reviewer agents behind a /feature-dev command, covering the same ground as repo-snapshot, design-architecture, write-plan, execute-plan and review-code, and it writes to none of the artifact chain",
+    "superpowers": "its using-superpowers skill tells the model to invoke a superpowers skill before any response, which competes directly with the keel router, and it injects its whole methodology at session start",
+    "gstack": "it carries its own planning and review workflow plus a session preamble running to several thousand tokens",
+}
+
+# Later files win, which is the order Claude Code merges them in.
+enabled = {}
+for p in [os.path.join(d, "settings.json") for d in dirs] + [".claude/settings.json", ".claude/settings.local.json"]:
+    try:
+        enabled.update(json.load(open(p)).get("enabledPlugins", {}))
+    except Exception:
+        pass
+enabled = {k.split("@")[0] for k, v in enabled.items() if v}
+
+# What each installed plugin ships, from the cache: <cfg>/plugins/cache/<market>/<plugin>/<version>/skills/<skill>/SKILL.md
+shipped = {}
+for d in dirs:
+    for path in glob.glob(os.path.join(d, "plugins", "cache", "*", "*", "*", "skills", "*", "SKILL.md")):
+        parts = path.split(os.sep)
+        shipped.setdefault(parts[-5], set()).add(parts[-2])
+
+# Ours comes from the working tree, not from the cache. The cached copy is whatever version was last
+# installed, which is routinely older than the CLI and would under-report a brand new collision.
+ours = {os.path.basename(os.path.dirname(p))
+        for p in glob.glob(os.path.join(os.environ["KEEL_HERE"], "skills", "*", "SKILL.md"))}
+
+for name in sorted(enabled):
+    if name in KNOWN:
+        print("conflict:%s|%s" % (name, KNOWN[name]))
+    if name == "keel":
+        continue
+    for s in sorted(shipped.get(name, set()) & ours):
+        print("dup:%s|%s" % (s, name))
+PY
+}
+
+docs_root() {
+    local r=""
+    [ -f .keel/profile.json ] && r="$(json_get .keel/profile.json docs_root || true)"
+    printf '%s' "${r:-$DEFAULT_DOCS_ROOT}"
+}
+
+# ---------------------------------------------------------------- init
+
+# The trap that makes the artifact chain vanish: a docs root git ignores. The snapshot writes,
+# reports success, and is invisible to every teammate. Nothing errors.
+check_docs_ignored() {
+    local root="$1"
+    git rev-parse --git-dir >/dev/null 2>&1 || return 0
+    local hit
+    hit="$(git check-ignore -v "$root/" 2>/dev/null || git check-ignore -v "$root/snapshot.md" 2>/dev/null || true)"
+    [ -z "$hit" ] && return 0
+    err "the docs root '$root' is ignored by git: $hit"
+    err "every skill downstream of repo-snapshot writes there and assumes it is committed."
+    err "fix one of these, then re-run:"
+    err "  1. append these to .gitignore, in this order. Git never looks inside an excluded"
+    err "     directory, so each parent is re-included before the negation can reach the root:"
+    local acc='' rest="$root"
+    while [ "${rest#*/}" != "$rest" ]; do
+      acc="$acc${rest%%/*}"
+      err "        !$acc/"
+      err "        $acc/*"
+      acc="$acc/"; rest="${rest#*/}"
+    done
+    err "        !$root/"
+    err "  2. set docs_root in .keel/profile.json to a path that is tracked"
+    return 1
+}
+
+# The repository's default branch, which is frequently not the checked-out one. Getting this
+# wrong matters: skills refuse to implement on the default branch, and repo-snapshot compares
+# HEAD against it.
+default_branch() {
+    local b
+    b="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')"
+    [ -n "$b" ] && { printf '%s' "$b"; return; }
+    for c in main master; do
+        git show-ref --verify --quiet "refs/heads/$c" && { printf '%s' "$c"; return; }
+    done
+    printf '%s' "$(git symbolic-ref --short HEAD 2>/dev/null || echo main)"
+}
+
+# Merge the freshly detected profile under any existing one: existing values win.
+#
+# Detection is a starting point, never an authority. Found by running init a second time on a
+# real project, where it replaced a hand-corrected test command with a detected one that could
+# not run without a database. A tool that discards a human's correction gets run once.
+merge_profile() {
+    local fresh="$1" existing="$2"
+    have_python || { mv "$fresh" "$existing"; return 0; }
+    python3 - "$fresh" "$existing" <<'PY'
+import json, sys
+fresh = json.load(open(sys.argv[1]))
+old = json.load(open(sys.argv[2]))
+def merge(new, cur):
+    out = dict(new)
+    for k, v in cur.items():
+        if k not in out:                      out[k] = v            # human-added key
+        elif isinstance(v, dict) and isinstance(out[k], dict):
+            out[k] = merge(out[k], v)
+        elif v not in (None, "", [], {}):     out[k] = v            # human value wins
+    return out
+merged = merge(fresh, old)
+# The one field the tool owns rather than the human. It records which keel wrote this
+# profile, so letting the old value win would freeze it at the version of the first init and
+# make "has this project been re-initialised since the upgrade?" unanswerable.
+merged["keel_version"] = fresh["keel_version"]
+# Same reasoning, and more load-bearing: doctor decides whether this profile is missing fields by
+# reading schema_version, so an old value surviving a re-init would make the refresh invisible to
+# the one check that exists to notice it.
+merged["schema_version"] = fresh["schema_version"]
+json.dump(merged, open(sys.argv[2], "w"), indent=2)
+open(sys.argv[2], "a").write("\n")
+PY
+    rm -f "$fresh"
+}
+
+# A repo with documents and no code is a legitimate state, not a misconfiguration. Found on a real
+# project carrying 30k words of requirements before a line of code existed: doctor demanded a test
+# command it could never have, and a check that always fails on a legitimate state teaches people to
+# ignore the checker.
+project_kind() {
+    [ "$(detect_stack | cut -d' ' -f1)" != "unknown" ] && { printf 'service'; return; }
+    local src
+    src=$(git ls-files 2>/dev/null | grep -cE '\.(ts|js|py|go|java|kt|php|rs|rb|cs|swift|lua|c|cc|cpp|h|hpp)$' || true)
+    [ "${src:-0}" -gt 0 ] && printf 'service' || printf 'docs'
+}
+
+# One JSON array from newline-separated input. Empty input gives an empty array rather than a
+# missing key, so a reader never has to tell absent from none.
+json_str_array() {
+    printf '%s\n' "$1" | awk 'NF { if (n++) printf ", "; printf "\"%s\"", $0 }'
+}
+
+# A JSON string, or null when a detector had nothing to declare. null and "none" are different
+# answers: "none" is a project that has no such thing, this is one whose answer could not be read,
+# and the skills that ask have to tell them apart.
+json_or_null() {
+    if [ -n "$1" ]; then printf '"%s"' "$1"; else printf 'null'; fi
+}
+
+write_profile() {
+    local root="$1" lang rt fw pm kind ui
+    read -r lang rt fw pm <<<"$(detect_stack)"
+    kind="$(project_kind)"
+    ui="$(detect_has_ui)"
+    mkdir -p .keel
+    local name; name="$(basename "$PWD")"
+    local pm_json; pm_json="$(json_or_null "$pm")"
+    {
+      printf '{\n'
+      printf '  "keel_version": "%s",\n' "$(cat "$HERE/VERSION" 2>/dev/null || echo 0.0.0)"
+      printf '  "schema_version": %s,\n' "$SCHEMA_VERSION"
+      printf '  "project": { "name": "%s", "kind": "%s", "description": "" },\n' "$name" "$kind"
+      printf '  "stack": { "language": "%s", "runtime": "%s", "framework": "%s", "package_manager": %s, "also": [%s], "datastores": [%s], "has_ui": %s },\n' \
+        "$lang" "$rt" "$fw" "$pm_json" "$(json_str_array "$(detect_also)")" \
+        "$(json_str_array "$(detect_datastores)")" "$ui"
+      # Fill the script cache here, in this shell. The loop below reads each verify key through
+      # `v="$(detect_verify ...)"`, and a $( ) is a subshell: it inherits this variable already
+      # full, but anything it loads itself dies with it. Without this line every key would load
+      # package.json again and the cache would save nothing. It is not redundant.
+      pkg_scripts_load
+      printf '  "verify": {\n'
+      local first=1 v
+      for k in test test_one test_integration lint format format_fix typecheck build e2e security; do
+          v="$(detect_verify "$k" "$lang")"
+          [ $first -eq 0 ] && printf ',\n'; first=0
+          if [ -z "$v" ]; then printf '    "%s": null' "$k"
+          else printf '    "%s": "%s"' "$k" "$(printf '%s' "$v" | sed 's/"/\\"/g')"; fi
+      done
+      printf '\n  },\n'
+      # done_verified starts at "warn", not "required". The Stop hook it drives refuses to let a
+      # turn end, which is not something to switch on for a repository without being asked. A
+      # project raises it to "required" once it has seen the warning fire and agreed with it.
+      printf '  "gates": { "tdd": "required", "coding_standards": "warn", "review": "required", "security_audit": "required", "observability": "required", "docs_updated": "warn", "commit_guard": "off", "done_verified": "warn" },\n'
+      printf '  "observability": { "backend": "signoz", "otlp_endpoint_var": "OTEL_EXPORTER_OTLP_ENDPOINT", "log_shipping": "otlp" },\n'
+      # response_style is written explicitly rather than left absent and defaulted. Terse is what a
+      # project gets without asking, so the key that turns it off has to be visible in the file the
+      # reader already opens, not a thing they must first learn exists. "verbose" is the opt-out.
+      printf '  "conventions": { "commit_style": "conventional", "default_branch": "%s", "protect_default_branch": true, "response_style": "terse" },\n' "$(default_branch)"
+      printf '  "deploy": { "target": %s, "ci": %s, "envs": [] },\n' \
+        "$(json_or_null "$(detect_deploy_target)")" "$(json_or_null "$(detect_ci)")"
+      printf '  "docs_root": "%s",\n' "$root"
+      printf '  "artifacts": {\n'
+      printf '    "_note": "Set any of these to a path when the artifact already exists elsewhere. Skills read the mapped path instead of the default under docs_root, so a repo with its own naming convention is not duplicated.",\n'
+      printf '    "snapshot": null, "prd": null, "stories": null, "architecture": null, "decisions": null, "plans": null\n'
+      printf '  }\n' 
+      printf '}\n'
+    } > .keel/profile.json.new
+
+    have_python && ! python3 -c "import json;json.load(open('.keel/profile.json.new'))" 2>/dev/null \
+        && die "generated an invalid profile; this is a bug in keel"
+
+    if [ -f .keel/profile.json ] && [ "${FORCE:-0}" -eq 0 ]; then
+        merge_profile .keel/profile.json.new .keel/profile.json
+    else
+        mv .keel/profile.json.new .keel/profile.json
+    fi
+    json_cache_clear
+    return 0
+}
+
+render_block() {
+    local out="$1" root="$2" src="$HERE/templates/project-claude-md-block.md" t v
+    t="$(mktemp)"
+    # Only the managed block, never the template's own header comment.
+    awk "/$(printf '%s' "$MARK_START" | sed 's/[][\\/.*^$]/\\\\&/g')/,/$(printf '%s' "$MARK_END" | sed 's/[][\\/.*^$]/\\\\&/g')/" "$src" > "$t"
+    sed -i.bak "s|{{DOCS_ROOT}}|$root|g" "$t"
+    for k in TEST LINT TYPECHECK; do
+        local key; key="$(printf '%s' "$k" | tr '[:upper:]' '[:lower:]')"
+        v="$(json_get .keel/profile.json "verify.$key" || true)"
+        # A null command is omitted rather than rendered as the word "null".
+        [ -z "$v" ] && v="# no $key command in this project"
+        sed -i.bak "s|{{VERIFY_$k}}|$(printf '%s' "$v" | sed 's/|/\\|/g')|g" "$t"
+    done
+    rm -f "$t.bak"; mv "$t" "$out"
+}
+
+scaffold_docs() {
+    local root="$1"
+    mkdir -p "$root"/{ideas,prd,stories,architecture,decisions,plans,runbooks,audits,port}
+    [ -f "$root/README.md" ] || cat > "$root/README.md" <<D
+# Project documentation
+
+Written and read by keel skills. Committed on purpose: this is the project's memory.
+
+| Path | Written by |
+|---|---|
+| \`snapshot.md\` | \`repo-snapshot\` |
+| \`standards.md\` | \`coding-standards\` |
+| \`ideas/\` | \`shape-idea\` |
+| \`port/\` | \`port-assess\` |
+| \`prd/\` | \`write-prd\` |
+| \`stories/\` | \`write-user-stories\` |
+| \`architecture/\`, \`decisions/\` | \`design-architecture\` |
+| \`plans/\` | \`write-plan\` |
+| \`runbooks/\` | \`setup-deployment\`, \`write-docs\` |
+| \`audits/\` | \`security-audit\` |
+
+See \`prompting.md\` for how to phrase a request so the right skill fires.
+D
+    sed "s|{{DOCS_ROOT}}|$root|g" "$HERE/templates/prompting-cheatsheet.md" > "$root/prompting.md"
+    [ -f "$root/decisions/ADR-0000-template.md" ] || \
+      printf '# ADR-0000: Template\n\nCopy this file. See the `design-architecture` skill.\n' \
+      > "$root/decisions/ADR-0000-template.md"
+}
+
+# Committed into the project, not shipped in the plugin. With skills living in the plugin rather
+# than the repo, this is the only thing that tells a session without the plugin that a standard
+# exists.
+#
+# It states the condition rather than testing it. A hook registered in a project's settings.json
+# receives nothing that names a loaded plugin: CLAUDE_PLUGIN_ROOT is set only for hooks a plugin
+# itself defines, and a project hook's environment carries CLAUDE_PROJECT_DIR and no plugin field at
+# all. The reader knows its own skill list, so the message asks it to look there.
+write_nudge() {
+    mkdir -p .claude
+    cat > .claude/keel-nudge <<'NUDGE'
+#!/usr/bin/env bash
+# SessionStart hook, committed to this repository by `keel init`.
+#
+# A project hook cannot see which plugins a session loaded, so this states the condition and leaves
+# the check to the reader. It prints in every session and sits in that session's context, which is
+# why it is short.
+set -eu
+
+read -r -d '' MSG <<'TXT' || true
+If you have no skills named `keel:*`, the keel plugin is not loaded in this session and the rest of
+this note applies. If you do have them, ignore it.
+
+This project expects the plugin. Without it its gates on tests, security, and review do not apply,
+and .keel/profile.json is what is left: read it before running any test, lint, or build command
+rather than assuming the stack's usual one.
+
+Install it:
+  /plugin marketplace add gbi-solutions-ltd/keel
+  /plugin install keel@gbi
+
+Continuing without it is fine for a small change.
+TXT
+
+escape() { local s="$1"; s="${s//\\/\\\\}"; s="${s//\"/\\\"}"; s="${s//$'\n'/\\n}"; printf '%s' "$s"; }
+printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$(escape "$MSG")"
+NUDGE
+    chmod +x .claude/keel-nudge
+}
+
+# The guardrails. Both lists are checked in and shared by the team, which is why neither contains
+# a permission mode: see write_local_settings for why that stays per-developer.
+#
+# `deny` and `ask` are the only instruments that still work once a session is in bypassPermissions
+# mode. Verified against a live session rather than taken from the documentation: a denied Read
+# and an asked Bash command both held while an ordinary write went through unprompted. Allow rules
+# have no effect in that mode, so protection expressed as an allowlist is not protection at all.
+#
+# deny is for what is never legitimate for an agent to do in a repository. Reading a secret is on
+# that list because the secret then lives in the transcript, and because settings files in the
+# wild already contain pasted production passwords.
+#
+# THE READ RULES DO NOT COVER BASH, and that is worth knowing rather than discovering. A `Read` deny
+# matches the Read tool only, so `cat .env` reaches the same bytes through a different door. Found
+# when a subagent working under these exact rules reported .env contents it had obtained via Bash.
+#
+# The Bash entries below close the common shapes. They are defence in depth and not a boundary: a
+# command string cannot be matched exhaustively, and `sh -c`, `xargs`, `env`, a python one-liner or a
+# here-doc all get past them. Treat a secret in the working tree as reachable by any agent that can
+# run commands, and keep the real secrets out of the tree.
+keel_deny_rules() {
+    cat <<'R'
+Read(./.env)
+Read(./.env.*)
+Read(./secrets/**)
+Read(./**/*.pem)
+Read(./**/id_rsa*)
+Bash(cat *.env*)
+Bash(cat *secrets/*)
+Bash(cat *id_rsa*)
+Bash(head *.env*)
+Bash(tail *.env*)
+Bash(less *.env*)
+Bash(more *.env*)
+Bash(strings *.env*)
+R
+}
+
+# ask is for what is destructive but sometimes right. It restores the prompt for exactly those
+# commands and leaves everything else flowing, which is the whole point of pairing it with bypass
+# mode. Rebasing a feature branch and force-pushing it is normal work; doing it without a human
+# reading the command first is not.
+#
+# Deliberately not here: a recursive delete rooted at the filesystem root or at the home directory,
+# which Claude Code already circuit-breaks in every mode. A rule that duplicates a built-in check
+# reads as protection while adding none.
+keel_ask_rules() {
+    cat <<'R'
+Bash(git push --force*)
+Bash(git push -f *)
+Bash(git reset --hard*)
+Bash(git clean *)
+Bash(git branch -D *)
+Bash(terraform apply*)
+Bash(terraform destroy*)
+Bash(kubectl delete *)
+Bash(docker system prune*)
+Bash(npm publish*)
+R
+}
+
+# Emit a JSON array of the rules from one of the two lists above, indented to sit inside
+# "permissions". Kept in one place so the writer, the merge, and doctor cannot disagree.
+json_rule_array() {
+    local first=1 r
+    printf '['
+    while IFS= read -r r; do
+        [ -n "$r" ] || continue
+        [ $first -eq 1 ] && first=0 || printf ','
+        printf '\n      "%s"' "$r"
+    done
+    printf '\n    ]'
+}
+
+# No extraKnownMarketplaces here, deliberately. A marketplace source says where this reader gets
+# keel from, which is a fact about their machine and not about the project, so a committed file
+# asserting one is wrong for everyone whose answer differs: a reader outside the GitHub org cannot
+# reach a private repo, and at project scope the declaration shadows whatever the reader chose at
+# user level. Every @claude-plugins-official plugin below is enabled without one and resolves fine.
+# Doctor names the install command when the marketplace is absent, and so does the nudge.
+write_settings() {
+    mkdir -p .claude
+    if [ -f .claude/settings.json ]; then
+        merge_permissions_into_settings
+        return 0
+    fi
+    {
+      printf '{\n  "enabledPlugins": {\n    "keel@gbi": true'
+      for p in security-guidance code-review skill-creator claude-md-management context7 $(detect_plugins); do
+          printf ',\n    "%s@claude-plugins-official": true' "$p"
+      done
+      printf '\n  },\n'
+      printf '  "permissions": {\n    "deny": '
+      keel_deny_rules | json_rule_array
+      printf ',\n    "ask": '
+      keel_ask_rules | json_rule_array
+      printf '\n  },\n'
+      printf '  "hooks": {\n    "SessionStart": [\n      {\n        "matcher": "startup|clear",\n'
+      printf '        "hooks": [ { "type": "command", "command": "./.claude/keel-nudge", "shell": "bash" } ]\n'
+      printf '      }\n    ]\n  }\n}\n'
+    } > .claude/settings.json
+}
+
+# An existing settings.json is the common case on a mature repo, and it is exactly the case that
+# most needs the guardrails. Add only what is missing: rules the project already lists are left
+# alone, and nothing else in the file is touched.
+merge_permissions_into_settings() {
+    have_python || { err "python3 absent: could not add permission guardrails to the existing .claude/settings.json. Add them by hand, or delete the file and re-run."; return 0; }
+    local deny ask
+    deny="$(keel_deny_rules)"; ask="$(keel_ask_rules)"
+    DENY="$deny" ASK="$ask" python3 - <<'PY'
+import json, os
+p = ".claude/settings.json"
+try:
+    d = json.load(open(p))
+except Exception as e:
+    raise SystemExit(f"keel: {p} is not valid JSON ({e}); leaving it alone")
+perms = d.setdefault("permissions", {})
+added = 0
+for key, env in (("deny", "DENY"), ("ask", "ASK")):
+    have = perms.setdefault(key, [])
+    for rule in os.environ[env].splitlines():
+        if rule and rule not in have:
+            have.append(rule); added += 1
+if added:
+    json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
+    print(f"  added {added} permission guardrail(s) to .claude/settings.json")
+PY
+}
+
+# The permission mode is per-developer and stays out of version control, deliberately.
+#
+# A committed file that sets bypassPermissions turns off every prompt for anyone who clones the
+# repository, before they have read a line of it. That is a decision each engineer makes about
+# their own machine, not one a repository makes on their behalf. The shared file carries the
+# guardrails; the local file carries the mode. Claude Code merges both, and the deny and ask rules
+# still apply, so the split costs nothing.
+write_local_settings() {
+    mkdir -p .claude
+    local f=.claude/settings.local.json
+    if [ ! -f "$f" ]; then
+        printf '{\n  "permissions": {\n    "defaultMode": "bypassPermissions"\n  }\n}\n' > "$f"
+        return 0
+    fi
+    # Never clobber this file. It accumulates a developer's own allow rules over months of work,
+    # and losing them is worse than not setting the mode.
+    have_python || { err "python3 absent: left $f alone. Set permissions.defaultMode by hand if you want bypass mode."; return 0; }
+    python3 - <<'PY'
+import json
+p = ".claude/settings.local.json"
+try:
+    d = json.load(open(p))
+except Exception as e:
+    raise SystemExit(f"keel: {p} is not valid JSON ({e}); leaving it alone")
+perms = d.setdefault("permissions", {})
+if "defaultMode" not in perms:
+    perms["defaultMode"] = "bypassPermissions"
+    json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
+    print("  set permissions.defaultMode in .claude/settings.local.json")
+PY
+}
+
+# Whether the repository's own rules ignore a path, with the developer's global excludes taken out
+# of the answer.
+#
+# The question doctor has to settle is whether whoever clones this will commit the file, and a
+# global rule protects only the machine it sits on. Found on the existing-service pilot, where a
+# corrupted .gitignore had destroyed the repository's rule for settings.local.json and doctor
+# reported it ignored anyway, because the author's own ~/.gitignore happened to cover it. A check
+# that passes for a reason no teammate shares is worse than no check.
+#
+# `.git/info/exclude` is per-clone and equally private, and is deliberately not neutralised here:
+# there is no config key for it, and this claims only what it checks.
+repo_ignores() {
+    GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.excludesFile GIT_CONFIG_VALUE_0=/dev/null \
+        git check-ignore -q "$1" 2>/dev/null
+}
+
+# A repository can reference a document a fresh clone cannot open, and until this nothing checked
+# it. check_docs_ignored covers the one directory keel owns; this covers every document the
+# repository points at.
+#
+# The author never sees it, because the file is on their disk and reads correctly. `git status` is
+# structurally blind to ignored files, so the obvious check comes back clean, and `git log` answers
+# for a path HEAD does not carry. Baselined against a real repository before this existed: two
+# agents reviewing its documentation, one asked outright what a fresh clone gets, both read three
+# unreachable files and called them "~6 months stale", the date being when they were last committed
+# before removal. The second then recommended linking a fourth document that is also ignored.
+#
+# Emits `severity<TAB>message`, so doctor keeps ownership of its counters. Only documents that
+# exist here are considered: a link to a path that is absent everywhere is a broken link, which is
+# a different defect and not this one.
+referenced_docs_findings() {
+    local root="$1" f dir target p pdir pbase sev top seen=''
+    git rev-parse --git-dir >/dev/null 2>&1 || return 0
+    # The logical `pwd` and not `git rev-parse --show-toplevel`: on macOS the latter answers with
+    # the physical path, so under /var every prefix test failed and the check silently found
+    # nothing. doctor already runs from the project root everywhere else.
+    top="$(pwd)"
+    for f in README.md CLAUDE.md AGENTS.md "$root"/*.md; do
+        [ -f "$f" ] || continue
+        dir="${f%/*}"; [ "$dir" = "$f" ] && dir='.'
+        while IFS= read -r target; do
+            # Anything git cannot carry either way: absolute URLs, protocol-relative, mail, page
+            # anchors, and site-absolute paths, which are served rather than cloned.
+            case "$target" in ''|'#'*|/*|*'://'*|mailto:*) continue ;; esac
+            target="${target%%#*}"
+            target="${target#./}"
+            [ -n "$target" ] || continue
+            p="$target"; [ "$dir" = '.' ] || p="$dir/$target"
+            p="${p%/}"
+            [ -e "$p" ] || continue
+
+            # `HEAD:<path>` does not resolve `..`, and git never normalises a tree path, so a
+            # document linking a sibling directory reads as missing. Found by running this against
+            # keel itself, where it called five committed files unreadable. The logical `pwd` is
+            # what collapses it, and anything landing outside the repository is not ours to judge.
+            case "$p" in */*) pdir="${p%/*}" ;; *) pdir='.' ;; esac
+            pbase="${p##*/}"
+            p="$( cd "$pdir" 2>/dev/null && printf '%s/%s' "$(pwd)" "$pbase" )" || continue
+            case "$p" in "$top"/*) p="${p#"$top"/}" ;; *) continue ;; esac
+
+            case "$seen" in *"|$f>$p|"*) continue ;; esac
+            seen="$seen|$f>$p|"
+
+            if [ -d "$p" ]; then
+                [ -n "$(git ls-tree -r --name-only HEAD -- "$p" 2>/dev/null)" ] && continue
+            else
+                git cat-file -e "HEAD:$p" 2>/dev/null && continue
+            fi
+
+            # Ignored is the failure: committing does not fix it, the ignore rule has to change
+            # first. Merely uncommitted clears with the next `git add`, and failing on that would
+            # fire on every document between being written and being committed.
+            if repo_ignores "$p"; then
+                sev=fail
+                printf '%s\t%s\n' "$sev" "$f links '$p', which git ignores and HEAD does not carry. A fresh clone cannot open it. Un-ignore and commit it, or drop the reference."
+            else
+                sev=warn
+                printf '%s\t%s\n' "$sev" "$f links '$p', which exists here but is not committed. A fresh clone cannot open it until it is."
+            fi
+        done < <(grep -oE '\]\([^)[:space:]]+' "$f" 2>/dev/null | sed 's/^](//')
+    done
+}
+
+# Two files keel writes into a working tree that must never reach a commit. The local settings file
+# holds a permission mode and a developer's own allow rules, and committing it imposes both on
+# everyone who clones. The handoff is session state written by the context watchdog, stale the moment
+# work resumes; without a rule it is swept in by the next `git add -A`.
+ignore_local_state() {
+    local line
+    # A hand-written .gitignore often has no newline on its final line, which an append then welds
+    # keel's rule onto: one line matching nothing, destroying the project's own last rule and adding
+    # neither of keel's. Found on the existing-service pilot, where it silently un-ignored the
+    # settings.local.json rule the repository already had.
+    [ -s .gitignore ] && [ -n "$(tail -c 1 .gitignore)" ] && printf '\n' >> .gitignore
+    for line in ".claude/settings.local.json" ".keel/handoff.md"; do
+        if [ -f .gitignore ] && grep -qxF "$line" .gitignore; then continue; fi
+        printf '%s\n' "$line" >> .gitignore
+    done
+}
+
+# Stage what init wrote, so a teammate's clone carries the SOP rather than a normal session.
+# `.gitignore` is on the list because ignore_local_state appends to it: left unstaged, the
+# teammate who clones has no rule keeping settings.local.json out, and commits the
+# bypassPermissions file that rule exists to exclude. Reports what actually happened, since
+# "Staged for commit" printed after a failed `git add` is worse than no message at all.
+stage_for_team() {
+    local root="$1"
+    if ! git rev-parse --git-dir >/dev/null 2>&1; then
+        say "  note: --team stages files for commit, and this is not a git repository. Nothing staged."
+        return 0
+    fi
+    local staged=0 p
+    for p in .keel CLAUDE.md AGENTS.md .claude "$root" .gitignore; do
+        [ -e "$p" ] || continue
+        git add "$p" >/dev/null 2>&1 && staged=1
+    done
+    if [ "$staged" -eq 1 ]; then
+        say "Staged for commit (--team)."
+    else
+        say "  note: --team staged nothing: 'git add' failed on every path. Add them by hand."
+    fi
+    return 0
+}
+
+cmd_init() {
+    # init is non-interactive today, so -y is accepted and has no effect. It is kept so scripts
+    # written against it keep working when prompts are added.
+    local team=0
+    FORCE=0
+    for a in "$@"; do case "$a" in -y|--yes) ;; --team) team=1 ;; --force) FORCE=1 ;; esac; done
+
+    local root; root="$(docs_root)"
+    check_docs_ignored "$root" || exit 1
+
+    for f in CLAUDE.md AGENTS.md; do
+        check_markers "$f"; local rc=$?
+        [ $rc -eq 2 ] && die "$f has duplicate keel markers. Remove the extra block by hand; keel will not guess which to keep."
+        [ $rc -eq 3 ] && die "$f has an unbalanced keel marker. Fix it by hand."
+    done
+
+    write_profile "$root"
+    # write_profile has just replaced the file and cleared the cache. Fill it here, in this shell,
+    # so the reads below and the ones inside render_block inherit it full. Each of those is a $( ),
+    # which cannot fill it for anybody else. Not redundant.
+    json_load .keel/profile.json || true
+    local block; block="$(mktemp)"
+    render_block "$block" "$root"
+    merge_block CLAUDE.md "$block"
+    merge_block AGENTS.md "$block"
+    rm -f "$block"
+    scaffold_docs "$root"
+    write_nudge
+    write_settings
+    write_local_settings
+    ignore_local_state
+
+    say "keel: configured $(basename "$PWD")"
+    [ "$FORCE" -eq 1 ] && say "  (--force: detected values overwrote the existing profile)"
+    say "  profile   .keel/profile.json"
+    say "  block     CLAUDE.md, AGENTS.md"
+    say "  docs      $root/"
+    say "  plugins   .claude/settings.json"
+    say "  guards    .claude/settings.json permissions: $(keel_deny_rules | grep -c .) deny, $(keel_ask_rules | grep -c .) ask"
+    say "  mode      .claude/settings.local.json: bypassPermissions, not committed"
+    local kind; kind="$(json_get .keel/profile.json project.kind || true)"
+    local t; t="$(json_get .keel/profile.json verify.test || true)"
+    # Not before there is code. doctor treats kind 'docs' as pre-implementation and says verify
+    # commands are not expected there; init demanding one by hand answers the same state the
+    # opposite way, and init is the message read first.
+    [ -z "$t" ] && [ "$kind" != docs ] && say "  note: no test command was detected. Set verify.test and verify.test_one by hand; skills will ask otherwise, and the commit guard needs test_one."
+    local pmn; pmn="$(json_get .keel/profile.json stack.package_manager || true)"
+    # Deliberately not "then re-run with --force": --force re-detects, so it would discard the very
+    # value this note asks for. The profile is the place to correct it, and init leaves it alone.
+    [ -z "$pmn" ] && say "  note: more than one lockfile, so no package manager was assumed and the commands needing one are null. Set stack.package_manager and those commands in .keel/profile.json; init will not overwrite them."
+    say ""
+    # Where there is no code, repo-snapshot reads nothing and reports nothing. Found by running init
+    # on an empty directory for a real greenfield project, which was then told to snapshot a
+    # codebase that did not exist. The greenfield case is the one the pilot cares most about.
+    if [ "$kind" = docs ]; then
+        say "Next: run 'keel doctor', then try \"use shape-idea\" for a rough idea, or \"use write-prd\" where the requirements are already clear."
+    else
+        say "Next: run 'keel doctor', then try \"use repo-snapshot on this codebase\"."
+    fi
+    [ $team -eq 1 ] && stage_for_team "$root"
+    return 0
+}
+
+# ---------------------------------------------------------------- profile
+
+# Reading and correcting a profile fact after init.
+#
+# init writes the profile once and merge_profile then defends every human value in it, which is
+# right for a re-init and wrong for a fact that has changed since. A project that turns out to
+# have a user interface during design had no way to record it short of hand-editing JSON, and a
+# tool that makes people hand-edit its own state file gets state that disagrees with itself.
+#
+# The path must already exist. A typo would otherwise write a key nothing reads, and the caller
+# walks away believing the fact was recorded, which is worse than the refusal by exactly the
+# amount of time it takes to notice.
+profile_set() {
+    python3 - "$1" "$2" <<'PY'
+import json, sys
+path, raw = sys.argv[1], sys.argv[2]
+p = ".keel/profile.json"
+d = json.load(open(p))
+
+if path.split(".")[0] in ("keel_version", "schema_version"):
+    sys.stderr.write(
+        "keel: %s is written by init, not by hand. keel_version records which keel configured "
+        "this project; schema_version records which set of fields this file has, and doctor reads "
+        "both.\n" % path.split(".")[0])
+    sys.exit(1)
+
+keys = path.split(".")
+node = d
+for k in keys[:-1]:
+    if not isinstance(node, dict) or k not in node:
+        sys.stderr.write("keel: no such field '%s' in .keel/profile.json.\n" % path)
+        sys.exit(1)
+    node = node[k]
+if not isinstance(node, dict) or keys[-1] not in node:
+    sys.stderr.write(
+        "keel: no such field '%s' in .keel/profile.json. Add it there first if it is really "
+        "new; a path that does not exist is far more often a typo.\n" % path)
+    sys.exit(1)
+
+# true, false and null are the JSON literals, never the strings that spell them. A profile
+# holding "false" for stack.has_ui is truthy everywhere that reads it.
+if   raw == "true":  val = True
+elif raw == "false": val = False
+elif raw == "null":  val = None
+else:
+    try:              val = int(raw)
+    except ValueError: val = raw
+
+node[keys[-1]] = val
+json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
+PY
+    # The refusals above are exit 1, and cmd_profile's caller reads that. Clearing the cache must
+    # not swallow it, so the status is carried over the clear by hand.
+    local rc=$?
+    json_cache_clear
+    return $rc
+}
+
+cmd_profile() {
+    [ -f .keel/profile.json ] || die "no .keel/profile.json here. Run 'keel init'."
+    have_python || die "python3 is absent, so the profile cannot be read or written safely."
+    case "${1:-}" in
+      get) [ -n "${2:-}" ] || die "usage: keel profile get <dotted.path>"
+           json_get .keel/profile.json "$2" || die "no such field '$2' in .keel/profile.json" ;;
+      set) { [ -n "${2:-}" ] && [ "$#" -ge 3 ]; } || die "usage: keel profile set <dotted.path> <value>"
+           profile_set "$2" "$3" ;;
+      *)   die "unknown profile subcommand '${1:-}'. Try get or set." ;;
+    esac
+}
+
+# ---------------------------------------------------------------- new
+
+# Set one profile field after init. `new` knows what it generated, so it states the verify command
+# rather than leaving detection to infer one whose tool is not installed.
+set_verify() {
+    have_python || return 0
+    python3 - "$1" "$2" <<'PY'
+import json, sys
+p = ".keel/profile.json"
+d = json.load(open(p))
+d["verify"][sys.argv[1]] = sys.argv[2] if sys.argv[2] else None
+json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
+PY
+    local rc=$?
+    json_cache_clear
+    return $rc
+}
+
+# A skeleton whose test command runs with nothing installed. That is the whole constraint here: a
+# generated project must pass its own doctor, or the greenfield path hands someone a broken project
+# on their first minute.
+scaffold_stack() {
+    case "$1" in
+      node)
+        cat > package.json <<'P'
+{
+  "name": "PROJECT_NAME",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
+P
+        sed -i.bak "s/PROJECT_NAME/$(basename "$PWD")/" package.json && rm -f package.json.bak
+        mkdir -p src test
+        cat > src/index.js <<'P'
+// Replace this. The point of the sample is that `npm test` passes from the first minute, so
+// `keel doctor` is green and the first real test has somewhere to go.
+export function add(a, b) {
+    return a + b;
+}
+P
+        cat > test/index.test.js <<'P'
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { add } from "../src/index.js";
+
+// Uses node:test, so the suite runs with nothing installed. Swap in your own runner when you add
+// one, and update verify.test in .keel/profile.json to match.
+test("adds two numbers", () => {
+    assert.equal(add(2, 3), 5);
+});
+P
+        printf 'node_modules/\ndist/\n' > .gitignore
+        ;;
+      python)
+        cat > pyproject.toml <<'P'
+[project]
+name = "PROJECT_NAME"
+version = "0.1.0"
+requires-python = ">=3.11"
+P
+        sed -i.bak "s/PROJECT_NAME/$(basename "$PWD" | tr '-' '_')/" pyproject.toml && rm -f pyproject.toml.bak
+        mkdir -p src tests
+        cat > src/__init__.py <<'P'
+def add(a, b):
+    return a + b
+P
+        cat > tests/test_add.py <<'P'
+import unittest
+import sys, pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from src import add
+
+
+# Uses unittest from the standard library, so the suite runs with nothing installed. Switch to
+# pytest when you add it, and update verify.test in .keel/profile.json to match.
+class TestAdd(unittest.TestCase):
+    def test_adds(self):
+        self.assertEqual(add(2, 3), 5)
+P
+        printf '__pycache__/\n.venv/\n*.egg-info/\n' > .gitignore
+        ;;
+      go)
+        printf 'module %s\n\ngo 1.22\n' "$(basename "$PWD")" > go.mod
+        cat > main.go <<'P'
+package main
+
+import "fmt"
+
+func Add(a, b int) int { return a + b }
+
+func main() { fmt.Println(Add(2, 3)) }
+P
+        cat > main_test.go <<'P'
+package main
+
+import "testing"
+
+func TestAdd(t *testing.T) {
+	if got := Add(2, 3); got != 5 {
+		t.Fatalf("Add(2, 3) = %d, want 5", got)
+	}
+}
+P
+        printf 'bin/\n' > .gitignore
+        ;;
+      *)
+        mkdir -p tests
+        cat > tests/test.sh <<'P'
+#!/usr/bin/env bash
+# Replace this. It exists so `keel doctor` is green from the first minute.
+set -euo pipefail
+printf 'ok  placeholder test\n'
+P
+        chmod +x tests/test.sh
+        ;;
+    esac
+    # apex-targets.json holds database passwords, and apex-capture/ holds application source before
+    # the credential scrubber has run over it. Both are ignored before either can exist, because a
+    # secret is only ever ignored in time once.
+    printf '.env\n.env.*\n!.env.example\n*.pem\n*.key\n*.pfx\n*.p12\n*.jks\n' >> .gitignore
+    printf '.keel/apex-targets.json\napex-capture/\n' >> .gitignore
+}
+
+write_ci() {
+    mkdir -p .github/workflows
+    local test_cmd; test_cmd="$(json_get .keel/profile.json verify.test || true)"
+    {
+      printf 'name: CI\n\non:\n  push:\n    branches: [main]\n  pull_request:\n\njobs:\n'
+      printf '  verify:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n'
+      case "$1" in
+        node)   printf '      - uses: actions/setup-node@v4\n        with:\n          node-version: "20"\n' ;;
+        python) printf '      - uses: actions/setup-python@v5\n        with:\n          python-version: "3.11"\n' ;;
+        go)     printf '      - uses: actions/setup-go@v5\n        with:\n          go-version: "1.22"\n' ;;
+      esac
+      # No continue-on-error. A test step that cannot fail the build is documentation.
+      printf '\n      - name: Test\n        run: %s\n' "${test_cmd:-echo 'no test command in .keel/profile.json'}"
+      printf '\n      - name: Refuse committed key material\n        run: |\n'
+      printf '          if git ls-files | grep -qE "\\.(pem|key|pfx|p12|jks)$|^\\.env$"; then\n'
+      printf '            echo "::error::key material is tracked in git"; git ls-files | grep -E "\\.(pem|key|pfx|p12|jks)$|^\\.env$"; exit 1\n'
+      printf '          fi\n'
+    } > .github/workflows/ci.yml
+}
+
+cmd_new() {
+    local name="${1:-}" stack=minimal
+    shift || true
+    for a in "$@"; do case "$a" in --stack=*) stack="${a#--stack=}" ;; --stack) shift; stack="${1:-minimal}" ;; esac; done
+    # Handle `--stack node` given as two words.
+    local prev=""; for a in "$@"; do [ "$prev" = "--stack" ] && stack="$a"; prev="$a"; done
+
+    [ -n "$name" ] || die "usage: keel new <name> [--stack node|python|go|minimal]"
+    case "$stack" in node|python|go|minimal) : ;; *) die "unknown stack '$stack'. Use node, python, go, or minimal." ;; esac
+
+    if [ -e "$name" ] && [ -n "$(ls -A "$name" 2>/dev/null)" ]; then
+        err "'$name' exists and is not empty, so keel new will not write into it."
+        err "For an existing directory, including one that holds only planning documents:"
+        err "  cd $name && keel init"
+        exit 1
+    fi
+
+    mkdir -p "$name" && cd "$name" || die "could not create '$name'"
+    git init -q -b main . 2>/dev/null || die "git init failed"
+
+    scaffold_stack "$stack"
+
+    FORCE=0
+    local root="$DEFAULT_DOCS_ROOT"
+    write_profile "$root"
+
+    # `new` states the test command rather than letting detection infer one whose tool is absent.
+    case "$stack" in
+      python)  set_verify test "python3 -m unittest discover -s tests -q"
+               set_verify test_one "python3 -m unittest tests.{name} -q" ;;
+      minimal) set_verify test "tests/test.sh"; set_verify test_one "tests/test.sh" ;;
+    esac
+
+    local block; block="$(mktemp)"
+    render_block "$block" "$root"
+    merge_block CLAUDE.md "$block"
+    merge_block AGENTS.md "$block"
+    rm -f "$block"
+    scaffold_docs "$root"
+    write_nudge
+    write_settings
+    write_local_settings
+    ignore_local_state
+    write_ci "$stack"
+
+    cat > "$root/NEXT-STEPS.md" <<'N'
+# Next steps
+
+This project was created by `keel new`. It has the keel layer, a passing sample test, and CI
+that fails on a broken build. It has no product yet, and that is deliberate.
+
+**Start here, not with code:**
+
+1. `use write-prd` and answer its questions. It will not let you skip to implementation, which is
+   the point: the decisions that are expensive to reverse are made now, cheaply.
+2. `use write-user-stories` once the PRD is approved.
+3. `use design-architecture` for the stack and the structure. The sample skeleton is a placeholder,
+   not a recommendation.
+4. `use write-plan`, then `use execute-plan`.
+
+**Before the first real commit:** replace the sample test and update `verify.test` in
+`.keel/profile.json` if you change the runner. Run `keel doctor` to confirm it still passes.
+N
+
+    git add -A >/dev/null 2>&1
+    git -c user.name="keel" -c user.email="keel@local" commit -q -m "chore: initialise $name with keel" >/dev/null 2>&1       || git commit -q -m "chore: initialise $name with keel" >/dev/null 2>&1 || true
+
+    say "keel: created $name ($stack)"
+    say "  profile   .keel/profile.json"
+    say "  docs      $root/  (start with NEXT-STEPS.md)"
+    say "  ci        .github/workflows/ci.yml"
+    say ""
+    say "Next: cd $name && keel doctor, then \"use write-prd\"."
+    return 0
+}
+
+# ---------------------------------------------------------------- doctor
+
+cmd_doctor() {
+    local problems=0 warnings=0
+    # Each returns 0 explicitly. The `condition && good || fail` idiom below depends on it: without
+    # a guaranteed 0 from good, a failing good would also run fail. Stating it beats assuming it.
+    fail() { printf 'FAIL  %s\n' "$1"; problems=$((problems+1)); return 0; }
+    warn() { printf 'WARN  %s\n' "$1"; warnings=$((warnings+1)); return 0; }
+    good() { printf 'ok    %s\n' "$1"; return 0; }
+
+    [ -f .keel/profile.json ] || { fail "no .keel/profile.json. Run 'keel init'."; return 1; }
+    if have_python; then
+        python3 -c "import json;json.load(open('.keel/profile.json'))" 2>/dev/null \
+          && good "profile parses" || { fail "profile is not valid JSON"; return 1; }
+    else
+        warn "python3 absent: cannot validate the profile or read its fields"
+    fi
+    json_load .keel/profile.json || true
+
+    local root; root="$(docs_root)"
+    check_docs_ignored "$root" && good "docs root '$root' is not gitignored" || problems=$((problems+1))
+    [ -d "$root" ] && good "docs root exists" || fail "docs root '$root' is missing. Run 'keel init'."
+
+    # Every document the repository points at has to be one a fresh clone can open.
+    local refs=0 sev msg
+    while IFS="$(printf '\t')" read -r sev msg; do
+        [ -n "$msg" ] || continue
+        refs=$((refs+1))
+        case "$sev" in fail) fail "$msg" ;; warn) warn "$msg" ;; esac
+    done < <(referenced_docs_findings "$root")
+    [ "$refs" -eq 0 ] && good "every referenced document is in HEAD" || true
+
+    for f in CLAUDE.md AGENTS.md; do
+        check_markers "$f"; local rc=$?
+        case $rc in
+          0) [ -f "$f" ] && good "$f markers intact" || warn "$f is absent" ;;
+          2) fail "$f has duplicate keel markers" ;;
+          3) fail "$f has an unbalanced keel marker" ;;
+        esac
+    done
+
+    # The managed block's size, which doc 05 has always said doctor enforces and doctor did not.
+    # It sits in the prefix of every request in this repository forever, so a line added here is not
+    # paid once, it is paid per request per engineer. Target 450 tokens, ceiling 700.
+    #
+    # Estimated at chars/3.6 rather than counted. The count-tokens endpoint needs an API key, and a
+    # budget check that only works where a key happens to be configured is a budget check that is
+    # absent exactly where nobody is watching. The estimate is within a few percent, which is all a
+    # ceiling this coarse requires.
+    if [ -f CLAUDE.md ]; then
+        local blk_chars blk_tokens
+        blk_chars=$(awk '/keel:start/,/keel:end/' CLAUDE.md | wc -c | tr -d ' ')
+        blk_tokens=$(( blk_chars * 10 / 36 ))
+        if [ "$blk_tokens" -gt 700 ]; then
+            fail "the CLAUDE.md keel block is about $blk_tokens tokens, over the 700 ceiling. It is in the prefix of every request here. Move detail into the docs root, which loads on demand."
+        elif [ "$blk_tokens" -gt 450 ]; then
+            warn "the CLAUDE.md keel block is about $blk_tokens tokens, over the 450 target though under the 700 ceiling."
+        else
+            good "CLAUDE.md keel block is about $blk_tokens tokens, within budget"
+        fi
+    fi
+
+    # Every verify command must actually run. This is the check that catches a profile naming a
+    # path that does not exist, which otherwise surfaces as a pipeline failure blamed on CI.
+    local kind; kind="$(json_get .keel/profile.json project.kind || echo service)"
+    if [ "$kind" = "docs" ]; then
+        good "project kind is 'docs': pre-implementation, so verify commands are not expected"
+        warn "set project.kind to 'service' once there is code, so the verify checks apply again"
+    fi
+
+    # Any artifact mapped to a path must exist, or a skill will read nothing and author a duplicate.
+    if have_python; then
+        while IFS= read -r line; do
+            [ -n "$line" ] || continue
+            local key path; key="${line%%=*}"; path="${line#*=}"
+            [ -e "$path" ] && good "artifacts.$key -> $path" \
+              || fail "artifacts.$key points at '$path', which does not exist"
+        done < <(python3 -c "
+import json
+d=json.load(open('.keel/profile.json')).get('artifacts',{})
+for k,v in d.items():
+    if k.startswith('_') or not v: continue
+    print(f'{k}={v}')
+" 2>/dev/null)
+    fi
+
+    if [ "$kind" != "docs" ] && have_python; then
+        # A missing test_one is an oversight when there are tests to run, and it is required then.
+        # With verify.test null as well the project declares no tests at all, and failing on the
+        # derived field points at the wrong thing: the root cause is one line below, as a warning.
+        local t1 t0
+        t1="$(json_get .keel/profile.json verify.test_one || true)"
+        t0="$(json_get .keel/profile.json verify.test || true)"
+        if [ -n "$t1" ]; then good "verify.test_one is set"
+        elif [ -z "$t0" ]; then warn "verify.test_one is null, and so is verify.test: this project declares no tests"
+        else fail "verify.test_one is null. It is required: the commit guard and tdd both need it."
+        fi
+        for k in test lint typecheck build; do
+            local c; c="$(json_get .keel/profile.json "verify.$k" || true)"
+            [ -z "$c" ] && { warn "verify.$k is null"; continue; }
+            case "$c" in *"{path}"*|*"{name}"*) good "verify.$k set (templated, not run)"; continue ;; esac
+            if ( eval "$c" ) >/dev/null 2>&1; then good "verify.$k runs: $c"
+            else fail "verify.$k does not run: $c"; fi
+        done
+    fi
+
+    # stack.has_ui is written once, by init, and a project grows a user interface after that.
+    # Nothing re-runs the detector, so this is the only place the drift can surface, and it matters
+    # because skills branch on the field: coding-standards reads its frontend guidance out of it.
+    #
+    # A warning and never a failure. The detector treats a bare `public/` directory as an interface,
+    # which is right often enough to be worth saying and not right enough to stop anyone working.
+    if have_python && [ "$(json_get .keel/profile.json stack.has_ui || echo true)" = "false" ] \
+       && [ "$(detect_has_ui)" = "true" ]; then
+        warn "stack.has_ui is false, but this project looks like it has a user interface. Skills that branch on it are reading the wrong answer. Correct it with: keel profile set stack.has_ui true"
+    fi
+
+    # Plugin set. Advisory in both directions: a missing plugin degrades a skill rather than
+    # breaking it, and feature-dev being present may be a deliberate choice. Specified in docs/04
+    # and found unwritten by a sweep of the plan against the repository.
+    if [ -f .claude/settings.json ] && have_python; then
+        while IFS= read -r line; do
+            [ -n "$line" ] || continue
+            case "$line" in
+              missing:*)  warn "recommended plugin not enabled: ${line#missing:}. The skill that uses it degrades to an inline fallback." ;;
+            esac
+        done < <(plugin_report)
+    fi
+
+    # The context watchdog is deliberately silent when it cannot run, so that a session is never
+    # interrupted by the thing meant to protect it. Silence with nothing reporting it would be
+    # dishonest, though: an engineer would believe they had a pause that was never going to arrive.
+    # This is where that gets said.
+    if [ -f "$HERE/lib/context_watch.py" ]; then
+        local watch_gate
+        watch_gate="$(json_get .keel/profile.json gates.context_watch 2>/dev/null || true)"
+        if [ "${KEEL_CONTEXT_WATCH:-}" = "off" ]; then
+            warn "the context watchdog is off for this shell (KEEL_CONTEXT_WATCH=off). No pause before the context fills."
+        elif [ "$watch_gate" = "false" ]; then
+            good "context watchdog disabled for this project (gates.context_watch)"
+        elif ! have_python; then
+            warn "python3 is absent, so the context watchdog is inert. Sessions here run to their context limit with no warning and no handoff. Everything else still works."
+        else
+            # The window cannot be read from a session. A 1M session records its model as plain
+            # `claude-opus-5` and no field anywhere names its window, which was found by measuring a
+            # real 2.4MB transcript holding 401,247 tokens against an assumed 200,000. So the
+            # assumption in force is printed rather than left silent: a wrong one either stops
+            # sessions at a fifth of their capacity or never fires at all, and neither announces
+            # itself.
+            local cw; cw="$(json_get .keel/profile.json gates.context_window 2>/dev/null || true)"
+            if [ -n "$cw" ] && [ "$cw" != "None" ]; then
+                good "context watchdog available (window $cw, from gates.context_window)"
+            else
+                good "context watchdog available (window assumed 200000, corrected upward once a session exceeds it). If sessions here use a larger context, set gates.context_window in .keel/profile.json"
+            fi
+        fi
+    fi
+
+    # Boundaries. Advisory by design: a competing plugin may be a deliberate choice, and nothing here
+    # disables one on somebody's behalf. What it does is make the collision visible, because the
+    # failure mode is silent. Two plugins answering to one skill name produce a session that picks
+    # one arbitrarily and never says so, which reads as the skill behaving inconsistently.
+    if have_python; then
+        local t
+        while IFS= read -r line; do
+            [ -n "$line" ] || continue
+            case "$line" in
+              conflict:*)
+                t="${line#conflict:}"
+                warn "${t%%|*} is enabled alongside keel: ${t#*|}. Running both means two answers to 'which methodology applies'. Disable one for this project, or accept it deliberately. See docs/04." ;;
+              dup:*)
+                t="${line#dup:}"
+                warn "both keel and ${t#*|} ship a skill named '${t%%|*}'. Claude Code does not error on this: it picks one and does not record which, so the skill will look inconsistent rather than broken. Disable one plugin for this project." ;;
+            esac
+        done < <(boundary_report)
+    fi
+
+    # Staleness. Per-project files do not update themselves when the plugin does, so a project can
+    # sit on the conventions of an older keel indefinitely while every session loads the new
+    # skills. Advisory: an old profile still works, it just has not been re-initialised.
+    #
+    # It keys off schema_version, not the release version, and that is the whole point. Comparing
+    # keel_version to VERSION warned on every release, including ones that changed no field at all:
+    # 0.7.0 and 0.7.1 both would have told every project to re-run init for nothing. A warning that
+    # fires when nothing changed is one nobody reads on the release where something did.
+    if have_python; then
+        local pv sv iv
+        pv="$(json_get .keel/profile.json keel_version || true)"
+        sv="$(json_get .keel/profile.json schema_version || true)"
+        iv="$(cat "$HERE/VERSION" 2>/dev/null || true)"
+        [ -n "$pv" ] && good "configured by keel $pv"
+        # Numeric, and three-way rather than two. The profile is a committed file, so on a team the
+        # engineer who upgraded last commits a higher schema_version than the others have installed.
+        # A bare `!=` called that stale and told them to re-run init, which writes the field back
+        # down, which makes the first engineer's doctor warn: the two would ping-pong the value
+        # between them forever, each following the tool's advice.
+        case "$sv" in
+            ''|*[!0-9]*) sv_num=-1 ;;   # absent, or not a number: written before the field existed
+            *)           sv_num="$sv" ;;
+        esac
+        if [ "$sv_num" -eq "$SCHEMA_VERSION" ]; then
+            good "profile is at schema version $SCHEMA_VERSION, which this keel expects"
+        elif [ "$sv_num" -gt "$SCHEMA_VERSION" ]; then
+            warn "this project's profile is at schema version $sv and keel ${iv:-unknown} expects $SCHEMA_VERSION, so your keel is the older one here. Upgrade the plugin. Do not re-run 'keel init' to silence this: it would write the field back down and undo whoever upgraded first."
+        else
+            warn "this project's profile is at schema version ${sv:-none}; keel ${iv:-unknown} expects $SCHEMA_VERSION. Re-run 'keel init' to pick up the new fields. It merges, so your own values survive."
+        fi
+    fi
+
+    # Permission guardrails. These are what make a bypassPermissions default defensible, so their
+    # absence is a real finding rather than an advisory: deny and ask are the only rules that still
+    # apply once prompts are off.
+    if [ -f .claude/settings.json ] && have_python; then
+        local missing_rules
+        missing_rules="$(DENY="$(keel_deny_rules)" ASK="$(keel_ask_rules)" python3 - <<'PY' 2>/dev/null
+import json, os
+try:
+    perms = json.load(open(".claude/settings.json")).get("permissions", {})
+except Exception:
+    raise SystemExit(0)
+missing = [r for key, env in (("deny", "DENY"), ("ask", "ASK"))
+           for r in os.environ[env].splitlines()
+           if r and r not in perms.get(key, [])]
+print(len(missing))
+PY
+)"
+        if [ "${missing_rules:-0}" -eq 0 ] 2>/dev/null; then
+            good "permission guardrails present in .claude/settings.json"
+        else
+            fail "$missing_rules permission guardrail(s) missing from .claude/settings.json. Re-run 'keel init' to add them. They are the only protection that survives bypassPermissions mode."
+        fi
+    fi
+
+    # The local file must stay out of git: it sets a permission mode, and committing it turns off
+    # prompts for everyone who clones rather than for the one person who chose it.
+    if [ -f .claude/settings.local.json ] && git rev-parse --git-dir >/dev/null 2>&1; then
+        if repo_ignores .claude/settings.local.json; then
+            good ".claude/settings.local.json is git-ignored"
+        else
+            fail ".claude/settings.local.json is not git-ignored. It carries a permission mode; committing it imposes that mode on everyone who clones. Add it to .gitignore."
+        fi
+    fi
+
+    # The handoff must stay out of git too. It is session state, stale the moment work resumes, and
+    # it reaches a commit on its own through 'git add -A'. check-ignore reports a tracked path as not
+    # ignored, so this catches the file that is already in the index as well as the missing rule.
+    if [ -f .keel/handoff.md ] && git rev-parse --git-dir >/dev/null 2>&1; then
+        if repo_ignores .keel/handoff.md; then
+            good ".keel/handoff.md is git-ignored"
+        else
+            fail ".keel/handoff.md is not git-ignored. A handoff is session state and is stale the moment work resumes. Add it to .gitignore, and if it is already tracked, run: git rm --cached .keel/handoff.md"
+        fi
+    fi
+
+    # Advisory, and the answer to "I set defaultMode and nothing happened". A session the VS Code
+    # extension starts resolves its own starting mode and ignores defaultMode from every settings
+    # file. Two extension settings are needed instead, and neither lives in this repository.
+    if [ -f .claude/settings.local.json ] && ls -d "$HOME"/.vscode/extensions/anthropic.claude-code-* >/dev/null 2>&1; then
+        local vs="$HOME/Library/Application Support/Code/User/settings.json"
+        [ -f "$vs" ] || vs=""
+        if [ -n "$vs" ] && grep -q '"claudeCode.initialPermissionMode"' "$vs" 2>/dev/null; then
+            good "the VS Code extension has its own initial permission mode set"
+        else
+            warn "the Claude Code VS Code extension is installed. Sessions it starts ignore permissions.defaultMode from settings files, so this project's mode applies only to CLI sessions. To match it in the extension, set claudeCode.allowDangerouslySkipPermissions and claudeCode.initialPermissionMode in VS Code user settings."
+        fi
+    fi
+
+    # Whether this machine has the plugin's marketplace registered, which is the real precondition
+    # for the skills existing at all. Advisory, never a failure: the profile and its gates are
+    # useful to a session without the plugin, and a CI runner legitimately has neither.
+    #
+    # This replaced a check on `gh`, which reported that gh was needed to install from the private
+    # marketplace. It is not: the marketplace clones over HTTPS through the ordinary git credential
+    # helper, proved by an install on a machine with no gh at all. The old wording sent people to
+    # install a tool they did not need, which is worse than staying quiet.
+    # Both the default config directory and CLAUDE_CONFIG_DIR are checked, because they can differ
+    # and either may be the one a session actually uses. Reporting "not registered" while it sits
+    # in the other directory is worse than saying nothing.
+    local found="" cfg
+    for cfg in "${CLAUDE_CONFIG_DIR:-}" "$HOME/.claude"; do
+        [ -n "$cfg" ] && [ -f "$cfg/plugins/known_marketplaces.json" ] || continue
+        MP="$cfg/plugins/known_marketplaces.json" python3 -c "
+import json, os, sys
+d = json.load(open(os.environ['MP']))
+sys.exit(0 if any('keel' in json.dumps(v) for v in d.values()) else 1)" 2>/dev/null \
+          && { found="$cfg"; break; }
+    done
+    if have_python; then
+        [ -n "$found" ] && good "the gbi marketplace is registered ($found)" \
+          || warn "the gbi marketplace is not registered on this machine, so a session here has no keel skills. Run '/plugin marketplace add gbi-solutions-ltd/keel' then '/plugin install keel@gbi'."
+    fi
+
+    printf '\n'
+    # Warnings are counted into the summary because they scroll off. Writing the 0.6.1 release notes
+    # meant counting the WARN lines by hand to say "no problems and one warning", which is the tell
+    # that a summary ignoring them under-reports the state of the project.
+    local wsuffix=""
+    if [ "$warnings" -eq 1 ]; then wsuffix=", 1 warning"
+    elif [ "$warnings" -gt 1 ]; then wsuffix=", $warnings warnings"; fi
+    [ "$problems" -eq 0 ] && { say "keel doctor: no problems$wsuffix"; return 0; }
+    say "keel doctor: $problems problem(s)$wsuffix"
+    return 1
+}
+
+# ---- supply chain scan and the push guard ----------------------------------
+#
+# The scanner ships with the plugin rather than being copied into each repository, for the same
+# reason the skills do: a vendored copy is a copy that stops being updated, and this one is a
+# denylist whose whole value is being current.
+
+SCANNER="$HERE/tests/supply-chain-scan.sh"
+
+cmd_scan() {
+    [ -x "$SCANNER" ] || die "the supply chain scanner is missing from this install ($SCANNER)."
+    "$SCANNER" "$@"
+}
+
+# The guard is opt-in, and it is opt-in for a reason worth stating rather than assuming: it sets
+# core.hooksPath, which is a change to the developer's git configuration for this repository. A tool
+# that reconfigures git the moment you run `init` is a tool people stop running.
+#
+# It is repo-local. Setting core.hooksPath globally would silently disable every other repository's
+# hooks on the machine, which is a far larger blast radius than anything this guard protects against.
+GUARD_DIR=".githooks"
+
+guard_hook_body() {
+    cat <<'HOOK'
+#!/usr/bin/env bash
+# pre-push hook, installed by `keel guard install`.
+#
+# Two refusals. A push to the default branch, because work lands through a pull request. And a push
+# carrying anything the supply chain scan flags: this repository's contents run on other people's
+# machines, so the last point at which a bad file is cheap to remove is before it reaches a remote
+# where it is permanent.
+#
+# Remove with `keel guard uninstall`. To push past it once, deliberately and on the record:
+#   git push --no-verify
+set -uo pipefail
+
+# The branch is read from the profile, never assumed. A repo whose default is not `main` is common,
+# and a guard protecting the wrong branch protects nothing while reading as though it does. Absent,
+# fall back to what the remote says its HEAD is, and when neither answers, check nothing rather than
+# guess: a refusal naming the wrong branch teaches people to pass --no-verify by reflex.
+protected="$(sed -n 's/.*"default_branch": *"\([^"]*\)".*/\1/p' .keel/profile.json 2>/dev/null | head -1)"
+if [ -z "$protected" ]; then
+    protected="$(git symbolic-ref --quiet --short "refs/remotes/${1:-origin}/HEAD" 2>/dev/null || true)"
+    protected="${protected##*/}"
+fi
+# Plain BRE, no `\|` alternation: that is a GNU extension, and on the BSD sed every macOS ships it
+# matches nothing, so the flag would read as unset and the guard would refuse a project that had
+# switched it off. Caught by the test for exactly that case.
+protect="$(sed -n 's/.*"protect_default_branch": *\([a-z]*\).*/\1/p' .keel/profile.json 2>/dev/null | head -1)"
+
+# Only when git is feeding the hook. A push supplies its refs on stdin; run by hand from a terminal
+# there is nothing to read, and a `read` against a tty would hang rather than check anything.
+if [ -n "$protected" ] && [ "$protect" != "false" ] && [ ! -t 0 ]; then
+    blocked=""
+    while read -r _lref _lsha rref _rsha; do
+        [ "$rref" = "refs/heads/$protected" ] && blocked="$protected"
+    done
+    if [ -n "$blocked" ]; then
+        cat >&2 <<MSG
+
+keel guard: push refused. '$blocked' is the default branch.
+
+Work lands through a pull request, so this branch is written by a merge and not by a push. What
+went to it directly skipped review, and on a shared branch that is not a mistake one person can
+undo quietly.
+
+  git switch -c <branch>
+  git push -u origin <branch>
+
+then open the pull request: 'gh pr create', or the link git prints on that push.
+
+To push anyway, deliberately and on the record:  git push --no-verify
+Or, if this project genuinely pushes to its default branch, set
+conventions.protect_default_branch to false in .keel/profile.json.
+MSG
+        exit 1
+    fi
+fi
+
+if command -v keel >/dev/null 2>&1; then
+    SCAN="keel scan"
+elif [ -x tests/supply-chain-scan.sh ]; then
+    SCAN="tests/supply-chain-scan.sh"
+else
+    printf 'keel guard: no scanner reachable, so nothing was checked. Push allowed.\n' >&2
+    exit 0
+fi
+
+printf 'keel guard: scanning before push\n'
+if $SCAN; then
+    exit 0
+fi
+
+cat >&2 <<'MSG'
+
+keel guard: push refused.
+
+Everything above either runs on, or leaks to, whoever clones or installs this. Once it is on a
+remote it is in history permanently, which is why the refusal is here rather than in review.
+
+For a committed key, keystore or certificate, deleting the file is not the fix. It stays in
+history, so the credential has to be rotated with whoever issued it.
+
+If a finding is wrong, there are two ways to record that, and both stay visible on every run:
+
+  a line in a text file   append to that line:  supply-chain-scan: allow <why this one is fine>
+  a whole file            add to .keel/scan-allow:  <path> <why this one is fine>
+
+To push anyway, deliberately and on the record:  git push --no-verify
+MSG
+exit 1
+HOOK
+}
+
+# The commit gate. Installed alongside the push hook and inert until the profile turns it on, which
+# is why it is a gate rather than part of the install: a team adopts the guard for its push
+# protections, and a commit gate that arrived uninvited with them is how the whole thing gets
+# uninstalled.
+#
+# It refuses and never formats. house-defaults and coding-standards both require a gate to be a
+# check-only command, and a hook that rewrites files and re-stages them puts content into a commit
+# its author never read.
+guard_precommit_body() {
+    cat <<'HOOK'
+#!/usr/bin/env bash
+# pre-commit hook, installed by `keel guard install`.
+#
+# Off unless the project asks for it: set gates.commit_guard to "required" to block a commit, or to
+# "warn" to report and let it through. Anything else, including the "off" that init writes, and this
+# hook does nothing.
+#
+# It checks and never rewrites, so a failure names verify.format_fix as the remedy rather than
+# running it. Remove with `keel guard uninstall`. To commit past it once, on the record:
+#   git commit --no-verify
+set -uo pipefail
+
+# python3 rather than the sed the pre-push hook uses for its one field. A verify command can contain
+# quotes, and `test -z "$(gofmt -l .)"` is one keel writes itself: pulling that out of JSON with a
+# regex yields a command that no longer runs, which reads as the project failing its own gate.
+field() {
+    python3 - "$1" <<'PY' 2>/dev/null
+import json, sys
+d = json.load(open(".keel/profile.json"))
+for k in sys.argv[1].split("."):
+    if not isinstance(d, dict) or k not in d: sys.exit(1)
+    d = d[k]
+print("" if d is None else d)
+PY
+}
+
+[ -f .keel/profile.json ] || exit 0
+if ! command -v python3 >/dev/null 2>&1; then
+    printf 'keel guard: python3 is absent, so nothing was checked. Commit allowed.\n' >&2
+    exit 0
+fi
+
+gate="$(field gates.commit_guard || true)"
+case "$gate" in
+  required|warn) ;;
+  *) exit 0 ;;
+esac
+
+# The fast subset, and only that. Tests are absent deliberately: verify.test_one takes a name this
+# hook has no way to derive from a changed file, and running a whole suite on every commit is how a
+# gate gets bypassed by reflex.
+failed=""
+for k in format lint typecheck; do
+    cmd="$(field "verify.$k" || true)"
+    [ -n "$cmd" ] || continue
+    # The two shapes doctor also declines to run. A template is not a command until something fills
+    # it in, and filling it in here would mean guessing.
+    case "$cmd" in *"{path}"*|*"{name}"*) continue ;; esac
+    printf 'keel guard: %s\n' "$cmd"
+    eval "$cmd" || failed="$failed  verify.$k: $cmd
+"
+done
+
+[ -n "$failed" ] || exit 0
+
+{
+    printf '\n'
+    if [ "$gate" = "warn" ]; then
+        printf 'keel guard: these did not pass. The commit was allowed because gates.commit_guard\n'
+        printf 'is "warn" rather than "required".\n\n'
+    else
+        printf 'keel guard: commit refused.\n\n'
+    fi
+    printf '%s\n' "$failed"
+    fix="$(field verify.format_fix || true)"
+    if [ -n "$fix" ]; then
+        printf 'To format in place:  %s\n\n' "$fix"
+    fi
+    printf 'These are gates, so they check and never rewrite. A hook that reformatted your files\n'
+    printf 'would put content into a commit its author never read.\n\n'
+    printf 'To commit anyway, deliberately and on the record:  git commit --no-verify\n'
+    printf 'Or set gates.commit_guard to "off" in .keel/profile.json.\n'
+} >&2
+
+[ "$gate" = "warn" ] && exit 0
+exit 1
+HOOK
+}
+
+cmd_guard() {
+    git rev-parse --git-dir >/dev/null 2>&1 || die "not a git repository."
+    case "${1:-status}" in
+        install)
+            mkdir -p "$GUARD_DIR"
+            guard_hook_body > "$GUARD_DIR/pre-push"
+            guard_precommit_body > "$GUARD_DIR/pre-commit"
+            chmod +x "$GUARD_DIR/pre-push" "$GUARD_DIR/pre-commit"
+            git config core.hooksPath "$GUARD_DIR"
+            say "installed $GUARD_DIR/pre-push and $GUARD_DIR/pre-commit, and set core.hooksPath for this repository only"
+            say "the commit hook stays inert until gates.commit_guard is 'required' or 'warn'"
+            say "commit $GUARD_DIR/ so a teammate gets it by running 'keel guard install' too"
+            ;;
+        uninstall)
+            git config --unset core.hooksPath 2>/dev/null || true
+            rm -f "$GUARD_DIR/pre-push" "$GUARD_DIR/pre-commit"
+            rmdir "$GUARD_DIR" 2>/dev/null || true
+            say "removed the push and commit guards. core.hooksPath is back to git's default"
+            ;;
+        status)
+            local hp; hp="$(git config core.hooksPath 2>/dev/null || true)"
+            if [ "$hp" = "$GUARD_DIR" ] && [ -x "$GUARD_DIR/pre-push" ]; then
+                say "push guard: active"
+                local cg; cg="$(json_get .keel/profile.json gates.commit_guard 2>/dev/null || true)"
+                if [ ! -x "$GUARD_DIR/pre-commit" ]; then
+                    say "commit guard: not installed. Re-run 'keel guard install'"
+                else
+                    case "$cg" in
+                      required) say "commit guard: active. format, lint and typecheck run before each commit" ;;
+                      warn)     say "commit guard: reporting only (gates.commit_guard is 'warn')" ;;
+                      *)        say "commit guard: installed but off. Set gates.commit_guard to 'required' in .keel/profile.json" ;;
+                    esac
+                fi
+            elif [ -n "$hp" ]; then
+                say "push guard: inactive. core.hooksPath points at '$hp', which keel did not set"
+                return 1
+            else
+                say "push guard: not installed. Run 'keel guard install'"
+                return 1
+            fi
+            ;;
+        *) die "unknown guard subcommand '$1'. Try install, uninstall, or status." ;;
+    esac
+}
+
+case "${1:-}" in
+    init)        shift; cmd_init "$@" ;;
+    new)         shift; cmd_new "$@" ;;
+    doctor)      shift; cmd_doctor ;;
+    profile)     shift; cmd_profile "$@" ;;
+    apex-export) shift; cmd_apex_export "$@" ;;
+    scan)        shift; cmd_scan "$@" ;;
+    guard)       shift; cmd_guard "$@" ;;
+    version)     cat "$HERE/VERSION" 2>/dev/null || echo unknown ;;
+    ""|-h|--help)
+        say "keel <command>"; say ""
+        say "  init [-y] [--team]   configure an existing project for keel"
+        say "  new <name> [--stack node|python|go|minimal]   create a new project"
+        say "  doctor               check this project; non-zero on any problem"
+        say "  profile get|set <dotted.path> [value]   read or correct one profile field"
+        say "  apex-export --app <id>   export an Oracle APEX application for porting"
+        say "  scan                 supply chain scan of this tree; non-zero on any finding"
+        say "  guard install|status|uninstall   pre-push hook: the scan, and no pushes to the default branch, plus a pre-commit hook that stays off until gates.commit_guard turns it on"
+        say "  version" ;;
+    *) die "unknown command '$1'. Try 'keel --help'." ;;
+esac

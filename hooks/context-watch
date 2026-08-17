@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# The session context watchdog. Registered on UserPromptSubmit, PreToolUse and PreCompact.
+#
+# It answers one question the session cannot answer for itself: how close is this context to full,
+# and is it close enough that the work should be written down before it is compacted away. A session
+# that runs to its limit mid-task loses the reasoning that got it there, and the next one pays to
+# rediscover it.
+#
+# SILENT BELOW THE WARN THRESHOLD. That is deliberate and it is the cost argument: an ordinary
+# session gets no output, so nothing enters the conversation and nothing is paid. What it does emit
+# is appended after the conversation, never into the prompt prefix, so the cache is untouched either
+# way. See docs/05-token-and-memory-design.md.
+#
+# NO PYTHON, NO WATCHDOG, NO NOISE. This is advisory infrastructure, not a correctness gate, so when
+# python3 is absent it does nothing at all rather than printing an apology on every prompt. That
+# silence would be dishonest if nothing reported it, so `keel doctor` says the watchdog is inert.
+#
+# Turn it off with KEEL_CONTEXT_WATCH=off, or gates.context_watch=false in .keel/profile.json.
+
+set -uo pipefail
+
+command -v python3 >/dev/null 2>&1 || exit 0
+
+ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+LIB="$ROOT/lib/context_watch.py"
+[ -f "$LIB" ] || exit 0
+
+# A hook that fails must not take the session with it. Any error here means no output and exit 0,
+# which is the same as having nothing to say.
+python3 "$LIB" hook 2>/dev/null || exit 0

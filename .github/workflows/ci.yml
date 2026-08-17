@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    name: Validate skills and templates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Every rule in the validator exists because it was violated during development.
+      - name: Run tests
+        run: tests/run-tests.sh
+
+      # The command comes from .keel/profile.json rather than being restated here. Restating it is
+      # how the pipeline came to run a stricter check than anyone ran locally.
+      - name: Shellcheck
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck jq
+          LINT=$(jq -r '.verify.lint' .keel/profile.json)
+          echo "running: $LINT"
+          eval "$LINT"
+
+  # A separate job, deliberately, rather than one more line inside `validate`. This is the check that
+  # decides whether code reaching other people's machines is safe, so it must be selectable as a
+  # required status check on its own and must not be able to pass because an unrelated step was
+  # skipped. It runs on a full checkout because the scan reads the whole tracked tree.
+  supply-chain:
+    name: Supply chain
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for anything that would run on an installing machine
+        run: tests/supply-chain-scan.sh
+
+      # The scan is a denylist, so a rule that quietly stops matching is the failure that matters.
+      # These tests prove every rule still fires, and they are the reason the scan above is worth
+      # gating on.
+      - name: Prove the scan still catches what it claims
+        run: tests/test-supply-chain.sh

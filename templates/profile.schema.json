@@ -1,0 +1,428 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/gbi-solutions-ltd/keel/main/templates/profile.schema.json",
+  "title": ".keel/profile.json",
+  "description": "The contract between a project and keel. Skills read this instead of guessing how to run the project's tests, where its artifacts live, and which gates apply. Written by `keel init`; safe to correct by hand, since init merges under existing values rather than overwriting them.",
+  "type": "object",
+  "required": [
+    "project",
+    "stack",
+    "verify",
+    "docs_root"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "keel_version": {
+      "type": "string",
+      "description": "Version of keel that last wrote this file."
+    },
+    "schema_version": {
+      "type": "integer",
+      "description": "Which set of profile fields this file has. Written by `keel init`, bumped only when a field is added, removed, renamed or moved. Absent means the file predates the field, which doctor treats as stale."
+    },
+    "project": {
+      "type": "object",
+      "required": [
+        "name",
+        "kind"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "service",
+            "library",
+            "cli",
+            "frontend",
+            "plugin",
+            "docs"
+          ],
+          "description": "`docs` means pre-implementation: no stack and no source files. doctor then skips the verify checks rather than failing on commands a documents-only repo cannot have."
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "stack": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "language": {
+          "type": "string"
+        },
+        "runtime": {
+          "type": "string"
+        },
+        "framework": {
+          "type": "string"
+        },
+        "package_manager": {
+          "type": "string"
+        },
+        "also": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Every other language detected in this repository. The primary in `language` drives the verify commands; these get a language server each."
+        },
+        "datastores": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "has_ui": {
+          "type": "boolean",
+          "description": "When true, the frontend standard applies. See skills/coding-standards/references/frontend.md."
+        }
+      }
+    },
+    "verify": {
+      "type": "object",
+      "required": [
+        "test",
+        "test_one"
+      ],
+      "additionalProperties": true,
+      "description": "Commands, exactly as a shell would run them. null means the project genuinely has none, so a skill asks rather than substituting a guess. Never write a command you have not run.",
+      "properties": {
+        "test": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "test_one": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Single test. `{path}` or `{name}` is substituted. Required by tdd and by the optional commit guard."
+        },
+        "test_integration": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Tests against a running database. Kept separate so the fast suite stays fast; both run in CI."
+        },
+        "lint": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Must be check-only. A command that rewrites files cannot gate."
+        },
+        "format": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Must be check-only, like lint. `prettier --check .`, not `prettier --write .`."
+        },
+        "format_fix": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The writing counterpart of format. Never run by a gate: it is what a refusal names as the remedy, so the person committing runs it and reads what it changed."
+        },
+        "typecheck": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "build": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "e2e": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "security": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "verify_notes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Why a command is what it is, especially where it is deliberately not the stack's idiomatic one. Read by a human, and by anyone tempted to 'fix' it."
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Where an artifact already lives, when it is not under docs_root. A skill reads the mapped path instead of the default, so a repo with its own naming convention is not duplicated into a second, competing set. doctor fails on a mapped path that does not exist.",
+      "properties": {
+        "snapshot": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "prd": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stories": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "architecture": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "decisions": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "plans": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": [
+          "required",
+          "warn",
+          "off"
+        ]
+      },
+      "description": "required blocks, warn reports, off skips. Every gate has a stated escape hatch except a hard_block_paths match.",
+      "properties": {
+        "tdd": {
+          "enum": [
+            "required",
+            "warn",
+            "off"
+          ]
+        },
+        "coding_standards": {
+          "enum": [
+            "required",
+            "warn",
+            "off"
+          ]
+        },
+        "review": {
+          "enum": [
+            "required",
+            "warn",
+            "off"
+          ]
+        },
+        "security_audit": {
+          "enum": [
+            "required",
+            "warn",
+            "off"
+          ]
+        },
+        "observability": {
+          "enum": [
+            "required",
+            "warn",
+            "off"
+          ]
+        },
+        "docs_updated": {
+          "enum": [
+            "required",
+            "warn",
+            "off"
+          ]
+        },
+        "commit_guard": {
+          "enum": [
+            "required",
+            "warn",
+            "off"
+          ],
+          "description": "The pre-commit hook `keel guard install` writes. off, the default, makes it inert, so installing the guard for its push protections does not impose a commit gate nobody asked for. required runs verify.format, verify.lint and verify.typecheck before each commit and refuses on a failure; warn reports and lets the commit through."
+        },
+        "done_verified": {
+          "enum": [
+            "required",
+            "warn",
+            "off"
+          ],
+          "description": "Drives hooks/done-guard on Stop and SubagentStop. required refuses to end a turn that edited code and never ran verify.test; warn says it and allows the stop. Off, or absent, and the hook does nothing."
+        },
+        "context_watch": {
+          "type": "boolean",
+          "description": "false turns the session context watchdog off for this project. Declared here rather than left to additionalProperties because it is not a required/warn/off gate."
+        },
+        "context_window": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Context window in tokens for sessions in this project. Set it where sessions use a larger window than the 200000 default: a 1M session records its model as plain claude-opus-5 and carries no field naming its window, so it cannot be detected. Left unset, the watchdog assumes 200000 and corrects upward once a session is observed exceeding it, which is proof but arrives late."
+        },
+        "context_warn_pct": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 99,
+          "description": "Percentage of the window at which the watchdog starts warning. Default 70."
+        },
+        "context_stop_pct": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Percentage of the window at which the watchdog blocks tool calls until a handoff is written. Default 85."
+        }
+      }
+    },
+    "hard_block_paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Path patterns where a security finding cannot be overridden in conversation. Intended for auth, money movement, and personal data. Enforced by hooks/sensitive-guard, which asks a human before a commit touching one. Matched with fnmatch against repository-root-relative paths, where * crosses directory separators, and a bare directory such as 'src/auth' also matches everything under it."
+    },
+    "conventions": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "commit_style": {
+          "type": "string"
+        },
+        "default_branch": {
+          "type": "string",
+          "description": "The repository's default branch, which is frequently not the checked-out one. Skills refuse to implement here and repo-snapshot compares HEAD against it."
+        },
+        "working_branch": {
+          "type": "string"
+        },
+        "protect_default_branch": {
+          "type": "boolean",
+          "default": true,
+          "description": "false lets the push guard allow a push straight to default_branch. Read by the pre-push hook from `keel guard install`, which otherwise refuses one, since work lands through a pull request. `git push --no-verify` is the one-off escape hatch."
+        },
+        "response_style": {
+          "enum": [
+            "terse",
+            "verbose"
+          ],
+          "default": "terse",
+          "description": "terse keeps conversation replies short and leaves artifacts at full detail; the SessionStart hook injects the rule. verbose turns it off. Absent is treated as terse."
+        }
+      }
+    },
+    "observability": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "backend": {
+          "enum": [
+            "signoz",
+            "grafana",
+            "datadog",
+            "none"
+          ],
+          "default": "signoz",
+          "description": "Instrumentation is OpenTelemetry regardless, so the vendor sits behind the exporter and switching is configuration."
+        },
+        "otlp_endpoint_var": {
+          "type": "string"
+        },
+        "log_shipping": {
+          "type": "string"
+        }
+      }
+    },
+    "deploy": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "target": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ci": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "registry": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "envs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "secrets_manager": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "plugins": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "recommended": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excluded": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "docs_root": {
+      "type": "string",
+      "default": "docs/keel",
+      "description": "Must not be gitignored. keel init refuses when it is, because a skill would write there successfully and be invisible to every teammate."
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Project facts a skill should know that nothing else records."
+    }
+  }
+}

@@ -1,0 +1,189 @@
+#!/usr/bin/env bash
+# The hard block on sensitive paths. Registered on PreToolUse, matcher Bash. Plan task 4.3,
+# decision 3.
+#
+# Decision 3 asks for one gate that a sentence in chat cannot move: a commit touching auth, money
+# movement or personal data should need a human, not a promise. Every other keel gate is enforced
+# with an escape hatch the model can take by saying so. This one is not.
+#
+# WHY `ask` AND NOT `deny`. `security-audit` is a skill, executed by the model, not a command a hook
+# can run. So nothing here can verify that an audit "ran clean", and any receipt the model could
+# write is a receipt a sentence in chat could obtain. `ask` is the only decision in the protocol the
+# model cannot satisfy for itself: the harness puts it to the human. It also survives
+# bypassPermissions, which bin/keel:393 records as verified against a live session, and which is
+# what makes it worth anything at all.
+#
+# SILENT UNLESS THE REPOSITORY ASKS FOR IT. A profile with no `hard_block_paths` costs one builtin
+# string match and produces no output, which is almost every repository.
+#
+# IT ASKS WHENEVER IT CANNOT ANSWER. An unreadable profile, an unparseable one, an absent python3, a
+# git that will not run: each of those used to exit 0 in silence, which is the one outcome a gate
+# must never have, because the repository declared sensitive paths and would believe it had cover.
+# The cheap filters run first, in bash, so this never becomes a prompt on every Read.
+#
+# It guards the commit rather than the edit. Blocking every edit to auth code would make this the
+# gate people delete, and the commit is where the change stops being private to the session. It
+# reads the staged set, plus tracked modifications when the command carries -a, --all or a pathspec,
+# because all three commit working tree content that `--cached` does not show.
+#
+# ITS LIMIT, STATED RATHER THAN DISCOVERED. It reads a command string, so `sh -c`, an alias, a
+# here-doc, or `git -C dir commit` reaches a commit without passing through here, exactly as the
+# permission deny rules in bin/keel:406 already warn. This raises the cost of a careless commit; it
+# is not a boundary against a determined one. The boundary is review.
+
+set -uo pipefail
+
+ask() {
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"keel: %s"}}' "$1"
+    exit 0
+}
+
+# Walk up for the profile, the way git looks for .git. A session started in a subdirectory is
+# ordinary, and looking only in the current directory meant the guard silently did not exist there.
+PROFILE=""
+d="$PWD"
+while [ -n "$d" ]; do
+    if [ -f "$d/.keel/profile.json" ]; then PROFILE="$d/.keel/profile.json"; break; fi
+    [ "$d" = "/" ] && break
+    d="$(dirname "$d")"
+done
+[ -n "$PROFILE" ] || exit 0
+
+# The cheap gate, deliberately with no external command. `grep ... || exit 0` cannot tell "no match"
+# from "grep is not on PATH", so it fails open in exactly the situation where a guard must not.
+# Builtins cannot go missing.
+profile_text="$(<"$PROFILE")"
+case "$profile_text" in
+    *'"hard_block_paths"'*) ;;
+    *) exit 0 ;;
+esac
+
+event="$(</dev/stdin)"
+
+# Both filters run before anything can fail closed. Without them, a machine with no python3 would
+# get a permission prompt on every Read, Grep and Edit, which is how a gate gets deleted.
+case "$event" in
+    *'"tool_name"'*'"Bash"'*) ;;
+    *) exit 0 ;;
+esac
+case "$event" in
+    *'git commit'*) ;;
+    *) exit 0 ;;
+esac
+
+if ! command -v python3 >/dev/null 2>&1; then
+    ask "this repository declares hard_block_paths and python3 is absent, so the guard cannot tell whether this commit touches one. Approving is a human decision."
+fi
+
+KEEL_EVENT="$event" KEEL_PROFILE="$PROFILE" python3 - <<'PY'
+import json, os, shlex, subprocess, sys
+from fnmatch import fnmatch
+
+def emit(reason):
+    print(json.dumps({"hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "ask",
+        "permissionDecisionReason": "keel: " + reason,
+    }}))
+    sys.exit(0)
+
+try:
+    ev = json.loads(os.environ.get("KEEL_EVENT") or "{}")
+except ValueError:
+    sys.exit(0)          # not our event shape; the bash filters already said this looks like a commit
+cmd = ((ev.get("tool_input") or {}).get("command") or "")
+
+# The profile said hard_block_paths, so a profile that will not parse is a declared gate with no
+# enforcement behind it. That is the case this hook exists to prevent, so it asks.
+try:
+    patterns = json.load(open(os.environ["KEEL_PROFILE"])).get("hard_block_paths") or []
+except (ValueError, OSError, KeyError):
+    emit("this repository declares hard_block_paths but its profile could not be read. The guard "
+         "cannot tell whether this commit touches a sensitive path. Approving is a human decision.")
+if not patterns:
+    sys.exit(0)
+
+# shlex, not a regex, so a message cannot look like a flag. `git commit -m "fix the -a flag"` must
+# not widen the check, and `git commit -am"msg"` must.
+try:
+    tokens = shlex.split(cmd)
+except ValueError:
+    tokens = cmd.split()
+
+start = None
+for i, t in enumerate(tokens):
+    if t != "git":
+        continue
+    for j in range(i + 1, len(tokens)):
+        if tokens[j] == "commit":
+            start = j + 1
+            break
+        if not tokens[j].startswith("-"):
+            break
+    if start is not None:
+        break
+if start is None:
+    sys.exit(0)
+
+# Options that swallow the next token, so their value is never mistaken for a pathspec.
+VALUE_OPTS = {"-m", "--message", "-F", "--file", "-C", "--reuse-message", "-c", "--reedit-message",
+              "--author", "--date", "-S", "--gpg-sign", "--cleanup", "-t", "--template",
+              "--fixup", "--squash", "--trailer"}
+
+rest, pathspecs, widen, i = tokens[start:], [], False, 0
+while i < len(rest):
+    t = rest[i]
+    if t == "--":
+        pathspecs += rest[i + 1:]
+        break
+    if t in VALUE_OPTS:
+        i += 2
+        continue
+    if t.startswith("--"):
+        widen = widen or t == "--all"
+        i += 1
+        continue
+    if t.startswith("-"):
+        widen = widen or "a" in t[1:]
+        i += 1
+        continue
+    pathspecs.append(t)
+    i += 1
+
+def files(*args):
+    # -z, because splitting git's output on whitespace tears `src/auth/two words/k.go` into two
+    # paths, and it stops git quoting anything unusual. A non-zero exit is not "nothing changed":
+    # git missing, a locked index or a timeout would otherwise read as a clean commit.
+    try:
+        r = subprocess.run(["git", "diff", "--name-only", "-z"] + list(args),
+                           capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        emit("this repository declares hard_block_paths and git could not be run, so the guard "
+             "cannot tell whether this commit touches a sensitive path. Approving is a human "
+             "decision.")
+    if r.returncode != 0:
+        emit("this repository declares hard_block_paths and `git diff` failed, so the guard cannot "
+             "tell whether this commit touches a sensitive path. Approving is a human decision.")
+    return [f for f in r.stdout.split("\0") if f]
+
+changed = set(files("--cached"))
+# -a, --all and a pathspec all commit working tree content that --cached does not show.
+if widen or pathspecs:
+    changed |= set(files("HEAD"))
+
+def matches(f, p):
+    # A bare directory has to match what is under it. Decision 3 proposes patterns like "anything
+    # under a path matching auth", and `fnmatch("src/auth/token.go", "src/auth")` is false, so a
+    # repository writing the obvious thing would declare a gate that never fired.
+    p = p.rstrip("/")
+    return fnmatch(f, p) or fnmatch(f, p + "/*")
+
+hit = sorted({f for f in changed for p in patterns if matches(f, p)})
+if not hit:
+    sys.exit(0)
+
+shown = ", ".join(hit[:5]) + (" and %d more" % (len(hit) - 5) if len(hit) > 5 else "")
+emit("this commit includes %d file(s) under hard_block_paths: %s. Decision 3 makes this the one "
+     "gate the model cannot clear by saying so, because it covers auth, money movement and personal "
+     "data. Run security-audit --diff and read its findings before approving." % (len(hit), shown))
+PY

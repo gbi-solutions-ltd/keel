@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+# The done guard. Registered on Stop and SubagentStop. Idea record
+# docs/ideas/verification-backed-done.md, stage 2.
+#
+# WHAT IT CHECKS, AND WHAT IT DELIBERATELY DOES NOT. It fires on a structural condition: this turn
+# edited code and never ran the project's test command. It does not read the assistant's final
+# message for the word "done". That was the first design and it is a string matcher over English:
+# it misses "that's the retry path covered" and fires on "done reading the config". A guard that
+# cries wolf gets switched off, and this one shares hooks.json with sensitive-guard, which must
+# never be switched off.
+#
+# IT FAILS OPEN. This is the opposite of sensitive-guard and the difference is not an oversight.
+# That hook asks a human whenever it cannot answer, because `ask` is the one decision the model
+# cannot grant itself. A Stop hook has no equivalent: denying a stop it cannot justify produces a
+# turn that will not end, with no human in the loop to clear it. So an unparseable profile, an
+# absent python3 or a malformed event emits systemMessage and allows the stop.
+#
+# A profile that cannot be READ is the one case that passes in silence rather than warning, and the
+# distinction is deliberate. It is caught by the `-r` test below, before anything has established
+# that this repository asked for the gate at all, and warning about a file we cannot open would put
+# a message on the end of every turn in every repository that happens to have an unreadable one.
+# Unparseable is different: the text was read, it contains done_verified, so the repository did ask
+# and is owed the warning.
+#
+# SILENT UNLESS THE REPOSITORY ASKS FOR IT, matching hard_block_paths. No gates.done_verified means
+# one builtin string match and no output.
+#
+# DOCUMENTATION TURNS PASS. A turn whose only edits are .md files or files under docs_root does not
+# need the test suite, and firing on every documentation commit is how this becomes the hook people
+# delete.
+#
+# ITS LIMIT, STATED RATHER THAN DISCOVERED. It matches the profile's test command as a substring of
+# a Bash command, so a wrapper script, a changed directory or an alias runs the suite without being
+# seen, and a command that merely mentions the string counts as having run it. This raises the cost
+# of claiming done without checking; it is not a proof that the suite passed. It cannot see the
+# exit code, and does not pretend to: `ship` is the gate that reads results.
+
+set -uo pipefail
+
+warn_and_exit() {
+    printf '{"systemMessage":"keel done-guard: %s"}' "$1"
+    exit 0
+}
+
+# Walk up for the profile, the way git looks for .git. A session started in a subdirectory is
+# ordinary, and looking only in the current directory means the guard silently does not exist there.
+PROFILE=""
+d="$PWD"
+while [ -n "$d" ]; do
+    if [ -f "$d/.keel/profile.json" ]; then PROFILE="$d/.keel/profile.json"; break; fi
+    [ "$d" = "/" ] && break
+    d="$(dirname "$d")"
+done
+# `-r` as well as `-f`. Without it an unreadable profile let bash print "Permission denied" to
+# stderr on the end of every single turn, which a Stop hook surfaces as an error notice in the
+# transcript. Exiting here keeps the failure silent, per the header.
+[ -n "$PROFILE" ] && [ -r "$PROFILE" ] || exit 0
+
+# The cheap gate, deliberately with no external command. `grep ... || exit 0` cannot tell "no match"
+# from "grep is not on PATH", so it fails open in exactly the situation where a guard must not.
+# Builtins cannot go missing.
+profile_text="$(<"$PROFILE")"
+case "$profile_text" in
+    *'"done_verified"'*) ;;
+    *) exit 0 ;;
+esac
+
+# Read the event before anything can fail, so the harness never sees a hook that ignored its stdin.
+event="$(</dev/stdin)"
+
+if ! command -v python3 >/dev/null 2>&1; then
+    warn_and_exit "this repository declares gates.done_verified and python3 is absent, so this turn was not checked."
+fi
+
+KEEL_EVENT="$event" KEEL_PROFILE="$PROFILE" python3 - <<'PY'
+import json, os, sys
+
+def emit(obj):
+    print(json.dumps(obj))
+    sys.exit(0)
+
+def warn(reason):
+    emit({"systemMessage": "keel done-guard: " + reason})
+
+def deny(reason):
+    emit({"decision": "deny", "reason": "keel: " + reason})
+
+try:
+    ev = json.loads(os.environ.get("KEEL_EVENT") or "{}")
+except ValueError:
+    warn("the stop event could not be parsed, so this turn was not checked.")
+
+# Already looping. Never deny twice: the second denial has no more information than the first and
+# nothing outside this hook can break the cycle.
+if ev.get("stop_hook_active"):
+    sys.exit(0)
+
+try:
+    prof = json.load(open(os.environ["KEEL_PROFILE"]))
+except (ValueError, OSError, KeyError):
+    warn("this repository declares gates.done_verified but its profile could not be read, so this "
+         "turn was not checked.")
+
+mode = (prof.get("gates") or {}).get("done_verified") or "off"
+if mode == "off":
+    sys.exit(0)
+
+test_cmd = (prof.get("verify") or {}).get("test")
+if not test_cmd:
+    sys.exit(0)          # nothing to check against, and inventing a command would be worse
+
+docs_root = (prof.get("docs_root") or "docs").rstrip("/")
+
+def is_code(p):
+    return not (p.endswith(".md") or p == docs_root or p.startswith(docs_root + "/"))
+
+edited, ran = [], False
+for c in ev.get("tool_calls") or []:
+    name = c.get("tool_name")
+    ti = c.get("tool_input") or {}
+    if name in ("Edit", "Write", "NotebookEdit"):
+        p = ti.get("file_path") or ti.get("notebook_path") or ""
+        if p and is_code(p):
+            edited.append(p)
+    elif name == "Bash" and test_cmd in (ti.get("command") or ""):
+        ran = True
+
+if not edited or ran:
+    sys.exit(0)
+
+who = "This subagent" if ev.get("hook_event_name") == "SubagentStop" else "This turn"
+uniq = sorted(set(edited))
+shown = ", ".join(uniq[:5]) + (" and %d more" % (len(uniq) - 5) if len(uniq) > 5 else "")
+msg = ("%s edited %d file(s) including %s and never ran `%s`. Run it and report what it printed "
+       "before ending the turn. If the work is genuinely incomplete, say what remains instead of "
+       "ending on it." % (who, len(uniq), shown, test_cmd))
+
+if mode == "required":
+    deny(msg)
+warn(msg)
+PY

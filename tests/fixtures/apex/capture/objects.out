@@ -1,0 +1,3 @@
+@@@KEEL-SECTION:objects
+{"results": [{"columns": [{"name": "OBJECT_NAME", "type": "VARCHAR2"}, {"name": "OBJECT_TYPE", "type": "VARCHAR2"}], "items": [{"object_name": "MERCHANTS", "object_type": "TABLE"}, {"object_name": "SETTLEMENTS", "object_type": "TABLE"}, {"object_name": "PAYOUTS", "object_type": "TABLE"}, {"object_name": "COUNTRIES", "object_type": "TABLE"}, {"object_name": "PARTNER_SYNC_LOG", "object_type": "TABLE"}, {"object_name": "MERCHANT_PKG", "object_type": "PACKAGE"}, {"object_name": "SETTLEMENT_PKG", "object_type": "PACKAGE"}, {"object_name": "AUDIT_PKG", "object_type": "PACKAGE"}, {"object_name": "SEC_PKG", "object_type": "PACKAGE"}]}]}
+

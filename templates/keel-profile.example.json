@@ -1,0 +1,98 @@
+{
+  "$schema": "https://raw.githubusercontent.com/gbi-solutions-ltd/keel/main/templates/profile.schema.json",
+  "keel_version": "0.1.0",
+  "schema_version": 1,
+  "project": {
+    "name": "payouts-api",
+    "kind": "service",
+    "description": "Merchant payout orchestration and settlement"
+  },
+  "stack": {
+    "language": "typescript",
+    "runtime": "node20",
+    "framework": "nestjs",
+    "package_manager": "npm",
+    "also": [],
+    "datastores": [
+      "postgres",
+      "redis"
+    ],
+    "has_ui": false
+  },
+  "verify": {
+    "test": "npm test",
+    "test_one": "npm test -- {path}",
+    "test_integration": "npm run test:integration",
+    "lint": "npm run lint",
+    "format": "npm run format:check",
+    "format_fix": "npm run format",
+    "typecheck": "npm run typecheck",
+    "build": "npm run build",
+    "e2e": null,
+    "security": "npm audit --audit-level=high"
+  },
+  "gates": {
+    "tdd": "required",
+    "coding_standards": "required",
+    "review": "required",
+    "security_audit": "required",
+    "docs_updated": "warn",
+    "observability": "required",
+    "commit_guard": "off",
+    "done_verified": "warn"
+  },
+  "conventions": {
+    "commit_style": "conventional",
+    "branch_prefix": "feat/",
+    "default_branch": "main",
+    "response_style": "terse",
+    "protect_default_branch": true
+  },
+  "deploy": {
+    "target": "gcp-cloud-run",
+    "registry": "europe-west1-docker.pkg.dev/gbi/payouts",
+    "envs": [
+      "dev",
+      "staging",
+      "prod"
+    ],
+    "ci": "github-actions",
+    "secrets_manager": "gcp-secret-manager"
+  },
+  "docs_root": "docs/keel",
+  "plugins": {
+    "recommended": [
+      "security-guidance@claude-plugins-official",
+      "code-review@claude-plugins-official",
+      "skill-creator@claude-plugins-official",
+      "claude-md-management@claude-plugins-official",
+      "context7@claude-plugins-official",
+      "typescript-lsp@claude-plugins-official"
+    ],
+    "excluded": [
+      "feature-dev@claude-plugins-official"
+    ]
+  },
+  "notes": [
+    "Money-moving endpoints must be idempotent. security-audit enforces this.",
+    "Never log full PAN, IBAN, or phone numbers. Redaction helpers are in src/common/redact.ts."
+  ],
+  "verify_notes": {
+    "test_integration": "Runs against a disposable Postgres via testcontainers. Slower, so it is a separate command; both run in CI."
+  },
+  "observability": {
+    "backend": "signoz",
+    "otlp_endpoint_var": "OTEL_EXPORTER_OTLP_ENDPOINT",
+    "log_shipping": "otlp",
+    "_note": "backend is one of signoz (default), grafana, datadog, none. Instrument with OpenTelemetry regardless; the vendor sits behind the exporter."
+  },
+  "artifacts": {
+    "_note": "Set any of these when the artifact already exists elsewhere. Skills read the mapped path instead of the default under docs_root, so a repo with its own naming convention is not duplicated into a second, competing set.",
+    "snapshot": null,
+    "prd": "docs/PROD-042-requirements.md",
+    "stories": null,
+    "architecture": "docs/PROD-051-architecture.md",
+    "decisions": "docs/PROD-018-decisions-log.md",
+    "plans": null
+  }
+}
