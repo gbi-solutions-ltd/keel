@@ -1,0 +1,15 @@
+keel
+Copyright (c) 2026 GBi Solutions Ltd
+
+This product includes software adapted from third-party open source projects,
+each MIT licensed. Those portions remain subject to their original licences,
+whose full texts and copyright notices are reproduced in
+THIRD-PARTY-LICENSES.md. SOURCES.md records which parts of this work derive
+from which project, per file, and distinguishes close adaptations from
+structural borrowings.
+
+This file exists because that paragraph used to live at the end of LICENSE,
+where it stopped GitHub's licence detector recognising the file as MIT. A public
+repository whose licence cannot be detected shows no licence to anyone browsing
+it and to any tool that reads one, which defeats the point of choosing a
+permissive licence.

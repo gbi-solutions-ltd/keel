@@ -305,7 +305,8 @@ distinguishes close adaptations from structural borrowings.
 
 MIT, in [`LICENSE`](LICENSE). The adapted portions keep their own notices, reproduced in full in
 [`THIRD-PARTY-LICENSES.md`](THIRD-PARTY-LICENSES.md), because crediting a source in `SOURCES.md` does
-not on its own discharge the obligation.
+not on its own discharge the obligation. [`NOTICE`](NOTICE) summarises that relationship; it is
+separate from `LICENSE` so that `LICENSE` stays canonical MIT text and licence detection works.
 
 We take the ideas, not the code. gstack is ~1,200 files and carries a browser daemon we
 do not need. superpowers is a general methodology with no opinion on our stack. What we
