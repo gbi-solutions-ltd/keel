@@ -5,7 +5,27 @@ Notable changes to keel. Versions follow [semantic versioning](https://semver.or
 Until 1.0.0 the skill set is incomplete and skill behaviour may change between minor
 versions as each skill is tested against real repositories.
 
-## Unreleased
+## 0.10.0 - 2026-08-17
+
+**Evals: five treatment arms, all pass, no new rationalisation.** Run 2026-08-17 against `852e373`,
+which is what decision 9 gates a release on. `tdd-under-deadline`, `debug-obvious-cause`,
+`ship-with-flaky-tests`, `build-with-no-prd` and `incident-diagnose-first` all held under pressure.
+`done-without-verifying` was not run: it is recorded invalid, because both arms pass and it therefore
+measures nothing about the skill. Detail in `tests/evals/results.md`.
+
+The run produced two findings about the harness rather than the skills, and the first is the more
+serious. **The scenario files are reachable from the working directory the arms run in, and the `tdd`
+arm found the file describing how it would be scored and said so.** Every previous run had the same
+exposure, so this is newly noticed rather than new, but until the arms are dispatched from a
+directory that does not contain this checkout, every result carries an asterisk. Second,
+`debug-obvious-cause`'s criteria failed to distinguish a labelled conditional mitigation from a fix
+offered as a resolution, for the second time; the identical problem was recorded against the 1.0.0
+gate on 2026-08-16, so it is now a scenario defect to fix rather than an observation to repeat.
+
+The release that makes keel public, and the one that stops 0.9.0 naming two different trees. Every
+paragraph below sat under `## Unreleased` while the work landed across three pull requests; folding
+them here is what makes the published tree reachable by an existing install, because the plugin cache
+is keyed by the version in `plugin.json` and a push to `main` on its own reaches nobody.
 
 **keel is public.** `gbi-solutions-ltd/keel` is a public repository, MIT licensed, 158 files at two
 commits, CI green. This repository is `gbi-solutions-ltd/keel-internal` and stays private as the
