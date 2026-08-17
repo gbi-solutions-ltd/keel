@@ -7,6 +7,50 @@ versions as each skill is tested against real repositories.
 
 ## Unreleased
 
+**keel is public.** `gbi-solutions-ltd/keel` is a public repository, MIT licensed, 158 files at two
+commits, CI green. This repository is `gbi-solutions-ltd/keel-internal` and stays private as the
+development history. Executed as `docs/plans/2026-08-17-go-public.md`; the runbook at
+`docs/runbooks/going-public.md` is now the record of what it took.
+
+**The history was not published.** Sweeping every commit found all 27 deny patterns reachable, from
+six real-content files carrying client names in old worked examples, from the deny list's own history,
+and from two commit messages. `HEAD` was already clean. So the public repository is a fresh tree and
+the 159 commits stayed private. `docs/audits/` is the only content deliberately withheld, because it
+is the security posture of real services, named.
+
+**MIT, replacing all rights reserved.** A public repository under that notice is source nobody may
+legally use. Roughly a third of the skill set is adapted from four MIT projects, so MIT is the honest
+match; their portions keep their own notices. `LICENSE` is canonical MIT text and nothing else, and
+the third-party relationship moved to `NOTICE`, because appending it to `LICENSE` stopped GitHub
+detecting the licence at all.
+
+**The deny list left the tree**, which decision 2 required before any public release. It was the one
+file that enumerated who we work with, and its test was a second copy, because both must contain the
+names in order to search for them. Both are clean now. Client patterns load from `KEEL_DENY_FILE`,
+default `~/.config/keel/internal-deny-list.txt`; an absent list degrades to the generic path patterns
+rather than to silence, and the mode prints on every run so a half-armed scan cannot report `OK`
+quietly. The coverage assertion now proves the mechanism with invented names rather than the real
+list, which is a real reduction and is recorded in both files.
+
+**Shipped content names no organisation.** All five reference files decision 2 confined GBi to are
+generic once the name comes out of their prose, so `GBI_ALLOWED` is gone and the rule is simply that
+shipped content carries no organisation name. `gbi-defaults.md` is `house-defaults.md`, renamed rather
+than deleted because the link checker fails on a broken link; that rename touched thirteen references
+across eleven files, not the one link expected, because the file was cited as prose throughout the
+coding-standards set.
+
+**Two push-protection rejections, neither a real secret, both fixed at the cause.** A literal PEM
+private-key opening line in a supply-chain fixture whose body was one character, and a synthetic
+Stripe-shaped token in the APEX redaction fixture. Fixing the fixtures rather than allowlisting the
+detections means a contributor or a fork never trips them. The first secret sweep missed the second
+one because it used the OpenAI `sk-` shape and not Stripe's `sk_live_`, so the sweep is now a
+per-provider list.
+
+Three smaller things fixed along the way, each found by a check rather than by review:
+`.claude-plugin/marketplace.json` advertised "GBi internal AI engineering tooling"; `plugin.json` still
+declared `"license": "SEE LICENSE IN LICENSE"` after the MIT change; and the plan document for this
+work enumerated the client names in an assertion, which the newly armed scanner caught immediately.
+
 Two fixes to the checks themselves, both found by reviewing 0.9.0 rather than by anything failing.
 Neither changes what keel does, so neither has taken a number yet; fold these paragraphs into
 whatever ships next.

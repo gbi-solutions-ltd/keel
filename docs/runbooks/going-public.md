@@ -1,16 +1,46 @@
 # Runbook: making this repository public
 
-Nothing here has been executed. It is the ordered list of what publishing actually requires,
-written while the repository is private so the work is known rather than discovered.
+**EXECUTED 2026-08-17.** This repository is `gbi-solutions-ltd/keel-internal` and remains private.
+The public repository is `gbi-solutions-ltd/keel`, a fresh tree of 158 files at two commits, MIT
+licensed, CI green. Executed as `docs/plans/2026-08-17-go-public.md`.
 
-**Two steps are decisions, not actions.** Step 1 and step 5 need an answer from an owner before
-anybody runs a command. The rest are mechanical once those two are settled.
+The three decisions taken first, by Bernard:
+
+| Decision | Answer |
+|---|---|
+| Vehicle | A fresh public repository, one initial commit, **no history** |
+| Licence | MIT |
+| Path | This repository renamed `keel-internal`; the public one took `keel`, so every committed URL was already correct |
+
+**Why the history stayed behind, which is the finding that decided the vehicle.** Sweeping every
+commit found **all 27 deny patterns reachable**. Six real-content files carried client names in old
+worked examples: `prd-template.md`, `standards-template.md`, `design-template.md`, `docs/03`, and two
+pre-rename `gbai` files. The deny list itself carried them across its 8-commit history. Two commit
+messages carry one each, `940effdd` and `bb0132bd`. `HEAD` by contrast was already clean. A rewrite
+was possible and a fresh tree was cheaper and safer, so the 159 commits stayed private.
+
+**What was excluded from the published tree:** `docs/audits/`, `.claude/`, `.keel/handoff.md`.
+Verified absent through the GitHub API after publishing. `IMPLEMENTATION-PLAN.md` was on that list
+and came off it, which is the only exclusion that was tested and reversed: it was excluded for naming
+both pilot repositories, those were genericised, it then swept clean, and excluding it broke three
+README links.
+
+**The steps below are kept as written, each annotated with what actually happened.** They are no
+longer instructions for this repository. They are the record, and they are the instructions for the
+next repository anyone publishes.
 
 **Read this first, because it changes the order.** Publishing is not reversible in the way people
 assume. Making a repository private again does not recall clones or forks, and a fork network keeps
 objects reachable after the parent is locked down. Everything below assumes one attempt.
 
 ## 1. Decide the licence. DECISION
+
+**DONE: MIT.** One thing was learned that this runbook did not anticipate and that the next reader
+needs. The first `LICENSE` kept the third-party paragraph appended to the MIT text, and GitHub then
+reported the published repository's licence as **not detected**, because the detector needs a close
+match to canonical text. A public repository whose licence cannot be detected shows no licence to
+anyone browsing it or to any tool that reads one. `LICENSE` is now canonical MIT and nothing else,
+and the third-party relationship lives in `NOTICE`.
 
 `LICENSE` is currently proprietary and all rights reserved: internal use by GBi Solutions Ltd and
 its authorised personnel only. A public repository under that notice is published source that
@@ -24,6 +54,17 @@ Do not skip this by publishing under the current notice and deciding later. The 
 moment of the first clone is the one that clone carries.
 
 ## 2. Move the deny list outside the tree
+
+**DONE.** `KEEL_DENY_FILE`, defaulting to `~/.config/keel/internal-deny-list.txt`, 25 patterns. An
+absent list degrades to the two generic path patterns rather than to silence, and the mode prints on
+every run. Both the scanner and its test are now clean of client names; the test uses invented
+identifiers that mirror the real shapes.
+
+Two things learned. **The deny file must live outside the scanned tree**, which is where production
+puts it: a fixture written inside made the scanner report it, and that is correct behaviour rather
+than a bug to skip around, because a deny list committed inside a repository is a leak. And the
+coverage guarantee is genuinely reduced: the test proves the mechanism, not that every pattern in the
+real list still matches something. A `pattern<TAB>sample` format would restore it.
 
 `tests/no-internal-leaks.sh` is the file that enumerates our clients, because it must contain their
 names in order to search for them. The guard against disclosure is the disclosure. Its own header
@@ -47,6 +88,19 @@ What to do, per that decision:
 the thing that keeps step 3 a deletion rather than an audit.
 
 ## 3. Deal with the five GBi reference files
+
+**DONE, and it went further than this section proposed.** All five are generic once the name comes out
+of their prose, so `GBI_ALLOWED` is gone and the rule is now that shipped content names no
+organisation at all.
+
+Three things this section got wrong or missed. The `house-defaults.md` rename touched **thirteen**
+references across eleven files, not the one link predicted below: the file was cited as prose
+throughout the coding-standards reference set, and prose citations are invisible to the link checker.
+**SigNoz stays the documented default**, because de-defaulting it would change what `keel init`
+writes, which is a behaviour change rather than de-branding. And the read of the two domain checklists
+found **one** item needing redaction rather than none: `pipeline-patterns.md` attributed a trap to "a
+payment platform with 3.6% coverage", and a sector plus an exact figure identifies an engagement to
+anyone who has read that audit.
 
 Decision 2 confined GBi-specific content to five files so that publishing would be a deletion. Since
 2026-08-17 that is enforced by `tests/no-internal-leaks.sh`, so the list is trustworthy:
@@ -76,6 +130,15 @@ array that no longer exists is a rule protecting nothing, and nothing would repo
 
 ## 4. Update the repository name and its URLs
 
+**DONE, and it was nearly a no-op**, because the public repository took the path `gbi-solutions-ltd/keel`.
+All five touchpoints below were already correct and none was edited.
+
+What this section missed: `.claude-plugin/` is shipped content that no rule scopes to and nothing had
+read. `marketplace.json` advertised "GBi internal AI engineering tooling" on a repository about to
+stop being internal, and `plugin.json` declared `"license": "SEE LICENSE IN LICENSE"` after the MIT
+change. Both fixed. That directory stays outside the GBi rule on purpose, because `owner.name`
+legitimately names the marketplace owner.
+
 `gbi-solutions-ltd/keel` is load-bearing in five places, and two of them break silently:
 
 - `README.md` install instructions and the private-repo paragraph
@@ -92,6 +155,18 @@ The README paragraph saying "the repository is private and this works anyway" al
 and should go, along with the credential-helper explanation it exists to give.
 
 ## 5. Decide what happens to the documents that name real work. DECISION
+
+**DONE: option 1, publish a subset, but a much narrower exclusion than this section imagined.** Only
+`docs/audits/` is withheld. Everything else publishes, including `docs/01` to `docs/07`,
+`docs/standards.md`, `decisions/`, `ideas/`, `plans/`, `runbooks/` and `IMPLEMENTATION-PLAN.md`.
+
+Two facts made that safe, and both were measured rather than argued. `HEAD` carried no client
+identifier outside the deny list and its test. And exactly **one** file under `docs/` named a GBi
+service, `2026-08-15-existing-service-pilot.md`, which is withheld. Note also that the audits name
+**GBi's own** services rather than a third party's, so that exposure was GBi's to accept.
+
+Accepted knowingly: the published tree names Bernard Tebandeke and Edrine Kamya as reviewers, with 17
+further references to "Bernard". Put to the author explicitly and authorised twice.
 
 This is the largest exposure and it is not covered by step 3's list, because those five files are
 about conventions and these are about clients.
@@ -114,6 +189,10 @@ Three options, and the choice is an owner's:
    detailed public statement about a client's security posture that we could make.
 
 ## 6. Scan the history, not the working tree
+
+**DONE, and it is what decided everything else.** All 27 patterns reachable; see the header. The
+history was never published rather than rewritten, so `git filter-repo` was never needed and never
+installed.
 
 The working tree being clean says nothing. Git keeps everything, and a name removed in a later
 commit is public the moment the repository is.
@@ -145,6 +224,26 @@ deleting the file.
 
 ## 7. Re-run the whole gate, then flip
 
+**DONE, and one step was added that this section did not have: run the suite inside the export.** That
+is the step that caught the manifest defect, and a subset that fails its own validator is not a
+release. Add it to this list for the next repository.
+
+**Push protection rejected the publish twice, and neither cause was a real secret.** Both were test
+fixtures, and both were fixed at the cause rather than by clicking the unblock link, so a contributor
+or a fork never trips them either:
+
+1. `tests/test-supply-chain.sh` carried a literal PEM private-key opening line, as a fixture proving
+   the supply-chain scanner rejects a committed key. Its body was the single character `x`. The header
+   is now assembled from two pieces, and the generated file is byte-identical, verified with `cmp`.
+2. `tests/fixtures/apex/capture/extract.out` carried a synthetic token shaped like a Stripe live
+   secret key, exercising the APEX exporter's bearer-token redaction. The redaction rule matches
+   `Bearer` plus twenty or more token characters, so the provider shape was never what the test
+   pinned.
+
+**The lesson worth keeping: sweep per provider, not with one regex.** The first sweep missed the
+Stripe key because it used the OpenAI hyphen shape, `sk-`, and not Stripe's underscore shape,
+`sk_live_`. Expect push protection to reveal one detection at a time.
+
 ```bash
 tests/run-tests.sh                    # all test files pass
 tests/supply-chain-scan.sh            # clean, with every honoured suppression printed
@@ -154,6 +253,10 @@ tests/no-internal-leaks.sh            # clean, and printing that it ran in fallb
 Then change visibility.
 
 ## 8. What changes the moment it is public
+
+**Checked after publishing.** No workflow references a secret, and the public repository has no
+secrets configured, so the `pull_request` trigger hands a fork nothing. Actions are enabled with all
+actions allowed and no SHA pinning required, which is worth revisiting if outside contributions start.
 
 - **Actions run on pull requests from forks.** Read every workflow trigger and every secret it uses
   before publishing, not after. A `pull_request` trigger with access to a secret is a credential
