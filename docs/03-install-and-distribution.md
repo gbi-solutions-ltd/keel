@@ -222,6 +222,7 @@ Detection matrix:
 | `Package.swift` | Swift, `swift test`, plus `swift-lsp` |
 | `CMakeLists.txt` or `meson.build` | C or C++, plus `clangd-lsp` |
 | `.luarc.json`, `init.lua` or a `*.rockspec` | Lua, plus `lua-lsp` |
+| No manifest for any of the above, and `.sql` plus `.plsql` dominating the tree with an Oracle-exclusive token present | PL/SQL, `oracle` as the datastore, and no language server, because none exists for it |
 | More than one of the above | The first is `stack.language` and drives the verify commands; the rest are `stack.also`, and each gets its language server |
 | `Dockerfile`, `.github/workflows/` | deployment already set up, `setup-deployment` runs in audit mode |
 | any of `next.config`, `vite.config`, `angular.json`, a `public/` dir | has a UI, so recommend `frontend-design` and `playwright` |

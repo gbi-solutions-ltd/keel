@@ -70,6 +70,133 @@ find_marker() {   # find_marker <maxdepth> <pattern>...
     return 1
 }
 
+# Whether this tree is a PL/SQL project. Clauses one to three of the marker, and the fourth through
+# has_oracle_token.
+#
+# NOT MEMOISED, AND THE REASON IS COST RATHER THAN IMPOSSIBILITY. One `keel init` calls this eight
+# times, traced by printing FUNCNAME from sql_census during a real init rather than counted by
+# reading the caller graph: detect_stack reaches it from write_profile, from project_kind and three
+# times by way of detect_has_ui; expected_plugins reaches it four times, twice through detect_has_ui
+# and twice directly; and detect_also accounts for one more. This count changes whenever a caller of
+# detect_stack, detect_has_ui or detect_also is added or removed, and has to be re-traced rather than
+# reasoned about when it does.
+#
+# A cache is possible: it cannot be filled from inside this function, because every call sits in its
+# own `$( )`, but pkg_scripts_load one file over solves exactly that by being called from
+# write_profile's own shell at bin/keel:363, and the same shape here would take eight walks to one.
+#
+# It is not done because the cost does not warrant a new global and a second call site: one census
+# measured 0.024 seconds on a 2,200 file tree, so eight of them are about 0.19 seconds, once, at
+# init. FR-04 is what keeps that bounded, since a repository declaring any of the thirteen never
+# reaches this function at all. Revisit if the census ever grows more expensive.
+#
+# The same applies to has_oracle_token, which is the second walk and the more expensive one. Its
+# worst case is a large manifest-less SQL tree with no Oracle token anywhere, where grep reads every
+# file and finds nothing: measured at 102 ms over 800 .sql files, so about 0.8 seconds across the
+# eight calls of one init. A tree that fails the count or the dominance test never reaches it, and a
+# tree that is genuinely PL/SQL stops at the first match.
+is_plsql_tree() {
+    local census sqlc othermax
+    census="$(sql_census)"
+    sqlc="${census%% *}"; othermax="${census##* }"
+    [ "${sqlc:-0}" -ge 10 ] && [ "${sqlc:-0}" -gt "${othermax:-0}" ] && has_oracle_token
+}
+
+# Echo: two integers, the number of .sql plus .plsql files and the largest number sharing any other
+# single extension. One find and one awk, because lib/detect-stack.sh uses neither sed, sort, uniq
+# nor tr and this must not be the change that introduces them.
+#
+# Extensionless files are not counted on either side. They are not a competing extension, so a tree
+# of 191 .sql files and 300 Makefiles is still SQL-dominant, which is the intended reading.
+#
+# The extension is what follows the last dot rather than the first, so .oracle.sql is a .sql file.
+# A dot in first position is not an extension and neither is one in last: .gitignore and a name
+# ending in a dot are both skipped, the second because every such name shared one empty bucket and
+# that bucket could outvote .sql.
+#
+# -print here, not the -print0 has_oracle_token's fallback uses, and the difference is deliberate.
+# Reading NUL-separated records back needs RS="\0", which macOS's default /usr/bin/awk does not
+# support: `printf 'a\0b\0c\0' | awk 'BEGIN{RS="\0"}{print}'` prints a and silently drops the
+# rest, verified on this project's awk on 2026-08-18. grep and xargs can be assumed to take -0
+# portably; awk cannot. The residue is that a filename containing a newline arrives as two records,
+# so its extension is read from the tail and a count can move by one. RS="\0" would instead make
+# the census read one file and stop.
+sql_census() {
+    find . \( -name node_modules -o -name .git \) -prune -o -type f -print 2>/dev/null | awk '
+        { n = split($0, p, "/"); base = p[n]
+          if (!match(base, /\.[^.]+$/) || RSTART == 1) next
+          ext = tolower(substr(base, RSTART + 1))
+          if (ext == "sql" || ext == "plsql") { s++; next }
+          # Package specs and bodies do not count as evidence, because a machine-wide search on
+          # 2026-08-18 found none anywhere and PRD A2 ruled them out as markers on that basis. They
+          # must not count against the evidence either: 30 .pks plus 30 .pkb plus 12 .sql censused
+          # as "12 30" and went undetected. Taking them out of the denominator is the whole of it:
+          # they are still not evidence, so 200 .pkb plus 9 .sql censuses as "9 0" and returns
+          # nothing. The idiomatic Oracle layout is detected only where ten or more plain .sql sit
+          # alongside it. Same principle the line above applies to extensionless files, applied here.
+          if (ext == "pks" || ext == "pkb" || ext == "prc" || ext == "fnc") next
+          c[ext]++; if (c[ext] > m) m = c[ext] }
+        END { print s+0, m+0 }'
+}
+
+# Whether any .sql or .plsql file carries a token no other SQL dialect uses. This is clause 4 of the
+# PL/SQL marker and it is what stops a PostgreSQL migrations repository being called Oracle.
+#
+# No other dialect uses the three tokens natively, which is weaker than exclusive: PostgreSQL's
+# orafce extension really does provide varchar2 and dbms_output, and a comment reading "these were
+# VARCHAR2 columns" matches as readily as a declaration. Outside comments and compatibility shims
+# they do not appear, so this is an accepted heuristic and not a proof. %TYPE and %ROWTYPE were
+# considered and rejected: PL/pgSQL supports both, so keying on them puts the false positive
+# straight back. Do not add them.
+#
+# -q stops at the first match, which is FR-13: on a repository that is PL/SQL the scan ends at the
+# first file, and only a tree with no Oracle token anywhere is read in full.
+has_oracle_token() {
+    local rc hit
+    # Case-folded globs, not -i. The -i flag folds the pattern, never the --include glob, so an
+    # all-uppercase Oracle tree passed the census and was invisible here. Verified on BSD grep
+    # 2.6.0 and GNU grep 3.11: both match K.SQL, k.sql and k.PlSql, and reject k.txt.
+    #
+    # [[:blank:]] rather than [[:space:]], because grep is line-based: a class that includes the
+    # newline claims a reach across lines that this scan does not have.
+    #
+    # A file named exactly `.sql` is scanned here and not counted by the census, so a tree can be
+    # called PL/SQL on evidence its own census does not acknowledge. Left alone deliberately: the
+    # clean fix is a glob that excludes bare dotfiles and there is no portable one, because BSD grep
+    # matches --include against the whole path and GNU against the basename, so `?*.[sS][qQ][lL]`
+    # still matched ./.sql here. The residue is one file name, and it can only produce a positive on
+    # a tree that is already SQL-dominant.
+    grep -qriE 'VARCHAR2|DBMS_|PACKAGE[[:blank:]]+BODY' \
+        --include='*.[sS][qQ][lL]' --include='*.[pP][lL][sS][qQ][lL]' \
+        --exclude-dir=node_modules --exclude-dir=.git . 2>/dev/null
+    rc=$?
+    [ "$rc" -eq 0 ] && return 0
+    [ "$rc" -eq 1 ] && return 1
+    # Anything above 1 means either this grep rejected --include, which busybox grep does and which
+    # would make every repository on an Alpine host silently not-PL/SQL, or something under the tree
+    # could not be read: both GNU and BSD grep also return 2 on an ordinary read error, reproduced
+    # with a mode-000 file present and no match anywhere. The answer is not trustworthy in either
+    # case, so re-scan with flags every grep has. -print0 and -0 carry an odd filename through
+    # intact, which is why they stay.
+    #
+    # -l into a non-empty test, not -q. xargs runs grep once per batch and fails if any batch fails,
+    # so `xargs grep -q` loses a match found in an earlier batch: 60 files in 20-file batches with
+    # the token in the first returned 1. Measured 2026-08-18. head -n 1 keeps the early stop.
+    #
+    # Checked for at least one match before xargs runs at all: GNU xargs runs its command once even
+    # on empty input unless given -r, and grep with no file operand then reads the inherited stdin,
+    # which is a hang rather than a quick "no match" on Linux. BSD xargs does not have this failure
+    # mode, which is why it went unnoticed here. -print -quit is the same idiom find_marker already
+    # uses for the same reason: stop at the first hit rather than collect them all.
+    [ -n "$(find . \( -name node_modules -o -name .git \) -prune -o \
+        -type f \( -name '*.[sS][qQ][lL]' -o -name '*.[pP][lL][sS][qQ][lL]' \) -print -quit 2>/dev/null)" ] \
+      || return 1
+    hit="$(find . \( -name node_modules -o -name .git \) -prune -o \
+        -type f \( -name '*.[sS][qQ][lL]' -o -name '*.[pP][lL][sS][qQ][lL]' \) -print0 2>/dev/null \
+      | xargs -0 grep -liE 'VARCHAR2|DBMS_|PACKAGE[[:blank:]]+BODY' 2>/dev/null | head -n 1)"
+    [ -n "$hit" ]
+}
+
 # The manager this project actually uses. The lockfile is the declaration; the binaries on the
 # machine running init are not, because a teammate's machine has a different set.
 #
@@ -204,6 +331,16 @@ detect_languages() {
         esac
     fi
 
+    # PL/SQL, and it is the only inferred language here. Every branch above reads a file the project
+    # declares; PL/SQL has no manifest format, so this infers from the shape of the tree instead.
+    #
+    # It runs last and only when nothing else matched, which is what makes it safe: any repository
+    # carrying a manifest has already been classified and never reaches the census. That ordering is
+    # a requirement, FR-04, not an optimisation.
+    if [ -z "$out" ] && is_plsql_tree; then
+        out="$out plsql"
+    fi
+
     # Word splitting is the point here, and the first occurrence wins so the primary is stable
     # whatever a repository adds later.
     # shellcheck disable=SC2086
@@ -265,6 +402,18 @@ lang_profile() {
         [ -f meson.build ] && pm=meson
         printf 'cpp native none %s\n' "$pm" ;;
       lua)    printf 'lua lua none luarocks\n' ;;
+      plsql)
+        # The framework marker is keel's own apex-export output, written by lib/apex_render.py, so
+        # it is self-declaring and cannot be claimed by another tool's manifest.json. The
+        # apex_version key is what distinguishes it, not the filename.
+        #
+        # Matched as a key (quote, name, quote, colon), not a bare substring: a manifest whose value
+        # happens to be the string "apex_version" is not an APEX export.
+        local fw=none
+        grep -qE '"apex_version"[[:space:]]*:' manifest.json 2>/dev/null && fw=apex
+        # No package manager exists for PL/SQL. `none` is the honest value and it is what a skill
+        # reads to know not to look for one.
+        printf 'plsql oracle %s none\n' "$fw" ;;
       *)      printf 'unknown unknown none none\n' ;;
     esac
 }
@@ -535,7 +684,9 @@ detect_verify() {
 # wrote a hardcoded false. Every project, including a Next.js one, was told it had no UI.
 detect_has_ui() {
     local fw; fw="$(detect_stack | cut -d' ' -f3)"
-    case "$fw" in next|react|vue|svelte|angular) printf 'true'; return 0 ;; esac
+    # apex is a UI, but not a local one: its pages are stored in the database, so a repository can
+    # be a genuine APEX application with no public/ or index.html for the fallback below to find.
+    case "$fw" in next|react|vue|svelte|angular|apex) printf 'true'; return 0 ;; esac
     if [ -d public ] || [ -f index.html ]; then printf 'true'; else printf 'false'; fi
 }
 
@@ -552,13 +703,24 @@ detect_has_ui() {
 #
 # Deliberately not lockfiles: a transitive driver pulled in by something else is not a declaration
 # that this project uses that store, and package-lock.json names every one of them.
-detect_datastores() {
-    local files='' f pair
+detect_datastores() {   # detect_datastores [lang]
+    # The language is passed in by write_profile, which already knows it, the same reason
+    # detect_verify takes one: detection touches the filesystem, and re-running detect_languages
+    # here would repeat sql_census and has_oracle_token's tree walks for a membership check the
+    # caller already paid for.
+    local lang="${1:-}" files='' f pair
+    [ -n "$lang" ] || lang="$(detect_stack | cut -d' ' -f1)"
     for f in package.json requirements.txt pyproject.toml Pipfile go.mod composer.json Gemfile \
              Cargo.toml pom.xml build.gradle build.gradle.kts \
              docker-compose.yml docker-compose.yaml compose.yml compose.yaml; do
         [ -f "$f" ] && files="$files $f"
     done
+    # PL/SQL first, and outside the manifest loop below. That loop greps dependency files and a
+    # PL/SQL repository has none, so a ninth pair in the list could never fire on one. CON-04.
+    #
+    # PL/SQL is never combined with another language, FR-11, so the primary language alone is
+    # exactly the membership test detect_languages used to run a whole second cascade to answer.
+    [ "$lang" = plsql ] && printf 'oracle\n'
     [ -z "$files" ] && return 0
     # `"pg"` is quoted rather than bare: the bare token appears inside half the package names on npm.
     for pair in 'postgres:postgres|psycopg|pgx|npgsql|"pg"' \

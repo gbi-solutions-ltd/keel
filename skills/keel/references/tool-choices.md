@@ -42,6 +42,7 @@ whatever the tool's current popularity, and changing it is a normal edit.
 | `swift` | swift-testing | XCTest | The current direction and much less ceremony per test. XCTest where the project still supports an older toolchain |
 | `cpp` | Catch2 | GoogleTest | Header-only, so it adds a dependency and not a build system. GoogleTest where mocking is central |
 | `lua` | busted | none | The only option with real adoption |
+| `plsql` | utPLSQL | none | The only real option, and the ecosystem agrees on it. It runs inside the database, so `verify.test` stays `null` until somebody supplies a connection string, a schema and credentials, none of which belong in the repository |
 
 **Coverage:** use the runner's own first (`vitest --coverage`, `pytest --cov`, `go test -cover`,
 JaCoCo on Gradle). A separate coverage tool is a second thing to configure for a number that is
@@ -66,6 +67,7 @@ author never read. `verify.format_fix` is the writing one.
 | `swift` | swift-format | SwiftLint | Ships with the toolchain now. SwiftLint adds opinions beyond formatting |
 | `cpp` | clang-format with clang-tidy | cpplint | The compiler vendor's own, so it understands the language rather than pattern-matching it |
 | `lua` | Stylua with luacheck | none | Formatting and static analysis are separate here, and both are small |
+| `plsql` | none | none | No linter ships outside vendor IDE tooling, and a rule set nobody can run in CI is not a lint step. Say `null` in the profile |
 | shell | shellcheck | none | Nothing else finds shell bugs. It is what this repository uses on itself |
 
 ## Typecheck
@@ -78,6 +80,7 @@ author never read. `verify.format_fix` is the writing one.
 | `ruby` | none | Sorbet only where it is already in use. Adding gradual typing to an untyped Ruby codebase is a project, not a gap |
 | `java`, `kotlin`, `csharp`, `go`, `rust`, `swift`, `cpp` | the build | Compiled. `verify.build` is the typecheck and `verify.typecheck` stays `null` rather than repeating it |
 | `javascript`, `lua` | none | Say `null` in the profile. A typecheck a language cannot do is not a gap |
+| `plsql` | none | The database is the compiler. A package body that does not compile fails at install time, so `verify.typecheck` stays `null` rather than repeating it |
 
 ## Everything else
 

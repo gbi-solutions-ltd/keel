@@ -6,12 +6,12 @@
 # counter, no reading of any file that changes. One volatile byte here costs the cache on every
 # request in every session.
 #
-# THE ONE EXCEPTION, AND ITS BOUND. It reads `conventions.response_style` from the project profile.
-# That is a file that changes, which the rule above forbids, so the bound matters: the output has
-# exactly two forms, and it moves between them only when a person deliberately edits the key. That
-# costs one cache miss on the session after the edit, the same as editing CLAUDE.md, rather than one
-# per request. A key read for its value would be volatile; a key read for which of two paragraphs to
-# print is not.
+# THE ONE EXCEPTION, AND ITS BOUND. It reads `conventions.response_style` and
+# `conventions.explain_level` from the project profile. That is a file that changes, which the rule
+# above forbids, so the bound matters: the output has exactly four forms, and it moves between them
+# only when a person deliberately edits a key. That costs one cache miss on the session after the
+# edit, the same as editing CLAUDE.md, rather than one per request. A key read for its value would
+# be volatile; a key read for which of four paragraphs to print is not.
 #
 # NO python3 HERE. This runs before every session, so it must not depend on an interpreter being
 # present or pay its startup. The profile is matched with a builtin `case`, which also means the
@@ -47,6 +47,18 @@ Replies stay brief; artifacts stay full. Say what changed, where it is, and what
 Never omit which checks ran or were skipped, assumptions, deviations, or a Done when command's output.
 TXT
 
+read -r -d '' PLAIN_TERSE <<'TXT' || true
+
+Replies stay brief and plain; artifacts full and technical. Define a technical term on first use.
+Never omit which checks ran or were skipped, assumptions, deviations, or a Done when command's output.
+TXT
+
+read -r -d '' PLAIN_VERBOSE <<'TXT' || true
+
+Replies stay plain; artifacts full and technical. Define a technical term on first use.
+Never omit which checks ran or were skipped, assumptions, deviations, or a Done when command's output.
+TXT
+
 # Walk up for the profile, the way sensitive-guard does. A session started in a subdirectory is
 # ordinary, and looking only in the current directory silently loses the project's choice.
 profile=""
@@ -57,20 +69,37 @@ while [ -n "$d" ]; do
     d="$(dirname "$d")"
 done
 
-# Terse unless the project asked for verbose. Absent profile, absent key and unreadable file all
-# mean terse, because that is the default and a hook is not the place to report a bad profile.
+# Terse and technical unless the project asked otherwise. Absent profile, absent key, unreadable
+# file and an unrecognised value all mean the defaults, because that is what the schema documents
+# and a hook is not the place to report a bad profile.
 #
 # The `-r` test is load bearing and was added after review caught it. This script runs under
 # `set -e`, and the assignment is the last command in the chain, so a read that fails takes the
 # whole hook down: exit 1, nothing on stdout, and the session loses the router pointer entirely
-# rather than just the brevity rule. A 000-mode profile is rare; a session that silently looks
+# rather than just the paragraph. A 000-mode profile is rare; a session that silently looks
 # like keel is not installed is expensive.
+#
+# Four combinations, four outcomes, and the silent one is deliberate: verbose plus technical is the
+# project that asked for neither rule.
 style_text=""
 [ -n "$profile" ] && [ -r "$profile" ] && style_text="$(<"$profile")"
+
+verbose=no
 case "$style_text" in
-    *'"response_style": "verbose"'*|*'"response_style":"verbose"'*) ;;
-    *) CONTEXT="$CONTEXT$BREVITY" ;;
+    *'"response_style": "verbose"'*|*'"response_style":"verbose"'*) verbose=yes ;;
 esac
+
+plain=no
+case "$style_text" in
+    *'"explain_level": "plain"'*|*'"explain_level":"plain"'*) plain=yes ;;
+esac
+
+if [ "$plain" = yes ]; then
+    if [ "$verbose" = yes ]; then CONTEXT="$CONTEXT$PLAIN_VERBOSE"
+    else CONTEXT="$CONTEXT$PLAIN_TERSE"; fi
+elif [ "$verbose" = no ]; then
+    CONTEXT="$CONTEXT$BREVITY"
+fi
 
 escape() { local s="$1"; s="${s//\\/\\\\}"; s="${s//\"/\\\"}"; s="${s//$'\n'/\\n}"; printf '%s' "$s"; }
 

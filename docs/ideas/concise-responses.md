@@ -92,8 +92,12 @@ line". A blunt terseness instruction erodes the rules that make the process audi
 
 ## Open questions
 
-1. **What is the actual split?** Before writing a rule, measure one comparable task with and without
-   keel loaded. If keel is 10% of reply length, this idea is close to worthless.
+1. ~~**What is the actual split?**~~ **Answered 2026-08-18: nobody will measure it, and the
+   question is closed rather than carried forward.** It went unanswered through the terse rollout
+   and again through `docs/ideas/plain-language-chat.md`, whose requester chose to accept the
+   problem statement as asserted from use for the second time, knowingly. Recorded as `A1` in
+   `docs/prd/plain-language-chat.md`, whose success metrics section says `Unknown, needs a decision`
+   for the same reason.
 2. **Opt-in or forced?** Forced is one boolean and takes over a setting the user chose. Recommended
    answer: opt-in.
 3. **Does terseness break the evals?** The Tier 3 scenarios assert that gates are announced. A style
@@ -106,7 +110,9 @@ line". A blunt terseness instruction erodes the rules that make the process audi
 the same pass, trim the report and summary sections of the skills that produce the most chat.
 
 Do not put a brevity rule in the always-loaded block while the block is over budget, and measure the
-split before spending anything larger than this on the idea.
+split before spending anything larger than this on the idea. **Both halves were overruled**: the
+rule went into the block on 2026-08-16 by instruction, and the measurement was closed unanswered on
+2026-08-18. See open question 1.
 
 ## Not decided here
 

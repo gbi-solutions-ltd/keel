@@ -29,7 +29,8 @@
       "additionalProperties": true,
       "properties": {
         "name": {
-          "type": "string"
+          "type": "string",
+          "description": "Name of this project, used in generated documents and reports. keel init takes it from the directory name; change it where the directory is not what the project is called."
         },
         "kind": {
           "enum": [
@@ -43,7 +44,8 @@
           "description": "`docs` means pre-implementation: no stack and no source files. doctor then skips the verify checks rather than failing on commands a documents-only repo cannot have."
         },
         "description": {
-          "type": "string"
+          "type": "string",
+          "description": "One line saying what this project is for, in the terms its users would use. Skills quote it at the top of a snapshot or a PRD, so a reader who has never seen the repository knows what they are looking at. Left empty by init because only a human knows the answer."
         }
       }
     },
@@ -52,16 +54,20 @@
       "additionalProperties": true,
       "properties": {
         "language": {
-          "type": "string"
+          "type": "string",
+          "description": "The primary language, which drives the verify commands and the conventions a skill applies. Read from a declared manifest such as package.json or go.mod for every language except plsql, which has no manifest format and is inferred from the shape of the tree instead: no other manifest present, .sql and .plsql dominant, and an Oracle-exclusive token in one of them. unknown means nothing was detected, and a skill asks rather than guessing."
         },
         "runtime": {
-          "type": "string"
+          "type": "string",
+          "description": "What actually executes the code: node, jvm, dotnet, python, native. Distinct from the language because several languages share a runtime and the runtime is what a deployment has to provide."
         },
         "framework": {
-          "type": "string"
+          "type": "string",
+          "description": "The application framework in use, such as nextjs, laravel or spring. none means the project uses its language's standard library and no framework, which is a real answer and not a gap."
         },
         "package_manager": {
-          "type": "string"
+          "type": "string",
+          "description": "How dependencies are installed and scripts are run, such as pnpm, poetry or cargo. Skills prefix commands with it, so a wrong value produces commands that do not run. A project with no package manager gets the string none rather than null."
         },
         "also": {
           "type": "array",
@@ -74,7 +80,8 @@
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "description": "Datastores this project talks to, detected from declared dependencies. Skills use it to know which failure modes are worth asking about: a service with postgres has migrations and transactions to reason about, one with none does not."
         },
         "has_ui": {
           "type": "boolean",
@@ -95,7 +102,8 @@
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "The command that runs the whole test suite, exactly as a shell would run it. Read from what the project declares rather than inferred from the stack, because the real command is frequently not the idiomatic one. null means the project genuinely has none, and a skill asks instead of substituting a guess."
         },
         "test_one": {
           "type": [
@@ -136,25 +144,29 @@
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "The command that checks types without producing a build. null for a language with no separate typecheck step, which is most of them."
         },
         "build": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "The command that produces the deployable artifact. null where there is nothing to build, such as an interpreted service run from source."
         },
         "e2e": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "The command that runs end-to-end tests against a running system. Separate from verify.test because it usually needs an environment, so a skill may run the unit suite and skip this one."
         },
         "security": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "The command that runs a security scanner, such as a dependency audit. null where the project has none; security-audit then does its own reading rather than reporting a clean scan that never ran."
         }
       }
     },
@@ -174,37 +186,43 @@
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "Path to an existing repository snapshot, where the project already has one under a different name. Skills read the mapped path instead of the default under docs_root, so a repository with its own naming convention is not duplicated. null means use the default."
         },
         "prd": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "Path to an existing requirements document, where the project already has one under a different name. null means use the default under docs_root."
         },
         "stories": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "Path to an existing backlog or stories document. null means use the default under docs_root."
         },
         "architecture": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "Path to an existing architecture document. null means use the default under docs_root."
         },
         "decisions": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "Path to an existing decision record directory, such as an adr/ folder the project already keeps. null means use the default under docs_root."
         },
         "plans": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "Path to an existing implementation plans directory. null means use the default under docs_root."
         }
       }
     },
@@ -224,42 +242,48 @@
             "required",
             "warn",
             "off"
-          ]
+          ],
+          "description": "Whether a failing test must be written before implementation code. Read by no skill, hook or CLI path today: the tdd skill asks for the cycle unconditionally, so changing this key changes nothing. Declared so the intent has somewhere to live once something enforces it."
         },
         "coding_standards": {
           "enum": [
             "required",
             "warn",
             "off"
-          ]
+          ],
+          "description": "Whether a change must follow the conventions in the project's standards document. Read by no skill, hook or CLI path today, so changing it has no effect. Declared for the same reason as gates.tdd."
         },
         "review": {
           "enum": [
             "required",
             "warn",
             "off"
-          ]
+          ],
+          "description": "Whether review-code must run before a change ships. Read by no skill, hook or CLI path today: ship runs its own gate regardless, so changing this key changes nothing."
         },
         "security_audit": {
           "enum": [
             "required",
             "warn",
             "off"
-          ]
+          ],
+          "description": "Whether security-audit must run before a change ships. required on anything touching money, credentials or personal data. warn elsewhere reports findings without blocking."
         },
         "observability": {
           "enum": [
             "required",
             "warn",
             "off"
-          ]
+          ],
+          "description": "Whether new code must emit the logs and traces the observability standard describes. Read by no skill, hook or CLI path today, so changing it has no effect. A project with no telemetry backend does not need to set it to off; nothing is asking."
         },
         "docs_updated": {
           "enum": [
             "required",
             "warn",
             "off"
-          ]
+          ],
+          "description": "Whether a change must land with the documents it makes wrong. Read by no skill, hook or CLI path today, so changing it has no effect. The obligation is carried by the standards document and by ship's own gate instead."
         },
         "commit_guard": {
           "enum": [
@@ -284,7 +308,7 @@
         "context_window": {
           "type": "integer",
           "minimum": 1,
-          "description": "Context window in tokens for sessions in this project. Set it where sessions use a larger window than the 200000 default: a 1M session records its model as plain claude-opus-5 and carries no field naming its window, so it cannot be detected. Left unset, the watchdog assumes 200000 and corrects upward once a session is observed exceeding it, which is proof but arrives late."
+          "description": "Context window in tokens for sessions in this project, written by keel init as 200000. It is a floor and not a ceiling: the watchdog raises it once a session is observed exceeding it, since the API would have refused the request otherwise, so a value that understates the window costs nothing beyond an early first estimate. It is never raised above 1000000, the largest window any current model offers, so a mistyped extra zero cannot silence the watchdog. A value at or below 200000 has no effect, because a floor only ever raises: KEEL_CONTEXT_WINDOW is how a smaller window is forced deliberately, and it is used as set except that it too is capped at 1000000."
         },
         "context_warn_pct": {
           "type": "integer",
@@ -312,14 +336,16 @@
       "additionalProperties": true,
       "properties": {
         "commit_style": {
-          "type": "string"
+          "type": "string",
+          "description": "The commit message convention this repository follows. conventional means the type(scope): subject form, and skills write messages in it. Set it to none where the repository has no convention, rather than having keel impose one."
         },
         "default_branch": {
           "type": "string",
           "description": "The repository's default branch, which is frequently not the checked-out one. Skills refuse to implement here and repo-snapshot compares HEAD against it."
         },
         "working_branch": {
-          "type": "string"
+          "type": "string",
+          "description": "The branch this project's work belongs on, where that is not a fresh branch per change. Read by no skill today, so setting it does not change what a skill proposes. Declared so a repository using one long-lived integration branch has somewhere to say so."
         },
         "protect_default_branch": {
           "type": "boolean",
@@ -333,6 +359,14 @@
           ],
           "default": "terse",
           "description": "terse keeps conversation replies short and leaves artifacts at full detail; the SessionStart hook injects the rule. verbose turns it off. Absent is treated as terse."
+        },
+        "explain_level": {
+          "enum": [
+            "technical",
+            "plain"
+          ],
+          "default": "technical",
+          "description": "technical assumes the vocabulary of the thing being described; plain has chat replies define a technical term the first time they use it. It changes replies only: artifacts stay technical whatever this says, and the SessionStart hook picks its injected paragraph from this key and response_style together. Absent is treated as technical."
         }
       }
     },
@@ -351,10 +385,12 @@
           "description": "Instrumentation is OpenTelemetry regardless, so the vendor sits behind the exporter and switching is configuration."
         },
         "otlp_endpoint_var": {
-          "type": "string"
+          "type": "string",
+          "description": "Name of the environment variable holding the OTLP endpoint, not the endpoint itself. The name is a fact about the project and belongs in a committed file; the value is a fact about an environment and does not."
         },
         "log_shipping": {
-          "type": "string"
+          "type": "string",
+          "description": "How logs reach the backend: otlp to export them directly, stdout to let the platform collect them, none where nothing is shipped. It decides whether generated code configures an exporter or simply writes to stdout."
         }
       }
     },
@@ -366,31 +402,36 @@
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "Where this project runs once shipped, such as kubernetes, lambda or a plugin marketplace. setup-deployment reads it to know which pipeline shape applies. null means it has not been decided, which is different from having no deployment."
         },
         "ci": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "The CI system that runs this project's pipeline, such as github-actions or gitlab-ci. null means there is none yet, and setup-deployment proposes one rather than assuming."
         },
         "registry": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "Where built images or packages are published, as a registry host and path. Named here so a pipeline and a runbook agree on one value instead of each carrying its own copy. Credentials never belong here: this is the address, not the access."
         },
         "envs": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "description": "The environments this project deploys to, in promotion order, such as staging then production. An empty list means it deploys nowhere yet. Skills use the order to know what promotes to what."
         },
         "secrets_manager": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "Where this project's secrets actually live, such as a named vault or a cloud secret store. Recorded so a runbook can say where to rotate a credential without a reader having to ask. It names the store, never a secret."
         }
       }
     },
@@ -402,13 +443,15 @@
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "description": "Plugins this project expects, as marketplace-qualified names such as typescript-lsp@claude-plugins-official. keel doctor names any that are not enabled, along with the command that installs them. A value here is preserved when init is re-run, so a curated list survives."
         },
         "excluded": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "description": "Plugins this project deliberately does not want, as marketplace-qualified names. Read by nothing today: plugin_report checks plugins.recommended only, so listing a plugin here does not stop it being recommended. Declared so a project has somewhere to record the decision once it is honoured."
         }
       }
     },

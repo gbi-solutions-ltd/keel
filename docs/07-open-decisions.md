@@ -449,6 +449,10 @@ not through `outputStyle`. `keel init` writes `conventions.response_style: "ters
 the mechanism `claude-plugins-official/explanatory-output-style` uses for the same problem, and it
 needs no style name.
 
+Extended on 2026-08-18: the hook now reads `conventions.explain_level` alongside `response_style`
+and selects one of four paragraphs rather than one of two. Length and vocabulary are separate dials,
+and the same reasoning applies to both.
+
 **STILL OPEN, and now an optimisation rather than the mechanism.** Writing `outputStyle` into
 `.claude/settings.json` would move the rule out of the per-request prefix and save the 56 tokens the
 injection now costs. It waits on the same single observation, and the behaviour no longer depends on

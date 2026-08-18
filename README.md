@@ -70,6 +70,20 @@ This is on by default in every keel project. To turn it off, set `verbose` in `.
 `keel init` writes `"terse"` there so the key is visible rather than implied, and a project with no
 key at all is treated as terse, so this applies without re-running `init`.
 
+### Replies can be plain as well as short
+
+Length and vocabulary are separate dials. Where somebody who is not a developer reads the replies,
+set `plain` in `.keel/profile.json`:
+
+```json
+"conventions": { "explain_level": "plain" }
+```
+
+A plain reply defines a technical term the first time it uses it, rather than swapping it for a
+simpler word: the reply still has to point at an artifact that uses the real term. `technical` is
+the default and is what `keel init` writes. This changes replies only. Artifacts stay technical
+whatever it says, and it composes with `response_style`, so all four combinations are valid.
+
 The plugin also ships an output style, **keel terse**, selectable in `/config` under **Output
 style**. That one is machine-wide rather than per-project, so it is the option for non-keel
 repositories. It is not required here and nothing sets it for you.
@@ -102,6 +116,9 @@ nobody.
 **`keel init` is safe to re-run** and is the only way per-project files pick up a change. It
 merges: your corrected verify commands, your profile edits, and your accumulated allow rules all
 survive. It adds what is missing and leaves the rest alone.
+
+Every key `.keel/profile.json` may contain, what it does, and whether keel writes it or you do,
+is listed in [docs/profile-keys.md](docs/profile-keys.md).
 
 `.keel/profile.json` records `keel_version`, so comparing it with `keel version` tells you
 whether a project has been re-initialised since the last upgrade.

@@ -5,6 +5,146 @@ Notable changes to keel. Versions follow [semantic versioning](https://semver.or
 Until 1.0.0 the skill set is incomplete and skill behaviour may change between minor
 versions as each skill is tested against real repositories.
 
+## 0.11.0 - 2026-08-18
+
+Four changes. Three touch the same file, `.keel/profile.json`: the watchdog's window key changed
+meaning and is now written, every key in the profile is now described and discoverable, and replies
+can be asked to define their technical terms. The fourth is a new language.
+
+**`gates.context_window` is now a floor, and `keel init` writes it.** The watchdog cannot read a
+session's context window: a 1M session records its model as plain `claude-opus-5` and no field
+anywhere names the window. The only correct mechanism was the profile key, and nothing wrote it, so
+every project needed it typed in by hand and `keel doctor` nagged about it on every run.
+
+Writing it was unsafe until the key changed meaning. `window_for` returned a configured value before
+it reached the observation correction, so a profile saying 200000 on a genuine 1M session reported
+200% occupancy, hard-stopped the session at 170,000 tokens and never lifted. Writing a conservative
+value into every profile would have made that the default experience. The key is now a floor:
+observation may still raise it in flight, which is what makes a wrong value recoverable rather than
+permanent.
+
+**Replies can be asked to use plain language, and artifacts still cannot.** The reply is the only
+part of keel's output aimed at a reader who is not a developer, and nothing told it to avoid the
+vocabulary of the thing it describes. `conventions.explain_level` is that dial, separate from
+`response_style` because length and vocabulary are independent choices. The always-loaded injection
+did not grow to pay for it: the hook swaps its paragraph rather than appending one, so the defaults
+still cost exactly what they did before.
+
+**PL/SQL is detected, and it is the first language keel infers rather than reads.** All thirteen
+existing languages are read from a file the project commits about itself, which is what makes a
+profile trustworthy, and a wrong profile is worse than an empty one because an empty one makes a
+skill ask. So the marker is deliberately conservative: no other language's manifest anywhere, `.sql`
+and `.plsql` outnumbering every other extension, at least ten of them, and at least one carrying a
+token no other dialect uses natively. A repository that declares itself is never censused, so no
+existing project's profile can change and `keel init` on one does no extra filesystem work.
+
+**Every profile key is now described, and discoverable in one page.** The file every skill reads and
+every user is expected to adjust could not be learned without reading `bin/keel`. 35 of 59 declared
+keys carried no description, and five had neither a description nor a mention in any document.
+
+### Added
+
+- `keel init` writes `gates.context_window: 200000`. `SCHEMA_VERSION` does not move, because the
+  schema already declared the field.
+- An upper bound of `LONG_WINDOW`, currently 1,000,000, on every window source. It is the largest
+  context window any current model offers and already the highest value observation could reach, so
+  it adds no ceiling the observed path did not have. A mistyped extra zero no longer silences the
+  watchdog for the life of the project.
+- `keel doctor` reports the window the watchdog will actually use, and says why when that differs
+  from the file: a value above the maximum, a value below the default that a floor cannot apply, a
+  value that is not a usable number, or `KEEL_CONTEXT_WINDOW` overriding all of them.
+- `docs/profile-keys.md`, a generated reference for every key `.keel/profile.json` may contain,
+  saying what each does and whether `keel init` writes it or you do. Produced by
+  `tests/generate-profile-keys.sh`, linked from the README, and guarded two ways:
+  `tests/validate-skills.sh` fails when the page and the schema disagree, and `tests/test-keel.sh`
+  pins the set-by column against a real `keel init`. The column is derived from an actual init
+  rather than a maintained list, because a maintained list is what drifts.
+- A description on all 35 keys that had none. The five with no description and no mention anywhere
+  got the most care: `deploy.secrets_manager` now says it names the store and never a secret,
+  `deploy.registry` that it is the address and not the access.
+- `keel init` writes `plugins.recommended`, and `keel doctor` names any recommended plugin that is
+  not enabled along with the `/plugin install` command for it.
+- PL/SQL detection, the fourteenth language and the first inferred rather than read. A repository
+  with no manifest for any of the other thirteen, where `.sql` and `.plsql` outnumber every other
+  extension and at least one carries an Oracle-exclusive token, is detected as `plsql` with `oracle`
+  as its datastore. Every verify command stays `null`, because utPLSQL runs inside a database and the
+  connection details are not in the repository, so the profile still needs finishing by hand.
+- `conventions.explain_level`, `technical` by default. Set it to `plain` and chat replies define a
+  technical term the first time they use it. Artifacts are unaffected: a PRD, plan or ADR stays as
+  technical and as detailed as its skill requires. `keel init` writes the key, and the SessionStart
+  hook picks its paragraph from this key and `response_style` together, so all four combinations are
+  configured rather than three plus a silence.
+
+### Changed
+
+- `gates.context_window` is a floor rather than a ceiling. A value at or below 200000 now has no
+  effect; `KEEL_CONTEXT_WINDOW` is how a smaller window is forced deliberately, and it is used as
+  set apart from the bound.
+- `lib/context_watch.py`'s `measure` and `handoff` commands take an optional project directory and
+  read `gates.context_window` from it. They previously ignored the profile entirely, which was
+  harmless while almost no profile set the key and wrong once `init` wrote it everywhere: a 1M
+  project at 150,001 tokens got a handoff header reading `150,001 of 200,000 tokens, 75.0%` while
+  the hook sat correctly silent at 15%. The project is named rather than inferred from the working
+  directory, because a transcript does not say which project it belongs to and guessing made the
+  same transcript report two different windows depending on where the command was run. With no
+  project named the window comes from the transcript alone, as before.
+- The `gates.context_window` schema description, both `keel doctor` watchdog messages, and
+  `window_for`'s docstring all describe the rule the code implements. All four previously said an
+  explicit setting simply wins.
+- `SCHEMA_VERSION` moves to 2, for `conventions.explain_level`. Existing projects will see
+  `keel doctor` report the profile as older than the installed keel. Re-run `keel init` to pick the
+  key up; it merges, so your own values survive.
+- `tests/validate-skills.sh` sizes the SessionStart injection for all four dial combinations rather
+  than only the one the local profile selects, and reports a hook that produces no output instead of
+  counting it as comfortably small.
+
+### Fixed
+
+- The session-prefix size check in `tests/test-session-start.sh` ran the hook by a relative path
+  with only an upper bound, so from any other working directory it measured 0 tokens and passed. The
+  hook could have been deleted and it would have stayed green. It now uses the absolute path and a
+  lower bound.
+- `keel doctor` no longer leaks `integer expression expected` when `gates.context_window` holds a
+  value wider than a 64 bit integer.
+- A repository that already had a `.claude/settings.json` received no plugins at all from
+  `keel init`, not even `keel@gbi`, and `keel doctor` could not report it. `plugin_report` reads
+  `plugins.recommended`, which nothing wrote, so it fell back to a hardcoded three with no language
+  server in it. init now writes the key, from one `expected_plugins()` definition that both writers
+  read, so a fresh init produces the same set in both places.
+- `keel doctor` reported a plugin as not enabled when it was enabled at user scope. `plugin_report`
+  read only the project's `.claude/settings.json`, which was harmless while its fallback list held
+  three plugins nobody enables per project, and wrong the moment `keel@gbi` entered the list: keel is
+  normally enabled at user scope, so every project was told it was missing, on the line above doctor
+  saying the marketplace was registered. It now merges every scope Claude Code merges, as
+  `boundary_report` already did.
+
+Nothing is written into an existing `.claude/settings.json`. That file is normally committed and
+decides what loads for everyone who clones, which is a decision for whoever owns the repository,
+and it is the same position `bin/keel` already takes on permission mode.
+
+### Known gaps
+
+The handoff still has to be resumed by hand: the watchdog writes `.keel/handoff.md`, and the user
+runs `/clear` and points the next session at it. `/clear` cannot be triggered by a plugin. The
+resume half is buildable and is not built, because nothing yet detects whether a handoff is current;
+a pointer injected at session start would otherwise send a new session to last week's work. Tracked
+in `docs/ideas/context-window-at-init.md`.
+
+An enabled plugin that is not installed still looks identical to one that is working. keel cannot
+install a plugin, and verifying that an entry resolves was left out of this change deliberately.
+
+`plugins.recommended` does not follow a project that changes stack. `merge_profile` keeps any
+non-empty existing value, which is what lets a curated list survive a re-init, and it cannot tell a
+curated list from a stale detected one: adding `go.mod` to a TypeScript project updates `stack.also`
+but leaves `gopls-lsp` out of the recommended list, and nothing reports the difference. Re-running
+`keel init` does not fix it. `keel doctor` warns about `stack.has_ui` drift in the same situation and
+the same treatment would suit here.
+
+Seven declared keys are read by nothing: `gates.tdd`, `gates.coding_standards`, `gates.review`,
+`gates.observability`, `gates.docs_updated`, `plugins.excluded` and `conventions.working_branch`.
+Their descriptions now say so rather than describing enforcement that does not happen. They are
+listed here because the list is worth closing, not worth hiding.
+
 ## 0.10.0 - 2026-08-17
 
 **Evals: five treatment arms, all pass, no new rationalisation.** Run 2026-08-17 against `852e373`,

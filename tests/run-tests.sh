@@ -18,6 +18,7 @@ run tests/test-no-leaks.sh
 run tests/test-apex-export.sh
 run tests/test-supply-chain.sh
 run tests/test-context-watch.sh
+run tests/test-profile-keys.sh
 run tests/test-sensitive-guard.sh
 run tests/test-done-guard.sh
 run tests/test-session-start.sh

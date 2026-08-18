@@ -94,6 +94,159 @@ out="$(fire UserPromptSubmit "$work/t50.jsonl" "$work")"
   || bad "measure" "expected silence at 10 percent, got: $out"
 printf '{"docs_root":"docs/keel"}\n' > "$work/.keel/profile.json"
 
+# ---- the floor -------------------------------------------------------------
+#
+# A configured window is a floor, not a ceiling. window_for used to return a configured value
+# before it ever reached the observation correction, so a profile saying 200000 on a genuine 1M
+# session reported 200% occupancy, hard-stopped it at 170,000 tokens and never lifted. That is the
+# same failure the unconfigured path was rewritten to avoid, reintroduced through the profile.
+#
+# These call window_for directly rather than through `measure`, because main() calls it without a
+# configured value: the profile only reaches it through the hook, and the hook asserts thresholds
+# rather than the number.
+wf() {   # wf <model> <observed> <configured|none>  -> the window window_for returns
+    env -u KEEL_CONTEXT_WINDOW python3 -c "
+import sys
+sys.path.insert(0, '$ROOT/lib')
+import context_watch
+cfg = sys.argv[3]
+print(context_watch.window_for(sys.argv[1],
+                               observed=int(sys.argv[2]),
+                               configured=int(cfg) if cfg.isdigit() else None))
+" "$1" "$2" "$3"
+}
+
+got="$(wf claude-opus-5 400000 200000)"
+[ "$got" = "1000000" ] && ok "a configured window below observed occupancy is raised" \
+  || bad "floor" "got $got, want 1000000: a configured 200000 would stop a 1M session at 170k forever"
+
+got="$(wf claude-opus-5 100001 1000000)"
+[ "$got" = "1000000" ] && ok "a configured window above observed occupancy is left alone" \
+  || bad "floor" "got $got, want 1000000"
+
+got="$(wf claude-opus-5 100001 none)"
+[ "$got" = "200000" ] && ok "with no configured window the conservative default still applies" \
+  || bad "floor" "got $got, want 200000"
+
+got="$(wf claude-opus-5 100001 200000)"
+[ "$got" = "200000" ] && ok "a session inside its configured window is not promoted" \
+  || bad "floor" "got $got, want 200000: the floor must not promote every session"
+
+# ---- the upper bound -------------------------------------------------------
+#
+# 1,000,000 is the largest context window any current Claude model offers, checked 2026-08-18. It
+# is also already the highest value observation can promote to, so bounding the configured value
+# there adds no ceiling the observed path did not have. Without it a mistyped extra zero silences
+# the watchdog for the life of the project, which is the same harm as the floor bug pointing the
+# other way.
+got="$(wf claude-opus-5 100001 200000000)"
+[ "$got" = "1000000" ] && ok "a profile window above the maximum is bounded" \
+  || bad "bound" "got $got, want 1000000: a mistyped window must not silence the watchdog"
+
+got="$(KEEL_CONTEXT_WINDOW=200000000 python3 -c "
+import sys
+sys.path.insert(0, '$ROOT/lib')
+import context_watch
+print(context_watch.window_for('claude-opus-5', observed=100001))
+")"
+[ "$got" = "1000000" ] && ok "an environment window above the maximum is bounded" \
+  || bad "bound" "got $got, want 1000000"
+
+got="$(wf claude-opus-5 100001 1000000)"
+[ "$got" = "1000000" ] && ok "a window at the maximum is untouched" \
+  || bad "bound" "got $got, want 1000000"
+
+grep -q 'min(window, LONG_WINDOW)' "$ROOT/lib/context_watch.py" \
+  && ok "the bound is the LONG_WINDOW constant, not a second literal" \
+  || bad "bound" "the bound is not expressed as LONG_WINDOW; a larger model would need two edits"
+
+# ---- measure does not depend on where it is run ------------------------------
+#
+# `measure` and `handoff` are given a transcript and no project. Reading gates.context_window from
+# the current directory looked like the obvious way to honour the profile, and it made the same
+# transcript report two different windows depending on where the operator happened to stand: from
+# this repository, whose own profile sets 1000000, a 100k fixture came back as 10% of 1M instead of
+# 50% of 200k. The project has to be passed, never guessed.
+mkdir -p "$work/onem/.keel"
+printf '{"docs_root":"docs","gates":{"context_window":1000000}}\n' > "$work/onem/.keel/profile.json"
+got="$( cd "$work/onem" && env -u KEEL_CONTEXT_WINDOW python3 "$LIB" measure "$work/t50.jsonl" | awk '{print $2}' )"
+[ "$got" = "200000" ] && ok "measure ignores the profile of whatever directory it is run from" \
+  || bad "measure cwd" "got window $got from a 1m profile in the cwd; the transcript is not that project's"
+
+got="$( env -u KEEL_CONTEXT_WINDOW python3 "$LIB" measure "$work/t50.jsonl" "$work/onem" | awk '{print $2}' )"
+[ "$got" = "1000000" ] && ok "measure honours a project passed explicitly" \
+  || bad "measure cwd" "got window $got, want 1000000 when the project is named"
+
+# ---- the environment override ----------------------------------------------
+#
+# The profile key is a floor; the environment variable is not. It is the deliberate escape hatch,
+# and the suite above depends on it: a test that forces a window smaller than its fixture's
+# occupancy has no other way to do it. Untested until now, which made it one refactor away from
+# quietly becoming a floor as well.
+got="$(KEEL_CONTEXT_WINDOW=50000 python3 -c "
+import sys
+sys.path.insert(0, '$ROOT/lib')
+import context_watch
+print(context_watch.window_for('claude-opus-5', observed=100001))
+")"
+[ "$got" = "50000" ] && ok "the environment window is not raised by observation" \
+  || bad "env" "got $got, want 50000: forcing a small window must stay possible"
+
+got="$(KEEL_CONTEXT_WINDOW=500000 python3 -c "
+import sys
+sys.path.insert(0, '$ROOT/lib')
+import context_watch
+print(context_watch.window_for('claude-opus-5', observed=1, configured=1000000))
+")"
+[ "$got" = "500000" ] && ok "the environment window outranks the profile" \
+  || bad "env" "got $got, want 500000"
+
+# ---- the cost --------------------------------------------------------------
+#
+# window_for runs on every prompt and, at the stop threshold, on every tool call. It receives
+# everything it needs as arguments, and it must stay that way: a filesystem read here is paid
+# dozens of times a minute for a number that moves slowly.
+python3 -c "
+import inspect, sys
+sys.path.insert(0, '$ROOT/lib')
+import context_watch
+src = inspect.getsource(context_watch.window_for) + inspect.getsource(context_watch._positive_int)
+banned = ['open(', 'os.path', 'os.stat', 'os.listdir', 'subprocess', 'socket', 'urllib', 'json.load']
+hits = [b for b in banned if b in src]
+sys.exit(1 if hits else 0)
+" && ok "window_for reads nothing from the filesystem or the network" \
+  || bad "cost" "window_for gained an I/O call; it runs on every prompt and every tool call"
+
+# ---- end to end ------------------------------------------------------------
+#
+# The whole plan in one assertion. A profile written by keel init says 200000. The session has used
+# 400000 tokens, which is 200% of the written window and 40% of the real one. Before the floor, the
+# hook stopped this session on its first tool call and never lifted. It must now be silent.
+transcript "$work/e2e.jsonl" 400000 'claude-opus-5'
+printf '{"docs_root":"docs/keel","gates":{"context_window":200000}}\n' > "$work/.keel/profile.json"
+out="$(fire UserPromptSubmit "$work/e2e.jsonl" "$work")"
+[ -z "$out" ] && ok "a 400k session in a project written with 200000 is silent" \
+  || bad "e2e" "expected silence at 40 percent of a raised window, got: $out"
+
+# And the warning still fires for a session that really is filling a 200000 window.
+transcript "$work/warn.jsonl" 150000 'claude-opus-5'
+out="$(fire UserPromptSubmit "$work/warn.jsonl" "$work")"
+case "$out" in *"75%"*) ok "the warn still fires at 75 percent of a genuine 200000 window" ;;
+  *) bad "e2e" "the floor silenced a warning that should have fired: $out" ;; esac
+printf '{"docs_root":"docs/keel"}\n' > "$work/.keel/profile.json"
+
+# The watchdog does nothing at all without python3, rather than printing an apology on every
+# prompt. doctor is what reports the silence; the hook must not.
+#
+# PATH is emptied rather than pointed at /nonexistent, and bash is resolved to an absolute path
+# first. hooks/context-watch is `#!/usr/bin/env bash`, so a PATH with no bash in it fails to exec
+# the hook at all: rc 127 and an env error, which never reaches the python3 check being tested.
+mkdir -p "$work/empty"
+bash_bin="$(command -v bash)"
+out="$(printf '{"hook_event_name":"UserPromptSubmit","transcript_path":"%s","cwd":"%s","session_id":"s-np","tool_name":"Bash"}' "$work/e2e.jsonl" "$work" | PATH="$work/empty" "$bash_bin" "$HOOK" 2>/dev/null)"; rc=$?
+[ "$rc" -eq 0 ] && [ -z "$out" ] && ok "the watchdog is silent and exits 0 when python3 is absent" \
+  || bad "no python" "rc=$rc out=$out"
+
 # A subagent's context is discarded when it returns. Counting it would report the main thread as
 # full because a subagent read twenty files, which inverts the reason for delegating at all.
 cat > "$work/side.jsonl" <<'T'

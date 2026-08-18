@@ -269,13 +269,26 @@ Everything above budgets **input**: what sits in the prefix of every request. Re
 **output**, and until 2026-08-16 nothing here addressed it, even though the same request that
 carries a 634-token block also carries however many tokens the model chooses to write back.
 
-**The rule is on by default and it is not free.** `hooks/session-start` appends it unless
-`conventions.response_style` is `verbose`, which took the injection from 300 tokens to **356**
-against a 250 target and a 400 ceiling. That is 56 tokens of input in every request of every session,
-spent to shorten output in some of them, and the direction of that trade has never been measured.
-It was taken as an explicit instruction on 2026-08-16, not as an inference, and it is recorded here
-rather than buried because the 44 tokens of remaining headroom are now the tightest budget in this
-document.
+**The rule is on by default and it is not free.** `hooks/session-start` selects one paragraph from
+`conventions.response_style` and `conventions.explain_level` together, so there are four forms and
+not two. Measured 2026-08-18:
+
+| `response_style` | `explain_level` | Injected | Chars | Tokens |
+|---|---|---|---|---|
+| `terse` | `technical` | the brevity paragraph | 1,284 | 356 |
+| `terse` | `plain` | brevity and define-on-first-use | 1,283 | 356 |
+| `verbose` | `technical` | nothing | 1,082 | 300 |
+| `verbose` | `plain` | define-on-first-use | 1,273 | 353 |
+
+The defaults cost **356** against a 250 target and a 400 ceiling. That is 56 tokens of input in
+every request of every session, spent to shorten output in some of them, and the direction of that
+trade has never been measured. It was taken as an explicit instruction on 2026-08-16, not as an
+inference, and it is recorded here rather than buried because the 44 tokens of remaining headroom
+are now the tightest budget in this document.
+
+`NFR-01` of `docs/prd/plain-language-chat.md` holds every combination at or under 356 for exactly
+that reason, so adding a dial did not spend the headroom. `tests/validate-skills.sh` measures all
+four rather than whichever one the local profile selects.
 
 `output-styles/keel-terse.md` still ships and still costs zero, but it is now the machine-wide
 alternative for non-keel repositories rather than the mechanism. The managed block was never an

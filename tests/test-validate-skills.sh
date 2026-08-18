@@ -493,5 +493,101 @@ run_out "a schema version with no recorded fingerprint is rejected" 1 m_schema_u
 # validator, because the fixture roots these tests run in have no templates/profile.schema.json.
 run_out "no profile schema present means the fingerprint check stays quiet" 0 noop "fingerprint" no
 
+# The size check ran the hook once, from the repository root, so it measured whichever form the
+# local profile selects and nothing else. A paragraph that fits terse and technical while breaking
+# verbose and plain would have shipped green. This fixture is what says otherwise: its hook is small
+# for every combination except verbose plus plain.
+m_hook_one_combo_oversized() {
+    mkdir -p "$1/hooks"
+    cat > "$1/hooks/session-start" <<'HOOK'
+#!/usr/bin/env bash
+# Names the fixture's skill, example, so the only finding this case can produce is the size one.
+set -euo pipefail
+text="short"
+profile="$(cat .keel/profile.json 2>/dev/null || true)"
+case "$profile" in
+    *'"response_style": "verbose"'*)
+        case "$profile" in
+            *'"explain_level": "plain"'*) text="$(head -c 1500 /dev/zero | tr '\0' 'x')" ;;
+        esac ;;
+esac
+printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"%s"}}\n' "$text"
+HOOK
+    chmod +x "$1/hooks/session-start"
+}
+run_out "a combination over the ceiling is reported, not just the local one" 1 \
+    m_hook_one_combo_oversized "response_style=verbose explain_level=plain" yes
+
+# A hook that does not run measures 0 characters, which is 0 tokens, which is under every ceiling.
+# The size check would report nothing and the run would go green with the hook broken. That is the
+# failure tests/test-session-start.sh already carries a floor for, with a comment saying a bound
+# with no floor cannot tell "unchanged" from "produced nothing". This block had four such
+# measurements and no floor. Caught in review.
+m_hook_produces_nothing() {
+    mkdir -p "$1/hooks"
+    cat > "$1/hooks/session-start" <<'HOOK'
+#!/usr/bin/env bash
+# Names the fixture's skill, example, so the only finding this case can produce is the size one.
+exit 1
+HOOK
+    chmod +x "$1/hooks/session-start"
+}
+run_out "a hook that produces nothing is reported, not counted as small" 1 \
+    m_hook_produces_nothing "produced no output" yes
+
+# The rule is guarded on both files existing, so the fixture has to build them or the case passes
+# by checking nothing. Same reason tool_table_fixture exists a few rules above.
+profile_keys_fixture() {
+    local root="$1" page_rows="$2"
+    mkdir -p "$root/docs" "$root/templates"
+    printf '{"properties":{"a":{"type":"string","description":"A."},"b":{"type":"string","description":"B."}}}\n' \
+      > "$root/templates/profile.schema.json"
+    { printf '# Profile keys\n\ngenerate-profile-keys.sh\n\n'
+      printf '| Key | Type | Set by | Description |\n|---|---|---|---|\n'
+      printf '%s' "$page_rows"
+    } > "$root/docs/profile-keys.md"
+}
+
+# Exit code cannot isolate this rule. Declaring a schema in a fixture also activates the fingerprint
+# rule, which reads SCHEMA_VERSION from a bin/keel a small fixture has no reason to carry, so the
+# validator exits 1 whatever the reference says. Three of these four cases would then have passed
+# while asserting nothing. Assert on the message instead, which is what actually distinguishes the
+# rule firing from the rule staying quiet.
+check_reports() {   # check_reports <name> <yes|no> <needle> <mutate-fn>
+    local name="$1" want="$2" needle="$3" mutate="$4"
+    local root; root="$(mktemp -d)"
+    fixture_valid "$root"
+    "$mutate" "$root"
+    local out; out="$( cd "$root" && "$VALIDATOR" 2>&1 )"
+    rm -rf "$root"
+    local saw=no
+    case "$out" in *"$needle"*) saw=yes ;; esac
+    if [ "$saw" = "$want" ]; then
+        printf '  PASS  %s\n' "$name"; pass=$((pass+1))
+    else
+        printf '  FAIL  %s (wanted saw=%s, got saw=%s)\n' "$name" "$want" "$saw"; fail=$((fail+1))
+    fi
+}
+
+m_keys_ok()      { profile_keys_fixture "$1" '| `a` | string | `keel init` | A. |
+| `b` | string | **you** | B. |
+'; }
+check_reports "a reference matching the schema is not reported" no "profile-keys.md disagrees" m_keys_ok
+
+m_keys_missing() { profile_keys_fixture "$1" '| `a` | string | `keel init` | A. |
+'; }
+check_reports "a key absent from the reference is reported" yes "no row for b" m_keys_missing
+
+m_keys_stale()   { profile_keys_fixture "$1" '| `a` | string | `keel init` | Something else entirely. |
+| `b` | string | **you** | B. |
+'; }
+check_reports "a stale description is reported" yes "a stale description for a" m_keys_stale
+
+m_keys_extra()   { profile_keys_fixture "$1" '| `a` | string | `keel init` | A. |
+| `b` | string | **you** | B. |
+| `c` | string | **you** | Not in the schema. |
+'; }
+check_reports "a row the schema does not declare is reported" yes "which the schema does not declare" m_keys_extra
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

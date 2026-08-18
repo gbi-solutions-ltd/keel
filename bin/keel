@@ -33,7 +33,7 @@ HERE="$(cd "$(dirname "$SELF")/.." && pwd)"
 # expects", which is the only version of that question worth warning about. Bump it only when a
 # field is added, removed, renamed or moved. 0.7.0 and 0.7.1 changed none, and a warning that fires
 # on releases like those is one nobody reads by the time it matters.
-SCHEMA_VERSION=1
+SCHEMA_VERSION=2
 
 # Fail loudly on a broken install. Without this the sources below print to stderr and execution
 # continues into undefined functions, which reads as a bug in the project being configured.
@@ -144,11 +144,23 @@ PY
 plugin_report() {
     have_python || return 0
     python3 - <<'PY' 2>/dev/null
-import json
-try:
-    enabled = set(json.load(open(".claude/settings.json")).get("enabledPlugins", {}))
-except Exception:
-    raise SystemExit(0)
+import json, os
+# Every scope Claude Code merges, in its order, the same list boundary_report reads. Project scope
+# alone was harmless while the fallback list was three plugins nobody enables per project. Once init
+# wrote keel@gbi into plugins.recommended it was not: keel is normally enabled at user scope, so
+# every project reported it missing, next to doctor's own line saying the marketplace is registered,
+# and the /plugin install it suggested wrote to the scope this never looked at.
+#
+# Names are compared whole. boundary_report strips the marketplace suffix because it is matching
+# skill names across plugins; here the recommended list carries qualified names and so must this.
+dirs = [d for d in (os.environ.get("CLAUDE_CONFIG_DIR"), os.path.expanduser("~/.claude")) if d]
+merged = {}
+for p in [os.path.join(d, "settings.json") for d in dirs] + [".claude/settings.json", ".claude/settings.local.json"]:
+    try:
+        merged.update(json.load(open(p)).get("enabledPlugins", {}))
+    except Exception:
+        pass
+enabled = {k for k, v in merged.items() if v}
 try:
     rec = json.load(open(".keel/profile.json")).get("plugins", {}).get("recommended")
 except Exception:
@@ -343,7 +355,7 @@ write_profile() {
       printf '  "project": { "name": "%s", "kind": "%s", "description": "" },\n' "$name" "$kind"
       printf '  "stack": { "language": "%s", "runtime": "%s", "framework": "%s", "package_manager": %s, "also": [%s], "datastores": [%s], "has_ui": %s },\n' \
         "$lang" "$rt" "$fw" "$pm_json" "$(json_str_array "$(detect_also)")" \
-        "$(json_str_array "$(detect_datastores)")" "$ui"
+        "$(json_str_array "$(detect_datastores "$lang")")" "$ui"
       # Fill the script cache here, in this shell. The loop below reads each verify key through
       # `v="$(detect_verify ...)"`, and a $( ) is a subshell: it inherits this variable already
       # full, but anything it loads itself dies with it. Without this line every key would load
@@ -361,15 +373,27 @@ write_profile() {
       # done_verified starts at "warn", not "required". The Stop hook it drives refuses to let a
       # turn end, which is not something to switch on for a repository without being asked. A
       # project raises it to "required" once it has seen the warning fire and agreed with it.
-      printf '  "gates": { "tdd": "required", "coding_standards": "warn", "review": "required", "security_audit": "required", "observability": "required", "docs_updated": "warn", "commit_guard": "off", "done_verified": "warn" },\n'
+      # context_window is written even though it is sometimes wrong. The window cannot be read from
+      # a session, so an unset key means the watchdog assumes 200000 and only discovers otherwise
+      # once a session exceeds it. Writing the conservative value is safe because a configured
+      # window is a floor: observation raises it in flight. It was a ceiling until 2026-08-18, and
+      # writing this key before that change would have hard-stopped every 1M session at 170,000
+      # tokens permanently.
+      printf '  "gates": { "tdd": "required", "coding_standards": "warn", "review": "required", "security_audit": "required", "observability": "required", "docs_updated": "warn", "commit_guard": "off", "done_verified": "warn", "context_window": 200000 },\n'
       printf '  "observability": { "backend": "signoz", "otlp_endpoint_var": "OTEL_EXPORTER_OTLP_ENDPOINT", "log_shipping": "otlp" },\n'
-      # response_style is written explicitly rather than left absent and defaulted. Terse is what a
-      # project gets without asking, so the key that turns it off has to be visible in the file the
-      # reader already opens, not a thing they must first learn exists. "verbose" is the opt-out.
-      printf '  "conventions": { "commit_style": "conventional", "default_branch": "%s", "protect_default_branch": true, "response_style": "terse" },\n' "$(default_branch)"
+      # response_style and explain_level are written explicitly rather than left absent and
+      # defaulted. Terse and technical are what a project gets without asking, so the keys that
+      # change them have to be visible in the file the reader already opens, not things they must
+      # first learn exist. "verbose" and "plain" are the opt-ins.
+      printf '  "conventions": { "commit_style": "conventional", "default_branch": "%s", "protect_default_branch": true, "response_style": "terse", "explain_level": "technical" },\n' "$(default_branch)"
       printf '  "deploy": { "target": %s, "ci": %s, "envs": [] },\n' \
         "$(json_or_null "$(detect_deploy_target)")" "$(json_or_null "$(detect_ci)")"
       printf '  "docs_root": "%s",\n' "$root"
+      # Written so doctor has the right list to check. plugin_report has always read this key and
+      # fallen back to a fixed three when it was absent, which is why a language server was never
+      # named on a repository that already had a .claude/settings.json: nothing enabled it and
+      # nothing reported it missing.
+      printf '  "plugins": { "recommended": [%s] },\n' "$(json_str_array "$(expected_plugins)")"
       printf '  "artifacts": {\n'
       printf '    "_note": "Set any of these to a path when the artifact already exists elsewhere. Skills read the mapped path instead of the default under docs_root, so a repo with its own naming convention is not duplicated.",\n'
       printf '    "snapshot": null, "prd": null, "stories": null, "architecture": null, "decisions": null, "plans": null\n'
@@ -554,6 +578,24 @@ json_rule_array() {
 # reach a private repo, and at project scope the declaration shadows whatever the reader chose at
 # user level. Every @claude-plugins-official plugin below is enabled without one and resolves fine.
 # Doctor names the install command when the marketplace is absent, and so does the nudge.
+#
+# That paragraph is about write_settings, two functions below. expected_plugins comes first because
+# both writers read it.
+
+# The plugin set this project expects, one name per line, marketplace-qualified.
+#
+# Both writers read this: write_settings enables them in .claude/settings.json on a fresh repository,
+# and write_profile records them in plugins.recommended so doctor can report what is missing. They
+# were two lists for one turn of this change and immediately disagreed: the profile carried only the
+# language servers, so doctor stopped naming the five official plugins it had always named, and an
+# existing assertion caught it. One definition, read twice.
+expected_plugins() {
+    printf 'keel@gbi\n'
+    for p in security-guidance code-review skill-creator claude-md-management context7 $(detect_plugins); do
+        printf '%s@claude-plugins-official\n' "$p"
+    done
+}
+
 write_settings() {
     mkdir -p .claude
     if [ -f .claude/settings.json ]; then
@@ -561,10 +603,15 @@ write_settings() {
         return 0
     fi
     {
-      printf '{\n  "enabledPlugins": {\n    "keel@gbi": true'
-      for p in security-guidance code-review skill-creator claude-md-management context7 $(detect_plugins); do
-          printf ',\n    "%s@claude-plugins-official": true' "$p"
-      done
+      printf '{\n  "enabledPlugins": {'
+      local first_plugin=1 ep
+      while IFS= read -r ep; do
+          [ -n "$ep" ] || continue
+          [ $first_plugin -eq 1 ] && first_plugin=0 || printf ','
+          printf '\n    "%s": true' "$ep"
+      done <<EOF_PLUGINS
+$(expected_plugins)
+EOF_PLUGINS
       printf '\n  },\n'
       printf '  "permissions": {\n    "deny": '
       keel_deny_rules | json_rule_array
@@ -1239,7 +1286,9 @@ for k,v in d.items():
         while IFS= read -r line; do
             [ -n "$line" ] || continue
             case "$line" in
-              missing:*)  warn "recommended plugin not enabled: ${line#missing:}. The skill that uses it degrades to an inline fallback." ;;
+              missing:keel@*)
+                          warn "keel itself is not enabled here: ${line#missing:}. Install it with '/plugin install ${line#missing:}'. Without it no keel skill loads at all, which is not a degraded mode." ;;
+              missing:*)  warn "recommended plugin not enabled: ${line#missing:}. Install it with '/plugin install ${line#missing:}'. The skill that uses it degrades to an inline fallback." ;;
             esac
         done < <(plugin_report)
     fi
@@ -1265,10 +1314,43 @@ for k,v in d.items():
             # sessions at a fifth of their capacity or never fires at all, and neither announces
             # itself.
             local cw; cw="$(json_get .keel/profile.json gates.context_window 2>/dev/null || true)"
-            if [ -n "$cw" ] && [ "$cw" != "None" ]; then
-                good "context watchdog available (window $cw, from gates.context_window)"
+            # The bound is LONG_WINDOW, read from the one place it is defined. A second literal here
+            # would drift the day a larger model ships, and that is exactly the day it matters. Read
+            # with sed rather than an interpreter: both init and doctor are asserted to start
+            # python3 at most ten times.
+            local cwmax; cwmax="$(sed -n 's/^LONG_WINDOW = //p' "$HERE/lib/context_watch.py" | tr -d '_' | head -n1)"
+            local cwdef; cwdef="$(sed -n 's/^DEFAULT_WINDOW = //p' "$HERE/lib/context_watch.py" | tr -d '_' | head -n1)"
+            # Report the window the watchdog will use, not the number in the file. The two differ in
+            # three ways and each was reported wrongly at first: the environment variable beats the
+            # file, a value above the maximum is bounded, and a value at or below the default is
+            # discarded because the profile key is a floor that only ever raises. Telling someone who
+            # lowered the window that it took effect is the worst of the three, because nothing
+            # later contradicts it.
+            #
+            # A digit screen guards every numeric comparison. `[` overflows on a value wider than a
+            # signed 64 bit integer and prints its complaint on stderr, so the width is capped before
+            # the value is ever compared.
+            local cwnum=0 envnum=0
+            local env_cw="${KEEL_CONTEXT_WINDOW:-}"
+            case "$cw"     in ''|*[!0-9]*) ;; *) [ "${#cw}" -le 18 ] && cwnum=1 ;; esac
+            case "$env_cw" in ''|*[!0-9]*) ;; *) [ "${#env_cw}" -le 18 ] && envnum=1 ;; esac
+            case "$cwmax"  in ''|*[!0-9]*) cwmax="" ;; esac
+            case "$cwdef"  in ''|*[!0-9]*) cwdef="" ;; esac
+
+            if [ "$envnum" = 1 ] && [ -n "$cwmax" ] && [ "$env_cw" -gt "$cwmax" ]; then
+                warn "KEEL_CONTEXT_WINDOW is $env_cw, above the largest context window that exists. The watchdog is using $cwmax. Correct it, or a session will never be warned."
+            elif [ "$envnum" = 1 ]; then
+                good "context watchdog available (window $env_cw, from KEEL_CONTEXT_WINDOW in this shell). It overrides gates.context_window and is used exactly as set."
+            elif [ "$cwnum" = 1 ] && [ -n "$cwmax" ] && [ "$cw" -gt "$cwmax" ]; then
+                warn "gates.context_window is $cw, above the largest context window that exists. The watchdog is using $cwmax. Correct the value, or a session will never be warned."
+            elif [ "$cwnum" = 1 ] && [ -n "$cwdef" ] && [ "$cw" -lt "$cwdef" ]; then
+                warn "gates.context_window is $cw, below the $cwdef default, so the watchdog is using $cwdef. The key is a floor and only ever raises the window. Set KEEL_CONTEXT_WINDOW to force a smaller one."
+            elif [ "$cwnum" = 1 ]; then
+                good "context watchdog available (window $cw from gates.context_window, raised automatically if a session is observed exceeding it)."
+            elif [ -n "$cw" ] && [ "$cw" != "None" ]; then
+                warn "gates.context_window is '$cw', which is not a usable number, so the watchdog is ignoring it and assuming 200000. Set a positive integer."
             else
-                good "context watchdog available (window assumed 200000, corrected upward once a session exceeds it). If sessions here use a larger context, set gates.context_window in .keel/profile.json"
+                good "context watchdog available (window assumed 200000, raised once a session is observed exceeding it). A profile written by a newer keel carries gates.context_window; set it here to start from a larger value."
             fi
         fi
     fi

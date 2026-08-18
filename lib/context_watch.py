@@ -117,6 +117,22 @@ def _measure_over(entries):
     return tokens, model
 
 
+def _positive_int(value):
+    """The value as a positive int, or None when it is not one.
+
+    Both sources are read here and neither is normalised before it arrives: a profile carries an
+    int, an environment variable carries a string. `bool` is excluded deliberately, because it is
+    an `int` in Python and `True` would otherwise be read as a one token window.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int) and value > 0:
+        return value
+    if isinstance(value, str) and value.isdigit() and int(value) > 0:
+        return int(value)
+    return None
+
+
 def window_for(model, observed=0, configured=None):
     """The context window this session is working against.
 
@@ -128,27 +144,40 @@ def window_for(model, observed=0, configured=None):
 
     So, in order:
 
-    1. An explicit setting wins. `KEEL_CONTEXT_WINDOW`, or `gates.context_window` in the profile.
-       This is the only mechanism that is actually correct, which is why `keel init` writes it and
-       `keel doctor` prints the value in use.
+    1. `KEEL_CONTEXT_WINDOW` wins over everything below, and is used as set apart from the bound in
+       step 5. It is the deliberate override: the test suite uses it to force a small window, and a
+       session that knows better can do the same. Nothing raises it, and only the bound lowers it.
     2. Observation beats assumption. Occupancy above a tier is proof the window is larger, since the
        API would have refused the request otherwise. This can only correct upward, so it never
        invents room that is not there.
-    3. Otherwise the model string, then the conservative default.
+    3. `gates.context_window` is a floor, not a ceiling. It raises the starting point, and step 2
+       may raise it further still. It was a ceiling until 2026-08-18, which is why `keel init` did
+       not dare write one: a conservative value would have hard-stopped every larger session at 85%
+       of it, permanently, with editing the file the only escape. Being a floor, it cannot lower the
+       window below the default either: `KEEL_CONTEXT_WINDOW` is the way to force a smaller one, and
+       `keel doctor` says so when a profile sets one that is too small to take effect.
+    4. Otherwise the model string, then the conservative default.
+    5. Nothing above LONG_WINDOW is returned, from any source. It is the largest context window any
+       current model offers, checked 2026-08-18, and already the highest value step 2 can reach, so
+       the bound adds no ceiling the observed path did not have. A mistyped extra zero is caught
+       rather than silencing the watchdog for the life of the project. When a larger model ships,
+       this constant moves and both paths follow.
 
-    The residual error is a 1M session below 200,000 tokens, which is assumed to be a full 200,000
-    window and warned early. That is why the setting exists and why doctor names it.
+    The residual error is now the other way round: a configured window larger than the true one
+    cannot be corrected downward, because occupancy proves a lower bound and never an upper one.
     """
-    for candidate in (os.environ.get("KEEL_CONTEXT_WINDOW", "").strip(), configured):
-        if isinstance(candidate, int) and candidate > 0:
-            return candidate
-        if isinstance(candidate, str) and candidate.isdigit() and int(candidate) > 0:
-            return int(candidate)
+    env = _positive_int(os.environ.get("KEEL_CONTEXT_WINDOW", "").strip())
+    if env is not None:
+        return min(env, LONG_WINDOW)
 
     window = LONG_WINDOW if "1m" in (model or "").lower() else DEFAULT_WINDOW
     if observed > window:
         window = LONG_WINDOW
-    return window
+
+    floor = _positive_int(configured)
+    if floor is not None and floor > window:
+        window = floor
+    return min(window, LONG_WINDOW)
 
 
 def _text_of(content):
@@ -469,7 +498,25 @@ def main(argv):
         return 2
     cmd, path = argv[1], argv[2]
     tokens, model = measure(path)
-    window = window_for(model, observed=tokens)
+    # The project is passed, never guessed. These two commands are handed a transcript and nothing
+    # else, and a transcript does not say which project it belongs to. Inferring it from the current
+    # directory made the same transcript report two different windows depending on where the
+    # operator stood: run from this repository, whose own profile sets 1000000, a 100k transcript
+    # came back as 10% of 1M rather than 50% of 200k. The hook does not have this problem because
+    # Claude Code hands it the session's own cwd.
+    #
+    # With no project named, the window comes from the transcript alone. That is the conservative
+    # answer and the one observation corrects upward, so the failure mode is an early warning rather
+    # than a session that is never warned at all.
+    project = None
+    if cmd == "measure" and len(argv) > 3:
+        project = argv[3]
+    elif cmd == "handoff" and len(argv) > 5:
+        project = argv[5]
+    configured = None
+    if project:
+        configured = (_profile(project).get("gates") or {}).get("context_window")
+    window = window_for(model, observed=tokens, configured=configured)
     if cmd == "measure":
         pct = int(100 * tokens / window) if window else 0
         print("%d %d %d %s" % (tokens, window, pct, model or "unknown"))

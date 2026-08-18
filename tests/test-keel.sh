@@ -59,6 +59,68 @@ P
 P
           echo '{}' > tsconfig.json
           printf '[project]\nname = "f"\n' > pyproject.toml ;;
+        plsql)
+          # Twelve .sql at the root and one package body below it, so .sql dominates and the
+          # Oracle token sits in a subdirectory rather than the first file read.
+          i=1; while [ "$i" -le 12 ]; do printf 'CREATE TABLE t%s (id NUMBER);\n' "$i" > "s$i.sql"; i=$((i+1)); done
+          mkdir -p src
+          printf 'CREATE OR REPLACE PACKAGE BODY pkg AS v VARCHAR2(30); END;\n' > src/pkg.sql
+          printf '# notes\n' > README.md ;;
+        plsql-small)
+          # Nine .sql files in total, one short of the floor, and the ninth carries the Oracle token
+          # so the fixture fails on the count alone rather than on two clauses at once.
+          i=1; while [ "$i" -le 8 ]; do printf 'SELECT 1 FROM DUAL;\n' > "q$i.sql"; i=$((i+1)); done
+          printf 'CREATE OR REPLACE PACKAGE BODY p AS v VARCHAR2(1); END;\n' > pkg.sql ;;
+        ts-migrations)
+          # The live false positive: .sql present, manifest present, .ts dominant.
+          cat > package.json <<'P'
+{"name":"f","scripts":{"test":"vitest run"},"devDependencies":{"typescript":"^5"}}
+P
+          echo '{}' > tsconfig.json
+          i=1; while [ "$i" -le 20 ]; do printf 'CREATE TABLE t%s (id int);\n' "$i" > "m$i.sql"; i=$((i+1)); done
+          i=1; while [ "$i" -le 40 ]; do printf 'export const x%s = 1\n' "$i" > "f$i.ts"; i=$((i+1)); done ;;
+        plsql-nomarker)
+          # PostgreSQL shaped: dominant .sql, no manifest, and PL/pgSQL syntax that must not count
+          # as Oracle. Clauses 1 to 3 all hold here, so clause 4, the Oracle token, is the only one
+          # that can reject it. The %ROWTYPE and %TYPE are the trap: PL/pgSQL has both, so a token
+          # set that included them would call this tree Oracle.
+          i=1; while [ "$i" -le 12 ]; do printf 'CREATE TABLE t%s (id integer);\n' "$i" > "m$i.sql"; i=$((i+1)); done
+          mkdir -p sql
+          printf 'DECLARE r mytable%%ROWTYPE; v mytable.col%%TYPE; BEGIN END;\n' > sql/fn.sql ;;
+        plsql-pkg)
+          # The idiomatic Oracle layout: package specs and bodies outnumber plain .sql. It must
+          # still be detected, which is why sql_census leaves .pks, .pkb, .prc and .fnc out of the
+          # denominator instead of letting them compete with .sql in the dominance test. Put them
+          # back in and this tree censuses as "12 30" and is not Oracle.
+          #
+          # The Oracle token goes in the .sql files, not the .pkb ones: has_oracle_token scans
+          # --include='*.sql' --include='*.plsql' only, so a token living in a .pkb is invisible to
+          # it and this fixture would fail the token clause rather than exercising the denominator.
+          i=1; while [ "$i" -le 30 ]; do printf 'PACKAGE p;\n' > "p$i.pks"; printf 'PACKAGE BODY p AS END;\n' > "p$i.pkb"; i=$((i+1)); done
+          i=1; while [ "$i" -le 12 ]; do printf 'CREATE TABLE t%s (id VARCHAR2(9));\n' "$i" > "s$i.sql"; i=$((i+1)); done ;;
+        plsql-notdominant)
+          # Twelve .sql against forty .md, with the Oracle token present, so the count clause and
+          # the token clause both hold and dominance is the only clause that fails. It is the
+          # fixture that pins the dominance comparison itself: with that comparison deleted from
+          # is_plsql_tree, this tree is the one that starts being called Oracle.
+          i=1; while [ "$i" -le 12 ]; do printf 'CREATE TABLE t%s (id NUMBER);\n' "$i" > "s$i.sql"; i=$((i+1)); done
+          printf 'CREATE OR REPLACE PACKAGE BODY p AS v VARCHAR2(9); END;\n' > s1.sql
+          i=1; while [ "$i" -le 40 ]; do printf '# doc %s\n' "$i" > "d$i.md"; i=$((i+1)); done ;;
+        plsql-upper)
+          # SQL Developer and exp emit uppercase names. The census counts these and the token scan
+          # must see them too, or the count and the evidence disagree.
+          i=1; while [ "$i" -le 13 ]; do printf 'CREATE TABLE t%s (id NUMBER);\n' "$i" > "M$i.SQL"; i=$((i+1)); done
+          printf 'CREATE OR REPLACE PACKAGE BODY p AS v VARCHAR2(9); END;\n' > M1.SQL ;;
+        plsql-hidden)
+          # A dotted name with a real extension is a .sql file. The census used to skip it while the
+          # token scan read it, so detection could rest on a file the census denied existed.
+          i=1; while [ "$i" -le 12 ]; do printf 'CREATE TABLE t%s (id integer);\n' "$i" > "m$i.sql"; i=$((i+1)); done
+          printf 'v VARCHAR2(9);\n' > .oracle.sql ;;
+        plsql-dotend)
+          # A basename ending in a dot has no extension. It used to land in a shared empty bucket
+          # and outvote .sql, which is the same defect the pks exclusion closed from the other side.
+          i=1; while [ "$i" -le 12 ]; do printf 'v VARCHAR2(9);\n' > "s$i.sql"; i=$((i+1)); done
+          i=1; while [ "$i" -le 40 ]; do : > "f$i."; i=$((i+1)); done ;;
         bare) : ;;
       esac
       git add -A >/dev/null 2>&1; git commit -qm init >/dev/null 2>&1 || true )
@@ -86,6 +148,181 @@ for stack in node-ts go php python csharp ruby kotlin swift cpp lua; do
     [ "$got" = "$want" ] && ok "detects $stack as $want" || bad "detects $stack" "got '$got', want '$want'"
     rm -rf "$d"
 done
+
+# PL/SQL is the first language keel infers rather than reads from a manifest, so each clause of the
+# marker gets its own assertion. A single happy-path test would pass with any one of them broken.
+for stack in plsql plsql-nomarker plsql-notdominant plsql-pkg plsql-small plsql-upper plsql-hidden plsql-dotend ts-migrations; do
+    d="$(fixture "$stack")"
+    got="$( cd "$d" && bash -c '. "$1"; detect_languages | tr "\n" " "' _ "$ROOT/lib/detect-stack.sh" 2>/dev/null )"
+    case "$stack" in
+      plsql)          want="plsql " ;;
+      plsql-nomarker)    want="" ;;
+      plsql-notdominant) want="" ;;
+      plsql-pkg)         want="plsql " ;;
+      plsql-small)    want="" ;;
+      plsql-upper)       want="plsql " ;;
+      plsql-hidden)      want="plsql " ;;
+      plsql-dotend)      want="plsql " ;;
+      ts-migrations)  want="typescript " ;;
+    esac
+    [ "$got" = "$want" ] && ok "detect_languages on $stack gives '${want:-nothing}'" \
+      || bad "detects $stack" "got '$got', want '${want:-nothing}'"
+    rm -rf "$d"
+done
+
+# Clause 4 of the marker, and the reason it exists. Each token gets its own case, because a single
+# alternation test passes with two of the three patterns wrong.
+#
+# The %TYPE and %ROWTYPE case is the important one. Both were proposed as Oracle signals and
+# rejected: PL/pgSQL supports them, so a detector keying on them mislabels every PostgreSQL
+# migrations repository, which is the exact false positive this clause removes.
+token_probe() {   # token_probe <file-content>
+    local d got
+    d="$(mktemp -d)"
+    ( cd "$d" || exit 1
+      i=1; while [ "$i" -le 12 ]; do printf 'CREATE TABLE t%s (id integer);\n' "$i" > "m$i.sql"; i=$((i+1)); done
+      printf '%s\n' "$1" > marker.sql )
+    got="$( cd "$d" && bash -c '. "$1"; detect_languages | tr "\n" " "' _ "$ROOT/lib/detect-stack.sh" 2>/dev/null )"
+    rm -rf "$d"
+    printf '%s' "$got"
+}
+
+# The fields are separated by | rather than :, because := is PL/SQL's assignment operator and the
+# first probe carrying one would split on its own content and assert on something it never wrote.
+for probe in 'v VARCHAR2(30);|plsql |VARCHAR2' \
+             'DBMS_OUTPUT.PUT_LINE(1);|plsql |DBMS_ prefix' \
+             'CREATE OR REPLACE PACKAGE BODY p AS END;|plsql |PACKAGE BODY' \
+             'v varchar2(30);|plsql |a lowercase token' \
+             'DECLARE r t%ROWTYPE; v t.c%TYPE; BEGIN END;||PL/pgSQL %TYPE and %ROWTYPE' \
+             'CREATE TABLE x (id integer);||plain SQL with no Oracle token'; do
+    content="${probe%%|*}"; rest="${probe#*|}"; want="${rest%%|*}"; label="${rest#*|}"
+    got="$(token_probe "$content")"
+    [ "$got" = "$want" ] && ok "$label yields '${want:-nothing}'" \
+      || bad "oracle token" "$label gave '$got', want '${want:-nothing}'"
+done
+
+# has_oracle_token's fallback used to pipe straight into `xargs -0 grep`. GNU xargs runs its command
+# once even on zero input unless given -r, and grep with no file operand then reads the inherited
+# stdin: a hang, not a quick "no match", and Linux-only, since BSD xargs does not invoke on empty
+# input. This fixture reaches the fallback (an unreadable directory forces the primary grep past
+# rc 1) with nothing for the fallback's own find to see, which is the exact shape that triggered it.
+# The assertion could not be watched fail on this machine's BSD xargs, only reasoned from GNU's
+# documented behaviour; it guards the return value and that the call does not block.
+d="$(mktemp -d)"
+( cd "$d" || exit 1
+  mkdir -p blocked; : > blocked/unreadable
+  chmod 000 blocked )
+got="$( cd "$d" && bash -c '. "$1"; has_oracle_token; echo "rc=$?"' _ "$ROOT/lib/detect-stack.sh" 2>/dev/null )"
+chmod 755 "$d/blocked"
+[ "$got" = "rc=1" ] \
+  && ok "has_oracle_token returns false rather than blocking with nothing for the fallback to scan" \
+  || bad "has_oracle_token empty fallback" "got '$got', want 'rc=1'"
+rm -rf "$d"
+
+# NFR-01, NFR-02 and NFR-04, asserted as properties rather than as a clock. A timed test fails on a
+# loaded CI runner for reasons unrelated to the code; these three do not.
+#
+# The census must not run at all on a project that declares itself, FR-04. The stub records itself
+# in a file rather than exiting: sql_census is called through census="$(sql_census)", so an exit
+# inside it only kills the substitution and the caller carries on, which is why the first version of
+# this assertion passed even against a detect_languages that ran the census first. Verified
+# 2026-08-18 against exactly that mutant.
+d="$(fixture ts-migrations)"
+sentinel="$d/census-ran"
+got="$( cd "$d" && bash -c 'S="$2"; . "$1"; sql_census() { echo ran >> "$S"; printf "20 40\n"; }; detect_languages | tr "\n" " "' \
+        _ "$ROOT/lib/detect-stack.sh" "$sentinel" 2>/dev/null )"
+if [ "$got" = "typescript " ] && [ ! -f "$sentinel" ]; then
+    ok "a declared project never reaches the census"
+else
+    bad "census ordering" "detect gave '$got' and the census $([ -f "$sentinel" ] && echo ran || echo did not run); want 'typescript ' and no census"
+fi
+rm -rf "$d"
+
+# Vendored trees must not sway the count. Without the prune, 40 .js files under node_modules make
+# .js the dominant extension and the Oracle repository stops being detected.
+d="$(fixture plsql)"
+mkdir -p "$d/node_modules/pkg"
+i=1; while [ "$i" -le 40 ]; do printf 'x\n' > "$d/node_modules/pkg/f$i.js"; i=$((i+1)); done
+got="$( cd "$d" && bash -c '. "$1"; detect_languages | tr "\n" " "' _ "$ROOT/lib/detect-stack.sh" 2>/dev/null )"
+[ "$got" = "plsql " ] && ok "node_modules is pruned from the census" \
+  || bad "census prune" "got '$got'; vendored files were counted"
+rm -rf "$d"
+
+# The same for .git, which on a real repository holds far more files than the working tree.
+d="$(fixture plsql)"
+got="$( cd "$d" && bash -c '. "$1"; sql_census' _ "$ROOT/lib/detect-stack.sh" 2>/dev/null )"
+[ "${got##* }" = "1" ] && ok "the git directory is pruned from the census" \
+  || bad "census prune" "largest other extension was '${got##* }', want 1; .git was counted"
+rm -rf "$d"
+
+# The APEX marker is keel's own output: lib/apex_render.py writes manifest.json with an apex_version
+# key, pinned by tests/test-apex-export.sh. Keying on a file keel writes itself is why this cannot
+# false-positive, and the third case is what keeps any other manifest.json from claiming it.
+for spec in 'none::an ordinary PL/SQL project' \
+            'apex:{"apex_version":"23.2"}:an APEX export tree' \
+            'none:{"name":"something-else"}:a manifest.json that is not an APEX export' \
+            'none:{"note":"apex_version"}:a manifest.json where apex_version is a value, not a key'; do
+    want="${spec%%:*}"; rest="${spec#*:}"; manifest="${rest%:*}"; label="${rest##*:}"
+    d="$(fixture plsql)"
+    [ -n "$manifest" ] && printf '%s\n' "$manifest" > "$d/manifest.json"
+    got="$( cd "$d" && bash -c '. "$1"; lang_profile plsql' _ "$ROOT/lib/detect-stack.sh" 2>/dev/null )"
+    [ "$got" = "plsql oracle $want none" ] \
+      && ok "$label gives framework $want" \
+      || bad "lang_profile plsql" "$label gave '$got', want 'plsql oracle $want none'"
+    rm -rf "$d"
+done
+
+# The end to end claim, which no other assertion makes: init writes the language into the profile.
+# detect_languages returning plsql is not the same thing, and until lang_profile gained its arm the
+# profile said unknown on a repository the detector had already classified.
+d="$(fixture plsql)"
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+got="$(python3 -c "import json;s=json.load(open('$d/.keel/profile.json'))['stack'];print(s['language'],s['runtime'])" 2>/dev/null)"
+[ "$got" = "plsql oracle" ] && ok "keel init writes plsql and oracle into the profile" \
+  || bad "init plsql" "profile says '$got', want 'plsql oracle'"
+rm -rf "$d"
+
+# detect_datastores greps dependency manifests and returns early when there are none, so it can
+# never reach a PL/SQL repository by its existing route. CON-04. This is a separate branch keyed on
+# the language, not a ninth pair in the list, and the third case is what proves the existing route
+# still works.
+d="$(fixture plsql)"
+got="$( cd "$d" && bash -c '. "$1"; detect_datastores | tr "\n" " "' _ "$ROOT/lib/detect-stack.sh" 2>/dev/null )"
+[ "$got" = "oracle " ] && ok "a PL/SQL project names oracle as its datastore" \
+  || bad "datastores" "got '$got', want 'oracle '"
+rm -rf "$d"
+
+d="$(fixture ts-migrations)"
+got="$( cd "$d" && bash -c '. "$1"; detect_datastores | tr "\n" " "' _ "$ROOT/lib/detect-stack.sh" 2>/dev/null )"
+case "$got" in
+  *oracle*) bad "datastores" "a TypeScript project with .sql migrations was given oracle" ;;
+  *)        ok "a project that is not PL/SQL gains no oracle datastore" ;;
+esac
+rm -rf "$d"
+
+d="$(fixture python)"
+printf 'psycopg2-binary==2.9\n' > "$d/requirements.txt"
+got="$( cd "$d" && bash -c '. "$1"; detect_datastores | tr "\n" " "' _ "$ROOT/lib/detect-stack.sh" 2>/dev/null )"
+case "$got" in
+  *postgres*) ok "the existing manifest-based datastore detection still works" ;;
+  *)          bad "datastores" "a psycopg project gave '$got', want postgres" ;;
+esac
+rm -rf "$d"
+
+# CON-02 and FR-08. utPLSQL runs inside a database and the connection string, schema and credentials
+# are nowhere in the repository, so no command can be written. The fixture carries a real utPLSQL
+# suite on purpose: it is the case most likely to tempt a future change into guessing one.
+d="$(fixture plsql)"
+mkdir -p "$d/tests"
+printf 'BEGIN ut.run(); END;\n/\n' > "$d/tests/run_all_tests.sql"
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+got="$(python3 -c "
+import json
+v=json.load(open('$d/.keel/profile.json'))['verify']
+print(' '.join(k for k in ('test','test_one','lint','typecheck','build') if v.get(k) is not None))" 2>/dev/null)"
+[ -z "$got" ] && ok "a PL/SQL project gets no invented verify command" \
+  || bad "verify" "these were written rather than left null: $got"
+rm -rf "$d"
 
 # A Kotlin Gradle build was reported as java/spring: the build.gradle.kts branch was reached before
 # anything looked for Kotlin, and the java branch hardcoded spring. Both halves are asserted here
@@ -658,6 +895,15 @@ d="$(mktemp -d)"
   || bad "has_ui" "NestJS service got '$(ui_of "$d")', want False"
 rm -rf "$d"
 
+# APEX pages are served from inside the database, so an APEX export has neither a local public/ nor
+# an index.html for the fallback below to find. The framework name is the only signal there is.
+d="$(fixture plsql)"
+printf '{"apex_version":"23.2"}\n' > "$d/manifest.json"
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+[ "$(ui_of "$d")" = "True" ] && ok "an APEX export has has_ui true" \
+  || bad "has_ui" "APEX export got '$(ui_of "$d")', want True"
+rm -rf "$d"
+
 # ---- datastores -----------------------------------------------------------
 # The same defect has_ui had, in the field beside it: stack.datastores was written as a hardcoded
 # empty list. Found on the existing-service pilot, whose repository declared postgres and redis
@@ -979,6 +1225,39 @@ rm -rf "$d"
 # ---- doctor ---------------------------------------------------------------
 
 d="$(fixture node-ts)"
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+
+# FR-16: doctor says nothing about explain_level. The schema drift message is the whole mechanism
+# for getting the key into an existing project, and a nudge for an optional preference key would
+# print on every run of every project that is content with the default, which is most of them.
+#
+# Both states are checked, and the stale one is the point. A freshly initialised profile is already
+# at the current schema version, so the drift branch never runs against it: the first version of
+# this case checked only that state and therefore could not fail for the reason written above. A
+# nudge added inside the drift message would have passed it. Caught in review.
+out="$( cd "$d" && "$KEEL" doctor 2>&1 )"
+case "$out" in
+    *explain_level*) bad "doctor" "doctor named explain_level on a current profile; FR-16 says the drift message is the whole mechanism" ;;
+    *) ok "doctor says nothing about explain_level on a current profile" ;;
+esac
+
+python3 - "$d" <<'PY_STALE'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".keel/profile.json"
+j = json.loads(p.read_text())
+j["schema_version"] = 1
+j.get("conventions", {}).pop("explain_level", None)
+p.write_text(json.dumps(j, indent=2) + "\n")
+PY_STALE
+out="$( cd "$d" && "$KEEL" doctor 2>&1 )"
+case "$out" in
+    *"schema version"*) ok "doctor reports drift on a profile older than the installed keel" ;;
+    *) bad "doctor" "no drift warning on a schema_version 1 profile; that message is how the key reaches an existing project" ;;
+esac
+case "$out" in
+    *explain_level*) bad "doctor" "doctor named explain_level in the drift path; FR-16 says the version message is the whole mechanism" ;;
+    *) ok "doctor says nothing about explain_level on a stale profile either" ;;
+esac
 ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
 # jest is not installed in the fixture, so verify.test cannot run: doctor must say so.
 if ( cd "$d" && "$KEEL" doctor >/dev/null 2>&1 ); then
@@ -1538,6 +1817,159 @@ sys.exit(0 if c.get('response_style')=='terse' else 1)" \
   && ok "init writes conventions.response_style=terse" \
   || bad "response_style" "init did not write terse"
 
+# explain_level is written explicitly for the same reason response_style is: technical is what a
+# project gets without asking, so the key that changes it has to be visible in the file the reader
+# already opens.
+python3 -c "
+import json,sys
+c=json.load(open('$d/.keel/profile.json')).get('conventions',{})
+sys.exit(0 if c.get('explain_level')=='technical' else 1)" \
+  && ok "init writes conventions.explain_level=technical" \
+  || bad "explain_level" "init did not write technical"
+
+# The watchdog cannot read the window from a session, so the only correct mechanism is this key and
+# nothing wrote it. 200000 is conservative and sometimes wrong, which is acceptable only because a
+# configured window is a floor: a larger session raises it in flight rather than being stopped at
+# 85% of the wrong number.
+python3 -c "
+import json,sys
+g=json.load(open('$d/.keel/profile.json')).get('gates',{})
+sys.exit(0 if g.get('context_window')==200000 else 1)" \
+  && ok "init writes gates.context_window=200000" \
+  || bad "context_window" "init did not write gates.context_window"
+
+# gates.context_window was already declared by the schema, which is why writing it into init's
+# output needed no SCHEMA_VERSION bump. This pins that fact rather than the version number it
+# happened to sit at: the literal 1 was unsatisfiable by any legitimate bump, and it blocked the
+# first one that came along (conventions.explain_level, 2026-08-18, which does add a key path and
+# therefore does require the bump the fingerprint rule demands).
+python3 -c "
+import json,sys
+g=json.load(open('$ROOT/templates/profile.schema.json'))['properties']['gates']['properties']
+sys.exit(0 if 'context_window' in g else 1)" \
+  && ok "context_window is schema-declared, so writing it needed no bump" \
+  || bad "context_window" "gates.context_window is no longer declared by the schema"
+
+# Re-running init is how a project picks up new keel defaults, and it must not quietly downgrade a
+# 1M project to a 200000 window on the way. merge_profile gives a non-empty human value precedence;
+# nothing asserted it for this key.
+e="$(fixture node-ts)"
+( cd "$e" && "$KEEL" init -y >/dev/null 2>&1 )
+python3 - "$e" <<'PY2'
+import json,sys,pathlib
+p=pathlib.Path(sys.argv[1])/".keel/profile.json"; d=json.loads(p.read_text())
+d["gates"]["context_window"]=1000000
+p.write_text(json.dumps(d,indent=2)+"\n")
+PY2
+( cd "$e" && "$KEEL" init -y >/dev/null 2>&1 )
+python3 -c "
+import json,sys
+sys.exit(0 if json.load(open('$e/.keel/profile.json'))['gates']['context_window']==1000000 else 1)" \
+  && ok "re-running init preserves a hand-set context_window" \
+  || bad "context_window" "re-init overwrote a human value, downgrading a 1m project"
+
+( cd "$e" && "$KEEL" init --force -y >/dev/null 2>&1 )
+python3 -c "
+import json,sys
+sys.exit(0 if json.load(open('$e/.keel/profile.json'))['gates']['context_window']==200000 else 1)" \
+  && ok "init --force replaces context_window, as it replaces the rest of the profile" \
+  || bad "context_window" "--force left the old value"
+
+# And the downgrade --force just performed is recoverable in flight, which is the only reason it is
+# acceptable behaviour rather than a defect.
+got="$(env -u KEEL_CONTEXT_WINDOW python3 -c "
+import sys
+sys.path.insert(0, '$ROOT/lib')
+import context_watch
+print(context_watch.window_for('claude-opus-5', observed=400000, configured=200000))
+")"
+[ "$got" = "1000000" ] && ok "a force-downgraded window is raised again by observation" \
+  || bad "context_window" "got $got: --force would strand a 1m project at 200000"
+rm -rf "$e"
+
+# Four places describe how the window is decided and all four said an explicit setting simply wins.
+# That stopped being true when the profile key became a floor. A description that is wrong is worse
+# than none: it is read once and believed.
+f="$(fixture node-ts)"
+( cd "$f" && "$KEEL" init -y >/dev/null 2>&1 )
+out="$( cd "$f" && "$KEEL" doctor 2>&1 )"
+case "$out" in
+  *"context watchdog available (window 200000"*) ok "doctor names the configured window" ;;
+  *) bad "doctor window" "did not name the configured window" ;;
+esac
+case "$out" in
+  *raised*) ok "doctor says the configured window can be raised by observation" ;;
+  *) bad "doctor window" "doctor still presents the configured window as final" ;;
+esac
+
+python3 - "$f" <<'PY2'
+import json,sys,pathlib
+p=pathlib.Path(sys.argv[1])/".keel/profile.json"; d=json.loads(p.read_text())
+del d["gates"]["context_window"]
+p.write_text(json.dumps(d,indent=2)+"\n")
+PY2
+out="$( cd "$f" && "$KEEL" doctor 2>&1 )"
+case "$out" in
+  *"window assumed 200000"*) ok "doctor still explains an unset window for older profiles" ;;
+  *) bad "doctor window" "the unset branch stopped being reachable or accurate" ;;
+esac
+rm -rf "$f"
+
+grep -q 'floor' templates/profile.schema.json \
+  && ok "the gates.context_window description describes the floor" \
+  || bad "schema doc" "the schema still describes a configured window as simply winning"
+
+# The bound must not be silent. It exists because a mistyped window disables the watchdog without
+# saying so, and a bound that clamps without saying so has moved that failure rather than fixed it.
+g="$(fixture node-ts)"
+( cd "$g" && "$KEEL" init -y >/dev/null 2>&1 )
+python3 - "$g" <<'PY3'
+import json,sys,pathlib
+p=pathlib.Path(sys.argv[1])/".keel/profile.json"; d=json.loads(p.read_text())
+d["gates"]["context_window"]=200000000
+p.write_text(json.dumps(d,indent=2)+"\n")
+PY3
+out="$( cd "$g" && "$KEEL" doctor 2>&1 )"
+case "$out" in *200000000*) ok "doctor names the configured value it bounded" ;;
+  *) bad "bound report" "doctor did not name the configured 200000000" ;; esac
+case "$out" in *1000000*) ok "doctor names the value actually in use" ;;
+  *) bad "bound report" "doctor did not name the bounded 1000000" ;; esac
+
+python3 - "$g" <<'PY3'
+import json,sys,pathlib
+p=pathlib.Path(sys.argv[1])/".keel/profile.json"; d=json.loads(p.read_text())
+d["gates"]["context_window"]=1000000
+p.write_text(json.dumps(d,indent=2)+"\n")
+PY3
+out="$( cd "$g" && "$KEEL" doctor 2>&1 )"
+case "$out" in *"above the largest"*) bad "bound report" "doctor warned about a legitimate 1000000" ;;
+  *) ok "doctor says nothing about bounding a window at the maximum" ;; esac
+rm -rf "$g"
+
+# Doctor must report the window the watchdog will actually use, not the number in the file. The
+# profile key is a floor: it raises the starting window and never lowers it, so a value at or below
+# the default is discarded. Reporting it as though it were in force tells someone who lowered the
+# window to get an earlier pause that it worked, when nothing changed.
+h="$(fixture node-ts)"
+( cd "$h" && "$KEEL" init -y >/dev/null 2>&1 )
+python3 - "$h" <<'PY4'
+import json,sys,pathlib
+p=pathlib.Path(sys.argv[1])/".keel/profile.json"; d=json.loads(p.read_text())
+d["gates"]["context_window"]=50000
+p.write_text(json.dumps(d,indent=2)+"\n")
+PY4
+out="$( cd "$h" && "$KEEL" doctor 2>&1 )"
+case "$out" in *"window 50000 from gates"*) bad "doctor window" "doctor reports 50000 as in force; the watchdog uses 200000" ;;
+  *) ok "doctor does not report a below-default window as the one in use" ;; esac
+case "$out" in *200000*) ok "doctor names the window actually in force for a below-default setting" ;;
+  *) bad "doctor window" "doctor did not name 200000, the window really in use" ;; esac
+
+# And the environment override is what doctor must report when it is set, since it beats the file.
+out="$( cd "$h" && KEEL_CONTEXT_WINDOW=500000 "$KEEL" doctor 2>&1 )"
+case "$out" in *KEEL_CONTEXT_WINDOW*500000*|*500000*KEEL_CONTEXT_WINDOW*) ok "doctor reports the environment override when it is set" ;;
+  *) bad "doctor window" "doctor ignored KEEL_CONTEXT_WINDOW while claiming it overrides" ;; esac
+rm -rf "$h"
+
 # The enabledPlugins entry stays. That is the part that is true of the project: this is the plugin
 # set the repository expects, and a teammate running /plugin sees it already listed.
 case "$(plugins_of "$d")" in *"keel@gbi"*) ok "init still records that the project expects keel@gbi" ;;
@@ -2081,6 +2513,139 @@ changelog_version="$(sed -n 's/^## \([0-9][0-9.]*\).*/\1/p' "$ROOT/CHANGELOG.md"
 [ "$cli_version" = "$changelog_version" ] \
   && ok "CHANGELOG's newest entry matches VERSION ($cli_version)" \
   || bad "version drift" "VERSION is $cli_version, newest CHANGELOG entry is $changelog_version"
+
+# The reference says which keys keel writes and which a human adds. That column is derived from a
+# real init when the page is generated, and this is what stops it drifting afterwards. A
+# hand-maintained list said twelve human-only keys until the context window work moved one, and
+# nothing would have noticed.
+c="$(fixture node-ts)"
+( cd "$c" && "$KEEL" init -y >/dev/null 2>&1 )
+drift="$(PAGE="$ROOT/docs/profile-keys.md" PROFILE="$c/.keel/profile.json" python3 -c "
+import json, os, re
+page = open(os.environ['PAGE']).read()
+claimed = {}
+for k, setby in re.findall(r'^\| \`([^\`]+)\` \| [^|]* \| ([^|]*) \|', page, re.M):
+    claimed[k] = 'init' in setby
+def leaves(o, p=''):
+    s = set()
+    if isinstance(o, dict):
+        for k, v in o.items(): s |= leaves(v, f'{p}.{k}' if p else k)
+    else: s.add(p)
+    return s
+actual = leaves(json.load(open(os.environ['PROFILE'])))
+print(' '.join(sorted(k for k, says in claimed.items() if says != (k in actual))))
+")"
+[ -z "$drift" ] && ok "the reference's set-by column matches what keel init writes" \
+  || bad "profile-keys" "the column disagrees with a real init for: $drift. Regenerate with tests/generate-profile-keys.sh"
+rm -rf "$c"
+
+# doctor has always been able to report a missing recommended plugin; it had nothing to check
+# against. plugin_report reads plugins.recommended and falls back to a fixed three when it is
+# absent, and init never wrote it, so no language server was ever named.
+pr="$(fixture node-ts)"
+( cd "$pr" && "$KEEL" init -y >/dev/null 2>&1 )
+python3 -c "
+import json,sys
+r=json.load(open('$pr/.keel/profile.json')).get('plugins',{}).get('recommended') or []
+sys.exit(0 if 'typescript-lsp@claude-plugins-official' in r else 1)" \
+  && ok "init records the language server for the detected stack" \
+  || bad "plugins" "plugins.recommended does not name typescript-lsp"
+rm -rf "$pr"
+
+pg="$(fixture go)"
+( cd "$pg" && "$KEEL" init -y >/dev/null 2>&1 )
+python3 -c "
+import json,sys
+r=json.load(open('$pg/.keel/profile.json')).get('plugins',{}).get('recommended') or []
+sys.exit(0 if 'gopls-lsp@claude-plugins-official' in r else 1)" \
+  && ok "a go project records gopls-lsp" \
+  || bad "plugins" "plugins.recommended does not name gopls-lsp"
+rm -rf "$pg"
+
+# The case this whole half exists for. A repository that already has .claude/settings.json takes
+# the merge path, which touches permissions and nothing else, so no plugin is enabled: not the
+# language server, not keel@gbi. Until init wrote plugins.recommended, doctor could not see it.
+pm="$(fixture node-ts)"
+mkdir -p "$pm/.claude"
+printf '{\n  "permissions": { "allow": ["Bash(ls:*)"] }\n}\n' > "$pm/.claude/settings.json"
+( cd "$pm" && "$KEEL" init -y >/dev/null 2>&1 )
+# CLAUDE_CONFIG_DIR points at an empty directory so nothing is enabled at user scope. Without it
+# this depends on the machine: a developer whose keel is enabled at user scope, which is how it is
+# normally installed, would see doctor correctly stay quiet about keel@gbi and the assertion would
+# fail for them and pass for everyone else.
+mkdir -p "$pm/emptyconf"
+out="$( cd "$pm" && CLAUDE_CONFIG_DIR="$pm/emptyconf" HOME="$pm" "$KEEL" doctor 2>&1 )"
+case "$out" in *typescript-lsp*) ok "doctor names the missing language server on a mature repo" ;;
+  *) bad "plugins" "doctor did not name typescript-lsp as missing" ;; esac
+case "$out" in *keel@gbi*) ok "doctor names keel@gbi as not enabled when it is enabled nowhere" ;;
+  *) bad "plugins" "doctor did not name keel@gbi as missing" ;; esac
+case "$out" in *"/plugin install"*) ok "doctor names the command that installs it" ;;
+  *) bad "plugins" "doctor reported a missing plugin without saying how to install it" ;; esac
+rm -rf "$pm"
+
+# A fresh repository has them enabled already, so it must stay quiet. A warning that fires on a
+# healthy project is one people learn to scroll past.
+pf="$(fixture node-ts)"
+( cd "$pf" && "$KEEL" init -y >/dev/null 2>&1 )
+out="$( cd "$pf" && "$KEEL" doctor 2>&1 )"
+case "$out" in *"recommended plugin not enabled"*) bad "plugins" "doctor warned on a fresh repo where init enabled everything" ;;
+  *) ok "a fresh repository is not warned about plugins" ;; esac
+rm -rf "$pf"
+
+# Two deliberate non-behaviours, which are the kind most easily lost to a later helpful change.
+ps="$(fixture node-ts)"
+mkdir -p "$ps/.claude"
+printf '{\n  "permissions": { "allow": ["Bash(ls:*)"] }\n}\n' > "$ps/.claude/settings.json"
+( cd "$ps" && "$KEEL" init -y >/dev/null 2>&1 )
+python3 -c "
+import json,sys
+s=json.load(open('$ps/.claude/settings.json'))
+sys.exit(0 if 'enabledPlugins' not in s else 1)" \
+  && ok "init adds no plugin entries to an existing settings file" \
+  || bad "settings" "init wrote enabledPlugins into a file the project already had"
+
+# The same path must still add the guardrails, which is the one thing it is for.
+python3 -c "
+import json,sys
+p=json.load(open('$ps/.claude/settings.json')).get('permissions',{})
+sys.exit(0 if p.get('deny') else 1)" \
+  && ok "init still merges the permission guardrails into an existing settings file" \
+  || bad "settings" "the permission merge stopped happening"
+
+# A curated plugins.recommended is a human value and merge_profile must keep it.
+python3 - "$ps" <<'PY5'
+import json,sys,pathlib
+p=pathlib.Path(sys.argv[1])/".keel/profile.json"; d=json.loads(p.read_text())
+d["plugins"]["recommended"]=["context7@claude-plugins-official"]
+p.write_text(json.dumps(d,indent=2)+"\n")
+PY5
+( cd "$ps" && "$KEEL" init -y >/dev/null 2>&1 )
+python3 -c "
+import json,sys
+r=json.load(open('$ps/.keel/profile.json'))['plugins']['recommended']
+sys.exit(0 if r==['context7@claude-plugins-official'] else 1)" \
+  && ok "a hand-edited plugins.recommended survives re-initialisation" \
+  || bad "plugins" "re-init overwrote a curated plugin list"
+rm -rf "$ps"
+
+# A plugin enabled at user scope is enabled. plugin_report read only the project settings file,
+# which was harmless while its fallback list was three plugins nobody enables per project. Once init
+# wrote keel@gbi into plugins.recommended, every project whose keel is enabled at user scope, which
+# is how it is normally installed, got a permanent warning that it was missing, alongside doctor's
+# own line saying the marketplace is registered. The remedy it printed did not help either:
+# /plugin install writes user scope, which is the scope this never read.
+pu="$(fixture node-ts)"
+mkdir -p "$pu/.claude" "$pu/userconf"
+printf '{\n  "permissions": { "allow": ["Bash(ls:*)"] }\n}\n' > "$pu/.claude/settings.json"
+printf '{ "enabledPlugins": { "keel@gbi": true } }\n' > "$pu/userconf/settings.json"
+( cd "$pu" && "$KEEL" init -y >/dev/null 2>&1 )
+out="$( cd "$pu" && CLAUDE_CONFIG_DIR="$pu/userconf" "$KEEL" doctor 2>&1 )"
+case "$out" in *"not enabled: keel@gbi"*) bad "plugin scope" "doctor called keel@gbi missing while it is enabled at user scope" ;;
+  *) ok "a plugin enabled at user scope is not reported missing" ;; esac
+# And one that really is missing everywhere is still reported, so the fix does not silence the check.
+case "$out" in *"not enabled: typescript-lsp"*) ok "a plugin missing from every scope is still reported" ;;
+  *) bad "plugin scope" "the scope fix silenced a genuinely missing plugin" ;; esac
+rm -rf "$pu"
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

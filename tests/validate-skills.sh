@@ -68,6 +68,7 @@ DESC_TOTAL_MAX_TOKENS=1320
 schema_fingerprint_for() {
     case "$1" in
         1) printf '2128b5ddbcc7' ;;
+        2) printf '24e947eee3ce' ;;
     esac
 }
 
@@ -275,13 +276,48 @@ if [ -f hooks/session-start ]; then
         grep -q "$s" hooks/session-start || report "hooks/session-start does not name the skill \"$s\""
     done < <(find skills -maxdepth 1 -mindepth 1 -type d -exec basename {} \; 2>/dev/null)
 
-    # Doc 05 budgets this at 250 tokens, 400 hard. Estimated at chars/3.6, the same way doctor sizes
+    # Doc 05 budgets this at 250 tokens, 400 hard, and NFR-01 of docs/prd/plain-language-chat.md
+    # tightens it to 356 for every combination. Estimated at chars/3.6, the same way doctor sizes
     # the CLAUDE.md block, because a count-tokens call needs an API key and a check that only runs
     # where a key happens to exist is absent exactly where nobody is watching.
-    hook_chars=$(bash hooks/session-start 2>/dev/null | wc -c | tr -d ' ')
-    hook_tokens=$(( hook_chars * 10 / 36 ))
-    if [ "$hook_tokens" -gt 400 ]; then
-        report "hooks/session-start injects about $hook_tokens tokens, over the 400 ceiling. It is in every request of every session."
+    #
+    # All four combinations of response_style and explain_level, not just the one this repository's
+    # profile selects. Measuring only the local configuration is how a paragraph that fits terse and
+    # technical reaches a release while breaking verbose and plain.
+    #
+    # Split with parameter expansion rather than `set --`. This is top level, not a function, so
+    # `set --` would clobber the script's own positional parameters, and it needs an unquoted
+    # expansion that shellcheck is right to flag.
+    # The mktemp guard is load bearing. Without it a failed mktemp leaves $probe empty, the profile
+    # writes fail, and `cd "" && bash "$hook_abs"` still succeeds, because cd with an empty argument
+    # is a no-op returning 0. The loop would then measure this repository's own profile four times
+    # and report green, which is the exact check this block exists to be. Caught in review.
+    hook_abs="$PWD/hooks/session-start"
+    if probe="$(mktemp -d)"; then
+        mkdir -p "$probe/.keel"
+        for combo in "terse technical" "terse plain" "verbose technical" "verbose plain"; do
+            rs="${combo%% *}"; el="${combo##* }"
+            printf '{"conventions": {"response_style": "%s", "explain_level": "%s"}}\n' "$rs" "$el" \
+                > "$probe/.keel/profile.json"
+            hook_chars=$( cd "$probe" && bash "$hook_abs" 2>/dev/null | wc -c | tr -d ' ' )
+            hook_tokens=$(( hook_chars * 10 / 36 ))
+            # The floor first. A hook that fails to run measures 0, which is under every ceiling, so
+            # a bound with no floor cannot tell "within budget" from "produced nothing".
+            #
+            # The floor is zero and not a size. This validator runs against arbitrary repositories
+            # and against fixtures whose hooks legitimately emit one short line, so any positive
+            # floor rejects a valid hook. Zero output is the one length that always means failure.
+            if [ "$hook_chars" -eq 0 ]; then
+                report "hooks/session-start produced no output for response_style=$rs explain_level=$el. It failed to run, and a size check with no floor would have counted that as comfortably within budget."
+            elif [ "$hook_tokens" -gt 400 ]; then
+                report "hooks/session-start injects about $hook_tokens tokens for response_style=$rs explain_level=$el, over the 400 ceiling. It is in every request of every session."
+            elif [ "$hook_tokens" -gt 356 ]; then
+                report "hooks/session-start injects about $hook_tokens tokens for response_style=$rs explain_level=$el, over the 356 rule in docs/prd/plain-language-chat.md NFR-01. The 44 tokens below the 400 ceiling are spoken for."
+            fi
+        done
+        rm -rf "$probe"
+    else
+        report "cannot create a temporary directory to size hooks/session-start"
     fi
 fi
 
@@ -348,6 +384,45 @@ if [ -f "$tool_tbl" ] && [ -f lib/detect-stack.sh ]; then
       || report "skills/repo-snapshot/references/section-templates.md section 10 does not cite tool-choices.md, so a gap gets a skill but no tool."
 fi
 
+# The reference page is generated, so the only way it goes wrong is by not being regenerated. This
+# compares the page against the schema and nothing else: the set-by column needs a real profile and
+# is checked in tests/test-keel.sh, because this validator runs on every commit and must stay fast.
+#
+# NO BACKTICK AND NO APOSTROPHE IN THE HEREDOC BELOW. bash 3.2 does not treat a quoted heredoc body
+# as literal inside a $( ), so either character breaks the parse of this whole file, and shellcheck
+# does not see it. Same trap lib/detect-stack.sh records above its own heredoc. \x60 is a backtick.
+if [ -f docs/profile-keys.md ] && [ -f templates/profile.schema.json ] && command -v python3 >/dev/null 2>&1; then
+    stale="$(python3 - <<'PYK'
+import json, re
+schema = json.load(open("templates/profile.schema.json"))
+def declared(node, p=""):
+    out = {}
+    for k, v in (node.get("properties") or {}).items():
+        path = "%s.%s" % (p, k) if p else k
+        if isinstance(v, dict) and v.get("properties"):
+            out.update(declared(v, path))
+        else:
+            out[path] = (v.get("description") or "").strip()
+    return out
+want = declared(schema)
+page = open("docs/profile-keys.md").read()
+got = {}
+row = re.compile("^\\| \x60([^\x60]+)\x60 \\| [^|]* \\| [^|]* \\| (.*) \\|$", re.M)
+for m in row.finditer(page):
+    got[m.group(1)] = m.group(2).replace("\\|", "|")
+problems = []
+problems += ["no row for %s" % k for k in sorted(set(want) - set(got))]
+problems += ["a row for %s, which the schema does not declare" % k for k in sorted(set(got) - set(want))]
+problems += ["a stale description for %s" % k
+             for k in sorted(set(want) & set(got))
+             if got[k] != (want[k] or "_No description yet._")]
+print("; ".join(problems))
+PYK
+)"
+    [ -z "$stale" ] \
+      || report "docs/profile-keys.md disagrees with templates/profile.schema.json: $stale. Regenerate it with tests/generate-profile-keys.sh > docs/profile-keys.md"
+fi
+
 # A field added, removed, renamed or moved without SCHEMA_VERSION moving is a release that expects a
 # field nobody's profile has, and doctor would stay quiet about it because doctor compares the
 # version, not the fields. Guarded on the file existing, like the checks above, because this
@@ -361,6 +436,26 @@ fi
 # run, and this validator is the free, fast check that runs on every commit. Stated rather than
 # implied, because a guard whose coverage you have to infer gets trusted for more than it does.
 if [ -f templates/profile.schema.json ] && command -v python3 >/dev/null 2>&1; then
+    # A key with no description is a key a reader cannot act on, and the generated reference has a
+    # blank cell where its answer should be. 35 of 59 were empty on 2026-08-18.
+    bare="$(python3 - <<'PYB'
+import json
+d = json.load(open("templates/profile.schema.json"))
+def walk(node, p=""):
+    out = []
+    for k, v in (node.get("properties") or {}).items():
+        path = "%s.%s" % (p, k) if p else k
+        if isinstance(v, dict) and v.get("properties"):
+            out += walk(v, path)
+        elif not (v.get("description") or "").strip():
+            out.append(path)
+    return out
+print(" ".join(walk(d)))
+PYB
+)"
+    [ -z "$bare" ] \
+      || report "templates/profile.schema.json has keys with no description: $bare. Every key a user may set has to say what it does; the generated reference shows a blank cell otherwise."
+
     schema_got="$(python3 - <<'PY'
 import hashlib, json
 d = json.load(open("templates/profile.schema.json"))

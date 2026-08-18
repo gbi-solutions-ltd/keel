@@ -46,6 +46,7 @@
     "branch_prefix": "feat/",
     "default_branch": "main",
     "response_style": "terse",
+    "explain_level": "technical",
     "protect_default_branch": true
   },
   "deploy": {
