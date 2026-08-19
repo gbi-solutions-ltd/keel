@@ -5,6 +5,32 @@ Notable changes to keel. Versions follow [semantic versioning](https://semver.or
 Until 1.0.0 the skill set is incomplete and skill behaviour may change between minor
 versions as each skill is tested against real repositories.
 
+## 0.13.0 - 2026-08-19
+
+**The managed CLAUDE.md block fits the budget it declares.** Its own header has always said "Budget:
+450 tokens. This sits in every request, so every line must earn its place." It rendered at 598. So
+every project `keel init` configured opened with a `keel doctor` warning about a block keel itself
+wrote, which is the warning most likely to teach someone that keel's warnings are noise.
+
+The template now renders at 421 tokens on the `node-ts` fixture, a 30 percent cut, with every rule
+intact. The `###` section headings became bold run-in leads and the prose was rewritten; the worked
+examples were compressed rather than dropped. Nothing that told an agent what to do was removed.
+
+**It shipped because nothing asserted the target.** `tests/test-keel.sh` checked the 700 ceiling and
+never the 450 target, so the template could drift 148 tokens past its stated budget with a green
+suite. There is now an assertion for the target, and it was verified red against the old template
+before the trim.
+
+**`docs/standards.md` recorded this overrun as a departure on the argument that closing it "deletes a
+rule rather than words".** That was wrong and is now corrected there. The words were available; the
+test that would have shown it was missing.
+
+**One caveat, recorded rather than hidden.** A rendered block substitutes the three verify commands
+and the docs root, so its size varies per project. This repository renders 469 because its
+`verify.lint` is a single 160 character `shellcheck` invocation, which is 198 characters of commands
+where the fixture has 37. That is a property of one profile value, and it stays recorded as a
+narrowed departure with shortening `verify.lint` as its end condition.
+
 ## 0.12.1 - 2026-08-19
 
 **A fixture's evidence file was never committed.** `tests/evals/fixtures/incident-diagnose-first/logs/worker.log`

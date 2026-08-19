@@ -68,19 +68,29 @@ the model may not have loaded when it builds the dispatch. `repo-snapshot`'s six
 verbatim brief suffix is 175 words on its own. That is now an explanation of why bodies differ, not
 a second budget line.
 
-Total always-loaded keel cost, measured 2026-08-16: **2,056 tokens** at 24 skills, being 1,066 for
-the descriptions, 634 for the CLAUDE.md block and 356 for the SessionStart injection. The injection
+Total always-loaded keel cost, measured 2026-08-19: **1,891 tokens** at 24 skills, being 1,066 for
+the descriptions, 469 for the CLAUDE.md block as this repository renders it, and 356 for the
+SessionStart injection. The injection
 was 300 until the brevity rule was made the default later the same day; see below. For comparison,
 superpowers injects its entire `using-superpowers` skill body at session start, which is around 900
 tokens on its own, and gstack's tier-4 preamble runs into several thousand.
 
-**Two lines are over target and under ceiling, which is a decision rather than an oversight.** The
+**One line is over target and under ceiling, which is a decision rather than an oversight.** The
 injection is at 356 tokens against a 250 target, because it names every skill, the count grew, and it
-now also carries the brevity rule that ships on by default; the
-block is at 634 against 450, because it carries the per-edit lint rule and the documentation gate on
-top of the surgical-change rules. Both are checked mechanically, so the next overrun fails a build
-instead of waiting for a token audit, and the block overrun is recorded as a departure with an end
-condition in `docs/standards.md` rather than settled by moving its target.
+now also carries the brevity rule that ships on by default. It is checked mechanically, so the next
+overrun fails a build instead of waiting for a token audit.
+
+**The managed block met its target on 2026-08-19, by trimming rather than by moving the number.** It
+had drifted to 598 tokens rendered, against a 450 target its own header declared, because
+`tests/test-keel.sh` asserted only the 700 ceiling and nothing asserted the target. The template now
+renders at 421 tokens on the `node-ts` fixture, a 30 percent cut with every rule intact: the section
+headings became bold run-in leads and the prose was rewritten, which is where the words were.
+
+**A rendered block is not one number, and the target applies to the rendered one.** The three verify
+commands and the docs root are substituted per project, so a repository whose commands are long
+renders a larger block than the fixture. This repository is the extreme case at 469 tokens, because
+`verify.lint` is a single 160 character `shellcheck` invocation naming every file. That overrun is a
+property of one profile value rather than of the template, and it is recorded in `docs/standards.md`.
 
 **The descriptions are the line to watch, and since 2026-08-16 the only one bounded as a sum.** They
 scale linearly with the skill count: at roughly 44 tokens each, another ten skills is another 440
@@ -267,7 +277,7 @@ the user's lever, not the model's:
 
 Everything above budgets **input**: what sits in the prefix of every request. Reply length is
 **output**, and until 2026-08-16 nothing here addressed it, even though the same request that
-carries a 634-token block also carries however many tokens the model chooses to write back.
+carries the block also carries however many tokens the model chooses to write back.
 
 **The rule is on by default and it is not free.** `hooks/session-start` selects one paragraph from
 `conventions.response_style` and `conventions.explain_level` together, so there are four forms and
@@ -292,7 +302,7 @@ four rather than whichever one the local profile selects.
 
 `output-styles/keel-terse.md` still ships and still costs zero, but it is now the machine-wide
 alternative for non-keel repositories rather than the mechanism. The managed block was never an
-option for either: it is already 634 against a 450 target.
+option for either: it sits in every request, and its budget is the tightest in the table.
 
 **What it governs.** Chat only. The rule it encodes is that artifact detail and reply length are
 separate dials: a PRD or a plan is as long as its skill requires, and the reply stops restating it.
@@ -314,7 +324,8 @@ instruction would otherwise trade them away first.
 ## Measuring it
 
 `context-budget` produces `docs/keel/context-audit.md`. The three keel-owned rows below are this
-plugin's real figures, measured on 2026-08-16; the project rows are one repository's and vary. The
+plugin's real figures. The block row was re-measured on 2026-08-19 after the template was trimmed;
+the other two are unchanged since 2026-08-16. The project rows are one repository's and vary. The
 descriptions row carries two numbers, because they answer different questions. Its budget is derived
 at the per-skill target of 44 times the skill count, so it moves every time a skill is added and says
 whether the descriptions are the right size; the fixed 1,320 ceiling beside it says whether there are
@@ -326,11 +337,11 @@ too many of them. `tests/validate-skills.sh` enforces the second:
 ## Always loaded
 | Source                             | Tokens | Budget | Status |
 |------------------------------------|--------|--------|--------|
-| CLAUDE.md keel block               |    634 |    450 | OVER   |
+| CLAUDE.md keel block               |    469 |    450 | OVER   |
 | CLAUDE.md project                  |  1,890 |    500 | OVER   |
 | SessionStart injection             |    356 |    250 | OVER   |
 | Skill descriptions (24, ceil 1,320)|  1,066 |  1,056 | OVER   |
-| Total                              |  3,946 |  2,256 | OVER   |
+| Total                              |  3,781 |  2,256 | OVER   |
 
 ## Cache hazards
 - CLAUDE.md line 84 embeds a "last updated" date. Changing it invalidates the cache

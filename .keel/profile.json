@@ -1,5 +1,5 @@
 {
-  "keel_version": "0.12.1",
+  "keel_version": "0.13.0",
   "schema_version": 2,
   "project": {
     "name": "keel",
@@ -59,6 +59,16 @@
     "note": "Distribution is `/plugin marketplace add gbi-solutions-ltd/keel`. No server."
   },
   "docs_root": "docs",
+  "plugins": {
+    "recommended": [
+      "keel@gbi",
+      "security-guidance@claude-plugins-official",
+      "code-review@claude-plugins-official",
+      "skill-creator@claude-plugins-official",
+      "claude-md-management@claude-plugins-official",
+      "context7@claude-plugins-official"
+    ]
+  },
   "artifacts": {
     "_note": "Set any of these to a path when the artifact already exists elsewhere. Skills read the mapped path instead of the default under docs_root, so a repo with its own naming convention is not duplicated.",
     "snapshot": null,

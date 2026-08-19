@@ -1653,6 +1653,14 @@ case "$out" in *"keel block is about"*) ok "doctor reports the managed block's t
 case "$out" in *"over the 700 ceiling"*) bad "block budget" "the shipped block exceeds its own ceiling" ;;
   *) ok "the shipped block is within the 700 token ceiling" ;; esac
 
+# The ceiling is where doctor fails, not what the template aims at. Only the ceiling was asserted
+# here, so the template drifted to 518 tokens against its own header's stated 450 and shipped that
+# way: every project keel configured then opened with a doctor warning about a block keel wrote,
+# which teaches people to read the warning as noise. The target needs its own assertion or it is a
+# comment.
+case "$out" in *"over the 450 target"*) bad "block budget" "the shipped block exceeds its own 450 token target" ;;
+  *) ok "the shipped block is within the 450 token target" ;; esac
+
 # And the check has to bite, or it is a number printed for decoration.
 python3 - "$b" <<'PY'
 import pathlib, sys

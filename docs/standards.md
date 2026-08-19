@@ -254,23 +254,32 @@ change even when it is a one-line change.
 | A bug fix ships with a test that reproduced it | Applies to `tests/`, not to skills | A skill's equivalent is a behavioural eval, which needs the Phase 6 harness. Recorded as a real gap in `CHANGELOG.md` |
 | Migrations forward-only | Not applicable | No database |
 | Scripts are bash, and `python3` is optional | `keel apex-export` requires `python3` and fails loudly without it | The work is parsing megabytes of JSON out of a database client, intersecting a wanted column list against a live catalog, and writing a file tree. Every bash version of that is a worse version of what the standard library already does. A half working export is worse than none, because the artifact's whole value is that an agent trusts what it reads. `apex_missing_deps` in `lib/apex-export.sh` names what is missing rather than degrading |
-| The managed CLAUDE.md block meets its 450-token target | This repository's block is about 634 tokens, over the target and under the 700 ceiling | See below. Recorded 2026-08-16 under plan task 7.5 |
+| The managed CLAUDE.md block meets its 450-token target | This repository renders it at about 469 tokens, over the target and under the 700 ceiling | See below. Recorded 2026-08-16, narrowed 2026-08-19 when the template itself came inside the target |
 
 The eval gap is temporary and has an end condition, tracked in `CHANGELOG.md`. The `python3`
 departure is permanent and scoped to one command; nothing else in `bin/keel` gained a hard
 dependency.
 
-**The block departure, and why it is a departure rather than a new target.** Task 7.5 offered two
-moves: trim the block to 450, or record the overrun. Closing a 184-token gap means removing about a
-quarter of the block, and the block is rules end to end with no summary prose to cut, so a trim of
-that size deletes a rule rather than words. Neither pilot showed a rule in it as unearned. Raising
-the target to 628 so the warning stops is the move the rule below forbids, which leaves this.
+**The template is no longer the reason, and the original reasoning was wrong.** Task 7.5 recorded
+this on the argument that closing the gap "means removing about a quarter of the block, and the block
+is rules end to end with no summary prose to cut, so a trim of that size deletes a rule rather than
+words". That was tested on 2026-08-19 and did not hold. The template went from 598 to 421 rendered
+tokens, a 30 percent cut, with all of its rules intact: the `###` headings became bold run-in leads
+and the prose was rewritten. The words were there; nobody had tried to find them, because
+`tests/test-keel.sh` asserted only the 700 ceiling and a target nothing asserts is a comment.
 
-**Its end condition:** the block is over target because it carries two rules as prose that nothing
-enforces, the per-edit lint rule and the documentation gate. When either becomes a check, its prose
-comes out and the block is re-measured against 450. Until then `keel doctor` warns on every run, the
-700 ceiling still fails, and the figure is re-measured at each release rather than assumed. A block
-that grows past 700 is not covered by this departure.
+**What remains is a property of this profile, not of the template.** A rendered block substitutes the
+three verify commands and the docs root, so its size varies per project. This repository's
+`verify.lint` is a single 160 character `shellcheck` invocation naming every file it checks, and
+`verify.typecheck` is null, which renders an explanatory line rather than nothing. Those two put 198
+characters of commands in a block where the fixture has 37, which is the whole of the 48 token
+difference between 421 and 469. A project with ordinary verify commands is inside the target.
+
+**Its end condition:** this closes when `verify.lint` becomes short, by moving the file list into a
+script that CI and the profile both call. That is a change to how this repository lints rather than
+to what keel ships, which is why it is not folded into the template work. Until then `keel doctor`
+warns here and nowhere that installs keel normally, the 700 ceiling still fails, and the figure is
+re-measured at each release rather than assumed. A block that grows past 700 is not covered.
 
 **This repository branches and reviews like any other.** Work goes on a branch, lands through a
 pull request, and `ship`'s check 8 applies here with no exception. Every commit on `main` arrives as
