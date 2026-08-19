@@ -1,0 +1,8 @@
+{
+  "verify": {
+    "test": "tests/run-tests.sh",
+    "test_one": "tests/run-tests.sh {name}",
+    "lint": null
+  },
+  "docs_root": "docs"
+}

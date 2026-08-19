@@ -19,7 +19,7 @@
     "test": "tests/run-tests.sh",
     "test_one": "tests/{name}",
     "test_integration": null,
-    "lint": "shellcheck -x bin/keel lib/*.sh tests/*.sh tests/evals/run.sh hooks/session-start hooks/context-watch hooks/sensitive-guard hooks/done-guard",
+    "lint": "shellcheck -x bin/keel lib/*.sh tests/*.sh tests/evals/run.sh tests/evals/stage.sh hooks/session-start hooks/context-watch hooks/sensitive-guard hooks/done-guard",
     "format": null,
     "format_fix": null,
     "typecheck": null,

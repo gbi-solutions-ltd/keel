@@ -219,7 +219,7 @@ direction nobody notices. The reasoning is in
 
 ```
 tests/run-tests.sh           # static: free, seconds, runs on every commit
-tests/evals/run.sh <name>    # behavioural: costs API tokens, runs before a release
+tests/evals/stage.sh <name>  # behavioural: costs API tokens, runs before a release
 tests/supply-chain-scan.sh   # refuse to ship anything that runs on an installing machine
 ```
 

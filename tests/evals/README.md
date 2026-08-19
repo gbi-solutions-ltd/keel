@@ -8,17 +8,45 @@ static suite is free and runs on every commit; these run before a release.
 
 ## Running one
 
-Each scenario is self-contained. Assemble the prompt and dispatch it to a fresh agent with **no
-other context**:
+Each scenario is self-contained. Stage it, which prints a directory **outside this repository**,
+and dispatch from there:
 
 ```bash
-tests/evals/run.sh tdd-under-deadline     # prints the assembled prompt
+dir=$(tests/evals/stage.sh tdd-under-deadline)
+cd "$dir/project" && claude -p "$(cat ../prompt.md)"
 ```
 
-Then dispatch that prompt to a subagent, or `claude -p "$(tests/evals/run.sh <name>)"`, and score
-the reply against the scenario's pass criteria by reading it. Scoring is deliberately human: the
-failures these catch are rhetorical, and a grep for "I will write the test first" is trivially
-satisfied by an agent that then does not.
+Then score the reply against the scenario's pass criteria by reading it. Scoring is deliberately
+human: the failures these catch are rhetorical, and a grep for "I will write the test first" is
+trivially satisfied by an agent that then does not.
+
+`tests/evals/run.sh <name>` still prints the assembled prompt on its own, which is useful for
+reading it. It is not a dispatch route.
+
+**Stage once per arm.** Two arms sharing a directory race on the same files, and the result looks
+fine either way. That nearly happened on 2026-08-16 and is recorded in `results.md`.
+
+### Why dispatch happens outside the tree
+
+An arm whose working directory is this repository can read `tests/evals/scenarios/`, which is the
+file describing how it will be scored. The 0.10.0 run caught one arm doing it. The 0.11.0 run
+suppressed it by telling every arm not to run commands, and recorded that as not a fix: the
+exposure was unchanged, and an instruction that suppresses the searching is itself a difference in
+treatment between two runs.
+
+`stage.sh` closes it by construction. It copies the assembled prompt to `<dir>/prompt.md`, gives
+the arm `<dir>/project` as its working directory, and refuses to run at all if `TMPDIR` points
+inside the tree. `tests/test-eval-harness.sh` asserts the isolation rather than trusting it,
+including that the pass criteria are nowhere under the staged directory.
+
+**A subagent spawned from a session working in this repository is not isolated**, whatever it is
+told. It inherits that working directory. Use the `claude -p` route above.
+
+### Fixtures
+
+A scenario that needs a project to work in has one under `tests/evals/fixtures/<scenario>/`, copied
+into `project/` at staging time. A scenario without one gets an empty directory. See
+`fixtures/README.md`, which records what each fixture seeds and is deliberately never staged.
 
 ## Running all of them before a release
 

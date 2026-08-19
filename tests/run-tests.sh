@@ -24,6 +24,7 @@ run tests/test-done-guard.sh
 run tests/test-session-start.sh
 run tests/test-cache-install.sh
 run tests/test-doc-claims.sh
+run tests/test-eval-harness.sh
 printf '\n== tests/validate-skills.sh (against this repo)\n'
 if tests/validate-skills.sh; then :; else failed=$((failed+1)); fi
 
