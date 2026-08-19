@@ -42,20 +42,29 @@ anything contradicting an accepted ADR.
 
 Raise all of it now. Finding it at task 6 wastes the five you already did.
 
-## Step 3: Choose a mode
+## Step 3: Delegate, unless you say why not
 
-| Mode | When | Cost |
-|---|---|---|
-| Inline | Short plans, or the user wants to watch | Implementation noise fills the main context |
-| Delegated | Long plans, independent tasks | One subagent per task keeps the main context clean |
+**Delegated is the default.** You are the coordinator: you dispatch, review, tick, commit and
+report, and you write no production code. Every edit you make yourself is the only change in the
+run that no review pass sees, because the diff both reviewers are given is the subagent's.
+
+Inline is still right for a plan of one or two tasks, or when the user asks to watch. Five tasks is
+not short; that is the size this skill exists for. Take it by **naming it and why in one line**, not
+by drifting into it. Steps 4 to 6 below are written for whoever holds the
+keyboard: in inline mode that is you, in delegated mode it is never you.
 
 In delegated mode, dispatch the task **verbatim** plus the plan's whole Global constraints block. A
 summary is where "never start on the default branch" quietly disappears. Then review in two passes:
-first does it match the task, then is the code sound. One task at a time, and never dispatch the next
-while the previous is unreviewed.
+first does it match the task, then is the code sound.
 
-Prompts for all three are in
+The three prompts, one implementer and two reviewers, are in
 [references/subagent-prompts.md](references/subagent-prompts.md). Read it before the first dispatch.
+
+**Tasks the plan declares as a concurrent batch may be dispatched together**, each in its own
+worktree. A batch is eligible only where the plan says so and its tasks meet the template's
+conditions; everything else is one task at a time, and never the next while the previous is
+unreviewed. [references/parallel-batches.md](references/parallel-batches.md) has the rules and what
+breaks without them.
 
 ## Step 4: Execute, one task at a time
 
@@ -95,3 +104,5 @@ If you deviated from the plan, say so explicitly and update the plan file to mat
 | Leaving checkboxes unticked | The plan is the progress record |
 | Deviating quietly because your way is better | Raise it. Then update the plan if agreed |
 | Continuing past an unexplained failure | Stop. Use `debug` |
+| Making the small fix yourself instead of re-dispatching | Re-dispatch. Your edit is the one nobody reviews |
+| Overlapping tasks the plan did not declare a batch | Disjoint files are not enough. Read the batch rules |

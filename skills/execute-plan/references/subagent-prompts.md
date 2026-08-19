@@ -102,8 +102,10 @@ line.
 
 ## Running the loop
 
-One task at a time. Do not dispatch task N+1 while task N is unreviewed: if task N deviated, task
-N+1 may have built on it, and you now have two problems entangled.
+One task at a time, unless the plan declares a concurrent batch and every condition in
+[parallel-batches.md](parallel-batches.md) holds. Outside a declared batch, do not dispatch task N+1
+while task N is unreviewed: if task N deviated, task N+1 may have built on it, and you now have two
+problems entangled.
 
 After both passes: tick the checkboxes in the plan file, commit as the task specifies, then dispatch
 the next.
@@ -127,8 +129,40 @@ Say which model you dispatched, in one line, whichever it is. A cheaper model th
 something that mattered is the failure this rule exists to make visible, and it is invisible by
 construction: the output looks like output.
 
-## What not to delegate
+## What you keep, and what you do not touch
 
 Delegate mechanical execution. Keep for yourself: any task whose step says to stop and ask, any
 decision the plan left open, and the judgement of whether a verdict is right. A subagent cannot ask
 you a question mid-task, so a task that needs one will guess.
+
+**And write no production code while you are coordinating.** Not a rename, not a template string,
+not the one-character fix that is plainly correct. Every correction goes back through a fresh
+dispatch, at any size.
+
+The reason is not tidiness. Both review passes are fed the subagent's diff, so **an edit you make
+is the only change in the whole run that neither pass sees.** It is not a small unreviewed change,
+it is the only unreviewed change.
+
+**The plan file is the exception, and it is yours.** The implementer prompt forbids the subagent
+from touching it and step 6 requires you to keep it true, so nobody else can. The test for an
+honest plan edit is direction: recording a verdict, tightening a step whose assertions a review
+found too weak, or withdrawing a claim the plan cannot support all make the task **harder** to pass,
+and those are yours to make. Loosening a gate so a failing step passes makes it easier, and that is
+the mistake the skill names. Where the repair would make a blocked task passable by changing what
+was planned, propose it and let the user rule.
+
+It is also usually bigger than it looks. A subagent that wrote its test first and watched it fail
+has a test asserting whatever it built, so a report saying "returns `a - b` rather than the
+specified `a: b`" describes two wrong files, not one wrong character. Fix the source and you turn
+a green test red, and the next temptation is to edit the test.
+
+This is the rule most easily rationalised away, because the enumeration above says what to keep and
+a reader under time pressure hears it as the whole of the boundary. It is not: a correction is
+neither "mechanical execution of a task" nor a judgement call, which is exactly the gap the
+temptation lives in.
+
+| The thought | What it costs |
+|---|---|
+| "Re-dispatching a one-character fix is absurd overhead" | The one change nobody reviewed, on top of a test asserting the wrong thing |
+| "It moves the code toward the plan, so it is not a deviation" | True, and irrelevant. The rule is about who reviewed it, not which direction it went |
+| "I am reviewing anyway, so I have effectively reviewed it" | You wrote it. That is the reviewer you do not have |

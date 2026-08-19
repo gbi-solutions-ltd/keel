@@ -1,7 +1,7 @@
 ---
 name: tdd
 description: Use when implementing any feature, bugfix, or behaviour change, before writing implementation code.
-allowed-tools: [Read, Write, Edit, Bash, Grep, Glob]
+allowed-tools: [Read, Write, Edit, Bash, Grep, Glob, AskUserQuestion]
 ---
 
 # Test-Driven Development
@@ -78,6 +78,16 @@ Not required for a throwaway spike, generated code, or pure configuration. Takin
 fine; taking it silently is not. Say which applies and why, then delete the spike before implementing
 properly. "I will tidy it later" means the spike is production code with no tests.
 
+### The project has no test tooling at all
+
+`verify.test` and `test_one` are both `null` and this is **not** greenfield: an established codebase
+that never had a runner. None of the three exceptions covers it, and you resolve it in neither
+direction yourself. Adding a runner to a years-old service is a standing decision about the
+repository, not a step in someone's feature.
+
+Ask, with the three options and their costs set out in
+[references/no-test-tooling.md](references/no-test-tooling.md), and record the answer.
+
 ## Rationalisations
 
 | Excuse | Reality |
@@ -89,7 +99,7 @@ properly. "I will tidy it later" means the spike is production code with no test
 | "Deleting hours is wasteful" | Sunk cost. Rewrite with confidence, or keep code you cannot trust |
 | "Keep it as reference" | You will adapt it, which is testing after |
 | "TDD is slower" | Slower to the first commit, faster to the working one |
-| "This code has no tests" | You are improving it. Add one for what you touch |
+| "This code has no tests" | You are improving it. Add one for what you touch. This assumes a runner exists; where none does, see the exception below rather than installing one |
 | "The suite is green, do not risk touching it" | It may be green *because* a test asserts the current wrong behaviour. Writing the test first tells you in two minutes, not mid-release |
 
 ## Red flags: stop and start over

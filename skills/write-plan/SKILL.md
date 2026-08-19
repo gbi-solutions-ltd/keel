@@ -1,7 +1,7 @@
 ---
 name: write-plan
 description: Use when a design or stories exist and implementation is about to start, or the user asks for an implementation plan, a task breakdown, or how to build something.
-allowed-tools: [Read, Write, Grep, Glob, Bash]
+allowed-tools: [Read, Write, Grep, Glob, Bash, Agent, AskUserQuestion]
 ---
 
 # Write Plan
@@ -40,6 +40,13 @@ fails.
 List every file to create or modify and what each is responsible for. Decomposition decisions
 get locked in here, and they are much cheaper to change now than inside task 7.
 
+**Where the area to map is larger than you can hold, delegate the reading**: `Explore` agents in
+one message, model `sonnet`, each citing `path:line`, said in one line. The predicate is the tree,
+not the mood: more directories than you can list from memory. Under that, read it yourself.
+
+Their findings are leads; the decomposition stays yours. Step 4 forbids naming a function no task
+defines, and second-hand knowledge is how that creeps in.
+
 Prefer small focused files. Files that change together belong together. In an existing codebase,
 follow the established pattern even where you would do it differently.
 
@@ -53,6 +60,11 @@ gate. Fold setup and configuration into the task whose deliverable needs them. S
 a reviewer could reject one task while approving its neighbour.
 
 **Every task carries a `Done when:` line**: a `profile.verify` command and its passing result.
+
+**Every task carries a `Depends on:` line** naming the tasks that must land first, or `none`;
+absent is read as unknown and runs alone. Where tasks depend on nothing outstanding and no two name
+the same file, declare a concurrent batch in the header. The template states the three further
+conditions a batch must also meet.
 
 Every task follows the same five steps: write the failing test, run it and watch it fail, write
 minimal code, run it and watch it pass, commit. Use the exact commands from
@@ -71,9 +83,9 @@ These are plan failures, not shortcuts. Never write them:
 Each one moves a decision from you to someone with less context. That is the opposite of
 planning.
 
-## Step 5: Self-review
+## Step 5: Self-review, then have it reviewed
 
-Run this yourself. It is a checklist, not a subagent dispatch.
+**These four are mechanical. Run them yourself; a dispatch is slower and no more reliable.**
 
 1. **Story coverage:** every story in scope maps to at least one task. Name any that do not.
 2. **Placeholder scan:** search for the phrases above. Fix each.
@@ -83,11 +95,16 @@ Run this yourself. It is a checklist, not a subagent dispatch.
    your idea of what the stack uses. Investigative and read-only commands (`grep`, `git log`,
    `ls`) need no profile entry.
 
+**Then dispatch a reviewer.** The four above compare the plan to itself; none opens the codebase, so
+a plan can pass all four and still be unbuildable. Measured: a run doing exactly these four passed a
+plan whose central story could not be delivered, catching it only by opening a file no item asked
+for. Brief in [references/plan-review.md](references/plan-review.md), model `inherit`, said in one
+line. Fix what it returns, or record why not.
+
 ## Step 6: Hand off
 
-Report task count, story coverage, and anything the plan could not settle. Offer two execution
-routes: `execute-plan` inline with checkpoints, or delegated with a fresh subagent per task.
-Do not start either.
+Report task count, story coverage, any concurrent batches, and anything the plan could not settle.
+Name `execute-plan` as next. Do not start it.
 
 ## Common mistakes
 

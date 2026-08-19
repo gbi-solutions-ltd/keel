@@ -18,9 +18,11 @@ jobs:
 
       # The command comes from .keel/profile.json rather than being restated here. Restating it is
       # how the pipeline came to run a stricter check than anyone ran locally.
+      # shellcheck and jq are preinstalled on ubuntu-latest; the apt install this step used to run
+      # added nothing and once hung the job for 23 minutes on `apt-get update`.
       - name: Shellcheck
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck jq
+          shellcheck --version | head -2
           LINT=$(jq -r '.verify.lint' .keel/profile.json)
           echo "running: $LINT"
           eval "$LINT"

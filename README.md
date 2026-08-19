@@ -169,7 +169,7 @@ writing it and hoping.
 | [`skills/write-plan`](skills/write-plan/SKILL.md) | Built | The same service. A 6-task plan from one story and one ADR, using the profile's verify commands |
 | [`skills/tdd`](skills/tdd/SKILL.md) | Built | Used for real to build this repo's own skill validator, red then green |
 | [`skills/debug`](skills/debug/SKILL.md) | Built | An undiagnosed worker leak in a NestJS suite. Two hypotheses refuted, no fix guessed |
-| [`skills/execute-plan`](skills/execute-plan/SKILL.md) | Built | Its refusal gate, against a real plan blocked by an unaccepted ADR. Correctly refused |
+| [`skills/execute-plan`](skills/execute-plan/SKILL.md) | Built | Its refusal gate, against a real plan blocked by an unaccepted ADR. Correctly refused. Then baselined and re-run for delegation: the mode table read as a free choice and inline won, three leaf tasks with disjoint files could not be overlapped because every `Done when:` gated on the whole suite, and no rule stopped a coordinator writing code. All four re-run scenarios pass, including a declared batch that had to be refused |
 | [`skills/coding-standards`](skills/coding-standards/SKILL.md) | Built | This repo. Produced `docs/standards.md` and found a broken lint command in its own profile. Carries 10 topic references: observability, time, resilience, async work, authorisation, rate limiting, API contracts, caching, data protection, frontend |
 | [`skills/review-code`](skills/review-code/SKILL.md) | Built | This repo's own last commit. All four project-specific passes ran; suite verified rather than assumed |
 | [`skills/security-audit`](skills/security-audit/SKILL.md) | Built | Phase order re-found every known issue in the Spring Boot service, including 6 keystores inside the built jar |

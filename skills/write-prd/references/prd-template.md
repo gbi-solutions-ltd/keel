@@ -43,9 +43,29 @@ split added.
 | `confirmed` | A person with authority has said yes, this is required | The user, in this conversation or in a cited document |
 | `inferred` | Derived from code, docs, or reasoning. Nobody has confirmed it | `from-repo` mode, before review |
 | `disputed` | Two sources disagree, or the user is unsure | Contradictions found in step 3 |
+| `author-added` | Nobody asked for it and nothing implies it. You judged it necessary | You, and it says so |
 
 In `from-repo` mode **every requirement starts `inferred`**. Statuses only improve when the user
 says so. Never write `confirmed` on the user's behalf.
+
+`author-added` is the one you will be tempted to skip, because a requirement you invented reads
+exactly like one you derived. It is not a confession, it is the mark that makes a requirement cheap
+to delete: an `author-added` row can be struck out with nothing else unravelling, and that is worth
+saying in the row itself.
+
+Measured on a one-sentence brief: a run produced 18 requirements, of which **2 came from the user
+and 7 were invented outright**, including durable delivery across restart in a service whose queue
+is an in-memory array. Nothing in the skill was violated. Every anti-invention rule it holds is
+about numbers, metrics and deadlines, and all seven inventions were features.
+
+So the count matters more than any single row. State it where the reader cannot miss it, above the
+requirements table:
+
+```markdown
+Of 18 requirements below, 2 were stated by the user, 9 derived from code or context, and 7 are
+author-added. The author-added ones are listed in Open questions as a single question: are they
+wanted at all?
+```
 
 ## Header
 
@@ -208,6 +228,10 @@ Run this yourself, not as a subagent dispatch:
 4. **Conflicts:** any two requirements that cannot both hold. Mark both `disputed` and ask.
 5. **Status honesty:** in `from-repo` mode, nothing is `confirmed` that the user did not confirm.
 6. **Empty sections:** none. `Not applicable, because X` where genuinely so.
+7. **Did anyone ask for this?** Go requirement by requirement. Each one traces to something the
+   user said, to a citation, or it is `author-added`. Count the three and write the count in.
+   Checks 1 to 6 all pass a requirement nobody wanted, because a well-formed invention is still
+   well formed.
 
-Fix inline and move on. Then present, naming the `inferred` and `disputed` items explicitly,
-because those are what approval actually turns on.
+Fix inline and move on. Then present, naming the `inferred`, `disputed` and `author-added` items
+explicitly, because those are what approval actually turns on.

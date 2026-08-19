@@ -230,20 +230,28 @@ interface block so a task executed in isolation knows the signatures its neighbo
 Every task follows the TDD five-step shape: write the failing test, run it and watch it
 fail, write minimal code, run it and watch it pass, commit.
 
+Each task also carries a `Depends on:` line, which is what lets `execute-plan` overlap work;
+a plan may declare a batch of tasks as concurrent when the template's five conditions hold.
+
 Ends with a self-review pass: does every story map to a task, are there placeholders left,
-do the type names used in task 7 match what task 3 defined.
+do the type names used in task 7 match what task 3 defined. Those four are mechanical and run
+inline. A dispatched reviewer then covers what they cannot reach, because all four compare the
+plan to itself and none of them opens the codebase the plan will be built on.
 
 ### `execute-plan`
 **Trigger:** a plan file exists and the user says go.
 **Reads:** the plan, `.keel/profile.json`.
 **Writes:** code, commits, and checked boxes back into the plan file.
-**Does:** two modes.
+**Does:** two modes, one of them the default.
 
+- **Delegated, the default:** a fresh subagent per task with two-stage review, spec compliance
+  first, then code quality, from superpowers' `subagent-driven-development`. Implementation noise
+  stays in subagents. Where the plan declares a concurrent batch, its tasks are dispatched
+  together, each in its own worktree. The coordinator dispatches, reviews, ticks, commits and
+  reports, and writes no production code at any size: both reviewers are fed the subagent's diff,
+  so a coordinator's own edit is the only change in the run nobody reviews.
 - **Inline:** executes tasks in the current session with a checkpoint after each. Right for
-  small plans and when the user wants to watch.
-- **Delegated:** a fresh subagent per task with two-stage review, spec compliance first,
-  then code quality, from superpowers' `subagent-driven-development`. Right for long plans,
-  and it keeps the main context clean because implementation noise stays in subagents.
+  small plans and when the user wants to watch, and taken by naming it and why, not by drifting.
 
 Stops and asks rather than guessing when it hits a blocker, a failing verification it
 cannot explain, or an instruction it does not understand. Never starts on `main`.

@@ -34,6 +34,13 @@ toolchain is absent. Every task after it must use the real commands, and if task
 Still refuse when the commands are absent and no task creates them. That is a plan that cannot be
 verified, which is the case the rule is for.
 
+**This exception is greenfield only, and the inverse case is not covered here.** An established
+codebase that has never had a test runner, with no plan and no task creating one, is not a
+precondition failure to route around: it is a decision for the user about whether this repository
+gets test tooling. `keel:tdd` carries it, under "the project has no test tooling at all". Refusing
+outright and installing a framework unasked are both wrong, and the greenfield reasoning above
+supports neither.
+
 ## Exception 2: `proposed` is about agreement, not proof
 
 The blocker exists because building on a decision nobody made wastes the build. It does not exist

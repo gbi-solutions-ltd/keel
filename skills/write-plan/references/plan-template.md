@@ -51,6 +51,8 @@ only its own section must still obey them.
 - Consumes: `SecurityProperties.apiKeys` (List<String>), defined in task 2
 - Produces: nothing new; adds validation to an existing type
 
+**Depends on:** task 2
+
 **Done when:** `./gradlew test --tests '*SecurityPropertiesTest'` passes and the full suite is green.
 
 - [ ] **Step 1: Write the failing test**
@@ -96,6 +98,60 @@ earlier tasks produced; `Produces` tells later tasks what to expect. Without it,
 a name for something task 3 already built, and the two never meet.
 
 Omit the block only when a task genuinely touches nothing shared.
+
+### Why the Depends on line exists
+
+It is what lets `execute-plan` run tasks concurrently, and it is required on every task. Write
+`none` where a task depends on nothing; an absent line is not the same as `none` and is read as
+the second case below.
+
+The line is not redundant with `Consumes`. A run asked to execute a five-task plan as fast as it
+reasonably could worked out for itself that three leaf tasks had disjoint `Files` and no
+`Consumes` entries, and still refused to overlap them, correctly:
+
+> "Inferring parallelism from the absence of a `Consumes:` line is an inference; a plan that
+> intends it should say it, because absence of a line is also what an incompletely-written task
+> looks like."
+
+So a plan earns concurrency by declaring it. `Depends on:` names task numbers, and it covers
+ordering that `Consumes` cannot see: a migration that must land before a task that queries the
+column, a config key written by one task and read by another, a task that must not start until a
+credential exists.
+
+### Tasks that run concurrently
+
+Where a plan has a batch of tasks that all say `Depends on: none`, or whose dependencies are all
+already complete, and no two of them name the same file anywhere in their `Files` blocks, say so
+in the header:
+
+```markdown
+**Concurrent batches:** tasks 1, 2 and 3 may run at the same time. Task 4 requires all three.
+Task 5 requires task 4.
+```
+
+**Disjoint files and declared dependencies are necessary and not sufficient.** Three more rules
+apply to every task in a concurrent batch, and each exists because the same baseline run predicted
+the failure in concrete terms:
+
+1. **Scope the `Done when:` to the task's own test.** `**Done when:** node --test test/format.test.js
+   passes.` and nothing about the full suite. The suite gate moves to the join, as its own line in
+   the header: `**Batch gate:** after tasks 1 to 3 land, node --test test/ is green.` A whole-suite
+   `Done when:` inside a batch cannot pass, because task 2's step 1 writes a failing test on
+   purpose while task 1 is running: *"even with perfect isolation of source files, three concurrent
+   agents each waiting for a green whole-suite cannot all pass."*
+2. **Commit named paths only.** The commit step lists every path explicitly and never uses
+   `git add -A` or `git commit -a`, which otherwise sweeps in a sibling's half-written files and
+   produces *"a commit labelled 'format' containing a half-written SMS module"*.
+3. **Touch no shared config.** A task in a batch that would create or edit a lockfile, a linter
+   config, a CI file, or the profile is not eligible for the batch. Two agents each deciding the
+   lint command needs a config file will each write one.
+
+The failure these prevent is not a lost race. It is quieter: with a sibling's failing test in the
+suite, every agent's step 2 sees red for the wrong reason and ticks the box, so *"the TDD gate
+silently stops proving anything"*.
+
+Where any of the three cannot hold, the tasks are sequential. Say so rather than declaring a batch
+and hoping.
 
 ### Why the Done when line exists
 

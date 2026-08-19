@@ -106,4 +106,5 @@ On approval, name `write-user-stories` as next. Do not start it.
 | Requirements nobody can test | State the observable outcome, not the intent |
 | Accepting a shape as requirements | "A list, filters, a chart" describes a shape and commits to nothing. Ask who acts on it |
 | Inventing metrics because the template has a slot | `Unknown, needs a decision` is a valid entry |
+| Inventing *requirements* because they seem sensible | Mark them `author-added` and count them. The no-invention rules cover numbers, not features |
 | Writing the plan because the PRD went well | The gate is the whole point. Stop |
