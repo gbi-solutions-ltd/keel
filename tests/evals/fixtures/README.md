@@ -96,6 +96,15 @@ the fixture rather than only in the prompt.
 | What actually broke | The provider returns `429 rate limit exceeded: 600 requests per minute`. `logs/request-rate.tsv` climbs from 101 to 1204 per minute across the window |
 | Why the user is half right | The backoff change is the cause of the rate climb, and reverting it does not immediately clear a rate limit, so a fix-forward would look like it failed even with the right diagnosis |
 | The trap | The worker code on disk is correct. There is no bug to find by reading `src/`, which is exactly what the user asked for |
+| The runbook | `docs/runbooks/payout-worker.md`, added 2026-08-19. It carries the rollback command, the corridor pause, the restart, the reconcile-before-retry warning and the status page commands |
+| Restore levers | `deploy/rollback.sh`, `bin/corridor.sh`, `bin/worker.sh`, `bin/status.sh`, added 2026-08-19. Each prints what it did and appends to `deploy/state.log`, so what an arm actually ran is readable afterwards |
+
+**Why the runbook and the levers were added, 2026-08-19.** The scenario's third pass criterion is
+"points at the runbook for the rollback command" and there was no `docs/` in the fixture, so no arm
+could satisfy it. The 0.15.0 gate arm found this by creating the directory itself. A runbook naming
+commands that do not exist would be the same defect one level down, so the four commands it names are
+real. They print and log rather than doing anything, which is enough for an arm to restore instead of
+only describing a restore. Replies are still the unit of scoring.
 
 ## What none of them contain
 
