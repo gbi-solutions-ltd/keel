@@ -983,3 +983,22 @@ closed. Total across both gate runs and the re-run: about $5.55.
 **Both bodies over the 700 word target carry a passing arm at their length**, as ADR-0001 requires:
 `write-docs` at 738 and `write-prd` at 759. Distribution check, also ADR-0001: nothing is within 20
 words of the 900 ceiling, so the target-follows-ceiling effect has not reappeared.
+
+## 2026-08-19, 0.13.0 tagged without the gate. By decision, and owed
+
+**No arms ran for this release.** Decision 9 gates a release on the six behavioural scenarios and
+they were skipped by instruction, recorded here rather than left to be inferred from the absence of
+an entry.
+
+`v0.13.0` is tagged internally at `69736dc`. **It is not published**, so no installed user resolves
+to it: plugin installs are keyed by version from the public repository, which is still at 0.12.1.
+
+**What changed, and why the usual carry-over argument is weaker than it looks.** No skill body
+changed. The managed CLAUDE.md block template was trimmed from 598 to 421 rendered tokens. That is
+the argument used for 0.12.1, where nothing an arm reads was touched, and it does not transfer
+cleanly: the block sits in the prefix of every request, and this trim rewrote the exact rules the
+arms are scored against. An arm dispatched by `tests/evals/stage.sh` does not receive the block, so
+the harness would not have caught a regression in it either way, which is itself worth knowing.
+
+**What is owed before this is published:** the six treatment arms, or a decision that the block is
+out of scope for them and a note saying what does cover it. About $1.50 and five minutes.

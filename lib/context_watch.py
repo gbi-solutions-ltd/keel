@@ -377,6 +377,14 @@ def hook():
     if not transcript or not os.path.exists(transcript):
         return 0
 
+    # PreToolUse never denies these, at any pct: Write, Edit and Read have to stay available so the
+    # handoff instruction below is not a deadlock (see ALWAYS_ALLOWED). Checking that here, before
+    # the profile is read or the transcript is measured, means the tools used on every turn skip both.
+    # hooks/context-watch already shortcuts most of these calls in bash from a cached measurement;
+    # this is what covers the rest, a stale or missing cache, without paying for either read.
+    if event == "PreToolUse" and (ev.get("tool_name") or "") in ALWAYS_ALLOWED:
+        return 0
+
     profile = _profile(cwd)
     if (profile.get("gates") or {}).get("context_watch") is False:
         return 0
@@ -422,8 +430,8 @@ def hook():
     if event == "PreToolUse":
         if pct < stop_at:
             return 0
-        if (ev.get("tool_name") or "") in ALWAYS_ALLOWED:
-            return 0
+        # tool_name is not re-checked against ALWAYS_ALLOWED here: it already returned above, before
+        # the profile and the transcript were touched, for every tool that set can ever reach.
         # Once the handoff has been refreshed since the stop fired, the session has done what it was
         # asked and is let go. Without this the stop is a wall rather than a pause, and a wall is
         # what makes people set KEEL_CONTEXT_WATCH=off permanently.

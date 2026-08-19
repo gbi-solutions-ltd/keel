@@ -234,7 +234,9 @@ default so `keel init -y` works in CI.
 keel doctor
 ```
 The verification command. Checks that:
-- every command in `profile.verify` actually runs and exits 0
+- every command in `profile.verify` actually runs and exits 0 (each is timed, printed as it
+  starts, and capped at 900s where a `timeout` binary exists; `--fast` skips executing them
+  and only validates the fields, for when the suite itself is the slow part)
 - the CLAUDE.md block markers are intact and not duplicated
 - recommended plugins for this stack are installed, and names the missing ones
 - `docs/keel/` structure exists

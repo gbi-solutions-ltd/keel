@@ -24,25 +24,37 @@ fail=0
 ok()  { printf '  PASS  %s\n' "$1"; pass=$((pass+1)); return 0; }
 bad() { printf '  FAIL  %s: %s\n' "$1" "$2"; fail=$((fail+1)); return 0; }
 
+# Built once: the tree, git init, its two config writes and the initial commit that fixture() below
+# used to redo on every one of the 43 times it is called. A plain directory copy of an already
+# committed tree is far cheaper than repeating all of that per case, and every case's mutate function
+# only ever adds to or edits this same shape, never depends on which case ran before it.
+TEMPLATE_ROOT="$(mktemp -d)"
+mkdir -p "$TEMPLATE_ROOT/skills/example" "$TEMPLATE_ROOT/templates" "$TEMPLATE_ROOT/docs" \
+         "$TEMPLATE_ROOT/hooks" "$TEMPLATE_ROOT/bin" "$TEMPLATE_ROOT/tests" "$TEMPLATE_ROOT/.claude-plugin"
+# The executable rule only runs in a plugin repository, so the fixture has to be one.
+printf '{"name":"example","version":"0.0.1"}\n' > "$TEMPLATE_ROOT/.claude-plugin/plugin.json"
+printf '#!/usr/bin/env bash\nset -euo pipefail\nprintf "{}"\n' > "$TEMPLATE_ROOT/hooks/session-start"
+printf '{"hooks":{"SessionStart":[{"hooks":[{"command":"session-start"}]}]}}\n' > "$TEMPLATE_ROOT/hooks/hooks.json"
+printf '#!/usr/bin/env bash\nset -euo pipefail\nsay() { printf "%%s\\n" "$1"; }\n' > "$TEMPLATE_ROOT/bin/keel"
+printf -- '---\nname: example\ndescription: Use when testing.\n---\n\n# Example\n\nDo the thing.\n' \
+  > "$TEMPLATE_ROOT/skills/example/SKILL.md"
+printf '# Template\n\nA template.\n' > "$TEMPLATE_ROOT/templates/t.md"
+printf '# Doc\n\nRun `curl -sf https://payouts.example.com/health` to check it.\n' > "$TEMPLATE_ROOT/docs/runbook.md"
+chmod +x "$TEMPLATE_ROOT/hooks/session-start" "$TEMPLATE_ROOT/bin/keel"
+( cd "$TEMPLATE_ROOT" && git init -q -b main . && git config user.email t@t.t && git config user.name t \
+  && git add -A && git commit -qm init ) >/dev/null 2>&1
+trap 'rm -rf "$TEMPLATE_ROOT"' EXIT
+
 # A tree shaped like this repository: a hook, a CLI, an agent-facing skill, and a doc. It is a real
 # git repo because the executable-bit rule reads the index, which is the only place a mode is
 # recorded, and a check that silently does nothing outside a repo would pass here forever.
+#
+# Copied from TEMPLATE_ROOT, .git included, rather than rebuilt: each case's mutate function edits or
+# adds a file and scan() below does its own `git add -A` before scanning, so a copy of the committed
+# template is exactly the clean starting state fixture() used to build from scratch.
 fixture() {
     local root; root="$(mktemp -d)"
-    mkdir -p "$root/skills/example" "$root/templates" "$root/docs" "$root/hooks" "$root/bin" \
-             "$root/tests" "$root/.claude-plugin"
-    # The executable rule only runs in a plugin repository, so the fixture has to be one.
-    printf '{"name":"example","version":"0.0.1"}\n' > "$root/.claude-plugin/plugin.json"
-    printf '#!/usr/bin/env bash\nset -euo pipefail\nprintf "{}"\n' > "$root/hooks/session-start"
-    printf '{"hooks":{"SessionStart":[{"hooks":[{"command":"session-start"}]}]}}\n' > "$root/hooks/hooks.json"
-    printf '#!/usr/bin/env bash\nset -euo pipefail\nsay() { printf "%%s\\n" "$1"; }\n' > "$root/bin/keel"
-    printf -- '---\nname: example\ndescription: Use when testing.\n---\n\n# Example\n\nDo the thing.\n' \
-      > "$root/skills/example/SKILL.md"
-    printf '# Template\n\nA template.\n' > "$root/templates/t.md"
-    printf '# Doc\n\nRun `curl -sf https://payouts.example.com/health` to check it.\n' > "$root/docs/runbook.md"
-    chmod +x "$root/hooks/session-start" "$root/bin/keel"
-    ( cd "$root" && git init -q -b main . && git config user.email t@t.t && git config user.name t \
-      && git add -A && git commit -qm init ) >/dev/null 2>&1
+    cp -R "$TEMPLATE_ROOT/." "$root"
     printf '%s' "$root"
 }
 

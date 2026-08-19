@@ -39,7 +39,8 @@ surfaces is approved by nobody. If the boundary is unclear, ask.
 
 ## Step 2: Ask, one question per message
 
-Read [references/questionnaire.md](references/questionnaire.md) and work its bank.
+Read the index at the top of [references/questionnaire.md](references/questionnaire.md), then
+read only the sections your mode needs.
 
 One per message, your best answer offered as the default. Stop once you can write every section.
 

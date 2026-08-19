@@ -60,12 +60,9 @@ esac
 
 event="$(</dev/stdin)"
 
-# Both filters run before anything can fail closed. Without them, a machine with no python3 would
-# get a permission prompt on every Read, Grep and Edit, which is how a gate gets deleted.
-case "$event" in
-    *'"tool_name"'*'"Bash"'*) ;;
-    *) exit 0 ;;
-esac
+# This filter runs before anything can fail closed. Without it, a machine with no python3 would get
+# a permission prompt on every Bash command, which is how a gate gets deleted. There is no tool_name
+# check here: the "Bash" matcher on this hook in hooks.json already guarantees that.
 case "$event" in
     *'git commit'*) ;;
     *) exit 0 ;;
@@ -75,7 +72,7 @@ if ! command -v python3 >/dev/null 2>&1; then
     ask "this repository declares hard_block_paths and python3 is absent, so the guard cannot tell whether this commit touches one. Approving is a human decision."
 fi
 
-KEEL_EVENT="$event" KEEL_PROFILE="$PROFILE" python3 - <<'PY'
+KEEL_EVENT="$event" KEEL_PROFILE_TEXT="$profile_text" python3 - <<'PY'
 import json, os, shlex, subprocess, sys
 from fnmatch import fnmatch
 
@@ -94,10 +91,12 @@ except ValueError:
 cmd = ((ev.get("tool_input") or {}).get("command") or "")
 
 # The profile said hard_block_paths, so a profile that will not parse is a declared gate with no
-# enforcement behind it. That is the case this hook exists to prevent, so it asks.
+# enforcement behind it. That is the case this hook exists to prevent, so it asks. The text was
+# already read once in bash to run the cheap gate above; KEEL_PROFILE_TEXT carries it here so this
+# does not open the file a second time for the same read.
 try:
-    patterns = json.load(open(os.environ["KEEL_PROFILE"])).get("hard_block_paths") or []
-except (ValueError, OSError, KeyError):
+    patterns = json.loads(os.environ.get("KEEL_PROFILE_TEXT") or "").get("hard_block_paths") or []
+except ValueError:
     emit("this repository declares hard_block_paths but its profile could not be read. The guard "
          "cannot tell whether this commit touches a sensitive path. Approving is a human decision.")
 if not patterns:

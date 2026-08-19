@@ -3,6 +3,19 @@
 Question banks per mode. Adapted from `cursor-starter/planning/prd-questionnaire.md`, with the
 per-mode split and the answer-first rule added.
 
+## Which sections apply to your mode
+
+This file holds three question banks in one place so the per-mode split stays visible. Read the
+rows below for your mode and skip the rest: it is another mode's bank and answers nothing for you.
+
+| Section | Read it when |
+|---|---|
+| [How to ask](#how-to-ask) | Always |
+| [Order](#order) | Always |
+| [`from-idea`](#from-idea) | Mode is `from-idea` |
+| [`from-repo`](#from-repo) | Mode is `from-repo` |
+| [`revise`](#revise) | Mode is `revise` |
+
 ## How to ask
 
 **One question per message.** Not two, not a numbered list of six. The reason is not politeness:

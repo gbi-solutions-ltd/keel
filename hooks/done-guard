@@ -72,7 +72,7 @@ if ! command -v python3 >/dev/null 2>&1; then
     warn_and_exit "this repository declares gates.done_verified and python3 is absent, so this turn was not checked."
 fi
 
-KEEL_EVENT="$event" KEEL_PROFILE="$PROFILE" python3 - <<'PY'
+KEEL_EVENT="$event" KEEL_PROFILE_TEXT="$profile_text" python3 - <<'PY'
 import json, os, sys
 
 def emit(obj):
@@ -96,8 +96,10 @@ if ev.get("stop_hook_active"):
     sys.exit(0)
 
 try:
-    prof = json.load(open(os.environ["KEEL_PROFILE"]))
-except (ValueError, OSError, KeyError):
+    # The text was already read once in bash to run the cheap gate above; KEEL_PROFILE_TEXT carries
+    # it here so this does not open the file a second time for the same read.
+    prof = json.loads(os.environ.get("KEEL_PROFILE_TEXT") or "")
+except ValueError:
     warn("this repository declares gates.done_verified but its profile could not be read, so this "
          "turn was not checked.")
 

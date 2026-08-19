@@ -5,7 +5,8 @@
 # honestly rather than silently: doctor reports what it could not check.
 #
 #   keel init [-y] [--team] [--force]   configure this project
-#   keel doctor                         check this project, non-zero on any problem
+#   keel doctor [--fast]                check this project, non-zero on any problem
+#                                       --fast: check the verify commands are set, do not run them
 #   keel version
 
 # The `condition && good || fail` idiom in doctor is safe because every reporting helper returns 0
@@ -53,7 +54,23 @@ done
 
 DEFAULT_DOCS_ROOT="docs/keel"
 
-have_python() { command -v python3 >/dev/null 2>&1; }
+# Asked once, at startup. The answer cannot change while this process runs, and the lookup was
+# forked about twenty times a run for a constant. The function stays so no call site changes.
+HAVE_PYTHON=0
+command -v python3 >/dev/null 2>&1 && HAVE_PYTHON=1
+have_python() { [ "$HAVE_PYTHON" -eq 1 ]; }
+
+# What bounds a verify command in doctor, when the machine has anything to bound it with. macOS
+# ships neither `timeout` nor `gtimeout`, so this is a preference and never a dependency: with
+# neither present the command runs unbounded, exactly as it did before.
+TIMEOUT_BIN=""
+for _t in timeout gtimeout; do
+    command -v "$_t" >/dev/null 2>&1 && { TIMEOUT_BIN="$_t"; break; }
+done
+# Generous on purpose. It is a ceiling for a suite that has hung, not a target: a real test run
+# that takes twelve minutes must still finish rather than be reported as broken.
+VERIFY_TIMEOUT=900
+
 say()  { printf '%s\n' "$1"; }
 err()  { printf 'keel: %s\n' "$1" >&2; }
 die()  { err "$1"; exit 1; }
@@ -139,28 +156,42 @@ else:            print(d)
 PY
 }
 
-# Prints "missing:<plugin>" per recommended plugin that is not enabled. Silent when there is nothing
-# to say. Conflicts moved to boundary_report below, which sees more than this file does.
-plugin_report() {
+# Both reports below read the same settings files, so they are one interpreter start and one parse
+# rather than two of each. Filled on the first lookup and never again in this process.
+#
+# Doctor reads it through two process substitutions, and neither can fill it for the other, so
+# cmd_doctor primes it in its own shell first. Same shape as pkg_scripts_load, same reason.
+SETTINGS_REPORT=""
+SETTINGS_REPORT_LOADED=""
+
+settings_report_load() {
+    [ -n "$SETTINGS_REPORT_LOADED" ] && return 0
     have_python || return 0
-    python3 - <<'PY' 2>/dev/null
-import json, os
-# Every scope Claude Code merges, in its order, the same list boundary_report reads. Project scope
+    SETTINGS_REPORT_LOADED=1
+    # No apostrophe anywhere below, and this is now load-bearing: the heredoc sits inside a $( ),
+    # and bash 3.2 does not treat a quoted heredoc body as literal there, so one of them swallows
+    # the rest of this file and reports the parse error hundreds of lines away. shellcheck does not
+    # see it. json_load one file up carries the same warning for the same reason.
+    SETTINGS_REPORT="$(KEEL_HERE="$HERE" python3 - <<'PY' 2>/dev/null
+import json, os, glob
+# Every scope Claude Code merges, in its order. Project scope
 # alone was harmless while the fallback list was three plugins nobody enables per project. Once init
 # wrote keel@gbi into plugins.recommended it was not: keel is normally enabled at user scope, so
-# every project reported it missing, next to doctor's own line saying the marketplace is registered,
+# every project reported it missing, next to the doctor line saying the marketplace is registered,
 # and the /plugin install it suggested wrote to the scope this never looked at.
 #
-# Names are compared whole. boundary_report strips the marketplace suffix because it is matching
-# skill names across plugins; here the recommended list carries qualified names and so must this.
+# Names are compared whole here. The duplicate check below strips the marketplace suffix because it
+# is matching skill names across plugins; the recommended list carries qualified names and so must
+# this.
 dirs = [d for d in (os.environ.get("CLAUDE_CONFIG_DIR"), os.path.expanduser("~/.claude")) if d]
+# Later files win, which is the order Claude Code merges them in.
 merged = {}
 for p in [os.path.join(d, "settings.json") for d in dirs] + [".claude/settings.json", ".claude/settings.local.json"]:
     try:
         merged.update(json.load(open(p)).get("enabledPlugins", {}))
     except Exception:
         pass
-enabled = {k for k, v in merged.items() if v}
+enabled_full = {k for k, v in merged.items() if v}
 try:
     rec = json.load(open(".keel/profile.json")).get("plugins", {}).get("recommended")
 except Exception:
@@ -170,32 +201,8 @@ if not rec:
            "code-review@claude-plugins-official",
            "skill-creator@claude-plugins-official"]
 for r in rec:
-    if r not in enabled:
+    if r not in enabled_full:
         print("missing:" + r)
-PY
-}
-
-# Where keel ends and another plugin begins.
-#
-# Two kinds of collision, and the second is the one no hardcoded list can catch:
-#
-#   conflict:<plugin>|<why>   a plugin known to ship a competing end-to-end methodology
-#   dup:<skill>|<plugin>      any enabled plugin shipping a skill name keel also ships
-#
-# The duplicate check reads the installed plugin cache rather than a registry, so a plugin nobody
-# anticipated surfaces the moment it ships its own `tdd` or `review-code`. Two skills under one name
-# is not an error in Claude Code, which is what makes it worth reporting: the model picks one, and
-# neither the session nor the transcript records which.
-#
-# It reports and stops there. Disabling somebody's plugin from a tool they ran to configure a
-# repository would be a larger decision than this command is entitled to make, and the conflicting
-# plugin may be the deliberate choice.
-boundary_report() {
-    have_python || return 0
-    KEEL_HERE="$HERE" python3 - <<'PY' 2>/dev/null
-import json, os, glob
-
-dirs = [d for d in (os.environ.get("CLAUDE_CONFIG_DIR"), os.path.expanduser("~/.claude")) if d]
 
 # Each reason is a sentence a reader can act on. A label ("conflicts") tells nobody what to do.
 KNOWN = {
@@ -204,14 +211,7 @@ KNOWN = {
     "gstack": "it carries its own planning and review workflow plus a session preamble running to several thousand tokens",
 }
 
-# Later files win, which is the order Claude Code merges them in.
-enabled = {}
-for p in [os.path.join(d, "settings.json") for d in dirs] + [".claude/settings.json", ".claude/settings.local.json"]:
-    try:
-        enabled.update(json.load(open(p)).get("enabledPlugins", {}))
-    except Exception:
-        pass
-enabled = {k.split("@")[0] for k, v in enabled.items() if v}
+enabled = {k.split("@")[0] for k in enabled_full}
 
 # What each installed plugin ships, from the cache: <cfg>/plugins/cache/<market>/<plugin>/<version>/skills/<skill>/SKILL.md
 shipped = {}
@@ -233,6 +233,46 @@ for name in sorted(enabled):
     for s in sorted(shipped.get(name, set()) & ours):
         print("dup:%s|%s" % (s, name))
 PY
+)"
+    return 0
+}
+
+# Prints "missing:<plugin>" per recommended plugin that is not enabled. Silent when there is nothing
+# to say. Conflicts are the other two shapes, which see more than this file does.
+plugin_report() {
+    settings_report_load
+    [ -n "$SETTINGS_REPORT" ] || return 0
+    local line
+    # The redirect is on the loop, not a pipe, so this runs in the current shell and spawns nothing.
+    while IFS= read -r line; do
+        case "$line" in missing:*) printf '%s\n' "$line" ;; esac
+    done <<< "$SETTINGS_REPORT"
+    return 0
+}
+
+# Where keel ends and another plugin begins.
+#
+# Two kinds of collision, and the second is the one no hardcoded list can catch:
+#
+#   conflict:<plugin>|<why>   a plugin known to ship a competing end-to-end methodology
+#   dup:<skill>|<plugin>      any enabled plugin shipping a skill name keel also ships
+#
+# The duplicate check reads the installed plugin cache rather than a registry, so a plugin nobody
+# anticipated surfaces the moment it ships its own `tdd` or `review-code`. Two skills under one name
+# is not an error in Claude Code, which is what makes it worth reporting: the model picks one, and
+# neither the session nor the transcript records which.
+#
+# It reports and stops there. Disabling somebody's plugin from a tool they ran to configure a
+# repository would be a larger decision than this command is entitled to make, and the conflicting
+# plugin may be the deliberate choice.
+boundary_report() {
+    settings_report_load
+    [ -n "$SETTINGS_REPORT" ] || return 0
+    local line
+    while IFS= read -r line; do
+        case "$line" in conflict:*|dup:*) printf '%s\n' "$line" ;; esac
+    done <<< "$SETTINGS_REPORT"
+    return 0
 }
 
 docs_root() {
@@ -342,15 +382,23 @@ json_or_null() {
 
 write_profile() {
     local root="$1" lang rt fw pm kind ui
+    # Detect the languages here, in this shell, before anything asks. Every line below reads them
+    # through a $( ), which is a subshell: it inherits the cache already full, but anything it
+    # detects itself dies with it. Without this line the tree is walked eight times over. Same
+    # shape and same reason as the pkg_scripts_load call further down; it is not redundant.
+    detect_languages >/dev/null
     read -r lang rt fw pm <<<"$(detect_stack)"
     kind="$(project_kind)"
     ui="$(detect_has_ui)"
     mkdir -p .keel
     local name; name="$(basename "$PWD")"
     local pm_json; pm_json="$(json_or_null "$pm")"
+    # `$( < )` rather than `$(cat )`: bash reads the file itself and forks nothing. The guard keeps
+    # the old fallback, since a missing VERSION is a broken install and 0.0.0 is what it recorded.
+    local kver=0.0.0; [ -f "$HERE/VERSION" ] && kver="$(<"$HERE/VERSION")"
     {
       printf '{\n'
-      printf '  "keel_version": "%s",\n' "$(cat "$HERE/VERSION" 2>/dev/null || echo 0.0.0)"
+      printf '  "keel_version": "%s",\n' "$kver"
       printf '  "schema_version": %s,\n' "$SCHEMA_VERSION"
       printf '  "project": { "name": "%s", "kind": "%s", "description": "" },\n' "$name" "$kind"
       printf '  "stack": { "language": "%s", "runtime": "%s", "framework": "%s", "package_manager": %s, "also": [%s], "datastores": [%s], "has_ui": %s },\n' \
@@ -714,8 +762,18 @@ repo_ignores() {
 # exist here are considered: a link to a path that is absent everywhere is a broken link, which is
 # a different defect and not this one.
 referenced_docs_findings() {
-    local root="$1" f dir target p pdir pbase sev top seen=''
+    local root="$1" f dir target p pdir pbase sev top seen='' tree
     git rev-parse --git-dir >/dev/null 2>&1 || return 0
+    # Every path HEAD carries, read once. It was one `git cat-file -e` per link, which on a
+    # repository whose documents cross-reference each other is dozens of processes for a membership
+    # test the shell can do itself. Wrapped in newlines so a whole-line match is a substring match.
+    #
+    # quotePath=false keeps a non-ASCII name readable. A name holding a quote, a backslash or a
+    # newline is still C-quoted by git and so will not match here, which reads as not in HEAD: a
+    # warning about a file that is committed, rather than silence about one that is not.
+    tree="
+$(git -c core.quotePath=false ls-tree -r --name-only HEAD 2>/dev/null)
+"
     # The logical `pwd` and not `git rev-parse --show-toplevel`: on macOS the latter answers with
     # the physical path, so under /var every prefix test failed and the check silently found
     # nothing. doctor already runs from the project root everywhere else.
@@ -746,10 +804,15 @@ referenced_docs_findings() {
             case "$seen" in *"|$f>$p|"*) continue ;; esac
             seen="$seen|$f>$p|"
 
+            # A directory counts as carried when HEAD holds anything under it, which is the same
+            # question the pathspec answered; a file, when HEAD holds that exact path.
             if [ -d "$p" ]; then
-                [ -n "$(git ls-tree -r --name-only HEAD -- "$p" 2>/dev/null)" ] && continue
+                case "$tree" in *"
+$p/"*) continue ;; esac
             else
-                git cat-file -e "HEAD:$p" 2>/dev/null && continue
+                case "$tree" in *"
+$p
+"*) continue ;; esac
             fi
 
             # Ignored is the failure: committing does not fix it, the ignore rule has to change
@@ -794,15 +857,17 @@ stage_for_team() {
         say "  note: --team stages files for commit, and this is not a git repository. Nothing staged."
         return 0
     fi
-    local staged=0 p
+    # One `git add`, not one per path. The positional parameters carry the list because `$root` can
+    # hold a space and this file uses no arrays; `$1` is already read into `root` above.
+    local p
+    set --
     for p in .keel CLAUDE.md AGENTS.md .claude "$root" .gitignore; do
-        [ -e "$p" ] || continue
-        git add "$p" >/dev/null 2>&1 && staged=1
+        [ -e "$p" ] && set -- "$@" "$p"
     done
-    if [ "$staged" -eq 1 ]; then
+    if [ "$#" -gt 0 ] && git add -- "$@" >/dev/null 2>&1; then
         say "Staged for commit (--team)."
     else
-        say "  note: --team staged nothing: 'git add' failed on every path. Add them by hand."
+        say "  note: --team staged nothing: 'git add' failed. Add them by hand."
     fi
     return 0
 }
@@ -1165,7 +1230,11 @@ N
 # ---------------------------------------------------------------- doctor
 
 cmd_doctor() {
-    local problems=0 warnings=0
+    local problems=0 warnings=0 fast=0 a
+    # --fast checks every field and runs none of them. verify.test here is routinely the whole
+    # suite, so the honest check costs what the suite costs, and a check nobody can afford to run
+    # before a commit is one they stop running at all. Unknown flags are ignored, as in cmd_init.
+    for a in "$@"; do case "$a" in --fast) fast=1 ;; esac; done
     # Each returns 0 explicitly. The `condition && good || fail` idiom below depends on it: without
     # a guaranteed 0 from good, a failing good would also run fail. Stating it beats assuming it.
     fail() { printf 'FAIL  %s\n' "$1"; problems=$((problems+1)); return 0; }
@@ -1213,7 +1282,9 @@ cmd_doctor() {
     # ceiling this coarse requires.
     if [ -f CLAUDE.md ]; then
         local blk_chars blk_tokens
-        blk_chars=$(awk '/keel:start/,/keel:end/' CLAUDE.md | wc -c | tr -d ' ')
+        # awk counts it rather than printing it for `wc -c` to count: same number, one process
+        # instead of three. The +1 per line is the newline the old pipeline's print emitted.
+        blk_chars=$(awk '/keel:start/,/keel:end/{c+=length($0)+1} END{print c+0}' CLAUDE.md)
         blk_tokens=$(( blk_chars * 10 / 36 ))
         if [ "$blk_tokens" -gt 700 ]; then
             fail "the CLAUDE.md keel block is about $blk_tokens tokens, over the 700 ceiling. It is in the prefix of every request here. Move detail into the docs root, which loads on demand."
@@ -1263,8 +1334,25 @@ for k,v in d.items():
             local c; c="$(json_get .keel/profile.json "verify.$k" || true)"
             [ -z "$c" ] && { warn "verify.$k is null"; continue; }
             case "$c" in *"{path}"*|*"{name}"*) good "verify.$k set (templated, not run)"; continue ;; esac
-            if ( eval "$c" ) >/dev/null 2>&1; then good "verify.$k runs: $c"
-            else fail "verify.$k does not run: $c"; fi
+            [ "$fast" -eq 1 ] && { good "verify.$k set (not run, --fast)"; continue; }
+            # Said before it runs, not after. Output is discarded, so a suite taking eleven minutes
+            # is indistinguishable from a hang unless doctor names what it is waiting on.
+            printf '..... verify.%s: running: %s\n' "$k" "$c"
+            local t0 el rc
+            t0=$SECONDS
+            if [ -n "$TIMEOUT_BIN" ]; then
+                # `bash -c`, because timeout takes a command and not a shell string, and these are
+                # shell strings: keel writes `test -z "$(gofmt -l .)"` itself.
+                "$TIMEOUT_BIN" "$VERIFY_TIMEOUT" bash -c "$c" >/dev/null 2>&1
+            else
+                ( eval "$c" ) >/dev/null 2>&1
+            fi
+            rc=$?
+            el=$(( SECONDS - t0 ))
+            if [ "$rc" -eq 0 ]; then good "verify.$k runs (${el}s): $c"
+            elif [ -n "$TIMEOUT_BIN" ] && [ "$rc" -eq 124 ]; then
+                fail "verify.$k timed out after ${VERIFY_TIMEOUT}s: $c. Either it hangs, or it needs longer than doctor is willing to wait; run it by hand to tell the two apart."
+            else fail "verify.$k does not run (${el}s): $c"; fi
         done
     fi
 
@@ -1278,6 +1366,11 @@ for k,v in d.items():
        && [ "$(detect_has_ui)" = "true" ]; then
         warn "stack.has_ui is false, but this project looks like it has a user interface. Skills that branch on it are reading the wrong answer. Correct it with: keel profile set stack.has_ui true"
     fi
+
+    # Fill the settings cache here, in this shell. Both readers below sit in a `< <( )`, which is a
+    # subshell: it inherits this variable already full, but anything it loads itself dies with it.
+    # Without this line the two would each start their own interpreter. It is not redundant.
+    settings_report_load
 
     # Plugin set. Advisory in both directions: a missing plugin degrades a skill rather than
     # breaking it, and feature-dev being present may be a deliberate choice. Specified in docs/04
@@ -1386,7 +1479,7 @@ for k,v in d.items():
         local pv sv iv
         pv="$(json_get .keel/profile.json keel_version || true)"
         sv="$(json_get .keel/profile.json schema_version || true)"
-        iv="$(cat "$HERE/VERSION" 2>/dev/null || true)"
+        iv=""; [ -f "$HERE/VERSION" ] && iv="$(<"$HERE/VERSION")"
         [ -n "$pv" ] && good "configured by keel $pv"
         # Numeric, and three-way rather than two. The profile is a committed file, so on a team the
         # engineer who upgraded last commits a higher schema_version than the others have installed.
@@ -1751,7 +1844,7 @@ cmd_guard() {
 case "${1:-}" in
     init)        shift; cmd_init "$@" ;;
     new)         shift; cmd_new "$@" ;;
-    doctor)      shift; cmd_doctor ;;
+    doctor)      shift; cmd_doctor "$@" ;;
     profile)     shift; cmd_profile "$@" ;;
     apex-export) shift; cmd_apex_export "$@" ;;
     scan)        shift; cmd_scan "$@" ;;
@@ -1761,7 +1854,7 @@ case "${1:-}" in
         say "keel <command>"; say ""
         say "  init [-y] [--team]   configure an existing project for keel"
         say "  new <name> [--stack node|python|go|minimal]   create a new project"
-        say "  doctor               check this project; non-zero on any problem"
+        say "  doctor [--fast]      check this project; non-zero on any problem. --fast checks that the verify commands are set without running them"
         say "  profile get|set <dotted.path> [value]   read or correct one profile field"
         say "  apex-export --app <id>   export an Oracle APEX application for porting"
         say "  scan                 supply chain scan of this tree; non-zero on any finding"

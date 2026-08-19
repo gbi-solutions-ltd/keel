@@ -27,8 +27,6 @@ true now.
 **Where things live.** `.keel/profile.json` holds project facts, verify commands and gates;
 everything else is under `docs/`. Read what you need.
 
-**Picking a skill.** Before substantive work, including clarifying questions, invoke a keel skill,
-saying which and why in one line; `docs/prompting.md` maps triggers. Process skills lead,
-implementation follows. User instructions override any skill; where a plugin competes, keel wins
-and only its skills write these artifacts.
+**Picking a skill.** `docs/prompting.md` maps triggers to skills. User instructions override any
+skill; where a plugin competes, keel wins and only its skills write these artifacts.
 <!-- keel:end -->

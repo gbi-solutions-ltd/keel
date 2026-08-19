@@ -4,8 +4,7 @@ GBi's standard operating procedure for AI-assisted software delivery, packaged a
 Claude Code plugin plus a thin per-project bootstrap.
 
 **Status:** installable, 24 skills built, `keel` CLI and session hook working. **Not 1.0.0:**
-that needs two pilots and a verified install from a second machine. See the gate in
-[`IMPLEMENTATION-PLAN.md`](IMPLEMENTATION-PLAN.md).
+that needs two pilots and a verified install from a second machine.
 
 ## Install
 
@@ -31,6 +30,7 @@ Then, in each project:
 keel init                        # existing project: detect the stack, write the profile and block
 keel new <name> --stack node     # new project: scaffold, git init, CI, a passing sample test
 keel doctor                      # check either, non-zero on any problem
+keel doctor --fast               # same checks minus executing the verify commands
 ```
 
 `init` is idempotent and never overwrites a value you have corrected by hand; detection is a
@@ -186,7 +186,7 @@ writing it and hoping.
 | [`skills/port-assess`](skills/port-assess/SKILL.md) | Built | Baseline first, then re-run, against a Spring Boot service. Each step came from a real failure: a snapshot describing a different branch, a React half with no source to port from, a Node serialiser dropping nulls so the bytes differed and every signature was rejected, and two runs judging a document from a grep count |
 
 Specifications are in [`docs/02-skill-catalog.md`](docs/02-skill-catalog.md); what remains to build
-around them is in [`IMPLEMENTATION-PLAN.md`](IMPLEMENTATION-PLAN.md).
+around them is tracked in [`docs/plans/`](docs/plans/) and [`CHANGELOG.md`](CHANGELOG.md).
 
 `repo-snapshot` feeding `write-prd` is the first working link in the artifact chain: the
 snapshot is read from disk rather than re-derived, so the PRD costs a fraction of what a cold
@@ -285,8 +285,7 @@ Read in order. Each doc is self-contained but they build on each other.
 
 | Doc | What it answers |
 |-----|-----------------|
-| [`IMPLEMENTATION-PLAN.md`](IMPLEMENTATION-PLAN.md) | What gets built, in what order, with what verification. **Start here.** |
-| [`docs/01-architecture.md`](docs/01-architecture.md) | How the pieces fit together and why it is shaped this way |
+| [`docs/01-architecture.md`](docs/01-architecture.md) | How the pieces fit together and why it is shaped this way. **Start here.** |
 | [`docs/02-skill-catalog.md`](docs/02-skill-catalog.md) | The 24 skills, their triggers, inputs, and outputs |
 | [`docs/03-install-and-distribution.md`](docs/03-install-and-distribution.md) | Install options compared, the recommendation, and the `keel` CLI spec |
 | [`docs/04-plugin-strategy.md`](docs/04-plugin-strategy.md) | Verdict on each of the nine third-party plugins and how skills call them |

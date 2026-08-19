@@ -19,10 +19,24 @@ fail=0
 ok()   { printf '  PASS  %s\n' "$1"; pass=$((pass+1)); return 0; }
 bad()  { printf '  FAIL  %s: %s\n' "$1" "$2"; fail=$((fail+1)); return 0; }
 
+# Every stack is built once, committed once, and copied per case. The content and the commit are
+# identical every time and no test asserts on commit identity, so the git work is shared as well as
+# the files. fixture() hands out a copy and never the template, so nothing a case does can reach it.
+FIXTURE_CACHE="$(mktemp -d)"
+
 # A throwaway git repo of the given stack, printed as a path.
 fixture() {
-    local stack="$1" dir
+    local stack="$1"
+    local tmpl="$FIXTURE_CACHE/$stack" dir
+    [ -d "$tmpl" ] || fixture_build "$stack" "$tmpl"
     dir="$(mktemp -d)"
+    cp -R "$tmpl/." "$dir/"
+    printf '%s' "$dir"
+}
+
+fixture_build() {   # fixture_build <stack> <dir>
+    local stack="$1" dir="$2"
+    mkdir -p "$dir"
     ( cd "$dir" || exit 1
       git init -q -b main .
       git config user.email t@t.t; git config user.name t
@@ -124,15 +138,42 @@ P
         bare) : ;;
       esac
       git add -A >/dev/null 2>&1; git commit -qm init >/dev/null 2>&1 || true )
-    printf '%s' "$dir"
+}
+
+# The detect-stack functions write_profile itself calls, run inside a fixture without paying for a
+# whole `keel init`. Used only where a case asserts on what detection returns; anything asserting on
+# a file init writes, on its output, or on doctor keeps the real CLI call.
+#
+# have_python belongs to bin/keel, not to the library, and pkg_scripts_load returns empty-handed
+# without it: every npm script would read as absent and every declared command as a guess. It is
+# defined here the same way the pkg_scripts_load probe further down defines it.
+detect_in() {   # detect_in <dir> <expression>
+    ( cd "$1" && bash -c 'have_python() { command -v python3 >/dev/null 2>&1; }
+                          . "$1"
+                          eval "$2"' _ "$ROOT/lib/detect-stack.sh" "$2" 2>/dev/null )
+}
+
+# Profile fields by dotted path, one per line, rendered as python prints them: None for null, True
+# for a boolean. Asking for several at once reads the file in one interpreter start rather than one
+# per field.
+prof_of() {   # prof_of <dir> <dotted path>...
+    local d="$1"; shift
+    python3 - "$d/.keel/profile.json" "$@" <<'PY' 2>/dev/null
+import json, sys
+j = json.load(open(sys.argv[1]))
+for path in sys.argv[2:]:
+    v = j
+    for seg in path.split('.'):
+        v = v[seg]
+    print(v)
+PY
 }
 
 # ---- detection -------------------------------------------------------------
 
 for stack in node-ts go php python csharp ruby kotlin swift cpp lua; do
     d="$(fixture "$stack")"
-    ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-    got="$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['stack']['language'])" 2>/dev/null)"
+    got="$(detect_in "$d" 'detect_stack | cut -d" " -f1')"
     case "$stack" in
       node-ts) want=typescript ;;
       go)      want=go ;;
@@ -315,21 +356,16 @@ rm -rf "$d"
 d="$(fixture plsql)"
 mkdir -p "$d/tests"
 printf 'BEGIN ut.run(); END;\n/\n' > "$d/tests/run_all_tests.sql"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-got="$(python3 -c "
-import json
-v=json.load(open('$d/.keel/profile.json'))['verify']
-print(' '.join(k for k in ('test','test_one','lint','typecheck','build') if v.get(k) is not None))" 2>/dev/null)"
+got="$(detect_in "$d" 'for k in test test_one lint typecheck build; do detect_verify "$k"; done')"
 [ -z "$got" ] && ok "a PL/SQL project gets no invented verify command" \
-  || bad "verify" "these were written rather than left null: $got"
+  || bad "verify" "these commands were invented rather than left null: $got"
 rm -rf "$d"
 
 # A Kotlin Gradle build was reported as java/spring: the build.gradle.kts branch was reached before
 # anything looked for Kotlin, and the java branch hardcoded spring. Both halves are asserted here
 # because fixing one without the other still writes a wrong profile.
 d="$(fixture kotlin)"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-got="$(python3 -c "import json;s=json.load(open('$d/.keel/profile.json'))['stack'];print(s['framework'],s['package_manager'])" 2>/dev/null)"
+got="$(detect_in "$d" 'detect_stack | cut -d" " -f3,4')"
 [ "$got" = "none gradle" ] && ok "a Kotlin build is not labelled spring" \
   || bad "detects kotlin" "framework and package manager were '$got', want 'none gradle'"
 rm -rf "$d"
@@ -338,8 +374,7 @@ rm -rf "$d"
 d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '<project><groupId>f</groupId><artifactId>f</artifactId></project>\n' > pom.xml )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-got="$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['stack']['framework'])" 2>/dev/null)"
+got="$(detect_in "$d" 'detect_stack | cut -d" " -f3')"
 [ "$got" = "none" ] && ok "a Maven project with no Spring dependency is framework none" \
   || bad "detects java" "framework '$got', want 'none'"
 rm -rf "$d"
@@ -352,8 +387,7 @@ d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf 'plugins { id("java") }\n' > build.gradle.kts
   mkdir -p src/main/java/com/example/app && printf 'class A {}\n' > src/main/java/com/example/app/A.java )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-got="$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['stack']['language'])" 2>/dev/null)"
+got="$(detect_in "$d" 'detect_stack | cut -d" " -f1')"
 [ "$got" = "java" ] && ok "a Java project on the Kotlin DSL is still Java" \
   || bad "detects java" "language '$got', want 'java'"
 rm -rf "$d"
@@ -365,23 +399,22 @@ d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf 'plugins { id "org.jetbrains.kotlin.jvm" }\n' > build.gradle
   mkdir -p src/main/java/com/example/app && printf 'class A {}\n' > src/main/java/com/example/app/A.java )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-got="$(python3 -c "import json;s=json.load(open('$d/.keel/profile.json'))['stack'];print(s['language'],','.join(s['also']))" 2>/dev/null)"
-[ "$got" = "kotlin java" ] && ok "a Kotlin build over a Java source tree records both" \
-  || bad "detects kotlin" "got '$got', want 'kotlin java'"
+got="$(detect_in "$d" 'detect_languages | tr "\n" " "')"
+[ "$got" = "kotlin java " ] && ok "a Kotlin build over a Java source tree records both" \
+  || bad "detects kotlin" "got '$got', want 'kotlin java '"
 rm -rf "$d"
 
 # Verify commands are read from package.json, not guessed.
 d="$(fixture node-ts)"
 ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-got="$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['verify']['test'])" 2>/dev/null)"
+got="$(prof_of "$d" verify.test)"
 [ "$got" = "npm test" ] && ok "reads verify.test from package.json scripts" || bad "verify.test" "got '$got'"
 rm -rf "$d"
 
 # A stack with no test script gets null, never a guess.
 d="$(fixture go)"
 ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-got="$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['verify']['lint'])" 2>/dev/null)"
+got="$(prof_of "$d" verify.lint)"
 [ "$got" = "None" ] && ok "absent command is null, not guessed" || bad "null lint" "got '$got'"
 rm -rf "$d"
 
@@ -397,11 +430,11 @@ for pair in "pnpm-lock.yaml:pnpm" "yarn.lock:yarn" "bun.lockb:bun"; do
     lock="${pair%%:*}"; want="${pair##*:}"
     d="$(fixture node-ts)"
     : > "$d/$lock"
-    ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-    got="$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['stack']['package_manager'])" 2>/dev/null)"
+    got="$(detect_in "$d" 'detect_stack | cut -d" " -f4')"
+    lint="$(detect_in "$d" 'detect_verify lint')"
     [ "$got" = "$want" ] && ok "$lock means $want" || bad "js pm" "got '$got', want '$want'"
-    case "$(verify_of "$d" lint)" in "$want"*) ok "$want runs the lint script with $want" ;;
-      *) bad "js pm" "lint was '$(verify_of "$d" lint)'" ;; esac
+    case "$lint" in "$want"*) ok "$want runs the lint script with $want" ;;
+      *) bad "js pm" "lint was '$lint'" ;; esac
     rm -rf "$d"
 done
 
@@ -409,9 +442,9 @@ done
 # must use `run` even for test. Getting this wrong runs a different test suite than the project's.
 d="$(fixture node-ts)"
 : > "$d/bun.lockb"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(verify_of "$d" test)" = "bun run test" ] && ok "bun runs the declared test script, not its own runner" \
-  || bad "js pm" "test was '$(verify_of "$d" test)'"
+got="$(detect_in "$d" 'detect_verify test')"
+[ "$got" = "bun run test" ] && ok "bun runs the declared test script, not its own runner" \
+  || bad "js pm" "test was '$got'"
 rm -rf "$d"
 
 # ---- more than one lockfile is not a declaration ---------------------------
@@ -455,9 +488,9 @@ for pair in ".gitlab-ci.yml:gitlab-ci" "Jenkinsfile:jenkins" "azure-pipelines.ym
     f="${pair%%:*}"; want="${pair##*:}"
     d="$(fixture node-ts)"
     mkdir -p "$d/$(dirname "$f")"; : > "$d/$f"
-    ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-    [ "$(deploy_of "$d" ci)" = "$want" ] && ok "$f means $want" \
-      || bad "deploy ci" "got '$(deploy_of "$d" ci)', want '$want'"
+    got="$(detect_in "$d" detect_ci)"
+    [ "$got" = "$want" ] && ok "$f means $want" \
+      || bad "deploy ci" "got '$got', want '$want'"
     rm -rf "$d"
 done
 
@@ -472,32 +505,32 @@ rm -rf "$d"
 # An empty .github/workflows is what `git clone` leaves behind after the last workflow is deleted.
 d="$(fixture node-ts)"
 mkdir -p "$d/.github/workflows"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(deploy_of "$d" ci)" = null ] && ok "an empty .github/workflows declares nothing" \
-  || bad "deploy ci" "got '$(deploy_of "$d" ci)' from an empty workflows directory"
+got="$(detect_in "$d" detect_ci)"
+[ -z "$got" ] && ok "an empty .github/workflows declares nothing" \
+  || bad "deploy ci" "got '$got' from an empty workflows directory"
 rm -rf "$d"
 
 # Same rule as two lockfiles: two pipelines are not two declarations, they are none.
 d="$(fixture node-ts)"
 : > "$d/.gitlab-ci.yml"; mkdir -p "$d/.github/workflows"; : > "$d/.github/workflows/ci.yml"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(deploy_of "$d" ci)" = null ] && ok "two pipeline configs leave the CI undeclared" \
-  || bad "deploy ci" "got '$(deploy_of "$d" ci)' with two CI configs"
+got="$(detect_in "$d" detect_ci)"
+[ -z "$got" ] && ok "two pipeline configs leave the CI undeclared" \
+  || bad "deploy ci" "got '$got' with two CI configs"
 rm -rf "$d"
 
 d="$(fixture node-ts)"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(deploy_of "$d" ci)" = null ] && ok "no pipeline config means null, not a guess" \
-  || bad "deploy ci" "got '$(deploy_of "$d" ci)' with no CI config at all"
+got="$(detect_in "$d" detect_ci)"
+[ -z "$got" ] && ok "no pipeline config means null, not a guess" \
+  || bad "deploy ci" "got '$got' with no CI config at all"
 rm -rf "$d"
 
 for pair in "fly.toml:fly" "vercel.json:vercel" "netlify.toml:netlify" "render.yaml:render"; do
     f="${pair%%:*}"; want="${pair##*:}"
     d="$(fixture node-ts)"
     : > "$d/$f"
-    ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-    [ "$(deploy_of "$d" target)" = "$want" ] && ok "$f means the target is $want" \
-      || bad "deploy target" "got '$(deploy_of "$d" target)', want '$want'"
+    got="$(detect_in "$d" detect_deploy_target)"
+    [ "$got" = "$want" ] && ok "$f means the target is $want" \
+      || bad "deploy target" "got '$got', want '$want'"
     rm -rf "$d"
 done
 
@@ -506,25 +539,25 @@ done
 # target would be the lockfile mistake again, in a field nobody would think to check.
 d="$(fixture node-ts)"
 printf 'FROM alpine\n' > "$d/Dockerfile"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(deploy_of "$d" target)" = null ] && ok "a Dockerfile alone is not a deploy target" \
-  || bad "deploy target" "a Dockerfile was read as target '$(deploy_of "$d" target)'"
+got="$(detect_in "$d" detect_deploy_target)"
+[ -z "$got" ] && ok "a Dockerfile alone is not a deploy target" \
+  || bad "deploy target" "a Dockerfile was read as target '$got'"
 rm -rf "$d"
 
 # Two platform manifests is a migration halfway done, and the same rule applies.
 d="$(fixture node-ts)"
 : > "$d/fly.toml"; : > "$d/vercel.json"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(deploy_of "$d" target)" = null ] && ok "two platform manifests leave the target undeclared" \
-  || bad "deploy target" "got '$(deploy_of "$d" target)' with two platform manifests"
+got="$(detect_in "$d" detect_deploy_target)"
+[ -z "$got" ] && ok "two platform manifests leave the target undeclared" \
+  || bad "deploy target" "got '$got' with two platform manifests"
 rm -rf "$d"
 
 # A declared typecheck script was detected and then thrown away for `npx tsc --noEmit`, which is a
 # different command on any project whose script passes flags or points at a second tsconfig.
 d="$(fixture node-ts)"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(verify_of "$d" typecheck)" = "npm run typecheck" ] && ok "a declared typecheck script is the typecheck command" \
-  || bad "js tooling" "typecheck was '$(verify_of "$d" typecheck)'"
+v_typecheck="$(detect_in "$d" 'detect_verify typecheck')"
+[ "$v_typecheck" = "npm run typecheck" ] && ok "a declared typecheck script is the typecheck command" \
+  || bad "js tooling" "typecheck was '$v_typecheck'"
 rm -rf "$d"
 
 # No script, but a tsconfig: tsc --noEmit is the fallback rather than nothing.
@@ -532,11 +565,12 @@ d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f","devDependencies":{"typescript":"^5"}}\n' > package.json
   echo '{}' > tsconfig.json )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(verify_of "$d" typecheck)" = "npx tsc --noEmit" ] && ok "a tsconfig with no script still typechecks" \
-  || bad "js tooling" "typecheck was '$(verify_of "$d" typecheck)'"
-[ -z "$(verify_of "$d" test)" ] && ok "no test script and no runner declared means no test command" \
-  || bad "js tooling" "test was guessed as '$(verify_of "$d" test)'"
+v_typecheck="$(detect_in "$d" 'detect_verify typecheck')"
+v_test="$(detect_in "$d" 'detect_verify test')"
+[ "$v_typecheck" = "npx tsc --noEmit" ] && ok "a tsconfig with no script still typechecks" \
+  || bad "js tooling" "typecheck was '$v_typecheck'"
+[ -z "$v_test" ] && ok "no test script and no runner declared means no test command" \
+  || bad "js tooling" "test was guessed as '$v_test'"
 rm -rf "$d"
 
 # Biome and Prettier are declared by their config file, which is how the project says which it uses.
@@ -544,11 +578,12 @@ d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f"}\n' > package.json
   printf '{"linter":{"enabled":true}}\n' > biome.json )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(verify_of "$d" lint)" = "npx biome check ." ] && ok "a biome.json is the lint command" \
-  || bad "js tooling" "lint was '$(verify_of "$d" lint)'"
-[ "$(verify_of "$d" format)" = "npx biome format ." ] && ok "biome is also the format check" \
-  || bad "js tooling" "format was '$(verify_of "$d" format)'"
+v_lint="$(detect_in "$d" 'detect_verify lint')"
+v_format="$(detect_in "$d" 'detect_verify format')"
+[ "$v_lint" = "npx biome check ." ] && ok "a biome.json is the lint command" \
+  || bad "js tooling" "lint was '$v_lint'"
+[ "$v_format" = "npx biome format ." ] && ok "biome is also the format check" \
+  || bad "js tooling" "format was '$v_format'"
 rm -rf "$d"
 
 # `ls a* b*` exits non-zero when either operand matches nothing, so testing both Prettier config
@@ -558,11 +593,12 @@ d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f"}\n' > package.json
   printf '{"semi":false}\n' > .prettierrc )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(verify_of "$d" format)" = "npx prettier --check ." ] && ok "a .prettierrc alone is the format command" \
-  || bad "js tooling" "format was '$(verify_of "$d" format)'"
-[ "$(verify_of "$d" format_fix)" = "npx prettier --write ." ] && ok "a .prettierrc alone gives the writing variant too" \
-  || bad "js tooling" "format_fix was '$(verify_of "$d" format_fix)'"
+v_format="$(detect_in "$d" 'detect_verify format')"
+v_format_fix="$(detect_in "$d" 'detect_verify format_fix')"
+[ "$v_format" = "npx prettier --check ." ] && ok "a .prettierrc alone is the format command" \
+  || bad "js tooling" "format was '$v_format'"
+[ "$v_format_fix" = "npx prettier --write ." ] && ok "a .prettierrc alone gives the writing variant too" \
+  || bad "js tooling" "format_fix was '$v_format_fix'"
 rm -rf "$d"
 
 # A newline inside a script value must not lose the script itself. Every caller reads the value as
@@ -571,13 +607,14 @@ rm -rf "$d"
 d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f","scripts":{"test":"echo a\\nfoo","lint":"eslint ."}}\n' > package.json )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(verify_of "$d" test)" = "npm test" ] \
+v_test="$(detect_in "$d" 'detect_verify test')"
+v_lint="$(detect_in "$d" 'detect_verify lint')"
+[ "$v_test" = "npm test" ] \
   && ok "a script value spanning lines still detects the command" \
-  || bad "js tooling" "test was '$(verify_of "$d" test)' on a package.json whose test script contains a newline"
-[ "$(verify_of "$d" lint)" = "npm run lint" ] \
+  || bad "js tooling" "test was '$v_test' on a package.json whose test script contains a newline"
+[ "$v_lint" = "npm run lint" ] \
   && ok "a script value spanning lines does not disturb the scripts beside it" \
-  || bad "js tooling" "lint was '$(verify_of "$d" lint)'"
+  || bad "js tooling" "lint was '$v_lint'"
 rm -rf "$d"
 
 # PKG_SCRIPTS_LOADED must mean loaded, not attempted. Priming the cache before the file exists and
@@ -673,37 +710,42 @@ rm -rf "$d"
 # pytest was written into every Python profile, declared or not. On a project that uses unittest
 # `keel doctor` then fails on a command the project never had, which is the check crying wolf.
 d="$(fixture python)"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ -z "$(verify_of "$d" test)" ] && ok "python without pytest declared gets no test command" \
-  || bad "python" "test was guessed as '$(verify_of "$d" test)'"
+v_test="$(detect_in "$d" 'detect_verify test')"
+[ -z "$v_test" ] && ok "python without pytest declared gets no test command" \
+  || bad "python" "test was guessed as '$v_test'"
 rm -rf "$d"
 
 d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '[project]\nname = "f"\ndependencies = []\n\n[dependency-groups]\ndev = ["pytest", "ruff", "pyright"]\n' > pyproject.toml
   : > uv.lock )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['stack']['package_manager'])" 2>/dev/null)" = "uv" ] \
+v_pm="$(detect_in "$d" 'detect_stack | cut -d" " -f4')"
+v_test="$(detect_in "$d" 'detect_verify test')"
+v_typecheck="$(detect_in "$d" 'detect_verify typecheck')"
+v_lint="$(detect_in "$d" 'detect_verify lint')"
+[ "$v_pm" = "uv" ] \
   && ok "a uv.lock means uv" || bad "python" "package manager was not uv"
-[ "$(verify_of "$d" test)" = "uv run pytest" ] && ok "uv runs pytest inside the project environment" \
-  || bad "python" "test was '$(verify_of "$d" test)'"
-[ "$(verify_of "$d" typecheck)" = "uv run pyright" ] && ok "pyright is honoured as the type checker" \
-  || bad "python" "typecheck was '$(verify_of "$d" typecheck)'"
-[ "$(verify_of "$d" lint)" = "uv run ruff check ." ] && ok "ruff is honoured under the project runner" \
-  || bad "python" "lint was '$(verify_of "$d" lint)'"
+[ "$v_test" = "uv run pytest" ] && ok "uv runs pytest inside the project environment" \
+  || bad "python" "test was '$v_test'"
+[ "$v_typecheck" = "uv run pyright" ] && ok "pyright is honoured as the type checker" \
+  || bad "python" "typecheck was '$v_typecheck'"
+[ "$v_lint" = "uv run ruff check ." ] && ok "ruff is honoured under the project runner" \
+  || bad "python" "lint was '$v_lint'"
 rm -rf "$d"
 
 d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf 'pytest\nflake8\nmypy\n' > requirements.txt
   mkdir -p tests )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(verify_of "$d" test)" = "pytest" ] && ok "plain pip runs pytest with no prefix" \
-  || bad "python" "test was '$(verify_of "$d" test)'"
-[ "$(verify_of "$d" lint)" = "flake8" ] && ok "flake8 in requirements.txt is the lint command" \
-  || bad "python" "lint was '$(verify_of "$d" lint)'"
-[ "$(verify_of "$d" typecheck)" = "mypy ." ] && ok "mypy is still honoured" \
-  || bad "python" "typecheck was '$(verify_of "$d" typecheck)'"
+v_test="$(detect_in "$d" 'detect_verify test')"
+v_lint="$(detect_in "$d" 'detect_verify lint')"
+v_typecheck="$(detect_in "$d" 'detect_verify typecheck')"
+[ "$v_test" = "pytest" ] && ok "plain pip runs pytest with no prefix" \
+  || bad "python" "test was '$v_test'"
+[ "$v_lint" = "flake8" ] && ok "flake8 in requirements.txt is the lint command" \
+  || bad "python" "lint was '$v_lint'"
+[ "$v_typecheck" = "mypy ." ] && ok "mypy is still honoured" \
+  || bad "python" "typecheck was '$v_typecheck'"
 rm -rf "$d"
 
 # A project with a tests/ directory and no pytest anywhere runs the standard library runner.
@@ -711,9 +753,9 @@ d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '[project]\nname = "f"\n' > pyproject.toml
   mkdir -p tests && printf 'import unittest\n' > tests/test_f.py )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(verify_of "$d" test)" = "python -m unittest discover" ] && ok "a tests dir with no pytest gets unittest" \
-  || bad "python" "test was '$(verify_of "$d" test)'"
+v_test="$(detect_in "$d" 'detect_verify test')"
+[ "$v_test" = "python -m unittest discover" ] && ok "a tests dir with no pytest gets unittest" \
+  || bad "python" "test was '$v_test'"
 rm -rf "$d"
 
 # ---- php, go and java, from declarations rather than from the machine -------
@@ -722,11 +764,12 @@ rm -rf "$d"
 d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f/f","require-dev":{"phpunit/phpunit":"^11","phpstan/phpstan":"^2"}}\n' > composer.json )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(verify_of "$d" test)" = "vendor/bin/phpunit" ] && ok "phpunit in composer.json is enough, with no vendor dir" \
-  || bad "php" "test was '$(verify_of "$d" test)'"
-[ "$(verify_of "$d" typecheck)" = "vendor/bin/phpstan analyse" ] && ok "phpstan is the PHP type checker" \
-  || bad "php" "typecheck was '$(verify_of "$d" typecheck)'"
+v_test="$(detect_in "$d" 'detect_verify test')"
+v_typecheck="$(detect_in "$d" 'detect_verify typecheck')"
+[ "$v_test" = "vendor/bin/phpunit" ] && ok "phpunit in composer.json is enough, with no vendor dir" \
+  || bad "php" "test was '$v_test'"
+[ "$v_typecheck" = "vendor/bin/phpstan analyse" ] && ok "phpstan is the PHP type checker" \
+  || bad "php" "typecheck was '$v_typecheck'"
 rm -rf "$d"
 
 # Pest is a different runner and a different binary. A project that declares it must not be told
@@ -734,24 +777,24 @@ rm -rf "$d"
 d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f/f","require-dev":{"pestphp/pest":"^3"}}\n' > composer.json )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(verify_of "$d" test)" = "vendor/bin/pest" ] && ok "a Pest project runs Pest" \
-  || bad "php" "test was '$(verify_of "$d" test)'"
+v_test="$(detect_in "$d" 'detect_verify test')"
+[ "$v_test" = "vendor/bin/pest" ] && ok "a Pest project runs Pest" \
+  || bad "php" "test was '$v_test'"
 rm -rf "$d"
 
 # Go's lint command depended on golangci-lint being installed on the machine running init, which
 # freezes one laptop's answer into a file every teammate reads. The config file is the declaration.
 d="$(fixture go)"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ -z "$(verify_of "$d" lint)" ] && ok "Go with no linter config gets no lint command" \
-  || bad "go" "lint was '$(verify_of "$d" lint)', which came from this machine rather than the repo"
+v_lint="$(detect_in "$d" 'detect_verify lint')"
+[ -z "$v_lint" ] && ok "Go with no linter config gets no lint command" \
+  || bad "go" "lint was '$v_lint', which came from this machine rather than the repo"
 rm -rf "$d"
 
 d="$(fixture go)"
 printf 'linters:\n  enable: [errcheck]\n' > "$d/.golangci.yml"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(verify_of "$d" lint)" = "golangci-lint run" ] && ok "a .golangci.yml is the declaration golangci-lint needs" \
-  || bad "go" "lint was '$(verify_of "$d" lint)'"
+v_lint="$(detect_in "$d" 'detect_verify lint')"
+[ "$v_lint" = "golangci-lint run" ] && ok "a .golangci.yml is the declaration golangci-lint needs" \
+  || bad "go" "lint was '$v_lint'"
 rm -rf "$d"
 
 # ---- verify commands for the languages added in this plan -------------------
@@ -759,51 +802,57 @@ rm -rf "$d"
 # stay null because the project declares no such tool. The null half is the half that matters:
 # a profile with a wrong command fails at first use and teaches people to distrust the file.
 d="$(fixture csharp)"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(verify_of "$d" test)" = "dotnet test" ] && ok "C# gets dotnet test" \
-  || bad "verify csharp" "test was '$(verify_of "$d" test)'"
-[ "$(verify_of "$d" format)" = "dotnet format --verify-no-changes" ] && ok "C# formats with the SDK formatter" \
-  || bad "verify csharp" "format was '$(verify_of "$d" format)'"
+v_test="$(detect_in "$d" 'detect_verify test')"
+v_format="$(detect_in "$d" 'detect_verify format')"
+[ "$v_test" = "dotnet test" ] && ok "C# gets dotnet test" \
+  || bad "verify csharp" "test was '$v_test'"
+[ "$v_format" = "dotnet format --verify-no-changes" ] && ok "C# formats with the SDK formatter" \
+  || bad "verify csharp" "format was '$v_format'"
 rm -rf "$d"
 
 d="$(fixture ruby)"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(verify_of "$d" test)" = "bundle exec rspec" ] && ok "Ruby with a spec dir gets rspec" \
-  || bad "verify ruby" "test was '$(verify_of "$d" test)'"
-[ -z "$(verify_of "$d" lint)" ] && ok "Ruby without rubocop declared gets no lint command" \
-  || bad "verify ruby" "lint was guessed as '$(verify_of "$d" lint)'"
+v_test="$(detect_in "$d" 'detect_verify test')"
+v_lint="$(detect_in "$d" 'detect_verify lint')"
+[ "$v_test" = "bundle exec rspec" ] && ok "Ruby with a spec dir gets rspec" \
+  || bad "verify ruby" "test was '$v_test'"
+[ -z "$v_lint" ] && ok "Ruby without rubocop declared gets no lint command" \
+  || bad "verify ruby" "lint was guessed as '$v_lint'"
 rm -rf "$d"
 
 d="$(fixture kotlin)"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(verify_of "$d" test)" = "./gradlew test" ] && ok "Kotlin gets the Gradle test task" \
-  || bad "verify kotlin" "test was '$(verify_of "$d" test)'"
-[ "$(verify_of "$d" typecheck)" = "./gradlew compileKotlin" ] && ok "Kotlin typechecks with compileKotlin, not compileJava" \
-  || bad "verify kotlin" "typecheck was '$(verify_of "$d" typecheck)'"
+v_test="$(detect_in "$d" 'detect_verify test')"
+v_typecheck="$(detect_in "$d" 'detect_verify typecheck')"
+[ "$v_test" = "./gradlew test" ] && ok "Kotlin gets the Gradle test task" \
+  || bad "verify kotlin" "test was '$v_test'"
+[ "$v_typecheck" = "./gradlew compileKotlin" ] && ok "Kotlin typechecks with compileKotlin, not compileJava" \
+  || bad "verify kotlin" "typecheck was '$v_typecheck'"
 rm -rf "$d"
 
 d="$(fixture swift)"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(verify_of "$d" test)" = "swift test" ] && ok "Swift gets swift test" \
-  || bad "verify swift" "test was '$(verify_of "$d" test)'"
+v_test="$(detect_in "$d" 'detect_verify test')"
+[ "$v_test" = "swift test" ] && ok "Swift gets swift test" \
+  || bad "verify swift" "test was '$v_test'"
 rm -rf "$d"
 
 d="$(fixture cpp)"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(verify_of "$d" build)" = "cmake --build build" ] && ok "CMake gets a build command" \
-  || bad "verify cpp" "build was '$(verify_of "$d" build)'"
-[ "$(verify_of "$d" test)" = "ctest --test-dir build" ] && ok "a CMake project that enables testing gets ctest" \
-  || bad "verify cpp" "test was '$(verify_of "$d" test)'"
-[ -z "$(verify_of "$d" format)" ] && ok "C++ without a .clang-format gets no format command" \
-  || bad "verify cpp" "format was guessed as '$(verify_of "$d" format)'"
+v_build="$(detect_in "$d" 'detect_verify build')"
+v_test="$(detect_in "$d" 'detect_verify test')"
+v_format="$(detect_in "$d" 'detect_verify format')"
+[ "$v_build" = "cmake --build build" ] && ok "CMake gets a build command" \
+  || bad "verify cpp" "build was '$v_build'"
+[ "$v_test" = "ctest --test-dir build" ] && ok "a CMake project that enables testing gets ctest" \
+  || bad "verify cpp" "test was '$v_test'"
+[ -z "$v_format" ] && ok "C++ without a .clang-format gets no format command" \
+  || bad "verify cpp" "format was guessed as '$v_format'"
 rm -rf "$d"
 
 d="$(fixture lua)"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(verify_of "$d" typecheck)" = "lua-language-server --check ." ] && ok "Lua with a .luarc.json gets a check command" \
-  || bad "verify lua" "typecheck was '$(verify_of "$d" typecheck)'"
-[ -z "$(verify_of "$d" test)" ] && ok "Lua without busted declared gets no test command" \
-  || bad "verify lua" "test was guessed as '$(verify_of "$d" test)'"
+v_typecheck="$(detect_in "$d" 'detect_verify typecheck')"
+v_test="$(detect_in "$d" 'detect_verify test')"
+[ "$v_typecheck" = "lua-language-server --check ." ] && ok "Lua with a .luarc.json gets a check command" \
+  || bad "verify lua" "typecheck was '$v_typecheck'"
+[ -z "$v_test" ] && ok "Lua without busted declared gets no test command" \
+  || bad "verify lua" "test was guessed as '$v_test'"
 rm -rf "$d"
 
 # ---- language servers ------------------------------------------------------
@@ -842,7 +891,7 @@ rm -rf "$d"
 # to tell absent from empty.
 d="$(fixture go)"
 ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['stack']['also'])" 2>/dev/null)" = "[]" ] \
+[ "$(prof_of "$d" stack.also)" = "[]" ] \
   && ok "a single-stack repo gets an empty stack.also" || bad "polyglot" "stack.also is missing or not empty"
 rm -rf "$d"
 
@@ -853,8 +902,7 @@ d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f","dependencies":{"@nestjs/core":"^10"},"scripts":{"test":"jest"}}' > package.json
   echo '{}' > tsconfig.json )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-got="$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['stack']['framework'])")"
+got="$(detect_in "$d" 'detect_stack | cut -d" " -f3')"
 if [ "$got" = "nest" ]; then ok "a NestJS service is detected as nest"
 else bad "framework" "got '$got', want 'nest'"; fi
 rm -rf "$d"
@@ -880,9 +928,9 @@ rm -rf "$d"
 d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '<!doctype html>\n' > index.html )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(ui_of "$d")" = "True" ] && ok "a static site has has_ui true" \
-  || bad "has_ui" "static site got '$(ui_of "$d")', want True"
+got="$(detect_in "$d" detect_has_ui)"
+[ "$got" = "true" ] && ok "a static site has has_ui true" \
+  || bad "has_ui" "static site got '$got', want true"
 rm -rf "$d"
 
 # The other direction matters as much, and this one passes before the fix: it is here to hold the
@@ -890,18 +938,18 @@ rm -rf "$d"
 d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f","dependencies":{"@nestjs/core":"^10"},"scripts":{"test":"jest"}}' > package.json )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(ui_of "$d")" = "False" ] && ok "a NestJS service has has_ui false" \
-  || bad "has_ui" "NestJS service got '$(ui_of "$d")', want False"
+got="$(detect_in "$d" detect_has_ui)"
+[ "$got" = "false" ] && ok "a NestJS service has has_ui false" \
+  || bad "has_ui" "NestJS service got '$got', want false"
 rm -rf "$d"
 
 # APEX pages are served from inside the database, so an APEX export has neither a local public/ nor
 # an index.html for the fallback below to find. The framework name is the only signal there is.
 d="$(fixture plsql)"
 printf '{"apex_version":"23.2"}\n' > "$d/manifest.json"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(ui_of "$d")" = "True" ] && ok "an APEX export has has_ui true" \
-  || bad "has_ui" "APEX export got '$(ui_of "$d")', want True"
+got="$(detect_in "$d" detect_has_ui)"
+[ "$got" = "true" ] && ok "an APEX export has has_ui true" \
+  || bad "has_ui" "APEX export got '$got', want true"
 rm -rf "$d"
 
 # ---- datastores -----------------------------------------------------------
@@ -917,10 +965,10 @@ stores_of() {  # stores_of <dir> -> the profile's stack.datastores, comma-separa
 d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f","dependencies":{"pg":"^8","ioredis":"^5"},"scripts":{"test":"jest"}}' > package.json )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(stores_of "$d")" = "postgres,redis" ] \
+got="$(detect_in "$d" 'detect_datastores | sort | tr "\n" " "')"
+[ "$got" = "postgres redis " ] \
   && ok "client libraries in package.json are read as datastores" \
-  || bad "datastores" "dependencies gave '$(stores_of "$d")', want postgres,redis"
+  || bad "datastores" "dependencies gave '$got', want 'postgres redis '"
 rm -rf "$d"
 
 # The second signal, and the one that is language-independent: a managed database reached over a
@@ -940,9 +988,9 @@ rm -rf "$d"
 # The other direction, as with has_ui: a project with no store must report none rather than a guess.
 # `[]` is the right answer here and the wrong one above, and only this pair tells them apart.
 d="$(fixture node-ts)"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ -z "$(stores_of "$d")" ] && ok "a project with no datastore reports none" \
-  || bad "datastores" "a storeless project got '$(stores_of "$d")', want nothing"
+got="$(detect_in "$d" 'detect_datastores | sort | tr "\n" " "')"
+[ -z "$got" ] && ok "a project with no datastore reports none" \
+  || bad "datastores" "a storeless project got '$got', want nothing"
 rm -rf "$d"
 
 # ---- profile ---------------------------------------------------------------
@@ -1029,12 +1077,12 @@ d["project"]["description"]="written by a human"
 p.write_text(json.dumps(d,indent=2)+"\n")
 PY
 ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-got="$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['verify']['test'])")"
+got="$(prof_of "$d" verify.test)"
 case "$got" in
   *runInBand*) ok "a corrected verify command survives re-init" ;;
   *) bad "clobbering" "init overwrote a human-corrected command with '$got'" ;;
 esac
-got="$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['project']['description'])")"
+got="$(prof_of "$d" project.description)"
 if [ "$got" = "written by a human" ]; then ok "human-written profile fields survive re-init"
 else bad "clobbering" "description was reset to '$got'"; fi
 rm -rf "$d"
@@ -1048,7 +1096,7 @@ d["verify"]["test"]="wrong"
 p.write_text(json.dumps(d,indent=2)+"\n")
 PY
 ( cd "$d" && "$KEEL" init -y --force >/dev/null 2>&1 )
-got="$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['verify']['test'])")"
+got="$(prof_of "$d" verify.test)"
 if [ "$got" = "npm test" ]; then ok "--force does overwrite"
 else bad "--force" "got '$got'"; fi
 rm -rf "$d"
@@ -1066,17 +1114,17 @@ got="$( cd "$d" && "$KEEL" profile get stack.language 2>&1 )"
 [ "$got" = "typescript" ] && ok "profile get prints a value" || bad "profile get" "got '$got'"
 
 ( cd "$d" && "$KEEL" profile set stack.has_ui true >/dev/null 2>&1 )
-got="$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['stack']['has_ui'])" 2>&1)"
+got="$(prof_of "$d" stack.has_ui)"
 [ "$got" = "True" ] && ok "profile set writes a JSON boolean, not the string 'true'" \
   || bad "profile set bool" "got '$got', want True"
 
 ( cd "$d" && "$KEEL" profile set verify.lint 'eslint . --max-warnings 0' >/dev/null 2>&1 )
-got="$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['verify']['lint'])" 2>&1)"
+got="$(prof_of "$d" verify.lint)"
 [ "$got" = "eslint . --max-warnings 0" ] && ok "profile set writes a string containing spaces" \
   || bad "profile set string" "got '$got'"
 
 ( cd "$d" && "$KEEL" profile set verify.build null >/dev/null 2>&1 )
-got="$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['verify']['build'])" 2>&1)"
+got="$(prof_of "$d" verify.build)"
 [ "$got" = "None" ] && ok "profile set null clears a value" || bad "profile set null" "got '$got'"
 
 # A typo has to fail loudly and name itself. Writing stack.hasUI beside stack.has_ui creates a key
@@ -1096,7 +1144,7 @@ case "$out" in
   *keel_version*) ok "profile set refuses keel_version, which init owns" ;;
   *)              bad "keel_version" "refusal did not name the field: '$out'" ;;
 esac
-got="$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['keel_version'])" 2>&1)"
+got="$(prof_of "$d" keel_version)"
 [ "$got" != "9.9.9" ] && ok "keel_version was left alone" || bad "keel_version" "it was rewritten"
 rm -rf "$d"
 
@@ -1106,46 +1154,45 @@ rm -rf "$d"
 # was detected for npm alone and every other stack carried null, which makes a format gate a
 # no-op on five stacks out of seven while reading as though it were switched on.
 
-fmt_of() {  # fmt_of <dir> <verify field>
-    python3 -c "import json;print(json.load(open('$1/.keel/profile.json'))['verify']['$2'])" 2>&1
-}
-
 # go and rust ship their formatter with the toolchain, so naming it is not a guess.
 d="$(fixture go)"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(fmt_of "$d" format)" = 'test -z "$(gofmt -l .)"' ] \
-  && ok "go gets a check-only formatter" || bad "go format" "got '$(fmt_of "$d" format)'"
-[ "$(fmt_of "$d" format_fix)" = "gofmt -w ." ] \
-  && ok "go gets the writing variant separately" || bad "go format_fix" "got '$(fmt_of "$d" format_fix)'"
+v_format="$(detect_in "$d" 'detect_verify format')"
+v_format_fix="$(detect_in "$d" 'detect_verify format_fix')"
+[ "$v_format" = 'test -z "$(gofmt -l .)"' ] \
+  && ok "go gets a check-only formatter" || bad "go format" "got '$v_format'"
+[ "$v_format_fix" = "gofmt -w ." ] \
+  && ok "go gets the writing variant separately" || bad "go format_fix" "got '$v_format_fix'"
 rm -rf "$d"
 
 d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '[package]\nname = "f"\n' > Cargo.toml )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(fmt_of "$d" format)" = "cargo fmt --check" ] \
-  && ok "rust gets a check-only formatter" || bad "rust format" "got '$(fmt_of "$d" format)'"
-[ "$(fmt_of "$d" format_fix)" = "cargo fmt" ] \
-  && ok "rust gets the writing variant separately" || bad "rust format_fix" "got '$(fmt_of "$d" format_fix)'"
+v_format="$(detect_in "$d" 'detect_verify format')"
+v_format_fix="$(detect_in "$d" 'detect_verify format_fix')"
+[ "$v_format" = "cargo fmt --check" ] \
+  && ok "rust gets a check-only formatter" || bad "rust format" "got '$v_format'"
+[ "$v_format_fix" = "cargo fmt" ] \
+  && ok "rust gets the writing variant separately" || bad "rust format_fix" "got '$v_format_fix'"
 rm -rf "$d"
 
 # npm is the case that motivated the split: `npm run format` rewrites, so it cannot be the gate.
 d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f","scripts":{"test":"jest","format":"prettier --write ."}}' > package.json )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(fmt_of "$d" format)" = "None" ] \
-  && ok "a writing npm format script does not become the gate" || bad "npm format" "got '$(fmt_of "$d" format)'"
-[ "$(fmt_of "$d" format_fix)" = "npm run format" ] \
-  && ok "a writing npm format script becomes format_fix" || bad "npm format_fix" "got '$(fmt_of "$d" format_fix)'"
+v_format="$(detect_in "$d" 'detect_verify format')"
+v_format_fix="$(detect_in "$d" 'detect_verify format_fix')"
+[ -z "$v_format" ] \
+  && ok "a writing npm format script does not become the gate" || bad "npm format" "got '$v_format'"
+[ "$v_format_fix" = "npm run format" ] \
+  && ok "a writing npm format script becomes format_fix" || bad "npm format_fix" "got '$v_format_fix'"
 rm -rf "$d"
 
 d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f","scripts":{"test":"jest","format":"prettier --write .","format:check":"prettier --check ."}}' > package.json )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(fmt_of "$d" format)" = "npm run format:check" ] \
-  && ok "a declared format:check earns the gate slot" || bad "npm format:check" "got '$(fmt_of "$d" format)'"
+v_format="$(detect_in "$d" 'detect_verify format')"
+[ "$v_format" = "npm run format:check" ] \
+  && ok "a declared format:check earns the gate slot" || bad "npm format:check" "got '$v_format'"
 rm -rf "$d"
 
 # Declared tools only for python, php and java: none of them ships a formatter with the runtime,
@@ -1153,42 +1200,44 @@ rm -rf "$d"
 d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '[project]\nname = "f"\n[tool.ruff]\nline-length = 100\n' > pyproject.toml )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(fmt_of "$d" format)" = "ruff format --check ." ] \
-  && ok "python with ruff declared gets ruff format --check" || bad "ruff format" "got '$(fmt_of "$d" format)'"
+v_format="$(detect_in "$d" 'detect_verify format')"
+[ "$v_format" = "ruff format --check ." ] \
+  && ok "python with ruff declared gets ruff format --check" || bad "ruff format" "got '$v_format'"
 rm -rf "$d"
 
 d="$(fixture python)"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(fmt_of "$d" format)" = "None" ] \
-  && ok "python with no formatter declared gets null, not a guess" || bad "python format" "got '$(fmt_of "$d" format)'"
+v_format="$(detect_in "$d" 'detect_verify format')"
+[ -z "$v_format" ] \
+  && ok "python with no formatter declared gets null, not a guess" || bad "python format" "got '$v_format'"
 rm -rf "$d"
 
 d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   echo '{"name":"f/f"}' > composer.json && mkdir -p vendor/bin && touch vendor/bin/pint )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(fmt_of "$d" format)" = "vendor/bin/pint --test" ] \
-  && ok "php with pint installed gets pint --test" || bad "pint format" "got '$(fmt_of "$d" format)'"
-[ "$(fmt_of "$d" format_fix)" = "vendor/bin/pint" ] \
-  && ok "php gets the writing variant separately" || bad "pint format_fix" "got '$(fmt_of "$d" format_fix)'"
+v_format="$(detect_in "$d" 'detect_verify format')"
+v_format_fix="$(detect_in "$d" 'detect_verify format_fix')"
+[ "$v_format" = "vendor/bin/pint --test" ] \
+  && ok "php with pint installed gets pint --test" || bad "pint format" "got '$v_format'"
+[ "$v_format_fix" = "vendor/bin/pint" ] \
+  && ok "php gets the writing variant separately" || bad "pint format_fix" "got '$v_format_fix'"
 rm -rf "$d"
 
 d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf 'plugins { id "com.diffplug.spotless" version "6.25.0" }\n' > build.gradle )
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-[ "$(fmt_of "$d" format)" = "./gradlew spotlessCheck" ] \
-  && ok "gradle with spotless declared gets spotlessCheck" || bad "spotless format" "got '$(fmt_of "$d" format)'"
-[ "$(fmt_of "$d" format_fix)" = "./gradlew spotlessApply" ] \
-  && ok "gradle gets the writing variant separately" || bad "spotless format_fix" "got '$(fmt_of "$d" format_fix)'"
+v_format="$(detect_in "$d" 'detect_verify format')"
+v_format_fix="$(detect_in "$d" 'detect_verify format_fix')"
+[ "$v_format" = "./gradlew spotlessCheck" ] \
+  && ok "gradle with spotless declared gets spotlessCheck" || bad "spotless format" "got '$v_format'"
+[ "$v_format_fix" = "./gradlew spotlessApply" ] \
+  && ok "gradle gets the writing variant separately" || bad "spotless format_fix" "got '$v_format_fix'"
 rm -rf "$d"
 
 # ---- the default branch is not the checked-out branch --------------------
 d="$(fixture node-ts)"
 ( cd "$d" && git checkout -q -b feature-x )
 ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-got="$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['conventions']['default_branch'])")"
+got="$(prof_of "$d" conventions.default_branch)"
 if [ "$got" = "main" ]; then ok "default_branch is the repo default, not the checked-out branch"
 else bad "default_branch" "got '$got' while on feature-x"; fi
 rm -rf "$d"
@@ -1475,7 +1524,7 @@ if ( cd "$d" && "$KEEL" doctor >/dev/null 2>&1 ); then ok "a new project passes 
 else bad "new" "doctor fails on a freshly created project"; fi
 
 # And the sample test must genuinely pass, not just exist.
-tc="$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['verify']['test'])")"
+tc="$(prof_of "$d" verify.test)"
 if ( cd "$d" && eval "$tc" >/dev/null 2>&1 ); then ok "the generated test command passes"
 else bad "new" "generated test command '$tc' fails"; fi
 
@@ -1494,7 +1543,7 @@ rm -rf "$parent"
 # Python stack.
 parent="$(mktemp -d)"
 ( cd "$parent" && "$KEEL" new svc-py --stack python >/dev/null 2>&1 )
-got="$(python3 -c "import json;print(json.load(open('$parent/svc-py/.keel/profile.json'))['stack']['language'])" 2>/dev/null)"
+got="$(prof_of "$parent/svc-py" stack.language)"
 [ "$got" = "python" ] && ok "new supports the python stack" || bad "new python" "got '$got'"
 if ( cd "$parent/svc-py" && "$KEEL" doctor >/dev/null 2>&1 ); then ok "a new python project passes doctor"
 else bad "new python" "doctor fails"; fi
@@ -1508,7 +1557,7 @@ rm -rf "$parent"
 d="$(fixture bare)"
 printf '# Requirements\n' > "$d/requirements.md"
 ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-got="$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['project']['kind'])" 2>/dev/null)"
+got="$(prof_of "$d" project.kind)"
 [ "$got" = "docs" ] && ok "a repo with no source is detected as kind docs" || bad "pre-code" "kind is '$got', want 'docs'"
 if ( cd "$d" && "$KEEL" doctor >/dev/null 2>&1 ); then ok "doctor passes on a pre-code repo"
 else bad "pre-code" "doctor fails on a documents-only repo, which it can never satisfy"; fi
@@ -1517,7 +1566,7 @@ rm -rf "$d"
 # A repo with source is still expected to have a test command.
 d="$(fixture node-ts)"
 ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-got="$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['project']['kind'])")"
+got="$(prof_of "$d" project.kind)"
 [ "$got" = "service" ] && ok "a repo with source is not marked docs" || bad "kind" "got '$got'"
 rm -rf "$d"
 
@@ -1816,33 +1865,27 @@ sys.exit(0 if 'extraKnownMarketplaces' not in s else 1)" \
   && ok "init declares no marketplace source in the committed settings" \
   || bad "marketplace" "init wrote extraKnownMarketplaces, which is a per-machine fact"
 
-# Terse is the default a project gets without asking. The key is written explicitly rather than left
-# absent and defaulted, so a reader can see it and change it without first knowing it exists.
-python3 -c "
-import json,sys
-c=json.load(open('$d/.keel/profile.json')).get('conventions',{})
-sys.exit(0 if c.get('response_style')=='terse' else 1)" \
+# Three keys out of the one profile in one read. Terse is the default a project gets without
+# asking, and the key is written explicitly rather than left absent and defaulted, so a reader can
+# see it and change it without first knowing it exists. explain_level is written for the same
+# reason: technical is what a project gets without asking.
+#
+# The watchdog cannot read the window from a session, so gates.context_window is the only correct
+# mechanism and nothing wrote it. 200000 is conservative and sometimes wrong, which is acceptable
+# only because a configured window is a floor: a larger session raises it in flight rather than
+# being stopped at 85% of the wrong number.
+{ read -r response_style; read -r explain_level; read -r context_window; } <<EOF
+$(prof_of "$d" conventions.response_style conventions.explain_level gates.context_window)
+EOF
+[ "$response_style" = terse ] \
   && ok "init writes conventions.response_style=terse" \
   || bad "response_style" "init did not write terse"
 
-# explain_level is written explicitly for the same reason response_style is: technical is what a
-# project gets without asking, so the key that changes it has to be visible in the file the reader
-# already opens.
-python3 -c "
-import json,sys
-c=json.load(open('$d/.keel/profile.json')).get('conventions',{})
-sys.exit(0 if c.get('explain_level')=='technical' else 1)" \
+[ "$explain_level" = technical ] \
   && ok "init writes conventions.explain_level=technical" \
   || bad "explain_level" "init did not write technical"
 
-# The watchdog cannot read the window from a session, so the only correct mechanism is this key and
-# nothing wrote it. 200000 is conservative and sometimes wrong, which is acceptable only because a
-# configured window is a floor: a larger session raises it in flight rather than being stopped at
-# 85% of the wrong number.
-python3 -c "
-import json,sys
-g=json.load(open('$d/.keel/profile.json')).get('gates',{})
-sys.exit(0 if g.get('context_window')==200000 else 1)" \
+[ "$context_window" = 200000 ] \
   && ok "init writes gates.context_window=200000" \
   || bad "context_window" "init did not write gates.context_window"
 
@@ -2057,7 +2100,7 @@ d = json.loads(p.read_text()); d["schema_version"] = 0
 p.write_text(json.dumps(d, indent=2) + "\n")
 PY
 ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-got="$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['schema_version'])")"
+got="$(prof_of "$d" schema_version)"
 [ "$got" = "$want" ] && ok "re-running init reclaims schema_version" \
   || bad "schema_version" "stayed '$got' after re-init, want '$want'"
 
@@ -2097,7 +2140,7 @@ case "$out2" in *"schema version none"*) ok "doctor treats an absent schema_vers
   *) bad "staleness" "doctor did not notice a profile with no schema_version" ;; esac
 
 ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-got="$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['keel_version'])")"
+got="$(prof_of "$d" keel_version)"
 want="$(cat "$ROOT/VERSION")"
 [ "$got" = "$want" ] && ok "re-running init refreshes the recorded version" \
   || bad "staleness" "version stayed '$got', want '$want'"
@@ -2111,7 +2154,7 @@ d = json.loads(p.read_text()); d["verify"]["test"] = "npm test -- --runInBand"
 p.write_text(json.dumps(d, indent=2) + "\n")
 PY
 ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
-got="$(python3 -c "import json;print(json.load(open('$d/.keel/profile.json'))['verify']['test'])")"
+got="$(prof_of "$d" verify.test)"
 case "$got" in *runInBand*) ok "refreshing the version does not disturb human values" ;;
   *) bad "staleness" "verify.test was overwritten with '$got'" ;; esac
 rm -rf "$d"
@@ -2654,6 +2697,8 @@ case "$out" in *"not enabled: keel@gbi"*) bad "plugin scope" "doctor called keel
 case "$out" in *"not enabled: typescript-lsp"*) ok "a plugin missing from every scope is still reported" ;;
   *) bad "plugin scope" "the scope fix silenced a genuinely missing plugin" ;; esac
 rm -rf "$pu"
+
+rm -rf "$FIXTURE_CACHE"
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

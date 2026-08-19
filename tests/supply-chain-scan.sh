@@ -176,18 +176,29 @@ list_files() {
 
 check_patterns
 
-# Three scope lists, built once. A file is text if grep says so; binaries are handled structurally.
+# Five lists, built in one walk instead of the four separate walks the structural checks below used
+# to do on their own: each of them called list_files() again and, for two of them, redid the same
+# LC_ALL=C grep -qI text/binary test this walk already has the answer to. FULL_LIST is every entry
+# list_files() prints (what structural-secret-material scans: it does not filter by text/binary).
+# BINARY_LIST is the text check's complement (what structural-binary scans). ALL_LIST, EXEC_LIST and
+# PROMPT_LIST are unchanged: the scoped, skip_file-filtered, text-only sets the pattern rules use,
+# and structural-invisible now reuses ALL_LIST directly since its own filtering was identical to it.
 ALL_LIST="$(mktemp)"; EXEC_LIST="$(mktemp)"; PROMPT_LIST="$(mktemp)"
-trap 'rm -f "$ALL_LIST" "$EXEC_LIST" "$PROMPT_LIST"' EXIT
+FULL_LIST="$(mktemp)"; BINARY_LIST="$(mktemp)"
+trap 'rm -f "$ALL_LIST" "$EXEC_LIST" "$PROMPT_LIST" "$FULL_LIST" "$BINARY_LIST"' EXIT
 
 while IFS= read -r f; do
     [ -n "$f" ] || continue
-    skip_file "$f" && continue
+    printf '%s\n' "$f" >> "$FULL_LIST"
     [ -f "$f" ] || continue
-    LC_ALL=C grep -qI . "$f" 2>/dev/null || continue
-    printf '%s\n' "$f" >> "$ALL_LIST"
-    in_scope exec "$f"   && printf '%s\n' "$f" >> "$EXEC_LIST"
-    in_scope prompt "$f" && printf '%s\n' "$f" >> "$PROMPT_LIST"
+    if LC_ALL=C grep -qI . "$f" 2>/dev/null; then
+        skip_file "$f" && continue
+        printf '%s\n' "$f" >> "$ALL_LIST"
+        in_scope exec "$f"   && printf '%s\n' "$f" >> "$EXEC_LIST"
+        in_scope prompt "$f" && printf '%s\n' "$f" >> "$PROMPT_LIST"
+    else
+        printf '%s\n' "$f" >> "$BINARY_LIST"
+    fi
 done < <(list_files)
 
 while IFS=$'\t' read -r id scope flags pat why; do
@@ -247,6 +258,8 @@ scan_allowed_path() {
     return 1
 }
 
+# Reuses FULL_LIST, built once above: every entry list_files() prints, same as calling it again here
+# would give, since this check is deliberately not filtered by text or binary (a keystore is binary).
 while IFS= read -r f; do
     [ -n "$f" ] || continue
     case "$f" in
@@ -259,7 +272,7 @@ while IFS= read -r f; do
         continue
     fi
     report "$f [structural-secret-material] a committed key, keystore or certificate. git keeps it forever, so the remedy is rotating the credential, not deleting the file"
-done < <(list_files)
+done < "$FULL_LIST"
 
 # structural-binary: an opaque file nobody can review. Scoped to a plugin repository, where the whole
 # tree is markdown, bash and a little Python, so a binary has no legitimate reason to exist.
@@ -269,17 +282,17 @@ done < <(list_files)
 # check that fires twenty times on correct code is a check people learn to skip, which would have
 # cost the keystore finding above as well.
 if [ -f .claude-plugin/plugin.json ]; then
+    # Reuses BINARY_LIST, built once above by the same LC_ALL=C grep -qI test this loop used to redo
+    # itself: BINARY_LIST already holds exactly the files that test failed.
     while IFS= read -r f; do
         [ -n "$f" ] || continue
-        [ -f "$f" ] || continue
-        LC_ALL=C grep -qI . "$f" 2>/dev/null && continue
         # An entry in scan-allow means the path has been reviewed and accepted, so it covers every
         # file-level rule rather than only the one that happened to fire first. Without this, an
         # accepted fixture key in a plugin repo is allowed by one rule and rejected by the next,
         # which reads as the allow list not working.
         scan_allowed_path "$f" && continue
         report "$f [structural-binary] a tracked binary file. Nothing in a plugin should be unreadable"
-    done < <(list_files)
+    done < "$BINARY_LIST"
 fi
 
 # structural-executable: the executable set is enumerated in allowed_executable above, and the
@@ -295,15 +308,15 @@ fi
 # structural-invisible: bidirectional and zero-width characters. This is the one rule here a careful
 # reviewer genuinely cannot enforce, because the characters render as nothing: a bidi override can
 # make a line of code display in an order that differs from the order it executes in.
+#
+# Reuses ALL_LIST, built once above: its filtering (skip_file, exists, text not binary) is exactly
+# what this loop applied itself before checking each file for an invisible character.
 while IFS= read -r f; do
     [ -n "$f" ] || continue
-    skip_file "$f" && continue
-    [ -f "$f" ] || continue
-    LC_ALL=C grep -qI . "$f" 2>/dev/null || continue
     if LC_ALL=C grep -qE "$(printf '\xe2\x80[\xaa-\xae\x8b-\x8f]|\xe2\x81[\xa6-\xa9]')" "$f" 2>/dev/null; then
         report "$f [structural-invisible] contains a bidirectional or zero-width character. It renders as nothing and can make code read differently from how it runs"
     fi
-done < <(list_files)
+done < "$ALL_LIST"
 
 # structural-orphan-hook: every executable under hooks/ is named in hooks.json. An unregistered hook
 # either does nothing, in which case it is dead weight, or it is wired up somewhere else, in which

@@ -125,34 +125,60 @@ list_files() {
     fi
 }
 
+# One grep per pattern over the whole candidate list, not one grep per pattern per file. The
+# original did the latter: files times 27 DENY patterns, about 6,400 grep processes and 37 seconds
+# on this repository. The candidate list (skip_file and the binary filter below, both unchanged) is
+# built once here instead of being recomputed for every pattern.
+CANDIDATES="$(mktemp)"; GBI_CANDIDATES="$(mktemp)"
+trap 'rm -f "$CANDIDATES" "$GBI_CANDIDATES"' EXIT
+
 while IFS= read -r f; do
     [ -n "$f" ] || continue
     skip_file "$f" && continue
     [ -f "$f" ] || continue
     # Skip binaries.
     LC_ALL=C grep -qI . "$f" 2>/dev/null || continue
-    for pat in "${DENY[@]}"; do
-        # Not `if hit=$(... | head -1)`. head exits after one line, grep dies on SIGPIPE with 141,
-        # and `set -o pipefail` makes that the pipeline's status, so the branch is skipped while
-        # `hit` holds a real finding: a file with more matches than a pipe buffer scanned clean.
-        # Reproduces from about 5,000 matching lines. The `[ -n "$hit" ]` test is the only guard
-        # this needs, and it was already here inside the `if` that was hiding the bug.
-        hit=$(grep -nE "$pat" "$f" 2>/dev/null | head -1)
-        [ -n "$hit" ] && report "$f: project-specific identifier matching '$pat' -> ${hit%%:*}: $(printf '%s' "${hit#*:}" | cut -c1-70)"
-    done
+    printf '%s\n' "$f" >> "$CANDIDATES"
     case "$f" in
-      skills/*|templates/*|output-styles/*)
-        # Not `if hit=$(... | head -1)`. Under `set -o pipefail` a file with more than a pipe buffer
-        # of matches makes head exit first, grep die on SIGPIPE, and the pipeline report 141, so the
-        # branch is skipped while `hit` holds a real leak. Verified at 200k matching lines. The
-        # `[ -n "$hit" ]` below is the only guard needed.
-        hit=$(grep -nE '\bGBi' "$f" 2>/dev/null | head -1)
-        if [ -n "$hit" ]; then
-            report "$f: names GBi. Shipped content carries no organisation name: decision 2 required it extractable, and 2026-08-17 removed the last of it -> ${hit%%:*}: $(printf '%s' "${hit#*:}" | cut -c1-70)"
-        fi
-        ;;
+        skills/*|templates/*|output-styles/*) printf '%s\n' "$f" >> "$GBI_CANDIDATES" ;;
     esac
 done < <(list_files)
+
+# Not `grep ... | head -1`. head exits after one line, grep dies on SIGPIPE with 141, and
+# `set -o pipefail` makes that the pipeline's status, so a branch guarded that way would be skipped
+# while a real finding exists: a file with more matches than a pipe buffer scanned clean. Reproduces
+# from about 5,000 matching lines. Nothing below pipes a grep into anything that can exit early:
+# each pattern's full output is captured through process substitution, and the loop keeps only the
+# first match per file per pattern in-shell, by skipping repeats of the filename it just reported.
+if [ -s "$CANDIDATES" ]; then
+    for pat in "${DENY[@]}"; do
+        prev_f=""
+        while IFS= read -r hit; do
+            [ -n "$hit" ] || continue
+            f="${hit%%:*}"; rest="${hit#*:}"
+            [ "$f" = "$prev_f" ] && continue
+            prev_f="$f"
+            line="${rest%%:*}"; text="${rest#*:}"
+            report "$f: project-specific identifier matching '$pat' -> $line: $(printf '%s' "$text" | cut -c1-70)"
+        done < <(tr '\n' '\0' < "$CANDIDATES" | xargs -0 grep -nHE -- "$pat" 2>/dev/null)
+    done
+fi
+
+# The GBi check, scoped to skills/, templates/ and output-styles/: see the header comment above for
+# why. Pulled out of the per-file loop for the same reason as the DENY patterns above: one grep over
+# the subset rather than one grep per file in it. Same first-match-per-file, same no-head-under-
+# pipefail reasoning.
+if [ -s "$GBI_CANDIDATES" ]; then
+    prev_f=""
+    while IFS= read -r hit; do
+        [ -n "$hit" ] || continue
+        f="${hit%%:*}"; rest="${hit#*:}"
+        [ "$f" = "$prev_f" ] && continue
+        prev_f="$f"
+        line="${rest%%:*}"; text="${rest#*:}"
+        report "$f: names GBi. Shipped content carries no organisation name: decision 2 required it extractable, and 2026-08-17 removed the last of it -> $line: $(printf '%s' "$text" | cut -c1-70)"
+    done < <(tr '\n' '\0' < "$GBI_CANDIDATES" | xargs -0 grep -nHE -- '\bGBi' 2>/dev/null)
+fi
 
 if [ "$errors" -eq 0 ]; then
     printf 'OK    no project-specific identifiers\n'

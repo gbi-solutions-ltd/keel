@@ -73,28 +73,25 @@ find_marker() {   # find_marker <maxdepth> <pattern>...
 # Whether this tree is a PL/SQL project. Clauses one to three of the marker, and the fourth through
 # has_oracle_token.
 #
-# NOT MEMOISED, AND THE REASON IS COST RATHER THAN IMPOSSIBILITY. One `keel init` calls this eight
-# times, traced by printing FUNCNAME from sql_census during a real init rather than counted by
-# reading the caller graph: detect_stack reaches it from write_profile, from project_kind and three
-# times by way of detect_has_ui; expected_plugins reaches it four times, twice through detect_has_ui
-# and twice directly; and detect_also accounts for one more. This count changes whenever a caller of
-# detect_stack, detect_has_ui or detect_also is added or removed, and has to be re-traced rather than
-# reasoned about when it does.
+# MEMOISED SINCE 2026-08-19, ONE LEVEL UP, IN detect_languages. This function is not cached itself
+# and does not need to be: its only caller is detect_languages, whose answer is now held in
+# DETECTED_LANGS for the rest of the process.
 #
-# A cache is possible: it cannot be filled from inside this function, because every call sits in its
-# own `$( )`, but pkg_scripts_load one file over solves exactly that by being called from
-# write_profile's own shell at bin/keel:363, and the same shape here would take eight walks to one.
+# One `keel init` called this eight times, traced by printing FUNCNAME from sql_census during a real
+# init rather than counted by reading the caller graph: detect_stack reaches it from write_profile,
+# from project_kind and three times by way of detect_has_ui; expected_plugins reaches it four times,
+# twice through detect_has_ui and twice directly; and detect_also accounts for one more. The cache
+# takes those eight tree walks to one.
 #
-# It is not done because the cost does not warrant a new global and a second call site: one census
-# measured 0.024 seconds on a 2,200 file tree, so eight of them are about 0.19 seconds, once, at
-# init. FR-04 is what keeps that bounded, since a repository declaring any of the thirteen never
-# reaches this function at all. Revisit if the census ever grows more expensive.
+# The cache cannot be filled from inside a `$( )`, because every one of those callers sits in its
+# own subshell, which is why write_profile primes it in its own shell alongside pkg_scripts_load.
+# Both are the same shape and both are load-bearing rather than redundant.
 #
-# The same applies to has_oracle_token, which is the second walk and the more expensive one. Its
-# worst case is a large manifest-less SQL tree with no Oracle token anywhere, where grep reads every
-# file and finds nothing: measured at 102 ms over 800 .sql files, so about 0.8 seconds across the
-# eight calls of one init. A tree that fails the count or the dominance test never reaches it, and a
-# tree that is genuinely PL/SQL stops at the first match.
+# What that saves is a census measured at 0.024 seconds on a 2,200 file tree, and has_oracle_token
+# behind it, which is the more expensive walk: its worst case is a large manifest-less SQL tree with
+# no Oracle token anywhere, where grep reads every file and finds nothing, measured at 102 ms over
+# 800 .sql files. FR-04 already bounded both, since a repository declaring any of the thirteen never
+# reaches this function at all; the cache bounds the repository that does not.
 is_plsql_tree() {
     local census sqlc othermax
     census="$(sql_census)"
@@ -293,10 +290,24 @@ py_declares() {   # py_declares <name>
     grep -qs "$1" pyproject.toml requirements.txt requirements-dev.txt Pipfile setup.cfg tox.ini
 }
 
+# The language list, read once. Same shape and same reason as PKG_SCRIPTS above: filled on the
+# first lookup and never again in this process, and primed from write_profile's own shell because
+# every caller here reads it inside a `$( )` that cannot fill it for anybody else.
+#
+# Keyed on nothing, because there is nothing to key on: the answer is a property of the working
+# directory, and no command changes directory between one call and the next. `keel new` creates and
+# enters its project before it detects anything, which is the only place that could.
+DETECTED_LANGS=""
+DETECTED_LANGS_LOADED=""
+
 # Every language with a marker in this tree, one per line, most specific first. The order is the
 # priority order: the first line is the primary stack and drives the verify commands, and the rest
 # become stack.also. A language appears at most once.
 detect_languages() {
+    if [ -n "$DETECTED_LANGS_LOADED" ]; then
+        [ -n "$DETECTED_LANGS" ] && printf '%s\n' "$DETECTED_LANGS"
+        return 0
+    fi
     local out=""
     if [ -f package.json ]; then
         if [ -f tsconfig.json ] || grep -q '"typescript"' package.json 2>/dev/null
@@ -341,10 +352,14 @@ detect_languages() {
         out="$out plsql"
     fi
 
+    # Set after the walks, not before: the flag means detected, and marking it against a tree that
+    # was never censused would serve an empty answer for the rest of the process.
+    DETECTED_LANGS_LOADED=1
     # Word splitting is the point here, and the first occurrence wins so the primary is stable
     # whatever a repository adds later.
     # shellcheck disable=SC2086
-    [ -n "$out" ] && printf '%s\n' $out | awk '!seen[$0]++'
+    [ -n "$out" ] && DETECTED_LANGS="$(printf '%s\n' $out | awk '!seen[$0]++')"
+    [ -n "$DETECTED_LANGS" ] && printf '%s\n' "$DETECTED_LANGS"
     return 0
 }
 

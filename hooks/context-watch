@@ -11,6 +11,17 @@
 # is appended after the conversation, never into the prompt prefix, so the cache is untouched either
 # way. See docs/05-token-and-memory-design.md.
 #
+# THE FAST PATH. PreToolUse has no matcher, so this runs on every tool call in the session, and
+# lib/context_watch.py always lets Write, Edit, NotebookEdit, Read, TodoWrite, TaskUpdate and
+# TaskCreate through regardless of context (ALWAYS_ALLOWED there). Paying for a python startup and a
+# transcript measurement to reach that same "do nothing" answer, on the tools used on every turn, is
+# the cost this hook was actually spending. So for exactly that case, a PreToolUse event naming one
+# of those tools, this wrapper reads the measurement lib/context_watch.py itself cached on the last
+# call and, when it is fresh and clearly nowhere near the warn threshold, answers with silence here
+# and never starts python. Anything less certain, a stale or missing cache, or a percentage close to
+# or past a threshold, falls through to python exactly as before. UserPromptSubmit and PreCompact are
+# never shortcut: they are once-per-turn events, not once-per-tool, so there is nothing to save there.
+#
 # NO PYTHON, NO WATCHDOG, NO NOISE. This is advisory infrastructure, not a correctness gate, so when
 # python3 is absent it does nothing at all rather than printing an apology on every prompt. That
 # silence would be dishonest if nothing reported it, so `keel doctor` says the watchdog is inert.
@@ -25,6 +36,62 @@ ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 LIB="$ROOT/lib/context_watch.py"
 [ -f "$LIB" ] || exit 0
 
+# Read stdin once, here, so the fast path below can look at it. It is fed to python again on the
+# slow path, since a pipe cannot be read twice.
+event="$(cat)"
+
+is_digits() { case "$1" in ''|*[!0-9]*) return 1 ;; esac; return 0; }
+
+fast=0
+case "$event" in
+    *'"hook_event_name"'*'"PreToolUse"'*)
+        case "$event" in
+            *'"tool_name"'*'"Write"'*|*'"tool_name"'*'"Edit"'*|*'"tool_name"'*'"NotebookEdit"'*| \
+            *'"tool_name"'*'"Read"'*|*'"tool_name"'*'"TodoWrite"'*|*'"tool_name"'*'"TaskUpdate"'*| \
+            *'"tool_name"'*'"TaskCreate"'*)
+                fast=1
+                ;;
+        esac
+        ;;
+esac
+
+if [ "$fast" = 1 ]; then
+    # The session id, pulled out with parameter expansion rather than a parser, so this never spawns
+    # anything to answer a question a builtin can answer. A field that is missing or oddly shaped just
+    # leaves session empty, which misses the cache file below and falls through to python, safely.
+    session=""
+    tail="${event#*\"session_id\"}"
+    if [ "$tail" != "$event" ]; then
+        tail="${tail#*:}"
+        tail="${tail#*\"}"
+        session="${tail%%\"*}"
+    fi
+
+    cache="${TMPDIR:-/tmp}/keel-context-watch/${session:-nosession}.measure"
+    if [ -f "$cache" ]; then
+        # The same "ts tok win" line lib/context_watch.py's _cached_measure writes. Anything that
+        # does not read as three plain integers is treated as no cache at all.
+        read -r ts tok win < "$cache" 2>/dev/null
+        now="$(date +%s 2>/dev/null)"
+        if is_digits "${ts:-}" && is_digits "${tok:-}" && is_digits "${win:-}" \
+            && is_digits "${now:-}" && [ "$win" -gt 0 ]; then
+            age=$((now - ts))
+            # 20, matching CACHE_SECONDS in lib/context_watch.py: the window the python side itself
+            # treats a measurement as still current.
+            if [ "$age" -ge 0 ] && [ "$age" -lt 20 ]; then
+                pct=$(( (100 * tok) / win ))
+                warn_at="${KEEL_CONTEXT_WARN:-70}"
+                is_digits "$warn_at" || warn_at=70
+                # "Clearly below" rather than merely below: PreToolUse only ever acts at or past the
+                # stop threshold, which defaults higher than warn and cannot be configured under it
+                # without the profile contradicting itself, so a percentage below warn is nowhere near
+                # deny territory either way this call could have been decided.
+                [ "$pct" -lt "$warn_at" ] && exit 0
+            fi
+        fi
+    fi
+fi
+
 # A hook that fails must not take the session with it. Any error here means no output and exit 0,
 # which is the same as having nothing to say.
-python3 "$LIB" hook 2>/dev/null || exit 0
+printf '%s' "$event" | python3 "$LIB" hook 2>/dev/null || exit 0
