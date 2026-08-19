@@ -252,6 +252,44 @@ tests/no-internal-leaks.sh            # clean, and printing that it ran in fallb
 
 Then change visibility.
 
+## 7a. Publishing an update, after the first release
+
+Written on 2026-08-19, the first time the public repository took a change that was not a release.
+The public tree is separate and has no history in common with this one, so an update is a fresh
+commit built from an export rather than a merge or a cherry pick.
+
+```bash
+tests/export-public.sh /tmp/keel-export
+( cd /tmp/keel-export && git init -q && git add -A \
+    && git -c user.name=export -c user.email=export@local commit -qm export \
+    && tests/run-tests.sh )                       # must be green before anything is pushed
+git clone git@github-personal:gbi-solutions-ltd/keel.git /tmp/keel-public
+rsync -a --delete --exclude '.git/' /tmp/keel-export/ /tmp/keel-public/
+( cd /tmp/keel-public && git status --short && git ls-files | wc -l )
+```
+
+**Commit inside the export before running the suite, not after.** The step above used to be
+`git init -q && git add -A && tests/run-tests.sh`, and it now fails: `tests/test-cache-install.sh`
+builds its copy with `git archive HEAD`, and a repository with a staged index and no commit has no
+HEAD to archive. It reports `fatal: not a valid object name: HEAD` and the suite is red for a reason
+that has nothing to do with the export. This is the same commit-then-verify ordering that a release
+needs, arriving in a second place.
+
+**Committing afterwards is worse than committing first.** A suite run writes files. The run leaves
+`lib/__pycache__/*.pyc` behind, and a commit taken after the run sweeps whatever it created into the
+tree being verified. They are gitignored, so they never reach a commit, but `rsync` does not read
+`.gitignore` and will copy them into the clone.
+
+**Check the file count against the export's own number.** `tests/export-public.sh` prints how many
+files it wrote. After the `rsync`, `git ls-files | wc -l` in the clone must equal it: 187 on
+2026-08-19. The three `.pyc` files above were caught exactly this way, by a count that disagreed with
+the export by three.
+
+**An update that is not a release gets no tag and no version bump.** Plugin installs are keyed by
+version, so an untagged commit on the public `main` reaches no installed user. A release is the other
+thing, and Decision 9 gates one on the behavioural evals, which cost agent runs. Do not quietly turn
+a documentation or test change into a release to get it published.
+
 ## 8. What changes the moment it is public
 
 **Checked after publishing.** No workflow references a secret, and the public repository has no
