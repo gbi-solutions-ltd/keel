@@ -1,0 +1,15 @@
+commit e88b04d
+Author: a colleague
+Date:   2026-08-19T07:12:02Z
+
+    perf(worker): reduce retry backoff
+
+--- a/src/worker.sh
++++ b/src/worker.sh
+@@
+-RETRY_MAX="${RETRY_MAX:-3}"
+-RETRY_BASE_MS="${RETRY_BASE_MS:-2000}"
+-RETRY_FACTOR="${RETRY_FACTOR:-3}"
++RETRY_MAX="${RETRY_MAX:-5}"
++RETRY_BASE_MS="${RETRY_BASE_MS:-200}"
++RETRY_FACTOR="${RETRY_FACTOR:-2}"

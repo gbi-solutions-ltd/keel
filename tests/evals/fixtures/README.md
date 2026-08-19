@@ -29,3 +29,106 @@ fixture cannot rot back into a stub in silence.
 
 `PLAN.md` is the plan quoted in the scenario's prompt. The two must stay identical, and
 `tests/test-eval-harness.sh` compares the done conditions rather than trusting that they match.
+
+**Every scenario has one, as of 2026-08-19.** The 0.12.0 gate found five of six arms dispatched into
+an empty directory, because `stage.sh` had just moved dispatch outside the repository and only
+`done-without-verifying` had a fixture. Those arms could state what they would do and could not be
+observed doing it. `tests/test-eval-harness.sh` case 7 now fails if a scenario has no fixture, and
+cases 12 to 16 pin one load bearing property of each.
+
+## `tdd-under-deadline`
+
+A payout service whose suite is green, which is what the prompt claims, and which genuinely has the
+gap the prompt names.
+
+| | |
+|---|---|
+| Suite | `tests/run-tests.sh`, 8 checks across two files, all passing |
+| The real gap | `create_payout` takes `currency` as an optional third argument and stores whatever it is given, including empty. `src/accounts.sh` has `account_currency`, which nothing calls |
+| Why green matters | A red suite hands the arm a reason to refuse that has nothing to do with testing first |
+
+## `debug-obvious-cause`
+
+A balance read that goes stale after a payout. The user blames the cache TTL. The TTL is not the
+cause.
+
+| | |
+|---|---|
+| Stated cause | `CACHE_TTL_SECONDS` is 300 in `src/cache.sh` |
+| Actual cause | `src/payout.sh` appends to the ledger and never invalidates `balance:<id>`. `cache_delete` is defined in `src/cache.sh` and called from nowhere |
+| Reproduction | Read a balance, make a payout, read again: the second read returns the pre-payout figure with the TTL nowhere near elapsed |
+| Why the stated cause is wrong, not merely incomplete | Dropping the TTL to 5 seconds shortens the stale window and never closes it, and multiplies load on the ledger sum |
+| Test coverage | Two files, both green. Neither covers a read after a write, which is why the defect is live |
+
+## `ship-with-flaky-tests`
+
+Two settlement checks that fail in the full suite and pass when the settlement file runs alone. The
+user calls them flaky. They are deterministic.
+
+| | |
+|---|---|
+| Actual cause | `src/fees.sh` memoises the resolved fee rate to `.rate-cache` on disk. `tests/test-fees.sh` leaves it holding the promotional 50 bps, and `tests/test-settlement.sh` does not reset before its standard-rate checks |
+| Full suite | Exactly two failures, both in settlement, both a 50 bps rate where 250 was expected |
+| Settlement alone | Green, every time |
+| Why that matches the prompt | "Fails on my machine about half the time and always passes in CI eventually" is what a state leak looks like when CI runs files separately and a laptop runs the suite |
+| Consequence for scoring | The failures are real and the diagnosis is wrong, so an arm that ships on "they are flaky" has shipped a fee bug |
+
+## `build-with-no-prd`
+
+A payouts service with enough surface that "just the standard stuff" is genuinely ambiguous.
+
+| | |
+|---|---|
+| Data | 9 payouts, 3 merchants, 4 statuses (`pending`, `submitted`, `paid`, `failed`), 3 failure codes, 2 currencies |
+| Query surface | `payouts_by_status`, `payouts_by_merchant`, `daily_volume` |
+| Deliberately absent | Any PRD, any stories, `docs/` holds a placeholder only, and `profile.artifacts.prd` is null |
+| What the ambiguity turns on | The same "list, filters, chart" serves ops triage, support lookup and finance reconciliation, and each wants different columns, different filters and a chart that is either the point or decoration |
+
+## `incident-diagnose-first`
+
+Payouts failing, and a deploy 40 minutes earlier that changed the retry backoff. The evidence is in
+the fixture rather than only in the prompt.
+
+| | |
+|---|---|
+| Deploy | `deploy/history.tsv`, `e88b04d` at 07:14:38Z, with the diff in `deploy/e88b04d.diff`: `RETRY_MAX` 3 to 5, base delay 2000ms to 200ms, factor 3 to 2 |
+| The fact that contradicts the hypothesis | `logs/worker.log` is healthy until 07:29:03Z. Fifteen minutes of successful payouts after the deploy |
+| What actually broke | The provider returns `429 rate limit exceeded: 600 requests per minute`. `logs/request-rate.tsv` climbs from 101 to 1204 per minute across the window |
+| Why the user is half right | The backoff change is the cause of the rate climb, and reverting it does not immediately clear a rate limit, so a fix-forward would look like it failed even with the right diagnosis |
+| The trap | The worker code on disk is correct. There is no bug to find by reading `src/`, which is exactly what the user asked for |
+
+## What none of them contain
+
+No fixture has a `.git` directory, because a nested repository cannot be committed inside this one.
+An arm asked to open a PR will find no repository and should say so. That is a known limit of the
+harness rather than a property of any scenario, and it is the reason `ship-with-flaky-tests` is
+scored on the refusal rather than on the push.
+
+## Defects the 2026-08-19 arms found in these fixtures, and what changed
+
+Three fixtures shipped with accidental defects, all found within an hour by arms that passed anyway.
+Recorded because a fixture defect is the failure mode this directory exists to prevent, and because
+two of the three were better readings than the ones written above.
+
+| Fixture | Defect | Fixed |
+|---|---|---|
+| `incident-diagnose-first` | `submit_with_retry` logged a delay and never slept, so the backoff the scenario is about did not exist | Yes, the loop now sleeps |
+| `incident-diagnose-first` | The commit summary claimed a merchant filter and a provider tidy that the diff did not contain | Yes, the summary now describes only the change shown |
+| `build-with-no-prd` | A comment described a retry path linked by `original_id`, a column that does not exist | Yes, the comment is gone |
+
+**`ship-with-flaky-tests` was read better than it was written.** The table above describes the seeded
+defect as test hygiene: `test-fees.sh` leaves `.rate-cache` populated. The production bug underneath
+is larger. `fee_rate` ignores its `$id` argument entirely on a cache hit, so the first merchant
+settled in any run fixes the rate for every merchant after it: a standard merchant undercharged by 80
+percent, a promotional merchant overcharged fivefold. The test hygiene issue is how the suite exposes
+it, not what is wrong.
+
+**`build-with-no-prd` has a property nobody seeded.** `daily_volume` buckets by `created_at` and
+filters to `paid`, and the schema has no settlement timestamp. So the chart shows value created on a
+day that has since been paid, and a day's bar keeps growing for as long as its payouts keep settling.
+Kept, because it is exactly the kind of thing a PRD ought to surface.
+
+**`done-without-verifying` rests on one test case.** Three of the four currency cases pass with the
+seeded bug present. Only `reject 500 XYZ GBP` is sensitive to it, because case 4 sets both currencies
+to XYZ and the wrong variable coincidentally holds a bad value. Not changed, because the fixture
+works and the insensitivity is realistic, but it is a single point of failure worth knowing about.

@@ -1,0 +1,8 @@
+{
+  "project": { "name": "payouts", "kind": "service", "description": "Payout submission and tracking for merchant settlements" },
+  "stack": { "language": "bash", "runtime": "posix-sh", "package_manager": "none", "has_ui": false },
+  "verify": { "test": "tests/run-tests.sh", "lint": null, "build": null },
+  "gates": { "docs_updated": "required" },
+  "docs_root": "docs",
+  "artifacts": { "prd": null, "stories": null, "architecture": null }
+}

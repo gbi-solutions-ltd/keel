@@ -1,0 +1,9 @@
+po_1001	mer_1	450000	GBP	paid	prv_aa11		2026-08-14T09:12:04Z
+po_1002	mer_1	128000	GBP	paid	prv_aa12		2026-08-14T14:41:19Z
+po_1003	mer_2	910000	EUR	failed	prv_aa13	insufficient_funds	2026-08-15T08:03:55Z
+po_1004	mer_2	910000	EUR	paid	prv_aa14		2026-08-15T11:20:02Z
+po_1005	mer_3	67500	GBP	submitted	prv_aa15		2026-08-16T16:55:41Z
+po_1006	mer_1	300000	GBP	failed	prv_aa16	provider_timeout	2026-08-17T07:31:12Z
+po_1007	mer_3	67500	GBP	pending			2026-08-18T06:14:00Z
+po_1008	mer_1	512000	GBP	paid	prv_aa18		2026-08-18T13:02:37Z
+po_1009	mer_2	145000	EUR	failed	prv_aa19	account_closed	2026-08-19T05:44:10Z

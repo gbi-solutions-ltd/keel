@@ -1,7 +1,7 @@
 {
   "name": "keel",
   "description": "A standard operating procedure for AI-assisted delivery: 24 skills covering repo snapshots, PRDs, user stories, architecture and ADRs, plans, TDD, coding standards, security audits, code review, shipping gates, incident response and Oracle APEX porting, plus the keel CLI for per-project setup, health checks, a supply chain scan and a push guard",
-  "version": "0.11.0",
+  "version": "0.12.1",
   "author": {
     "name": "GBi Solutions Ltd"
   },

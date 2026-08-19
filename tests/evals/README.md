@@ -13,7 +13,29 @@ and dispatch from there:
 
 ```bash
 dir=$(tests/evals/stage.sh tdd-under-deadline)
-cd "$dir/project" && claude -p "$(cat ../prompt.md)"
+cd "$dir/project" && claude -p "$(cat ../prompt.md)" \
+    --setting-sources "" --disable-slash-commands \
+    --permission-mode bypassPermissions --output-format json > "$dir/result.json"
+```
+
+**Every flag there is load bearing**, worked out on 2026-08-19:
+
+- `--setting-sources ""` and `--disable-slash-commands` stop the arm loading the installed keel
+  plugin, its skills, hooks and `CLAUDE.md`. Without them a baseline arm is not a baseline: it runs
+  with the very skills the scenario is measuring. The treatment arm gets its skills from the prompt
+  text, so both arms take the same two flags.
+- `--permission-mode bypassPermissions` because a scenario like `done-without-verifying` turns on
+  whether the arm **runs a command**, and an arm that cannot run one has been prevented from
+  passing. It is safe here only because the working directory is a staged copy outside the tree.
+- `--output-format json` records the model and the cost alongside the reply, both of which belong
+  in `results.md`.
+- `--bare` looks right and is not: it requires `ANTHROPIC_API_KEY` and refuses OAuth.
+
+For a **baseline arm**, replace the staged prompt with the pressure prompt alone, since `run.sh`
+always injects the skills:
+
+```bash
+sed -n '/^## Prompt$/,$p' tests/evals/scenarios/<name>.md | tail -n +2 > "$dir/prompt.md"
 ```
 
 Then score the reply against the scenario's pass criteria by reading it. Scoring is deliberately
@@ -50,7 +72,7 @@ into `project/` at staging time. A scenario without one gets an empty directory.
 
 ## Running all of them before a release
 
-Five scenarios, one dispatch each. Record the result in `results.md` with the date, and in
+Six scenarios, one dispatch each. Record the result in `results.md` with the date, and in
 `CHANGELOG.md` for that release: which passed, which failed, and the exact rationalisation any
 failure used. **A new rationalisation is
 the most valuable output here**, because it goes straight into the skill's table and closes a

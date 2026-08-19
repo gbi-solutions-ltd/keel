@@ -90,6 +90,11 @@ work, following [../keel/references/asking-questions.md](../keel/references/aski
 A question buried in section 13 goes unanswered; the same question as a choice gets settled in
 seconds.
 
+**Step 2's rule holds here: one question per message, the blocking one first.** "As choices" is
+about the form of a question, never a licence to batch. Five questions with defaults is the wall
+step 2 refuses however it is rendered, and where `AskUserQuestion` is unavailable it is still one
+question in the reply rather than a list in it.
+
 On approval, name `write-user-stories` as next. Do not start it.
 
 ## Common mistakes

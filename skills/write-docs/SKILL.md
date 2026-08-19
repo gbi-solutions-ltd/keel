@@ -1,7 +1,7 @@
 ---
 name: write-docs
 description: Use when asked to write or update a README, document a feature or module, produce a runbook, draw a process flow or diagram, or create onboarding material.
-allowed-tools: [Read, Write, Edit, Bash, Grep, Glob]
+allowed-tools: [Read, Write, Edit, Bash, Grep, Glob, Agent]
 ---
 
 # Write Docs
@@ -47,6 +47,10 @@ reader must do. Where a generator would fit and is not wired up, wiring it up is
 Read what already exists: `<docs_root>/snapshot.md`, the PRD, the architecture doc, the profile.
 Most of what a README needs has already been established, and re-deriving it produces a second,
 subtly different account.
+
+Where those do not exist and the code must be read instead, delegate that reading to concurrent
+`Explore` agents in one message, model `sonnet`: theirs is discarded, yours sits in context all
+session. Findings are leads, so verify anything you state as fact.
 
 Where something is genuinely unknown, write `Unknown` rather than a plausible guess. A confidently
 wrong setup step costs more than a gap.

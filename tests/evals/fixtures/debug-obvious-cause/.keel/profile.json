@@ -1,0 +1,6 @@
+{
+  "project": { "name": "paybalance", "kind": "service" },
+  "stack": { "language": "bash", "runtime": "posix-sh", "package_manager": "none", "datastores": ["redis"] },
+  "verify": { "test": "tests/run-tests.sh", "lint": null, "build": null },
+  "docs_root": "docs"
+}

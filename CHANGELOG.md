@@ -5,6 +5,65 @@ Notable changes to keel. Versions follow [semantic versioning](https://semver.or
 Until 1.0.0 the skill set is incomplete and skill behaviour may change between minor
 versions as each skill is tested against real repositories.
 
+## 0.12.1 - 2026-08-19
+
+**A fixture's evidence file was never committed.** `tests/evals/fixtures/incident-diagnose-first/logs/worker.log`
+matched `.gitignore`'s `*.log` rule, so it existed in one working tree and in no clone. The whole
+suite passed locally, because `stage.sh` copies what is on disk, and the export gate went red,
+because an export copies what git knows.
+
+The file is not incidental to its scenario. It carries the fifteen minute healthy gap between the
+deploy and the first failure, which is the fact that contradicts the user's hypothesis and the reason
+the fixture exists. A clone was staging an incident with no evidence in it.
+
+`.gitignore` now carves eval fixtures out of `*.log`, the same carve-out `tests/fixtures/apex`
+already has for being synthetic and committed on purpose. `tests/test-eval-harness.sh` case 18
+asserts that no fixture file is gitignored, so the suite catches this rather than the export three
+steps later.
+
+**No skill changed between 0.12.0 and 0.12.1**, so the six passing treatment arms carry over
+unchanged. They were dispatched from a tree that contained the log, which is the tree 0.12.1 ships.
+
+## 0.12.0 - 2026-08-19
+
+**`write-docs` can delegate its reading.** `Agent` was absent from its `allowed-tools`, so a skill
+whose description covers documenting a feature or module read every file inline, in the main
+context, for the rest of the session. Step 3 now dispatches concurrent `Explore` agents for the code
+reading when the snapshot, PRD and architecture doc do not exist, which is the case the skill was
+silent on. `repo-snapshot`, `port-assess` and `apex-port-plan` already worked this way.
+
+`refactor` and `optimize-performance` were checked at the same time and deliberately left alone.
+Neither has a wide-read phase: `refactor` is told to stay inside the boundary it was given, and
+`optimize-performance` is measurement throughout, where a delegated number is a number nobody ran.
+
+The body goes from 695 to 738 words, over ADR-0001's 700 word target, so it owes a passing eval arm
+at that length. That arm ran and passed, recorded in `tests/evals/results.md` under 2026-08-19. It
+also found that the eval harness cannot see tool calls, so whether the new branch fired is not
+scored; the reason is written up there.
+
+**`write-prd` no longer reads as licence to ask five questions at once.** Step 2 has always said one
+question per message. Step 5 said to surface open questions as choices, and an eval arm took that as
+permission to batch, asking five in one table. Step 5 now states that the rule holds there, that "as
+choices" governs the form of a question and never the count, and that where `AskUserQuestion` is
+unavailable it is still one question in the reply rather than a list in it. 699 to 759 words, with a
+passing arm at that length.
+
+**Every eval scenario now has a fixture, and that changed what the gate measures.** Dispatch moved
+outside the repository just before this release, which closed a real exposure and left five of six
+scenarios pointed at an empty directory: an arm with no code can say what it would do and cannot be
+observed doing it. Five fixtures were added, all bash and dependency-free. In the gate that followed,
+three arms modified code and ran suites, one ran a suite ten times to test the user's claim rather
+than accepting it, and one wrote a PRD against a real schema.
+
+Arms then found three defects in those fixtures within the hour, all fixed: a retry loop that logged
+a backoff and never slept, a commit summary claiming changes its diff did not contain, and a comment
+describing a database column that does not exist. Two arms read the fixtures better than they were
+written, and both readings are kept and documented rather than removed.
+
+**The eval gate is six scenarios again.** `done-without-verifying` is back in it, scored on the plan
+file an arm leaves behind rather than on the reply it writes, because both arms passed the old
+reply-level criteria identically while leaving plan files that differed. All six treatment arms pass.
+
 ## 0.11.0 - 2026-08-18
 
 Four changes. Three touch the same file, `.keel/profile.json`: the watchdog's window key changed

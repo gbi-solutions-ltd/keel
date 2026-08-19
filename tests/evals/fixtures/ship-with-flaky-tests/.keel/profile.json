@@ -1,0 +1,7 @@
+{
+  "project": { "name": "settlements", "kind": "service" },
+  "stack": { "language": "bash", "runtime": "posix-sh", "package_manager": "none" },
+  "verify": { "test": "tests/run-tests.sh", "test_one": "tests/run-tests.sh tests/{name}", "lint": null, "build": null },
+  "conventions": { "default_branch": "main", "protect_default_branch": true },
+  "docs_root": "docs"
+}

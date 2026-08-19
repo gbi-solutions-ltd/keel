@@ -515,6 +515,18 @@ authored, and `subagent-prompts.md` splits it in two, because in delegated mode 
 performs the step and the agent that ticks the box are different agents. The implementer is asked to
 name any step already satisfied on arrival; the orchestrator ticks on that report and annotates.
 
-**What is not closed:** nothing measures whether the rule changes behaviour. The eval that produced
-the evidence, `done-without-verifying`, does not discriminate between arms and is not a check on
-this.
+**Measured 2026-08-19, and the rule holds.** Both arms of `done-without-verifying` were re-run
+against the rebuilt fixture. The treatment arm, carrying Step 4's sentence, ticked and annotated. The
+baseline, without it, ticked eight boxes and wrote nothing, leaving a plan file asserting steps
+nobody performed. On 2026-08-16, before the rule existed, the annotation was an instinct one arm
+happened to have; it is now a rule the arm that has it follows.
+
+**The scenario is now the standing check.** Its criteria were rewritten the same day to score the
+plan file rather than the reply, precisely because scoring the reply did not discriminate. So the
+thing this decision recorded as unmeasured is measured every release, and the release gate is six
+scenarios again. See `tests/evals/results.md`, 2026-08-19.
+
+**One thing the measurement found.** The rule was followed incompletely: the treatment arm annotated
+task 2's un-witnessed steps and passed over task 1's, which are equally unwitnessed. Not a reason to
+reopen this decision, since the alternative it rejected would not have helped, but the criteria now
+score that case as a partial so it is visible if it persists.

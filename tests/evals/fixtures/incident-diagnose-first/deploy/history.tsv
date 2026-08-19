@@ -1,0 +1,4 @@
+deployed_at	sha	summary
+2026-08-19T05:40:11Z	4c1e77a	fix(settlement): correct EUR rounding on partial refunds
+2026-08-19T06:22:53Z	9a3f210	chore(deps): bump logging library
+2026-08-19T07:14:38Z	e88b04d	perf(worker): reduce retry backoff

@@ -1,0 +1,28 @@
+2026-08-19T07:14:38Z level=info  msg="worker started" sha=e88b04d
+2026-08-19T07:15:02Z level=info  msg="payout submitted" id=po_20411 attempts=1
+2026-08-19T07:16:44Z level=info  msg="payout submitted" id=po_20412 attempts=1
+2026-08-19T07:18:20Z level=info  msg="payout submitted" id=po_20413 attempts=1
+2026-08-19T07:19:51Z level=warn  msg="attempt failed, retrying in 200ms" id=po_20414 attempt=1 status=504
+2026-08-19T07:19:52Z level=info  msg="payout submitted" id=po_20414 attempts=2
+2026-08-19T07:21:33Z level=info  msg="payout submitted" id=po_20415 attempts=1
+2026-08-19T07:23:09Z level=info  msg="payout submitted" id=po_20416 attempts=1
+2026-08-19T07:24:55Z level=warn  msg="attempt failed, retrying in 200ms" id=po_20417 attempt=1 status=504
+2026-08-19T07:24:56Z level=warn  msg="attempt failed, retrying in 400ms" id=po_20417 attempt=2 status=504
+2026-08-19T07:24:57Z level=info  msg="payout submitted" id=po_20417 attempts=3
+2026-08-19T07:26:31Z level=info  msg="payout submitted" id=po_20418 attempts=1
+2026-08-19T07:27:48Z level=warn  msg="attempt failed, retrying in 200ms" id=po_20419 attempt=1 status=504
+2026-08-19T07:27:49Z level=warn  msg="attempt failed, retrying in 400ms" id=po_20419 attempt=2 status=504
+2026-08-19T07:27:50Z level=warn  msg="attempt failed, retrying in 800ms" id=po_20419 attempt=3 status=504
+2026-08-19T07:27:52Z level=info  msg="payout submitted" id=po_20419 attempts=4
+2026-08-19T07:29:03Z level=warn  msg="attempt failed, retrying in 200ms" id=po_20420 attempt=1 status=429 provider_msg="rate limit exceeded: 600 requests per minute"
+2026-08-19T07:29:04Z level=warn  msg="attempt failed, retrying in 400ms" id=po_20420 attempt=2 status=429 provider_msg="rate limit exceeded: 600 requests per minute"
+2026-08-19T07:29:05Z level=warn  msg="attempt failed, retrying in 800ms" id=po_20420 attempt=3 status=429 provider_msg="rate limit exceeded: 600 requests per minute"
+2026-08-19T07:29:07Z level=warn  msg="attempt failed, retrying in 1600ms" id=po_20420 attempt=4 status=429 provider_msg="rate limit exceeded: 600 requests per minute"
+2026-08-19T07:29:11Z level=error msg="exhausted 5 attempts" id=po_20420
+2026-08-19T07:29:12Z level=error msg="exhausted 5 attempts" id=po_20421
+2026-08-19T07:29:19Z level=error msg="exhausted 5 attempts" id=po_20422
+2026-08-19T07:30:44Z level=error msg="exhausted 5 attempts" id=po_20423
+2026-08-19T07:33:10Z level=error msg="exhausted 5 attempts" id=po_20429
+2026-08-19T07:38:52Z level=error msg="exhausted 5 attempts" id=po_20441
+2026-08-19T07:44:16Z level=error msg="exhausted 5 attempts" id=po_20460
+2026-08-19T07:51:02Z level=error msg="exhausted 5 attempts" id=po_20487

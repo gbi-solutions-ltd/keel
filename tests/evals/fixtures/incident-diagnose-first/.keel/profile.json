@@ -1,0 +1,7 @@
+{
+  "project": { "name": "payout-worker", "kind": "service" },
+  "stack": { "language": "bash", "runtime": "posix-sh", "package_manager": "none" },
+  "verify": { "test": "tests/run-tests.sh", "lint": null, "build": null },
+  "observability": { "backend": "signoz", "log_shipping": "otlp" },
+  "docs_root": "docs"
+}

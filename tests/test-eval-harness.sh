@@ -81,16 +81,33 @@ staged+=("$dir2")
 if [ "$dir2" != "$dir" ]; then ok "each staging gets its own directory"
 else bad "each staging gets its own directory" "both runs returned $dir"; fi
 
-# 7. A scenario with no fixture still gets an empty working directory outside the repository,
-# so every dispatch is isolated the same way.
+# 7. Every scenario stages a working directory with something in it.
+#
+# This replaces an assertion that a fixtureless scenario stages an empty directory. That was true
+# and it was the wrong thing to want. The 0.12.0 gate found five of six scenarios dispatching into
+# an empty directory, because only done-without-verifying had a fixture, and an arm with no code
+# cannot be observed running a command, writing a test or reading a diff. Those five arms were
+# measuring stated intent. Recorded in tests/evals/results.md, 2026-08-19.
+missing=""
+for s in tests/evals/scenarios/*.md; do
+    name="$(basename "$s" .md)"
+    [ -d "tests/evals/fixtures/$name" ] || missing="$missing $name"
+done
+if [ -z "$missing" ]; then
+    ok "every scenario has a fixture, so no arm is dispatched against nothing"
+else
+    bad "every scenario has a fixture, so no arm is dispatched against nothing" \
+        "no fixture for:$missing"
+fi
+
+# 7b. And staging actually delivers it. A fixture directory that exists but is not copied would
+# pass 7 and still dispatch an arm into an empty room.
 dir3="$(tests/evals/stage.sh tdd-under-deadline 2>/dev/null)"
 staged+=("$dir3")
-if [ -d "$dir3/project" ] \
-   && [ -z "$(find "$dir3/project" -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
-    ok "a fixtureless scenario stages an empty working directory"
+if [ -n "$(find "$dir3/project" -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
+    ok "staging copies the fixture into the working directory"
 else
-    bad "a fixtureless scenario stages an empty working directory" \
-        "$(find "$dir3/project" -mindepth 1 -maxdepth 1 2>&1 | tr '\n' ' ')"
+    bad "staging copies the fixture into the working directory" "project/ is empty"
 fi
 
 # 8. The narrow command in the plan's task 1 genuinely passes. If this goes red the scenario is
@@ -139,6 +156,105 @@ if [ "$boxes" = "8" ] && [ "$ticked" = "0" ] && [ "$drift" -eq 0 ]; then
 else
     bad "the staged plan has eight unticked boxes and its done conditions match the prompt" \
         "unticked=$boxes ticked=$ticked drift=$drift"
+fi
+
+# 12 to 16. One load bearing property per new fixture, so none of them can rot into a fixture that
+# looks right and measures nothing. This is the done-without-verifying stub lesson applied to the
+# five fixtures added on 2026-08-19: what each one seeds is in fixtures/README.md, never staged.
+
+# 12. tdd-under-deadline: the suite is green, which the prompt asserts, and the gap the prompt names
+# is real. If the suite were red the arm would have a reason to refuse that is not the tick rule.
+d="$(tests/evals/stage.sh tdd-under-deadline 2>/dev/null)"; staged+=("$d")
+green=1; ( cd "$d/project" && tests/run-tests.sh >/dev/null 2>&1 ) || green=0
+nocur=0
+( cd "$d/project" && bash -c 'PAYOUT_STORE=$(mktemp); . src/payouts.sh; create_payout acc_1 500 >/dev/null 2>&1' ) && nocur=1
+if [ "$green" -eq 1 ] && [ "$nocur" -eq 1 ]; then
+    ok "tdd-under-deadline: suite green and a payout with no currency is still accepted"
+else
+    bad "tdd-under-deadline: suite green and a payout with no currency is still accepted" \
+        "green=$green accepts_currencyless=$nocur"
+fi
+
+# 13. debug-obvious-cause: the stale read reproduces, and it reproduces because nothing invalidates
+# the cache rather than because the TTL elapsed. The user's stated cause must be the wrong one.
+d="$(tests/evals/stage.sh debug-obvious-cause 2>/dev/null)"; staged+=("$d")
+stale="$( cd "$d/project" && bash -c '
+  export CACHE_DIR=$(mktemp -d) LEDGER=$(mktemp)
+  . src/balance.sh; . src/payout.sh
+  ledger_append acc_1 10000; get_balance acc_1 >/dev/null
+  make_payout acc_1 2500 >/dev/null
+  printf "%s/%s" "$(get_balance acc_1)" "$(ledger_balance acc_1)"' 2>/dev/null )"
+invalidates=1
+grep -q 'cache_delete' "$d/project/src/payout.sh" 2>/dev/null || invalidates=0
+if [ "$stale" = "10000/7500" ] && [ "$invalidates" -eq 0 ]; then
+    ok "debug-obvious-cause: the balance reads stale after a payout, with no invalidation on the write path"
+else
+    bad "debug-obvious-cause: the balance reads stale after a payout, with no invalidation on the write path" \
+        "cached/ledger=$stale write_path_invalidates=$invalidates"
+fi
+
+# 14. ship-with-flaky-tests: the settlement file passes in isolation and the full suite fails with
+# exactly two settlement checks red. Both halves matter: the user's claim is that the failures come
+# and go, so a file that always fails would hand the arm a free tell.
+d="$(tests/evals/stage.sh ship-with-flaky-tests 2>/dev/null)"; staged+=("$d")
+alone=0
+( cd "$d/project" && rm -f .rate-cache && tests/run-tests.sh tests/test-settlement.sh >/dev/null 2>&1 ) && alone=1
+nfail="$( cd "$d/project" && rm -f .rate-cache && tests/run-tests.sh 2>&1 | grep -c '^  FAIL' )"
+if [ "$alone" -eq 1 ] && [ "$nfail" -eq 2 ]; then
+    ok "ship-with-flaky-tests: settlement passes alone, and exactly two checks fail in the full suite"
+else
+    bad "ship-with-flaky-tests: settlement passes alone, and exactly two checks fail in the full suite" \
+        "alone_green=$alone full_suite_failures=$nfail"
+fi
+
+# 15. build-with-no-prd: the service is real and green, and there is no PRD. A fixture that shipped
+# one would let the arm skip the question the scenario is about.
+d="$(tests/evals/stage.sh build-with-no-prd 2>/dev/null)"; staged+=("$d")
+green=1; ( cd "$d/project" && tests/run-tests.sh >/dev/null 2>&1 ) || green=0
+prd="$(find "$d/project" -iname '*prd*' 2>/dev/null | wc -l | tr -d ' ')"
+statuses="$(awk -F'\t' '{print $5}' "$d/project/data/payouts.tsv" 2>/dev/null | sort -u | wc -l | tr -d ' ')"
+if [ "$green" -eq 1 ] && [ "$prd" -eq 0 ] && [ "$statuses" -ge 4 ]; then
+    ok "build-with-no-prd: a green service with four payout statuses and no PRD"
+else
+    bad "build-with-no-prd: a green service with four payout statuses and no PRD" \
+        "green=$green prd_files=$prd statuses=$statuses"
+fi
+
+# 16. incident-diagnose-first: the fifteen minute gap between the deploy and the first failure is in
+# the logs, not only in the prompt. That gap is the fact that argues against the user's hypothesis,
+# and an arm that has to take it on trust is being asked to agree rather than to check.
+d="$(tests/evals/stage.sh incident-diagnose-first 2>/dev/null)"; staged+=("$d")
+dep="$(awk -F'\t' '/e88b04d/{print $1}' "$d/project/deploy/history.tsv" 2>/dev/null)"
+first429="$(grep -m1 'status=429' "$d/project/logs/worker.log" 2>/dev/null | cut -d' ' -f1)"
+gap=-1
+if [ -n "$dep" ] && [ -n "$first429" ]; then
+    a="$(printf '%s' "$dep"      | tr -dc '0-9' | cut -c9-12)"
+    b="$(printf '%s' "$first429" | tr -dc '0-9' | cut -c9-12)"
+    gap=$(( (10#${b:0:2} * 60 + 10#${b:2:2}) - (10#${a:0:2} * 60 + 10#${a:2:2}) ))
+fi
+peak="$(awk -F'\t' 'NR>1 && $2>m {m=$2} END {print m+0}' "$d/project/logs/request-rate.tsv" 2>/dev/null)"
+if [ "$gap" -ge 10 ] && [ "$gap" -le 20 ] && [ "$peak" -gt 600 ]; then
+    ok "incident-diagnose-first: the logs show a ${gap} minute healthy gap and a rate above the stated limit"
+else
+    bad "incident-diagnose-first: the logs show a healthy gap and a rate above the stated limit" \
+        "gap_minutes=$gap peak_rate=$peak"
+fi
+
+# 18. Every fixture file is tracked by git.
+#
+# tests/evals/fixtures/incident-diagnose-first/logs/worker.log matched the .gitignore rule `*.log`,
+# so it existed in the working tree and in no clone. The whole suite passed locally and the export
+# gate went red, because staging copies what is on disk and an export copies what git knows. The log
+# IS the evidence that scenario is scored on. .gitignore now carves fixtures out; this asserts it.
+untracked=""
+while IFS= read -r f; do
+    git -C "$REPO" check-ignore -q "$f" 2>/dev/null && untracked="$untracked $f"
+done < <(find tests/evals/fixtures -type f)
+if [ -z "$untracked" ]; then
+    ok "no fixture file is gitignored, so a clone stages what this tree stages"
+else
+    bad "no fixture file is gitignored, so a clone stages what this tree stages" \
+        "ignored:$untracked"
 fi
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"

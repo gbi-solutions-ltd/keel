@@ -14,6 +14,10 @@
 # Node, once bin/ and tests/ arrive
 node_modules/
 *.log
+# Eval fixtures are synthetic and committed on purpose, the same carve-out tests/fixtures/apex has.
+# An incident fixture's log IS the evidence the scenario is scored on, and `*.log` swallowed one
+# silently: the working tree had it, every clone did not, and the export gate caught it.
+!tests/evals/fixtures/**/*.log
 
 # Build output
 dist/
