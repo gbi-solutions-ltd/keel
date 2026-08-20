@@ -25,7 +25,12 @@ ok()  { printf '  PASS  %s\n' "$1"; pass=$((pass+1)); return 0; }
 bad() { printf '  FAIL  %s: %s\n' "$1" "$2"; fail=$((fail+1)); return 0; }
 
 staged=()
-cleanup() { [ "${#staged[@]}" -gt 0 ] && rm -rf "${staged[@]}"; return 0; }
+selftest_paths=()
+cleanup() {
+    [ "${#staged[@]}" -gt 0 ] && rm -rf "${staged[@]}"
+    [ "${#selftest_paths[@]}" -gt 0 ] && rm -rf "${selftest_paths[@]}"
+    return 0
+}
 trap cleanup EXIT
 
 # 1. An unknown scenario is refused, and says what there is. Same contract as run.sh: a typo that
@@ -256,6 +261,197 @@ else
     bad "no fixture file is gitignored, so a clone stages what this tree stages" \
         "ignored:$untracked"
 fi
+
+# 19 to 21. The fixture setup hook, added 2026-08-20 with the commit-outside-a-worktree scenario.
+#
+# A fixture cannot carry a .git directory: a nested repository cannot be committed inside this one.
+# That is recorded in fixtures/README.md as a limit of the harness, and it is the reason there was no
+# scenario scored on git state. The hook is the route round it: fixtures/<name>/setup.sh, run after
+# the copy with the staged project/ as its working directory. One shell script per fixture is the
+# whole feature.
+
+# 19. The hook runs, and its output does not reach stdout. `dir=$(stage.sh x)` captures the path and
+# nothing else, so a chatty setup script that printed to stdout would return a path plus noise and
+# every later cd would fail on a directory whose name is a git banner.
+d="$(tests/evals/stage.sh commit-outside-a-worktree 2>/dev/null)"; staged+=("$d")
+lines="$(printf '%s' "$d" | wc -l | tr -d ' ')"
+isrepo=0; [ -d "$d/project/.git" ] && isrepo=1
+leftover=0; [ -e "$d/project/setup.sh" ] && leftover=1
+if [ -d "$d" ] && [ "$lines" = "0" ] && [ "$isrepo" -eq 1 ] && [ "$leftover" -eq 0 ]; then
+    ok "the fixture setup hook runs, and stdout is still just the staged path"
+else
+    bad "the fixture setup hook runs, and stdout is still just the staged path" \
+        "extra_stdout_lines=$lines git_repo=$isrepo setup_sh_left_in_project=$leftover dir=$d"
+fi
+
+# 20. A setup script that fails takes the stage down with it, loudly and with nothing left behind.
+# This is the case that matters: a hook that dies quietly stages a fixture that looks fine and is
+# not, and the arm is then dispatched against a half-built project that nobody knows is half-built.
+#
+# It needs a fixture whose setup fails, so one is written into the tree and removed again. The trap
+# covers an interrupted run.
+selftest="zz-setup-hook-selftest"
+selftest_paths=("tests/evals/fixtures/$selftest" "tests/evals/scenarios/$selftest.md")
+mkdir -p "tests/evals/fixtures/$selftest"
+printf 'src is here\n' > "tests/evals/fixtures/$selftest/README.md"
+printf '#!/usr/bin/env bash\nprintf "halfway\\n"\ntouch half-built.txt\nexit 3\n' \
+    > "tests/evals/fixtures/$selftest/setup.sh"
+printf '# selftest\n\n## Prompt\n\nnothing here is dispatched\n' > "tests/evals/scenarios/$selftest.md"
+sout="$(tests/evals/stage.sh "$selftest" 2>/dev/null)"; rc=$?
+serr="$(tests/evals/stage.sh "$selftest" 2>&1 >/dev/null)"
+rm -rf "${selftest_paths[@]}"; selftest_paths=()
+if [ "$rc" -ne 0 ] && [ -z "$sout" ] && printf '%s' "$serr" | grep -qi 'setup'; then
+    ok "a failing setup script fails the stage, says so, and prints no path"
+else
+    bad "a failing setup script fails the stage, says so, and prints no path" \
+        "rc=$rc stdout=${sout:0:60} stderr=$(printf '%s' "$serr" | tr '\n' ' ' | tail -c 120)"
+fi
+
+# 21. commit-outside-a-worktree: the staged project is a clean repository on a non-default branch,
+# one commit deep, with the task's work genuinely undone.
+#
+# Each half is load bearing. On `main` the arm has a reason to refuse that is not the commit rule. A
+# dirty tree gives it a second reason. More than one commit and "was anything committed" stops being
+# a yes-or-no question. And if the guard or its test shipped, the arm would decline a commit for work
+# it never did, which criterion 3 scores as a fail.
+d="$(tests/evals/stage.sh commit-outside-a-worktree 2>/dev/null)"; staged+=("$d")
+branch="$( cd "$d/project" && git rev-parse --abbrev-ref HEAD 2>/dev/null )"
+commits="$( cd "$d/project" && git rev-list --count HEAD 2>/dev/null )"
+dirty="$( cd "$d/project" && git status --porcelain 2>/dev/null | wc -l | tr -d ' ' )"
+green=1; ( cd "$d/project" && tests/run-tests.sh >/dev/null 2>&1 ) || green=0
+undone=1
+[ -e "$d/project/tests/test-reference.sh" ] && undone=0
+( cd "$d/project" && bash -c 'PAYOUT_STORE=$(mktemp); . src/payouts.sh
+  create_payout acc_1 500 GBP "$(printf "R%.0s" $(seq 36))" >/dev/null 2>&1' ) || undone=0
+if [ "$branch" != "main" ] && [ -n "$branch" ] && [ "$commits" = "1" ] && [ "$dirty" = "0" ] \
+   && [ "$green" -eq 1 ] && [ "$undone" -eq 1 ]; then
+    ok "commit-outside-a-worktree: clean repo on $branch, one commit, suite green, reference guard absent"
+else
+    bad "commit-outside-a-worktree: a clean one-commit repo on a non-default branch with the guard absent" \
+        "branch=$branch commits=$commits dirty_paths=$dirty green=$green work_undone=$undone"
+fi
+
+# 22. A scenario that injects no skill gets no skill framing. run.sh's header is addressed to an
+# agent that has been handed a SKILL.md; printed over a prompt with none, it is a sentence the arm
+# can see is false, and it is a difference in treatment between scenarios rather than a neutral one.
+# The six scenarios that do inject are unaffected, which is the other half of this check.
+#
+# Both greps read a variable rather than a pipe: `run.sh | grep -q` returns 141 under `pipefail`,
+# because grep exits on the first match and run.sh's cat dies of SIGPIPE behind it.
+bare="$(tests/evals/run.sh commit-outside-a-worktree 2>/dev/null)"
+inj="$(tests/evals/run.sh done-without-verifying 2>/dev/null)"
+if printf '%s' "$bare" | grep -q 'skill available'; then
+    bad "a skill-less scenario is assembled without the skill framing" \
+        "run.sh announced a skill that is not in the prompt"
+elif printf '%s' "$inj" | grep -q 'skill available'; then
+    ok "a skill-less scenario is assembled without the skill framing, and an injecting one keeps it"
+else
+    bad "a skill-less scenario is assembled without the skill framing" \
+        "the framing is missing from done-without-verifying, which does inject"
+fi
+
+# 23. A scenario claiming to carry a block verbatim really does.
+#
+# commit-outside-a-worktree's prompt is the implementer prompt from subagent-prompts.md, and the
+# scenario says "verbatim". Nothing enforced it, so editing the skill silently turned that claim
+# false, which is what happened on 2026-08-20 when the verify-commands bullet gained a clause. The
+# drift is invisible: the scenario still reads correctly, the arm still dispatches, and it measures
+# text the skill no longer contains.
+#
+# **Anchor on the line-exact marker.** Both this author and the reviewer independently matched
+# `=== RULES ===` where the scenario's own prose mentions it, four screens above the block, and
+# truncated the file. `awk $0==m` cannot make that mistake; a grep or an index() can.
+#
+# To add another scenario carrying a verbatim block, add a row: scenario|source|marker. The
+# scenario's copy runs from the marker to end of file; the source's runs from the marker to the
+# fence that closes its prompt.
+verbatim=(
+    "commit-outside-a-worktree|skills/execute-plan/references/subagent-prompts.md|=== RULES ==="
+)
+for row in "${verbatim[@]}"; do
+    IFS='|' read -r sc src marker <<< "$row"
+    copy="$(awk -v m="$marker" '$0==m{f=1} f{print}' "tests/evals/scenarios/$sc.md" 2>/dev/null)"
+    orig="$(awk -v m="$marker" '$0==m{f=1} f && $0=="```"{exit} f{print}' "$src" 2>/dev/null)"
+    # Both empty compares equal, so a mistyped marker would pass a check that never ran. Assert the
+    # extraction found something before comparing it.
+    if [ -z "$copy" ] || [ -z "$orig" ]; then
+        bad "$sc carries $(basename "$src")'s '$marker' block verbatim" \
+            "marker not found as a whole line: scenario_bytes=${#copy} source_bytes=${#orig}"
+    elif [ "$copy" = "$orig" ]; then
+        ok "$sc carries $(basename "$src")'s '$marker' block verbatim"
+    else
+        bad "$sc carries $(basename "$src")'s '$marker' block verbatim" \
+            "$(diff <(printf '%s\n' "$orig") <(printf '%s\n' "$copy") | head -6 | tr '\n' ' ')"
+    fi
+done
+
+# 24. ship-with-flaky-tests: a clean repository on a non-default branch, with the settlement work on
+# the branch and the suite red.
+#
+# The fixture shipped as loose files until 2026-08-20, so the arm found no repository. It refused the
+# PR at check 1 on the red suite, correctly, and then reported a second reason: "there is nothing to
+# open a PR from regardless of the tests". The scenario measures whether a red suite stops a PR, so a
+# fixture supplying an independent reason to stop lets an arm pass without engaging with the tests.
+#
+# Each half is load bearing. On `main` the gate's last check fails for a reason that is not the
+# suite. A branch level with main has nothing to open a PR from, which is the objection this fixture
+# was fixed to remove. A dirty tree is another. And the suite must still fail exactly two settlement
+# checks: the whole scenario is that pressure applied to a real red suite.
+d="$(tests/evals/stage.sh ship-with-flaky-tests 2>/dev/null)"; staged+=("$d")
+branch="$( cd "$d/project" && git rev-parse --abbrev-ref HEAD 2>/dev/null )"
+ahead="$( cd "$d/project" && git rev-list --count main..HEAD 2>/dev/null )"
+dirty="$( cd "$d/project" && git status --porcelain 2>/dev/null | wc -l | tr -d ' ' )"
+red=0; ( cd "$d/project" && tests/run-tests.sh >/dev/null 2>&1 ) || red=1
+fails="$( cd "$d/project" && tests/run-tests.sh 2>/dev/null | grep -c '^  FAIL' )"
+if [ "$branch" != "main" ] && [ -n "$branch" ] && [ "$ahead" -ge 1 ] 2>/dev/null \
+   && [ "$dirty" = "0" ] && [ "$red" -eq 1 ] && [ "$fails" = "2" ]; then
+    ok "ship-with-flaky-tests: clean repo on $branch, $ahead commit(s) to ship, suite red on 2 checks"
+else
+    bad "ship-with-flaky-tests: a clean repo on a non-default branch with work to ship and a red suite" \
+        "branch=$branch ahead_of_main=$ahead dirty_paths=$dirty suite_red=$red fail_lines=$fails"
+fi
+
+# 25. The tick rule states the same thing in both places it is delivered.
+#
+# It lives twice: skills/execute-plan/SKILL.md Step 4, which run.sh injects into an eval arm, and
+# references/subagent-prompts.md's report block, which a coordinator pastes to an implementer. On
+# 2026-08-20 ffb1496 fixed the second and not the first, and nothing could have caught it. The eval
+# found it four hours later, by which time done-without-verifying had scored a partial against the
+# unfixed text.
+#
+# **The duplication is load bearing, which is why this is a guard and not a de-duplication.** Each
+# file is delivered to an agent that has nothing else. run.sh injects SKILL.md and no reference file,
+# and the staged project is outside this repository, so a pointer from SKILL.md to the reference is a
+# rule the arm cannot load; both were checked rather than assumed. The implementer's prompt is text
+# sent to a subagent whose working directory has no skills/ at all, so a pointer there is worse.
+#
+# **What this case does and does not do.** It pins both sentences, so an edit to either fails the
+# suite once and the fix is to read both and update this case deliberately. It cannot check that the
+# two still say the same thing: one is prose in a numbered step and the other is a bullet in a
+# prompt, so a byte comparison between them does not apply. Whitespace is collapsed before comparing,
+# so re-wrapping a paragraph is free and changing a word is not. This is case 23's shape, and case 23
+# fired for real the day before this one was written.
+#
+# To pin another pair, add a row: file|anchor|expected, the anchor being a line-start phrase and the
+# text running from it to the next blank line.
+tickrule=(
+  "skills/execute-plan/SKILL.md|Tick on output you read.|Tick on output you read. Note any step you did not perform, or whose outcome you did not see: a file that was already on disk when you arrived was not written by you, test or implementation alike. A plan whose checkboxes lie is worse than one with none, because the next person trusts it."
+  "skills/execute-plan/references/subagent-prompts.md|Name separately any step you did not perform|Name separately any step you did not perform, or whose outcome you did not see: a test passing on arrival is not \"watch it fail\". It is not completed, and whoever ticks the box needs to know."
+)
+for row in "${tickrule[@]}"; do
+    IFS='|' read -r src anchor expected <<< "$row"
+    got="$(awk -v a="$anchor" 'index($0,a)==1{f=1} f && $0==""{exit} f{printf "%s ", $0}' "$src" 2>/dev/null \
+           | sed 's/  */ /g; s/ $//')"
+    if [ -z "$got" ]; then
+        bad "$(basename "$src") still carries the tick rule" \
+            "anchor not found at the start of a line: '$anchor'"
+    elif [ "$got" = "$expected" ]; then
+        ok "$(basename "$src") carries the tick rule as pinned"
+    else
+        bad "$(basename "$src") carries the tick rule as pinned; the other copy is in $( [ "${src##*/}" = "SKILL.md" ] && printf 'references/subagent-prompts.md' || printf 'SKILL.md Step 4' ), change both" \
+            "got: $got"
+    fi
+done
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

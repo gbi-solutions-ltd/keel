@@ -140,10 +140,15 @@ VS Code user settings, once per machine:
 
 The CLI, and JetBrains, need neither. `keel doctor` warns when this applies to you.
 
-Bypassing prompts is safe here because the guardrails do not depend on them: `keel init` writes
-`deny` rules for secrets and `ask` rules for destructive commands into the committed
-`.claude/settings.json`, and both kinds still apply under `bypassPermissions`. `allow` rules do
-not, which is why the protection is written the way it is. See
+Bypassing prompts is bounded here because the guardrails do not depend on them: `keel init` writes
+`deny` rules for secrets and `ask` rules for destructive commands and for network egress into the
+committed `.claude/settings.json`, and both kinds still apply under `bypassPermissions`. `allow`
+rules do not, which is why the protection is written the way it is.
+
+**Bounded is not safe.** The rules cover the file tools and the common command shapes; they do not
+cover a secret read by a script that opens the file itself, anything outside the repository, or
+egress by any route other than `curl`, `wget` and `nc`. The residual is listed in full as decision
+12 of [doc 07](docs/07-open-decisions.md), and it is accepted knowingly. See
 [doc 03](docs/03-install-and-distribution.md).
 
 ## What problem this solves
@@ -199,12 +204,19 @@ reading does not run on whatever the session happens to be pinned to:
 
 | Brief | Model | Why |
 |---|---|---|
-| `repo-snapshot`, `port-assess`, `apex-port-plan`, `shape-idea` fan-outs | `sonnet` | Wide mechanical reading over many files, with a cited `path:line` for every claim, so the output is checkable |
-| `execute-plan` implementation and both reviews | `inherit` | These write code under the TDD gate or judge another agent's verdict. A cheaper model gets less benefit of the doubt, not more |
+| `repo-snapshot`, `port-assess`, `apex-port-plan`, `shape-idea`, `write-docs`, `write-plan`, `security-audit` fan-outs | `sonnet` | Wide mechanical reading over many files, with a cited `path:line` for every claim, so the output is checkable |
+| `execute-plan` implementation, both reviews and concurrent batches, and the `write-plan` reviewer | `inherit` | These write code under the TDD gate or judge another agent's verdict. A cheaper model gets less benefit of the doubt, not more |
 
-The dispatching skill announces the model in one line when it delegates.
+Every one should announce the model in one line when it delegates, and four of the seven `sonnet`
+fan-outs do: `apex-port-plan`, `write-plan`, `shape-idea` and `security-audit`. `repo-snapshot`,
+`port-assess` and `write-docs` carry the pin without the announcement, which is a departure recorded
+with an end condition under "Departures" in `docs/standards.md`, not the intent. That the pins
+themselves fire was measured on 2026-08-20 and is recorded in `tests/evals/results.md`.
+
 `tests/validate-skills.sh` rejects any alias Claude Code does not accept, because a brief sent to a
-model that does not exist is a brief sent to nothing and the failure is silent. No brief names a
+model that does not exist is a brief sent to nothing and the failure is silent. Since 2026-08-20 it
+also fails a dispatch that names no model at all, which is the worse case and was the unchecked one:
+`security-audit` had been fanning out one subagent per phase unpinned since it was written. No brief names a
 full model id, which would pin harder and rot faster, and none names `haiku` yet: that waits on one
 measured comparison rather than an assumption.
 
@@ -274,10 +286,11 @@ the machine.
 The evals in `tests/evals/` are the only thing that tests whether a discipline skill changes
 behaviour under pressure. The static suite checks shape; a skill can pass it and do nothing.
 
-6 scenarios exist. Five pass and discriminate, last re-run 2026-08-16 after both pilots. The sixth,
-`done-without-verifying`, passes in both arms, which means it measures nothing about the skill and
-is recorded as an invalid scenario rather than a passing one. Results and the arguments they
-produced are in [`tests/evals/results.md`](tests/evals/results.md).
+7 scenarios exist. Six are dispatched at a release gate and score a reply. The seventh,
+`commit-outside-a-worktree`, was added on 2026-08-20 and scores git state instead: its fixture is
+built into a real repository by `tests/evals/stage.sh`, and the arm passes or fails on whether
+`git log` moved. Results and the arguments they produced are in
+[`tests/evals/results.md`](tests/evals/results.md).
 
 ## How to read this repo
 
@@ -291,7 +304,7 @@ Read in order. Each doc is self-contained but they build on each other.
 | [`docs/04-plugin-strategy.md`](docs/04-plugin-strategy.md) | Verdict on each of the nine third-party plugins and how skills call them |
 | [`docs/05-token-and-memory-design.md`](docs/05-token-and-memory-design.md) | Prompt caching, context budget, project memory |
 | [`docs/06-repo-layout.md`](docs/06-repo-layout.md) | Exact file tree of the keel repo |
-| [`docs/07-open-decisions.md`](docs/07-open-decisions.md) | Every call taken and why, decisions: 11 of 11 resolved, two with a named part still open |
+| [`docs/07-open-decisions.md`](docs/07-open-decisions.md) | Every call taken and why, decisions: 12 of 12 resolved, two with a named part still open |
 | [`docs/standards.md`](docs/standards.md) | This repo's own conventions, the judgement calls only |
 | [`docs/runbooks/going-public.md`](docs/runbooks/going-public.md) | What publishing this repository would require. Two of its steps are decisions, and none of it has been executed |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to add or change a skill, and why the order matters |

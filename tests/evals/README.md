@@ -31,12 +31,27 @@ cd "$dir/project" && claude -p "$(cat ../prompt.md)" \
   in `results.md`.
 - `--bare` looks right and is not: it requires `ANTHROPIC_API_KEY` and refuses OAuth.
 
+**To check which model a dispatch actually ran on, swap in `--output-format stream-json --verbose`.**
+It emits every assistant message, `tool_use` blocks and their inputs included, so an `Agent` call's
+`model` parameter is read rather than inferred. This is the standing method for any question about
+whether an agent dispatched, and on what: `modelUsage` alone cannot answer it, because an agent that
+dispatched and ignored its model looks identical to one that never dispatched. Pair it with a control
+run whose model is set explicitly, so absence means something. Worked out 2026-08-20, which is also
+where the 2026-08-19 note that the tool calls "cannot be read back" was closed; see `results.md`.
+
 For a **baseline arm**, replace the staged prompt with the pressure prompt alone, since `run.sh`
-always injects the skills:
+injects the skills:
 
 ```bash
 sed -n '/^## Prompt$/,$p' tests/evals/scenarios/<name>.md | tail -n +2 > "$dir/prompt.md"
 ```
+
+A scenario whose arm is a subagent injects no skill at all, because an implementer or a reviewer
+receives a prompt and nothing else. Its assembled prompt is the pressure prompt, with none of the
+skill framing, and its baseline is made by editing the staged `prompt.md`; the scenario says which
+lines. `commit-outside-a-worktree` is the only one so far, and it is also the one scenario dispatched
+with `--output-format stream-json --verbose` rather than `json`, because one of its criteria is
+whether a command ran and a reply cannot settle that.
 
 Then score the reply against the scenario's pass criteria by reading it. Scoring is deliberately
 human: the failures these catch are rhetorical, and a grep for "I will write the test first" is
@@ -47,6 +62,13 @@ reading it. It is not a dispatch route.
 
 **Stage once per arm.** Two arms sharing a directory race on the same files, and the result looks
 fine either way. That nearly happened on 2026-08-16 and is recorded in `results.md`.
+
+**Arms can be dispatched concurrently, and a full gate should be.** Staging once per arm is what makes
+that safe: each arm's working directory is its own, outside the tree, so nothing is shared to race on.
+The seven-arm gate on 2026-08-20 ran in about two and a half minutes of wall clock rather than nine,
+at the same cost, because the dispatches overlapped. Wait on all of them and score afterwards; a
+dispatch takes one to three minutes, so a foreground timeout under about five is a timeout on work
+that is still running, and re-dispatching on it pays for every arm twice.
 
 ### Why dispatch happens outside the tree
 
@@ -70,9 +92,15 @@ A scenario that needs a project to work in has one under `tests/evals/fixtures/<
 into `project/` at staging time. A scenario without one gets an empty directory. See
 `fixtures/README.md`, which records what each fixture seeds and is deliberately never staged.
 
+**A fixture that needs more than files carries a `setup.sh`**, run after the copy with the staged
+`project/` as its working directory. A setup that exits non-zero fails the stage and prints no path,
+because a half-built fixture dispatches an arm that produces something which looks like a result. It
+exists for one thing a fixture cannot ship: a `.git` directory, which cannot be committed inside this
+repository, and which `commit-outside-a-worktree` is scored on.
+
 ## Running all of them before a release
 
-Six scenarios, one dispatch each. Record the result in `results.md` with the date, and in
+Seven scenarios, one dispatch each. Record the result in `results.md` with the date, and in
 `CHANGELOG.md` for that release: which passed, which failed, and the exact rationalisation any
 failure used. **A new rationalisation is
 the most valuable output here**, because it goes straight into the skill's table and closes a

@@ -43,8 +43,9 @@ Ordered by where breaches actually come from, which is not where code review loo
    [references/payments-checklist.md](references/payments-checklist.md). This is where the real
    risk is, and generic tooling does not cover it.
 
-Delegate phases to parallel subagents on a `--full` run, one per phase, so the reading stays out
-of the main context.
+Delegate phases to parallel subagents on a `--full` run, one per phase, model `sonnet`, and say
+which model in one line. The reading stays out of the main context, and step 3 verifies every
+finding before it is written, so nothing ships on the cheaper model's judgement alone.
 
 ## Step 3: Verify every finding before writing it
 

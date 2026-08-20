@@ -29,18 +29,31 @@ Implement exactly this task and nothing more.
 === RULES ===
 - Follow the steps in order. Do not skip the step that runs the test and watches it fail.
 - Use only the verify commands above. Do not substitute the command you would expect this stack to
-  use; this project's real one is frequently not the obvious one.
+  use; this project's real one is frequently not the obvious one. **If one of them does not run at
+  all** (a missing config, an uninstalled runner, a path that is not there) and this task's own
+  steps are not what make it run, report that and stop. Repairing it is a change to the project's
+  tooling, not to your task: it appears in no diff your reviewers are given, and it silently changes
+  what every later verification in this run means, including the ones they read the output of.
 - Implement only this task. If you notice something else worth doing, name it in your report and
   leave it alone.
 - If a step cannot be executed as written, stop and report why. Do not improvise a way past it.
 - Do not edit the plan file.
+- **Do not commit unless this task's own final step tells you to**, which happens only when you are
+  working in your own private git worktree. Otherwise stage the paths this task names, with
+  `git add <path> ...`, and stop there. Whoever reviews you has to be able to reject you, and that
+  is not possible once you have committed.
+- Never `git add -A`, `git add .` or `git commit -a`, in either case: the tree may hold work that is
+  not yours.
 
 === REPORT ===
 Finish with: which steps you completed, the exact output of each verify command, anything you
 noticed and deliberately left alone, and anything that blocked you.
 
-Name separately any step that was already satisfied when you arrived. Do not count it as completed:
-you did not perform it, and whoever ticks the box needs to know that.
+Name separately any step you did not perform, or whose outcome you did not see: a test passing on
+arrival is not "watch it fail". It is not completed, and whoever ticks the box needs to know.
+
+Paste `git status --porcelain` as your last line. If it lists a path this task does not name, say so
+rather than staging it.
 
 Run the task's `Done when:` command last and paste its output. If you did not run it, say so in
 your first line. A report claiming completion with no command output in it is rejected and
@@ -107,8 +120,22 @@ One task at a time, unless the plan declares a concurrent batch and every condit
 while task N is unreviewed: if task N deviated, task N+1 may have built on it, and you now have two
 problems entangled.
 
-After both passes: tick the checkboxes in the plan file, commit as the task specifies, then dispatch
-the next.
+**Before the first dispatch, and again before each one, check `git status --porcelain` is empty.**
+A dirty tree is not a refusal, so it is not in step 1's table; it is handled here, because it can
+become true again halfway through a run that started clean. Stop and ask what to do with what is
+there: committing, stashing and discarding are all reasonable and all the user's call. See
+[preconditions.md](preconditions.md).
+
+After both passes: tick the checkboxes in the plan file, **then commit**, with the paths and the
+message the task's hand-over step names, then dispatch the next.
+
+**You commit, not the implementer.** The implementer stages and stops, unless its task's final step
+says otherwise, which only a batched task's does. This is the order the skill
+body already states, and it is what keeps the review a gate rather than a comment on history that
+has already landed: a verdict you can only act on by rewriting a commit is not a verdict you can
+act on. `plan-template.md` carries the reasoning and the one exception, a declared concurrent batch,
+where each task commits inside its own private worktree and nothing reaches the shared tree until
+you merge it back after review.
 
 You are ticking boxes for work you did not do, so tick on the subagent's reported output and add a
 note for every step it named as already satisfied. Nobody witnessed those, and the plan is the only
@@ -117,6 +144,18 @@ place that can say so.
 **On a DEVIATES verdict**, re-dispatch the same task to a fresh subagent with the review attached,
 rather than asking the original to fix it. A subagent that has already justified its approach will
 defend it, and you get a negotiation instead of a correction.
+
+**Discard the first attempt before re-dispatching, and be explicit about what that means**, because
+"fresh subagent" is a claim about the tree as much as about the agent. Nothing was committed, so
+there is no history to rewrite: unstage and discard the working tree, and the second subagent starts
+from exactly the state the first one did. In a declared batch, reset or delete that task's worktree
+and do not merge it.
+
+**Never re-dispatch on top of the rejected attempt.** A fresh agent handed a tree containing work a
+reviewer just rejected reads it as the starting point and builds on it, which is how a DEVIATES
+verdict turns into two entangled problems instead of one corrected task. If the work was committed
+anyway, by an implementer that ignored its rules or a plan written before them, say so and stop:
+undoing a commit is the user's call, and it is the one repair this loop must not make silently.
 
 ## Which model each prompt goes to
 

@@ -251,7 +251,7 @@
             "warn",
             "off"
           ],
-          "description": "Whether a change must follow the conventions in the project's standards document. Read by no skill, hook or CLI path today, so changing it has no effect. Declared for the same reason as gates.tdd."
+          "description": "Whether a change must follow the conventions in the project's standards document. Read by no skill, hook or CLI path today, so nothing in keel enforces it; an agent that reads the profile may still act on it, observed 2026-08-20 in tests/evals/results.md. Declared for the same reason as gates.tdd."
         },
         "review": {
           "enum": [

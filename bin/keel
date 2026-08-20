@@ -592,6 +592,19 @@ R
 # Deliberately not here: a recursive delete rooted at the filesystem root or at the home directory,
 # which Claude Code already circuit-breaks in every mode. A rule that duplicates a built-in check
 # reads as protection while adding none.
+#
+# The last three are the egress rules, and they guard a different thing from the rest of the list.
+# Everything above destroys something the user can see is gone. These send something out, and the
+# loss is silent: whatever a session can read, it can post. Decision 12 in docs/07-open-decisions.md
+# recorded that gap when it accepted the bypassPermissions default, and this closes it. The vendor's
+# own hardening guidance names denying these commands as the way to do it; ask rather than deny,
+# because fetching a page is ordinary work and a prompt is enough to make it a decision.
+#
+# THESE ARE NOT AN EGRESS BOUNDARY, for the same reason the Bash entries in the deny list are not a
+# read boundary. Not covered, and not an exhaustive list of what is not covered: a remote shell or
+# file copy over ssh, a git push to a remote nobody looked at, a python or node one-liner opening a
+# socket, and any of those reached through sh -c or xargs. A machine that must not talk to the
+# internet needs a sandbox or a firewall, not a rule list.
 keel_ask_rules() {
     cat <<'R'
 Bash(git push --force*)
@@ -605,6 +618,12 @@ Bash(kubectl delete *)
 Bash(docker system prune*)
 Bash(npm publish*)
 R
+    # The egress three are emitted rather than written into the heredoc above, because a heredoc
+    # line cannot carry a scanner suppression: its text is the rule, so a trailing comment would
+    # land inside the rule string. supply-chain-scan reads this file as an executable and its
+    # net-in-script rule cannot tell a command named in a permission rule from one being run, which
+    # is the same false positive the two test files already suppress.
+    printf 'Bash(%s *)\n' curl wget nc  # supply-chain-scan: allow these name the commands to prompt for, nothing here runs them
 }
 
 # Emit a JSON array of the rules from one of the two lists above, indented to sit inside
@@ -702,10 +721,14 @@ PY
 # The permission mode is per-developer and stays out of version control, deliberately.
 #
 # A committed file that sets bypassPermissions turns off every prompt for anyone who clones the
-# repository, before they have read a line of it. That is a decision each engineer makes about
-# their own machine, not one a repository makes on their behalf. The shared file carries the
-# guardrails; the local file carries the mode. Claude Code merges both, and the deny and ask rules
-# still apply, so the split costs nothing.
+# repository, before they have read a line of it. The split stops that: the shared file carries the
+# guardrails, the local file carries the mode, and the mode never reaches anyone else's machine.
+#
+# Be accurate about what it does not do. keel picks this default and the engineer overrides it, so
+# this is keel's call for the machine it is run on, announced in init's summary, not a choice each
+# engineer makes unprompted. Recorded as decision 12 in docs/07-open-decisions.md with the residual
+# it accepts. Claude Code merges both files and the deny and ask rules still apply under the mode,
+# verified twice and cited there, which is what makes the split cost nothing.
 write_local_settings() {
     mkdir -p .claude
     local f=.claude/settings.local.json

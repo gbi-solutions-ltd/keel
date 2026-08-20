@@ -22,6 +22,9 @@ set -uo pipefail
 # ceiling with nothing under it is simply where bodies settle.
 CEILING_WORDS=900
 TARGET_WORDS=700
+# How close to the ceiling a body has to be before the warning says how close. Wide enough that a
+# body reaches it before an ordinary edit does, narrow enough that the number still means something.
+HEADROOM_WORDS=30
 
 # 216 chars is doc 05's 60-token description ceiling, at the chars/3.6 estimate used everywhere else
 # here. It was 260, which is about 72 tokens, so the check was looser than the budget it existed to
@@ -109,9 +112,17 @@ for skill in skills/*/SKILL.md; do
 
     # Body budget. Past the ceiling the model starts skimming, which is the failure the budget
     # exists to prevent.
+    #
+    # Within HEADROOM_WORDS of the ceiling the warning says how many words are left, because "over
+    # the 700 target" reads the same at 750 and at 897 and only one of those is a body where the next
+    # edit fails the suite. write-plan sat at 897 and nothing said so until someone tried to add a
+    # sentence and had the suite refuse it. Whoever is about to edit a body runs this, so this is
+    # where the number reaches them.
     words=$(printf '%s' "$body" | wc -w | tr -d ' ')
     if [ "$words" -gt "$CEILING_WORDS" ]; then
         report "$name: body is $words words, ceiling $CEILING_WORDS"
+    elif [ "$words" -gt $(( CEILING_WORDS - HEADROOM_WORDS )) ]; then
+        warn "$name: body is $words words, $(( CEILING_WORDS - words )) from the $CEILING_WORDS ceiling and over the $TARGET_WORDS target. Adding a sentence fails the suite: take the words out of this body, or move a section a reader needs at one step into references/. ADR-0001 requires a passing eval arm at this length."
     elif [ "$words" -gt "$TARGET_WORDS" ]; then
         warn "$name: body is $words words, over the $TARGET_WORDS target (ceiling $CEILING_WORDS). ADR-0001 requires a passing eval arm at this length."
     fi
@@ -227,12 +238,51 @@ done
 # The marker is the word `model` before the alias, not `on`. `on \`x\`` was the first pattern and it
 # collided with seven existing phrases, `on \`main\`` three times among them, so the rule would have
 # failed on correct prose the moment it was added.
+# The match is case-insensitive because `skills/write-plan/references/plan-review.md` writes
+# `Model \`inherit\`` at the start of a sentence. Until 2026-08-20 that pin was invisible here, so a
+# capital M was a way to hold an unchecked alias.
 # shellcheck disable=SC2016  # the $ in s/`$// is an end anchor, not an expansion; single quotes are required
-bad_models=$(grep -rhoE 'model `[a-z0-9.-]+`' skills/*/SKILL.md skills/*/references/*.md 2>/dev/null \
-    | sed 's/^model `//; s/`$//' | sort -u \
+bad_models=$(grep -rhoiE 'model `[a-z0-9.-]+`' skills/*/SKILL.md skills/*/references/*.md 2>/dev/null \
+    | sed 's/^[Mm]odel `//; s/`$//' | sort -u \
     | grep -vxE 'sonnet|opus|haiku|fable|inherit' || true)
 [ -z "$bad_models" ] \
   || report "unknown model alias in a skill: $(printf '%s' "$bad_models" | tr '\n' ' '). Claude Code accepts sonnet, opus, haiku, fable or inherit."
+
+# The check above rejects a model that does not exist. It says nothing about a dispatch that names
+# no model at all, so until 2026-08-20 a wrong pin was caught and a missing one was invisible, which
+# is the worse of the two: an unpinned dispatch silently inherits whatever the driver is paying for,
+# and the output looks like output either way. Found by the same sweep that measured the pins firing;
+# `security-audit` had been fanning out one subagent per phase unpinned since it was written.
+#
+# Detection is per paragraph: a block that instructs a dispatch and names an agent must have a model.
+# The dispatch verb must open a sentence, follow a comma or colon, or open a bold run-in. Bare
+# containment was tried first and flagged `prd-template.md`'s "Run this yourself, not as a subagent
+# dispatch", which is an instruction not to dispatch, so position is doing real work here.
+#
+# The model may sit anywhere in the file, or in a reference the file links to, because
+# `execute-plan/SKILL.md` legitimately keeps its briefs and their `inherit` pin in
+# `references/subagent-prompts.md`. Paragraph-level detection with file-level satisfaction is what
+# lets that pass while `references/parallel-batches.md`, which links to no such file, still fails.
+#
+# What it cannot do: tell a real dispatch from prose that reads like one. It is a marker, like the
+# `model` marker above, and a skill that dispatches without using either word is not covered.
+# shellcheck disable=SC2016  # the backticks are the pattern, not a command substitution
+names_model() { grep -qiE 'model `[a-z0-9.-]+`' "$1" 2>/dev/null; }
+for skill_doc in skills/*/SKILL.md skills/*/references/*.md; do
+    [ -e "$skill_doc" ] || continue
+    dispatch=$(awk 'BEGIN{RS="";FS="\n"}
+        $0 ~ /(^|\*\*|[.,:;>] )([Dd]ispatch|[Dd]elegat)/ && $0 ~ /[Aa]gents?|[Ss]ubagents?/ {print $1; exit}' "$skill_doc")
+    [ -n "$dispatch" ] || continue
+    names_model "$skill_doc" && continue
+    linked=""
+    for ref in $(grep -oE '\(([A-Za-z0-9_./-]*references/[A-Za-z0-9_.-]+\.md)\)' "$skill_doc" 2>/dev/null | tr -d '()'); do
+        cand="$(dirname "$skill_doc")/$ref"
+        [ -e "$cand" ] || cand="$(dirname "$skill_doc")/${ref#*references/}"
+        names_model "$cand" && { linked=yes; break; }
+    done
+    [ -n "$linked" ] && continue
+    report "$skill_doc: dispatches subagents without naming a model. \"$(printf '%s' "$dispatch" | cut -c1-60)...\" An unpinned dispatch inherits the driver's model silently."
+done
 
 # A plan task without a done condition is where "done" becomes an adjective the implementer applies
 # to their own work. The template is the only place the requirement can be stated once, so this

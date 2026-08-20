@@ -42,6 +42,27 @@ if [ -d "$fixture" ]; then
     cp -R "$fixture/." "$dir/project/" || { rm -rf "$dir"; exit 1; }
 fi
 
+# A fixture that needs more than files carries a setup.sh, run here with the staged project/ as its
+# working directory. One scenario needs it: a fixture cannot ship a .git directory, because a nested
+# repository cannot be committed inside this one, so a scenario scored on git state has to build the
+# repository at staging time. Its output goes to stderr, because stdout is the path this script
+# returns.
+#
+# The script is not left in the working directory, for the reason prompt.md is not: it is not one of
+# the files the arm should find lying around in the project it is working on, and a setup script that
+# builds a repository would otherwise be in the first commit of it.
+#
+# A setup that fails takes the stage with it. Staging a half-built fixture and printing a path is the
+# worse outcome: the arm runs, the result looks like a result, and nothing says the project it worked
+# in was never finished.
+if [ -f "$fixture/setup.sh" ]; then
+    rm -f "$dir/project/setup.sh"
+    ( cd "$dir/project" && bash "$repo/$fixture/setup.sh" ) >&2 \
+        || { printf 'fixture setup failed (exit %d): %s\nstaged nothing; the scenario cannot be dispatched until it is fixed\n' \
+                    "$?" "$fixture/setup.sh" >&2
+             rm -rf "$dir"; exit 1; }
+fi
+
 printf '%s\n' "$dir"
 
 # Guidance on stderr so `dir=$(stage.sh x)` still captures only the path.

@@ -2185,6 +2185,19 @@ sys.exit(0 if any(r.startswith('Bash(') and 'env' in r for r in p) else 1)" 2>/d
   && ok "the deny list covers reading a secret through Bash, not only through Read" \
   || bad "guardrails" "only Read is denied, so cat .env is unguarded"
 
+# Egress. The deny list stops the file tools reading a secret; nothing stopped a session posting
+# whatever it could already read, which decision 12 recorded as the open gap when it accepted the
+# bypassPermissions default. Asserted per command rather than as a count, because a count passes
+# while naming the wrong three.
+for cmd in curl wget nc; do  # supply-chain-scan: allow the commands this assertion looks for in the rule list
+  python3 -c "
+import json,sys
+p=json.load(open('$d/.claude/settings.json'))['permissions']['ask']
+sys.exit(0 if any(r.startswith('Bash($cmd ') for r in p) else 1)" 2>/dev/null \
+    && ok "the ask list restores a prompt for $cmd" \
+    || bad "guardrails" "$cmd is not in the ask list, so egress is unprompted under bypassPermissions"
+done
+
 # The security property of the whole split. A committed bypassPermissions turns off prompts for
 # everyone who clones the repository, before they have read a line of it.
 grep -q 'bypassPermissions' "$d/.claude/settings.json" \

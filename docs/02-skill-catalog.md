@@ -316,7 +316,7 @@ find-references rather than grep. It is both faster and correct.
 **Trigger:** "review this", before opening a PR, after finishing a task, or on request for
 a second opinion on a diff.
 **Reads:** the diff, `<docs_root>/standards.md`, the plan if one exists.
-**Writes:** findings, ranked by severity, and optionally applies fixes.
+**Writes:** findings, ranked by severity. It does not change the code: "Say what is wrong. The author fixes it."
 **Does:** delegates to the `code-review` plugin when installed, because its multi-agent
 confidence-scored review beats a single inline pass. Falls back to an inline rubric
 otherwise: correctness, standards conformance, test coverage and honesty, error handling,

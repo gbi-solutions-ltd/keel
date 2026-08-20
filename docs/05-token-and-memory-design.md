@@ -152,12 +152,24 @@ Enforced by two rules in every skill:
 
 ## Subagent delegation as a context strategy
 
-The largest single saving available, and it is why `repo-snapshot` and `execute-plan` are
-built the way they are.
+The largest single saving of **main-thread context** available, and it is why `repo-snapshot`
+and `execute-plan` are built the way they are. It is not a saving of money, and the section
+title is the accurate one: this is a context strategy.
 
 Reading twenty files to answer one question costs 40,000 tokens in the main context, and
 those tokens stay for the rest of the session. The same work in a subagent costs 40,000
 tokens in a context that is discarded, and returns a 400-token answer.
+
+**The arithmetic above understates what the subagent spends.** It counts the delegated read as
+the same 40,000 tokens, but a subagent starts cold and re-reads what the main thread already
+holds. Measured on `repo-snapshot` 2026-08-20: the six-agent fan-out re-read 1,737,695 cache
+tokens to return 39,852, and the same 187-file tree read inline cost **$1.48 less in total**
+than delegating it. Reading those files inline cost the main thread $0.55 more, which is inside
+the run-to-run noise floor; delegating the same reading cost $2.03. See
+`tests/evals/results.md`.
+
+The context claim on this page is **untested in either direction** and is not what that run
+measured. The money reading of it is measured and false at that size.
 
 Skills that must delegate:
 

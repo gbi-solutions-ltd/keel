@@ -135,6 +135,17 @@ run_out "body between 700 and 900 warns" 0 m_over_target "over the 700 target" y
 # And the warning must not fire on a body inside the target, or it carries no information.
 run_out "body inside the target is not warned about" 0 noop "over the 700 target" no
 
+# A body close to the ceiling says how close, because "over the 700 target" reads the same at 750 and
+# at 897 and only one of those is a body where the next edit fails the suite. write-plan sat at 897,
+# three words of headroom, and nothing said so until someone tried to add a sentence. The number has
+# to reach whoever is about to edit the file, and the moment they run the suite is when that is.
+m_near_ceiling() { pad 870 "$1/skills/example/SKILL.md"; }
+run_out "a body near the ceiling reports its headroom" 0 m_near_ceiling "from the 900 ceiling" yes
+
+# It must stay quiet on a body that is over target with room to work, or every warned skill carries a
+# number that means nothing and the ones that matter stop standing out.
+run_out "a body with room to work does not report headroom" 0 m_over_target "from the 900 ceiling" no
+
 # Forbidden constructs
 m_at_link() { printf '\nSee @references/thing.md for detail.\n' >> "$1/skills/example/SKILL.md"; }
 run "@ link is rejected" 1 m_at_link

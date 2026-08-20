@@ -95,7 +95,7 @@ Two rule kinds survive `bypassPermissions`, and one does not:
 | Kind | Under bypass | Used for |
 |---|---|---|
 | `deny` | Still blocks | What is never legitimate. Reading `.env`, keys, `secrets/**` |
-| `ask` | Still prompts | Destructive but sometimes right. Force push, `reset --hard`, `terraform destroy`, `kubectl delete` |
+| `ask` | Still prompts | Destructive but sometimes right. Force push, `reset --hard`, `terraform destroy`, `kubectl delete`. Since 0.16.1 also egress: `curl`, `wget`, `nc` |
 | `allow` | **No effect** | Nothing. Everything is already approved |
 
 That last row is the one to internalise: protection written as an allowlist evaporates the moment

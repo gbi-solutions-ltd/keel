@@ -1,8 +1,10 @@
 # Open Decisions
 
-Nine calls. Each has my recommendation and the reasoning.
+Twelve calls. Each has my recommendation and the reasoning.
 
-**Status as of 2026-08-11: all nine decisions are fully resolved.** Nothing outstanding.
+**Status as of 2026-08-20: eleven resolved, one partly.** Decisions 1 to 9 were resolved on
+2026-08-11; decision 10 is `PARTLY RESOLVED` and says what remains; decisions 11 and 12 were
+resolved on 2026-08-17 and 2026-08-20.
 
 Earlier status: decisions 1 through 5 were resolved before the build began. **Phase 1 is fully
 unblocked and can start.** Decisions 6 through 9 are needed at the phase noted on each.
@@ -18,6 +20,9 @@ unblocked and can start.** Decisions 6 through 9 are needed at the phase noted o
 | 7 | Artifact location | **Resolved:** `docs/keel/`, configurable via `profile.docs_root` |
 | 8 | FeatureDev | **Resolved:** excluded |
 | 9 | Ownership | **Resolved:** Bernard or Edrine reviews, monthly release, evals before the pilot |
+| 10 | `keel init` and `outputStyle` | **Partly resolved 2026-08-16:** see decision 10 |
+| 11 | The un-witnessed step | **Resolved 2026-08-17:** implemented as specified |
+| 12 | `keel init` and `permissions.defaultMode` | **Resolved 2026-08-20:** keep `bypassPermissions`, residual recorded |
 
 ---
 
@@ -530,3 +535,100 @@ scenarios again. See `tests/evals/results.md`, 2026-08-19.
 task 2's un-witnessed steps and passed over task 1's, which are equally unwitnessed. Not a reason to
 reopen this decision, since the alternative it rejected would not have helped, but the criteria now
 score that case as a partial so it is visible if it persists.
+
+---
+
+## 12. Should `keel init` set `permissions.defaultMode`? RESOLVED 2026-08-20: yes, unchanged.
+
+Raised because the posture every engineer gets had never been recorded as a decision. `keel init`
+writes `permissions.defaultMode: bypassPermissions` into `.claude/settings.local.json`
+(`bin/keel:709-732`), and `init` runs on every machine, so a per-machine file written by a shared
+tool is a team default by another name.
+
+**One correction to the framing this was raised under.** The argument is not confined to a code
+comment: `docs/03-install-and-distribution.md:86-123` carries it in full, with the surviving-rule
+table and the live-session verification. What was missing is a decision entry, which is this one.
+
+### The load-bearing fact, checked rather than reasoned
+
+**Deny and ask rules survive `bypassPermissions`. Allow rules do not.** Checked 2026-08-20 against
+the vendor documentation, which states it directly:
+
+> Modes set the baseline. Layer permission rules on top to pre-approve or block specific tools.
+> **Deny rules block in every mode, including `bypassPermissions`.** [...] Allow rules have no
+> effect in `bypassPermissions`.
+>
+> - `code.claude.com/docs/en/permission-modes`, "Available modes"
+
+The same page lists what no mode auto-approves, "including `bypassPermissions`", and the first
+entry is "Tools matched by an explicit ask rule". Precedence within the rule lists is deny, then
+ask, then allow, first match wins (`code.claude.com/docs/en/permissions`, "Manage permissions"), and
+the mode decides only what would otherwise prompt.
+
+This corroborates, from a second source, the live-session check already recorded at
+`bin/keel:552-555` and `docs/03-install-and-distribution.md:104-107`. **So the risk is bounded and
+the split is sound**, and the finding that would have stopped this decision, that init disables
+keel's own guardrails, does not hold.
+
+### What the rules do not reach, which is the actual residual
+
+The guardrails are 13 deny and 10 ask rules (`bin/keel:569-608`), wider than a summary of ".env,
+secrets, pem, id_rsa" suggests, because they also close the common Bash shapes. The residual is
+still large, and it is a **machine-level** residual rather than a repository-level one:
+
+| Not reached | Why |
+|---|---|
+| **Any file read through a subprocess** | Vendor documentation is explicit that Read and Edit deny rules cover the file tools and recognised Bash file commands, and "don't apply to arbitrary subprocesses that read or write files indirectly, like a Python or Node script that opens files itself". `bin/keel:565-568` already says the same of `sh -c`, `xargs`, `env` and here-docs |
+| **Anything outside the repository** | Every `Read` rule is `./`-scoped, so a cloud CLI's credentials file under the home directory matches none of them. The `id_rsa` Bash rule reaches a key outside the tree only by the shape of the string, incidentally
+| **Network egress** | No rule covers `curl`, `wget` or `nc`. Whatever a session can read, it can send. The vendor's own hardening guidance names denying these as the way to close it |
+| **Destructive filesystem work** | `rm` and `rmdir` are circuit-broken on critical paths in every mode, which is why no rule duplicates that. `rm -rf src/` is not a critical path and nothing here prompts for it |
+| **Arbitrary code from dependencies** | `npm install`, `pip install` and equivalents run vendor code unprompted |
+| **Destructive git beyond the ask list** | Force push, `reset --hard`, `clean` and `branch -D` prompt. A plain push to the default branch is covered by the separate pre-push guard from `keel guard install`, not by these rules |
+
+### Options
+
+| Option | Cost | Why not this |
+|---|---|---|
+| **Keep it, and record the argument** | Nothing | **Chosen.** See below |
+| Stop writing `defaultMode`, print one line telling the engineer how to set it | Every engineer does manual setup before the tooling is usable | Buys a moment of explicit consent and then lands on the same posture, because everyone pastes the line. The consent is real but small, and `init` already announces the mode |
+| Write a weaker default and let them opt up | Same manual step, plus a period where skills prompt on every subagent dispatch | A default everyone immediately overrides is theatre. It also makes the first run of every skill look broken |
+
+**Decision: keep it.** The prompts are the tax on the whole tooling: a skill that dispatches six
+subagents and runs a verify command is worth little if a person approves each step, and that is the
+workflow keel exists to deliver. What makes it defensible is that the instruments which survive the
+mode are the ones the guardrails are written in, which is now checked twice from independent
+sources, and that `keel init` announces what it did:
+
+```
+  mode      .claude/settings.local.json: bypassPermissions, not committed
+```
+
+**The comment's framing is corrected in the same change.** `bin/keel:705-707` said the mode "is a
+decision each engineer makes about their own machine, not one a repository makes on their behalf".
+The second half is true and is the whole point of the file split: the mode never propagates to
+anyone else's clone. The first half was not, because keel picks the default and the engineer only
+overrides it. The comment now says what actually happens.
+
+**This is the posture for a developer's own working copy, and not a claim about anything else.** The
+vendor documentation says to use this mode "in isolated environments like containers or VMs where
+Claude Code can't cause damage", and a laptop is not that. The residual above is the price, it is
+accepted knowingly, and it is written down here so the next person weighing it starts from the list
+rather than from the reassuring half.
+
+### The follow-up this opened, taken 2026-08-20 in 0.16.1
+
+**Network egress was the one gap in the table that was cheap to close, and it is now closed.**
+`Bash(curl *)`, `Bash(wget *)` and `Bash(nc *)` are in the `ask` list. It was held back from the
+0.16.0 release commit because it changes the shared guardrails rather than this decision, and it
+landed as its own change with its own test.
+
+**The residual table above is otherwise unchanged**, and the egress row now reads: the three common
+commands prompt, and nothing else does. Not covered, and not an exhaustive list: `ssh`, `scp`,
+`rsync`, a `git push` to a remote nobody looked at, a python or node one-liner opening a socket, and
+any of those reached through `sh -c` or `xargs`. **This is defence in depth and not a boundary.** A
+machine that must not talk to the internet needs a sandbox or a firewall, not a rule list.
+
+**It changes what `doctor` says on every project initialised before it.** Missing guardrails are a
+`fail` rather than a warning (`bin/keel:1506-1527`), by design, since these rules are what make the
+bypass default defensible. So an older project reports three missing rules until `keel init` is
+re-run, which merges and leaves existing rules and settings alone.

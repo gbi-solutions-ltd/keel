@@ -26,7 +26,7 @@ common, so read [references/preconditions.md](references/preconditions.md) befor
 | The plan has open questions that block its own tasks | The plan says it is not ready |
 | The PRD is a draft and the stories are provisional | The work may be cancelled |
 | You are on the default branch | Never implement on `main` without consent |
-| A command the plan uses **to verify** is absent from the profile | It cannot be verified as written |
+| A command the plan uses **to verify** cannot produce a verdict | It cannot be verified as written |
 
 These are not obstacles to route around. A plan that says it is blocked is doing its job.
 
@@ -68,18 +68,19 @@ breaks without them.
 
 ## Step 4: Execute, one task at a time
 
-For each task: mark it in progress, follow its steps exactly, run its `Done when:` command, tick
-the checkboxes only on output you have read, then commit as the task specifies.
+For each task: mark it in progress, follow its steps exactly, run its `Done when:` command, then
+hand over as the task specifies.
 
 **REQUIRED SUB-SKILL:** `keel:tdd`. The plan's steps assume it.
 
-Tick on output you read; note any step you did not witness. A plan whose checkboxes lie is worse
-than one with none, because the next person trusts it.
+Tick on output you read. Note any step you did not perform, or whose outcome you did not see: a file
+that was already on disk when you arrived was not written by you, test or implementation alike. A
+plan whose checkboxes lie is worse than one with none, because the next person trusts it.
 
 ## Step 5: Stop when blocked
 
 Stop immediately, and ask, when: a verification fails in a way you cannot explain, a step is
-ambiguous, a dependency is missing, a `verify` command does not exist, or the same failure
+ambiguous, a dependency is missing, a `verify` command does not run, or the same failure
 recurs twice.
 
 **REQUIRED SUB-SKILL:** `keel:debug` for any failure. Do not adjust the plan to make a

@@ -43,7 +43,7 @@ re-deriving what someone already wrote.
 
 ## Step 2: Delegate the reading
 
-**This is why the skill exists.** Files read inline sit in context all session; a subagent's are
+**Delegate even though it costs more.** Files read inline sit in context all session; a subagent's are
 discarded.
 
 Dispatch these `Explore` agents concurrently **in one message**, model `sonnet`:

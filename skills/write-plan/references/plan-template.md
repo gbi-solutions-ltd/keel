@@ -82,14 +82,54 @@ private List<String> apiKeys;
 Run: `./gradlew test --tests '*SecurityPropertiesTest'`
 Expected: PASS. Then run the full suite; nothing else may break.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Hand over**
 
 ```bash
 git add src/main/java/com/example/config/SecurityProperties.java \
         src/test/java/com/example/config/SecurityPropertiesTest.java
-git commit -m "fix(config): reject an empty apiKeys at startup"
+git status --porcelain
 ```
+
+Stage exactly those paths and stop. **Do not commit.** The coordinator commits after both review
+passes, with `git commit -m "fix(config): reject an empty apiKeys at startup"`. Paste the
+`git status --porcelain` output into your report; if it lists anything this task did not touch, say
+so and leave it unstaged.
 ````
+
+### Why the implementer stages and the coordinator commits
+
+**Nothing reaches shared history before both review passes.** That is the guarantee the whole
+delegated design rests on, and a per-task commit run by the implementer breaks it: the commit lands
+first and review can then only be acted on by rewriting history, which is not a gate.
+
+Three things follow, and each closes a hole that was recorded before it was fixed:
+
+- **The reviewer gets a diff that exists.** `git diff` in the working tree is exactly this task's
+  change. `parallel-batches.md` already records the other outcome, that a plain diff shows "nothing
+  at all once each agent has committed, and an empty diff produces a confident COMPLIES over
+  nothing".
+- **A DEVIATES verdict costs nothing to act on.** The re-dispatch goes to a fresh subagent, and
+  discarding an uncommitted working tree returns the tree to precisely the state the first subagent
+  started from. With a commit already in, "fresh" is not true of the tree it arrives at.
+- **Staging names the task's paths.** `git status --porcelain` in the report is how the coordinator
+  sees a file the task never mentioned before it is committed rather than afterwards.
+
+**The one exception is a declared concurrent batch**, where each task runs in its own worktree and
+does commit there, because the worktree is private and the join reads
+`git diff <the commit the batch started from>..HEAD` from it. Nothing enters the shared tree until
+the coordinator merges that worktree back, after review, so the guarantee holds in both modes.
+
+### Named paths only, in every task
+
+**Never `git add -A`, `git add .` or `git commit -a`, in any task, batch or not.** The hand-over step
+lists every path by name and stages those.
+
+This used to be stated only for tasks in a concurrent batch, where the harm is a sibling's
+half-written files being swept up. **Outside a batch the same rule is needed for a different reason:
+a working tree that was already dirty when the run started.** Whatever was sitting there uncommitted,
+someone's debugging edit, a half-finished experiment, gets swept into the first task's commit and
+attributed to work that never touched it. A batch is not what makes `git add -A` dangerous; a
+non-empty `git status` is, and that can be true on task 1 of a serial plan.
 
 ### Why the Interfaces block exists
 
@@ -139,9 +179,32 @@ the failure in concrete terms:
    `Done when:` inside a batch cannot pass, because task 2's step 1 writes a failing test on
    purpose while task 1 is running: *"even with perfect isolation of source files, three concurrent
    agents each waiting for a green whole-suite cannot all pass."*
-2. **Commit named paths only.** The commit step lists every path explicitly and never uses
-   `git add -A` or `git commit -a`, which otherwise sweeps in a sibling's half-written files and
-   produces *"a commit labelled 'format' containing a half-written SMS module"*.
+2. **Write the final step as a commit, not a hand-over.** A batched task is the one case that
+   commits for itself, because it runs in its own worktree and the join reads
+   `git diff <the commit the batch started from>..HEAD` from it. **The difference has to be in the
+   task text**, not added at dispatch time: a coordinator that pastes a hand-over step saying "do not
+   commit" and then appends a rule saying "do commit" has given the implementer two orders, and
+   `subagent-prompts.md` tells it the task wins.
+
+   ```markdown
+   - [ ] **Step 5: Commit**
+
+   You are in your own worktree, so this task commits rather than handing over.
+
+   ```bash
+   git add src/format.js test/format.test.js
+   git commit -m "feat(format): normalise whitespace"
+   ```
+   ```
+
+   The named-paths rule above still applies and is load bearing here, because `git add -A` in a
+   shared tree sweeps in a sibling's half-written files and produces *"a commit labelled 'format'
+   containing a half-written SMS module"*.
+
+   **A batched task left with a hand-over step commits nothing, so the join diff is empty**, and an
+   empty diff produces a confident COMPLIES over nothing. Observed on 2026-08-20: a real implementer
+   given a hand-over step plus a dispatch-time rule telling it to commit staged its paths, said "not
+   committed, per instructions", named neither rule, and left `git diff <start>..HEAD` at zero bytes.
 3. **Touch no shared config.** A task in a batch that would create or edit a lockfile, a linter
    config, a CI file, or the profile is not eligible for the batch. Two agents each deciding the
    lint command needs a config file will each write one.
@@ -177,7 +240,7 @@ Each step is one action, two to five minutes:
 - Run it and watch it fail
 - Write the minimal code
 - Run it and watch it pass
-- Commit
+- Hand over: stage the named paths, do not commit
 
 Steps 2 and 4 are not ceremony. A test you did not watch fail may be asserting nothing, and a
 plan that omits the failure check produces suites that are green because they test nothing.
@@ -274,7 +337,9 @@ is worse than an honest gap because it reads as coverage.
 3. Names used in later tasks match what earlier tasks defined.
 4. Every **verifying** command comes from `profile.verify`. Investigative commands (`grep`,
    `git log`, `ls`) need no entry, and demanding one makes the check reject correct plans.
-5. Every task ends with a commit step.
+5. Every task ends with a hand-over step that stages named paths and names the commit the
+   coordinator will make after both review passes. Only a task in a declared concurrent batch commits
+   for itself, and then only inside its own worktree.
 6. No task depends on a file no task creates.
 
 Fix inline. Then report coverage and hand off.

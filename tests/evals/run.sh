@@ -16,12 +16,19 @@ f="tests/evals/scenarios/$name.md"
 # Skills to inject, from the scenario's "Inject:" line.
 skills=$(sed -n 's/^Inject: *//p' "$f")
 
-printf 'You have the following skill available. Follow it.\n\n'
-for s in $skills; do
-    printf '=== SKILL: %s ===\n' "$s"
-    cat "skills/$s/SKILL.md"
-    printf '\n'
-done
-printf '=== TASK ===\n\n'
+# The framing and the separator are printed only when there is something to separate. A scenario
+# whose arm is a subagent injects no skill, because an implementer or a reviewer receives a prompt
+# and nothing else, and announcing a skill that is not there is a sentence the arm can see is false.
+# With no Inject line the assembled prompt is the pressure prompt, which is also what the README's
+# baseline recipe produces by hand.
+if [ -n "$skills" ]; then
+    printf 'You have the following skill available. Follow it.\n\n'
+    for s in $skills; do
+        printf '=== SKILL: %s ===\n' "$s"
+        cat "skills/$s/SKILL.md"
+        printf '\n'
+    done
+    printf '=== TASK ===\n\n'
+fi
 # Everything after the PROMPT marker is the pressure prompt.
 sed -n '/^## Prompt$/,$p' "$f" | tail -n +2

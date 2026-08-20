@@ -63,8 +63,8 @@ something that mattered produces plausible output, not an error.
 
 | Assumption | True if | How we would know | Checked? |
 |---|---|---|---|
-| A cheaper model is adequate for the delegated brief | The brief is mechanical and its output is checkable | Only by running the Tier 3 evals with the model pinned | No |
-| Delegation saves more than it costs | The task is long relative to the context it must re-read | Needs one measured comparison | No |
+| A cheaper model is adequate for the delegated brief | The brief is mechanical and its output is checkable | Only by running the Tier 3 evals with the model pinned | **Yes, 2026-08-20. False for `haiku` on `repo-snapshot`: see "What shipped"** |
+| Delegation saves more than it costs | The task is long relative to the context it must re-read | Needs one measured comparison | **Yes, 2026-08-20. False for `repo-snapshot` at 187 files: inline cost $1.48 less. See "What shipped"** |
 | A pinned model survives a keel release | The alias set is stable | Aliases have changed before. A full model id would pin harder and rot faster | No |
 
 ## What the system says
@@ -85,8 +85,9 @@ something that mattered produces plausible output, not an error.
    the TDD gate.
 2. **Alias or full model id?** An alias tracks the vendor's current model and can shift under a
    pinned keel release. A full id is reproducible and goes stale.
-3. **Is there a measurement worth taking first?** One `repo-snapshot` run with briefs on `haiku`
-   against one on `inherit`, compared on output quality and total spend, would settle most of this.
+3. **Is there a measurement worth taking first?** ~~One `repo-snapshot` run with briefs on
+   `haiku` against one on `inherit`, compared on output quality and total spend, would settle most
+   of this.~~ **Taken 2026-08-20. Answered below: haiku loses.**
 
 ## Recommendation
 
@@ -117,7 +118,81 @@ writes code under the TDD gate or judges another agent's verdict.
 **Alias or full id.** Alias. A full id is reproducible and goes stale inside a pinned release, and
 the validator's job is to catch the stale case, which it can only do against a known alias set.
 
-**The measurement worth taking first.** Not taken, which is why no brief names `haiku`. The
-`sonnet` pins are a shape judgement rather than a measured saving, and this record should not be
-read as claiming otherwise: keel measures context, not spend, so nothing here has demonstrated a
-cost reduction. That remains the honest gap.
+**The measurement worth taking first.** Taken 2026-08-20, in full, and recorded in
+`tests/evals/results.md`. It changes two things this record used to say.
+
+**Haiku is not adequate on the fan-out briefs, so no brief should name it.** One `repo-snapshot`
+run with its six briefs on `haiku` against one as shipped on `sonnet`, same 187-file tree, same
+prompt but for the one pinned word, same `claude-opus-5[1m]` dispatcher. Both dispatched all six
+`Explore` agents in one message on the model they were pinned to, read off the `tool_use` blocks.
+
+| | Haiku | Sonnet |
+|---|---|---|
+| Fan-out cost | $1.16 | $2.03 |
+| Total run | $3.76 | $5.20 |
+| Structural rules (`path:line` present, section 10 items, did-not-check line) | all pass | all pass |
+| Files cited that do not exist | none | none |
+| **Citations that do not support their claim** | **35%** | **15%** |
+
+The cost win is real: **43% off the delegated reading**, and that is the honest figure, because the
+rest of the 28% total gap is dispatcher turn-count variance one run cannot separate from noise.
+It does not buy the quality. Haiku's citations resolve to real files and real lines and are wrong
+about twice as often, systematically so, one line low on `.keel/profile.json` in three separate
+sections. `repo-snapshot`'s core principle is that a confident snapshot which is wrong is worse than
+none, because the next three decisions inherit the error, and that is the exact property haiku fails.
+
+**This is the failure mode "The case against" above predicted**, which is the part worth keeping:
+a cheap model doing a poor job on something that mattered produces plausible output, not an error.
+Every structural check passed. The defect was reachable only by opening the cited lines. Wide
+mechanical reading looked like the safest thing to route down, and it was not, so "route by the
+shape of the work" is now a weaker heuristic than this record claimed.
+
+**The cost claim is no longer a gap, and is smaller than it looked.** keel now has one measured
+figure: the fan-out is $2.03 of a $5.20 `repo-snapshot` run, so the entire budget the `model:` pins
+can move is 39% of that skill's spend, and the cheaper end of it costs accuracy. The `sonnet` pins
+stay where they are, and they stay a shape judgement for the other five skills, which were not
+exercised.
+
+**Measured 2026-08-20, and the answer is that delegation loses on cost.** The second unchecked
+assumption in the table above, taken the same way: the recorded `sonnet` arm above against one new
+arm reading the same byte-identical 187-file tree inline, same dispatcher, the prompt differing only
+where it delegates. Recorded in `tests/evals/results.md`.
+
+| | Delegated | Inline |
+|---|---|---|
+| Total run | $5.20 | **$3.72** |
+| Fan-out | $2.03 | none, by construction |
+| Dispatching thread | $3.17 | $3.72 |
+| Document | 482 lines, 11 sections | 512 lines, 11 sections |
+
+Removing the fan-out saved $2.03 and the absorbing thread grew $0.55, which is inside the $0.56 noise
+floor this repository's own arms establish. Net **$1.48 against delegating**, on a document that is
+structurally identical: same section count, same seven section 10 items, same did-not-check line.
+
+**So the assumption is false for this fan-out**, and that reaches further than the row. `repo-snapshot`
+Step 2 opens "**This is why the skill exists**", and the `sonnet` pins on the four fan-outs are a shape
+judgement that presumes the fan-out is worth doing at all. On this repository, at this size, the prior
+question of whether to delegate now has one measurement against it. The entry above asked which model
+should receive the fan-out; this one asks whether it should be sent.
+
+**Two things it does not license.** It says **nothing about quality in either direction**. The
+coverage measure applied to it turned out to count itemised rows rather than claims, so it scored the
+delegated document's prose sections as zero rows while counting one itemised inline finding as six;
+the inline document carries 68 `path:line` citations against the delegated document's 52 and still
+scored worse. That axis is void, not close, and the quality question is **open rather than settled in
+delegation's favour**. And it does not touch
+`skills/repo-snapshot/SKILL.md:46-47`, which claims delegation exists for **context hygiene**, not
+cost. That sentence is untested in either direction, and this result must not be read as evidence for
+it.
+
+**Wall clock is not evidence here either.** The delegated baseline was measured with both arms of the
+haiku run overlapping on one machine, twelve subagents deep; the inline arm ran alone. The bias runs
+toward inline and the axis is void.
+
+**So the run lands with two axes void and one clean**, and on the clean one the row is false. The cost
+decomposition is the mechanism: reading the files inline cost the dispatching thread $0.55 more, which
+is inside the noise floor, while delegating the same reading cost $2.03.
+
+**Still not measured:** the same comparison on the other four fan-outs, on a repository that is not
+keel, or at a size where inline would not fit. The assumption's own "true if" is *the task is long
+relative to the context it must re-read*, and 187 files in a 1M window is not that case.

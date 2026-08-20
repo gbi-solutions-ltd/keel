@@ -20,13 +20,45 @@ Everything lived in the reply.
 1. **Restores before explaining.** The first restore instruction comes before any account of how the
    failure works. Running the restore itself is stronger than instructing it and both pass.
 2. Opens or names an incident record to append to.
-3. **Points at `docs/runbooks/payout-worker.md`** for the rollback command rather than inventing one.
+3. **Takes its restore commands from `docs/runbooks/payout-worker.md` rather than inventing them.**
+   Naming the path and citing "the runbook" both pass; see below for what has to be true either way.
 4. Defers the root cause to after service is restored, naming `keel:debug` or saying when it will
    come. Refusing to produce the cause now, while saying when it will come, is a pass.
 
 **Fails if the reply:** delivers a causal account before naming a restore, proposes a hotfix, or
 agrees to find the cause before service is restored. Also fails if it rolls back without capturing
 evidence first.
+
+### What criterion 3 measures, settled 2026-08-20
+
+**The measurement is that the runbook was consulted and nothing was invented.** Score it by checking
+the arm's commands against `docs/runbooks/payout-worker.md`: every restore command it gives is one
+the runbook carries, with the arguments the runbook documents. A command the runbook does not
+contain fails, whether or not it would work, and so does a runbook command with invented flags. The
+fixture ships four real levers and a runbook naming them, so this is checkable rather than a matter
+of reading tone.
+
+**Naming the path and citing "the runbook" score the same**, which is the change. Record which form
+the arm used, because the path is more useful to an on-call reader and a drift from naming it to not
+is worth seeing, but both are a pass.
+
+**Why they score the same.** The criterion used to read "points at `docs/runbooks/payout-worker.md`",
+and two consecutive arms, 2026-08-20 and the seven-arm gate the same day, gave the runbook's commands
+verbatim while calling it "the runbook". Both satisfied the stated purpose, "rather than inventing
+one", and both failed the wording. Two runs is a pattern. The alternative was to require the path and
+say why, and it was rejected on the rule this file already applies in the other direction: nothing in
+`skills/incident-response` asks an arm to name a file path in a reply, so a criterion demanding one
+measures the eval's preference rather than the skill. When criterion 1 and the skill disagreed on
+2026-08-20 the skill was changed, because restore-first is the behaviour keel wants; here there is no
+behaviour keel wants that the arms are missing.
+
+**What this does not license.** An arm that gives a correct command and shows no sign of having read
+the runbook still has to be checked, not assumed: the fixture's levers are visible in the tree, so a
+command can be right by inspection. The evidence that the runbook was read is either the path, or
+something in the reply that only the runbook carries, its wording on the worker taking its settings
+from the environment at start being the usual one. A reply with neither, whose commands happen to
+match, is a `partial`: nothing was invented, and the project's documented procedure was not
+demonstrably used, which is the gap this scenario was written to close.
 
 ### What "restores before explaining" means, settled 2026-08-19
 
@@ -49,6 +81,11 @@ added with the runbook and are not a change in what is scored: replies remain th
 previous run of this scenario.
 
 ## Criteria history
+
+**Criterion 3 stopped requiring the path on 2026-08-20**, after two consecutive arms passed its
+purpose and failed its wording. The working is above, under "What criterion 3 measures". The verdicts
+it produced do not change: both arms were scored a pass on the substance, and the rewrite makes the
+criterion say what was already being scored. Nothing in `incident-response` changed.
 
 **Until 2026-08-19 criterion 3 could not be satisfied.** It read "points at the runbook for the
 rollback command" and the fixture shipped no `docs/runbooks/` at all, so no arm could meet it and it

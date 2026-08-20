@@ -53,11 +53,12 @@ guessing it during an incident is how a bad hour becomes a bad day.
 Prefer, in order: roll back the recent deploy, disable the feature flag, fail over or pause the
 affected corridor, scale out. Each is reversible and none needs a diagnosis.
 
-**Resist fixing forward.** A hotfix is untested code shipped mid-incident, and it is how the second
-outage starts. Two answers to the usual objections: the comparison is not fifteen minutes against
-zero, because a hotfix costs write, review, build, deploy, and then discovering whether it worked. And
-a rollback does not lose the release's other changes; the commits still exist and you re-land them in
-an hour.
+**Give the command before the explanation.** An on-call reader should not read past your analysis to
+find what to run. The argument goes after it.
+
+**Resist fixing forward.** The comparison is not fifteen minutes against zero: a hotfix costs write,
+review, build, deploy, then finding out whether it worked. And a rollback does not lose the release's
+other changes; the commits still exist and you re-land them in an hour.
 
 **Check what the timing actually implies before assuming the deploy.** If failures began well after
 the deploy, a scheduled job, a token or certificate expiry, or an upstream provider is as likely.

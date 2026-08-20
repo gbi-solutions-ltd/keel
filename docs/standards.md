@@ -16,7 +16,8 @@ These are checked by `tests/validate-skills.sh`, so they are not conventions you
 remember. Listed only so you know what you are covered for:
 
 frontmatter has `name` and `description`; the description starts with "Use when" and is under 260
-characters; the body is within the 900 word ceiling, and warns over the 700 target; no `@` links;
+characters; the body is within the 900 word ceiling, warns over the 700 target and says how many
+words are left once it is within 30 of the ceiling; no `@` links;
 no hardcoded `docs/keel` path
 in a skill or template; no `{{DOCS_ROOT}}` in a skill; relative links resolve; no em or en dashes.
 
@@ -30,6 +31,22 @@ written it. That is why they are enforced rather than documented.
 **Rule:** a skill body targets 700 words. 900 is a hard ceiling. `tests/validate-skills.sh` fails
 at the ceiling and warns over the target, and a body over the target needs a passing eval arm at
 that length in `tests/evals/results.md`. See `docs/decisions/ADR-0001-skill-body-word-ceiling.md`.
+
+**Within 30 words of the ceiling the warning says how many are left**, added 2026-08-20. "Over the
+700 target" reads the same at 750 and at 897, and only one of those is a body where the next edit
+fails the suite. **`write-plan` is at 897, three words of headroom**, and `execute-plan` is at 884
+with sixteen; both were found by trying to edit them rather than by reading anything. The place a
+number like that has to reach someone is the moment they run the suite, which is what the warning
+now does.
+
+**Neither is fixed by moving a section into `references/`, and that was checked before it was left
+alone.** `write-plan`'s eight sections are all instruction at the point of use: the four mechanical
+self-review checks in Step 5 are the ones a planner runs and would skip behind a link, and Step 4's
+placeholder list is consulted while writing. What is genuinely reference already moved, into
+`references/plan-template.md` and `references/plan-review.md`, which is the split done correctly.
+A body sitting near the ceiling because every section belongs in it is not the same defect as one
+that is 200 words of material a reader needs at one step, and the rule above already says which:
+reach for a reference because a reader needs it at one step, not as a way to buy words.
 
 **Why:** the body loads on every invocation, so length has a real per-use cost, and a long enough
 body gets skimmed rather than followed. The previous numbers were 400 and 600 under a hard 700, and
@@ -255,6 +272,7 @@ change even when it is a one-line change.
 | Migrations forward-only | Not applicable | No database |
 | Scripts are bash, and `python3` is optional | `keel apex-export` requires `python3` and fails loudly without it | The work is parsing megabytes of JSON out of a database client, intersecting a wanted column list against a live catalog, and writing a file tree. Every bash version of that is a worse version of what the standard library already does. A half working export is worse than none, because the artifact's whole value is that an agent trusts what it reads. `apex_missing_deps` in `lib/apex-export.sh` names what is missing rather than degrading |
 | The managed CLAUDE.md block meets its 450-token target | This repository renders it at about 469 tokens, over the target and under the 700 ceiling | See below. Recorded 2026-08-16, narrowed 2026-08-19 when the template itself came inside the target |
+| A dispatch announces its model in one line | `repo-snapshot`, `port-assess` and `write-docs` name the model at the dispatch site but do not announce it | See below. Recorded 2026-08-20, when a run measured the pin firing and the announcement absent |
 
 The eval gap is temporary and has an end condition, tracked in `CHANGELOG.md`. The `python3`
 departure is permanent and scoped to one command; nothing else in `bin/keel` gained a hard
@@ -280,6 +298,31 @@ script that CI and the profile both call. That is a change to how this repositor
 to what keel ships, which is why it is not folded into the template work. Until then `keel doctor`
 warns here and nowhere that installs keel normally, the 700 ceiling still fails, and the figure is
 re-measured at each release rather than assumed. A block that grows past 700 is not covered.
+
+**Three skills name their dispatch model without announcing it.** The rule in "A dispatch names its
+model" is unconditional and stays that way. `apex-port-plan`, `write-plan`, `shape-idea` and
+`security-audit` carry the clause, four of the seven `sonnet` fan-outs; `repo-snapshot`,
+`port-assess` and `write-docs` do not, which was found on 2026-08-20 by a run that dispatched six
+correctly pinned `sonnet` agents and announced nothing.
+
+**What blocks each, measured the same day.** `repo-snapshot` is 699 words and `port-assess` is 699,
+one word each under ADR-0001's 700-word target, and the clause costs about eight. `write-docs` is
+738, already over the target and inside the 900 ceiling, so it carries an ADR-0001 obligation to
+have a passing eval arm at its length and adding words re-opens it. The clause was cut from these
+three when the pin was added, on the argument recorded above that the announcement costs nothing.
+It does not.
+
+**Why it is not closed by the stream.** The eval harness can now read the dispatch model out of
+`--output-format stream-json`, which is why the pin is no longer in doubt. That reaches whoever runs
+an arm and nobody else. A developer in an interactive session sees only what the skill says, so for
+them the announcement is not a redundant signal, it is the only one.
+
+**Its end condition:** this closes when each of the three has the words. For `repo-snapshot` and
+`port-assess` that is a trim of roughly eight words at the next edit of either body, which is small
+enough that it should not wait for its own task. For `write-docs` it is the ADR-0001 arm being re-run
+at whatever length it then is. Until then the three are listed here by name, the count is re-measured
+at each release rather than assumed, and no further skill gains a pin without the clause: a fourth
+name in this row means the departure is growing rather than closing.
 
 **This repository branches and reviews like any other.** Work goes on a branch, lands through a
 pull request, and `ship`'s check 8 applies here with no exception. Every commit on `main` arrives as
@@ -313,7 +356,8 @@ is why the departures table above exists at all rather than being quietly empty.
 **Rule:** a skill that dispatches a subagent names the model at the dispatch site and announces it
 in one line. Wide mechanical reading goes to `sonnet`. Anything writing code under a gate, or
 judging another agent's verdict, stays `inherit`. No brief names a full model id, and none names
-`haiku` yet. `tests/validate-skills.sh` rejects any alias Claude Code does not accept.
+`haiku` yet. `tests/validate-skills.sh` rejects any alias Claude Code does not accept, and since
+2026-08-20 also fails a dispatch that names no model at all.
 
 **Why:** a session's model cannot be changed by a plugin, a hook, or the model itself. Checked
 2026-08-16 against the Claude Code hooks documentation: no hook event exposes model selection. So
@@ -325,11 +369,29 @@ doing a poor job produces plausible output rather than an error.
 
 `haiku` waits on one measured comparison, recorded as open question 3 in
 `docs/ideas/model-routing.md`. Full model ids are excluded because an id pinned in a skill goes
-stale with nothing to notice, while an alias tracks the current model. The announcement costs
-nothing and was asked for directly.
+stale with nothing to notice, while an alias tracks the current model. The announcement was asked
+for directly and was originally recorded here as costing nothing. **Corrected 2026-08-20:** it costs
+body words, and in three skills there are none to spare. The rule stays as written and the shortfall
+is a departure, listed in the departures table with its end condition.
 
 **Where the words came from.** `repo-snapshot` and `port-assess` had one and three words of
 headroom under ADR-0001's 700-word warning, so the dispatch sentences were tightened to fit the pin
-rather than the pin being dropped or the ceiling crossed. The announcement clause survives in full
-only in the two skills that had room and in
-`skills/execute-plan/references/subagent-prompts.md`; this section is what the other two point at.
+rather than the pin being dropped or the ceiling crossed. The announcement clause survives in full in
+four skills, `apex-port-plan`, `write-plan`, `shape-idea` and `security-audit`, and in
+`skills/execute-plan/references/` in both `subagent-prompts.md` and `parallel-batches.md`.
+**Corrected 2026-08-20:** this paragraph said two skills and did not name them, and the count was
+checkable in one grep. The three without it are `repo-snapshot`, `port-assess` and `write-docs`;
+this section is what they point at.
+
+**The pin fires, measured 2026-08-20.** A dispatch run under `--output-format stream-json` shows the
+`model` parameter on every `tool_use` block. That day a `repo-snapshot` run on a 189-file tree
+dispatched six `Explore` agents all carrying `model: "sonnet"`, and `claude-sonnet-5` did more output
+than the dispatcher. So the routing half of this rule is verified rather than assumed, which it had
+never been. Detail in `tests/evals/results.md`, 2026-08-20.
+
+**The stream does not replace the announcement, and the reason is who reads each.** `stream-json` is
+available to whoever runs an eval arm. It is not available to a developer in an interactive session,
+who has no way to see which model a dispatch went to except by being told. That line is their only
+cost signal, and routing cheap work to a cheap model is worth little to a team that cannot see it
+happening. The measurement above therefore closes an open question about the pin; it buys no relief
+from the announcement, and the shortfall below is a departure rather than a design.
