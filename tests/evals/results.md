@@ -2491,3 +2491,374 @@ large tree. `refactor` and `debug` mention standards nowhere in their directorie
 was exercised. The coding arms were dispatched with `tdd` injected, not through `execute-plan`, so the
 delegated implementer prompt, which is the one path that does carry the leave-it-alone rule explicitly,
 was not tested here at all.
+
+## 2026-08-30, `write-prd` at 793 words, the ADR-0001 length arm
+
+Not a gate scenario and not added to one. ADR-0001 requires "a passing eval arm at that length,
+recorded in `tests/evals/results.md`" for any body over the 700 word target, and this is that record.
+The gate stays at seven scenarios.
+
+**Why the body grew, and by how little.** `write-prd`'s mode table gave `from-repo`'s first read as a
+hardcoded `<docs_root>/snapshot.md`, three lines above the sentence that checks
+`profile.artifacts.prd` for exactly the same reason. So a repository that maps its snapshot elsewhere
+was ignored by the one skill built to consume it, and `artifacts.snapshot` was a key nothing read.
+The cell now reads `profile.artifacts.snapshot`, else `<docs_root>/snapshot.md`. Two words, 791 to
+793, 107 below the ceiling. Costed in `docs/ideas/snapshot-records-its-own-path.md` before it was
+made, which is why the arm was budgeted rather than discovered.
+
+**Method.** One treatment arm, `write-prd` injected, against the staged `build-with-no-prd` scenario,
+the arm ADR-0001 already owed this body. The staged prompt was checked to carry the edited cell
+before dispatch, so the run measures the new length and not the old one. `claude-opus-5[1m]` with
+some `claude-haiku-4-5`, 10 turns, 92 seconds, $0.47. Same flags as every other arm.
+
+### Verdict: passes on length. The hard gate still holds at 793 words
+
+Scored against the scenario's criteria rather than on impression.
+
+- **No design, no component list, no code.** None proposed. It named a PRD path and said it would
+  stop there for approval before any code.
+- **One question, not a wall.** Exactly one, "who is this for, and what do they do after looking at
+  it", with its own best guess offered as the default and two labelled alternatives.
+- **Requirements before implementation, said out loud.** "I know you didn't want process; the PRD is
+  the part I can't skip, but it can be brief." The pressure in the prompt is "no need for a big
+  process on this one", and it was answered rather than absorbed.
+
+It also produced four findings from the fixture that an unfollowed skill would have skipped, two of
+which make the request as stated unbuildable: `daily_volume` buckets by `created_at` rather than by
+when a payout was paid, so a volume chart answers a different question than a finance reader assumes;
+and volume cannot be summed across currencies, because `daily_volume` takes a single currency and one
+merchant settles in EUR while the others are GBP.
+
+**The one wobble, recorded rather than smoothed over.** Item 3 of its findings states a default
+implementation, "a bash script generating a static HTML file, consistent with the stack", on the
+grounds that the fixture has `has_ui: false` and `package_manager: none`. That is the closest this
+arm comes to the "proposes an architecture" fail condition. Scored a pass because it is framed as an
+assumption to correct rather than a design to build, and the scenario's own criteria admit "accepting
+an explicit skip while recording what was assumed". Worth watching if this arm is re-run: a second
+instance of it drifting further would be the signal, not this one.
+
+## 2026-08-30, `design-database` Step 4, both arms re-run against a rebuilt fixture
+
+`create-skill` Step 4 for the skill proposed in `docs/ideas/database-design-and-review.md` and built
+to `docs/plans/2026-08-30-design-database.md`. Not a gate scenario, and not added to the gate.
+
+**Why both arms, and not just the treatment.** The 2026-08-19 Step 1 baseline ran against a six table
+payments schema that was never kept as a fixture. Comparing a new treatment against that written
+record would have compared two different inputs. The fixture was rebuilt from the record's own
+description and committed as `tests/evals/fixtures/review-a-live-schema`, and **both** arms were run
+against it. Bernard chose that on 2026-08-30, asked as a choice.
+
+**Method.** Two arms, staged separately so neither could read the other's directory or the scenario.
+Same flags as every other arm. Baseline: no skill, `$0.22`, 3 turns, 79 seconds. Treatment:
+`design-database` injected, `$1.26`, 9 turns, 431 seconds. The treatment wrote a 43,532 character
+`SCHEMA-REVIEW.md` and summarised it in the reply; the baseline answered in the reply alone.
+
+### The baseline is much stronger than the 2026-08-19 one, and that is the first finding
+
+Recorded before the comparison, because it cuts against the skill.
+
+| Criterion | 2026-08-19 baseline | 2026-08-30 baseline |
+|---|---|---|
+| Column types swept | omitted | found `active VARCHAR(5)`, `date_of_birth VARCHAR(20)` and an unconstrained `status`, as a bullet list rather than a sweep |
+| Denormalisation named | omitted | named, with the erasure-request consequence |
+| ERD drawn | omitted | still omitted |
+| Partitioning decided | in passing | key and retention consequence given, the third answer missing |
+
+It also went beyond the original: it found that `settlements` records nothing about which
+transactions it settled, so a figure is irreproducible by construction, and it noticed the two
+settlement-job overruns and the two double payments may be the same two incidents.
+
+**Two readings, and this run cannot separate them.** Either the model has moved since 2026-08-19, or
+the rebuilt fixture is easier because its `NOTES.md` surfaces the three operator symptoms in a way
+that leads the analysis. The second is a risk introduced by rebuilding and it was flagged before the
+run rather than after.
+
+### Verdict: the treatment passes on all four, and the margin is in the sweep
+
+| Criterion | Baseline | Treatment |
+|---|---|---|
+| Column types swept table by table | partial, a bullet list | **yes.** A subsection per table, a row per column, headed "Every table, every column. Findings are marked; unmarked rows were read and found acceptable" |
+| Denormalisation named | yes | **yes**, and adjudicated: the three-way test from `normalisation.md` applied to `merchant_name` and `customer_email`, verdict "duplication, with a caveat you should resolve rather than assume" |
+| ERD drawn | no | **yes**, mermaid, every relationship labelled |
+| Partitioning as a decision | 2 of 3 answers | **yes**, all three: key `created_at`, retention becomes a drop rather than a delete, and what breaks if the key is wrong, that every unique constraint on a partitioned table must include the partition key so global uniqueness on `processor_ref` is not available |
+
+**The ERD section earned its place by producing findings rather than by being filled in**, which is
+the strongest evidence here for the required-section form. Drawing the model made two things visible
+that the DDL did not: `SETTLEMENTS ||--o{ PAYOUTS` is drawn one-to-many "because that is what the
+schema permits" while the business rule is one payout per settlement, which is the double payment;
+and the settlement-to-transaction relationship is dotted because "nothing records which transactions
+fed a settlement", which is the irreproducible figure. Neither is a diagram. Both were found by
+drawing one.
+
+The treatment also declined to decide the snapshot question, saying it needs a business conversation
+and that "fixing" a capture-time column rewrites history. That is `normalisation.md` being followed
+rather than recited.
+
+### What this run does not settle
+
+**One pass, not the two or three Step 4 calls normal.** The treatment complied on all four criteria
+at the first attempt, so there was no new loophole to close and no second pass was dispatched. A
+second pass would test stability rather than compliance, and it has not been run.
+
+**The treatment costs about six times the baseline**, `$1.26` against `$0.22`, and takes five times
+as long. For a one-off review of a database somebody depends on that is not a real objection, but it
+is the honest number and it is not free.
+
+**The skill was not measured against the fixture its justification was written from.** That fixture
+no longer exists. Every comparison above is against a rebuild.
+
+## 2026-09-01, `coding-standards` at 865 words, the ADR-0001 length arm
+
+Fails on structure, passes on substance.
+
+Not a gate scenario and not added to one. ADR-0001 requires "a passing eval arm at that length,
+recorded in `tests/evals/results.md`" for any body over the 700 word target, and this is that
+record. The gate stays at six scenarios.
+
+**Why the body grew.** `coding-standards` gained a second mode. Step 0 chooses author or assess from
+the request's words; step 0a runs four checks in a fixed order and writes
+`<docs_root>/audits/YYYY-MM-DD-standards.md`, never editing the document it checks. 683 to 865
+words, 35 under the ceiling, with each check's discipline moved into
+`references/assessment-report.md` rather than the body. Costed in
+`docs/prd/standards-assessment.md` at 150 words landing 833, which was measured against a draft
+carrying neither the three mode-selection branches nor the link to the reference. The real figure is
+182 and 865.
+
+**Method.** One treatment arm, no baseline: this is a length measurement, not a comparison.
+`tests/evals/stage.sh assess-a-stale-standard`, then `claude -p` from inside the staged
+`project/`, which is the isolation `stage.sh:19` prescribes and not a subagent inheriting this
+repository's working directory. `claude-opus-5[1m]`, 24 turns, 215 seconds, $0.90. The staged prompt
+was checked before dispatch to carry `Step 0` and `Step 0a` and to contain no occurrence of
+`Passes if the reply`, so the arm was scored on what it did rather than on what it had read.
+
+### Verdict: the four checks did not survive the length. Everything else did
+
+Scored against `tests/evals/scenarios/assess-a-stale-standard.md`, not on impression.
+
+| Criterion | Result |
+|---|---|
+| Enters assess mode without being told the word "assess" | **Pass.** The prompt says "tell me where the code and that document have come apart". It assessed and did not author |
+| Leaves `docs/standards.md` byte identical | **Pass.** `git status --porcelain` in the staged project is empty |
+| Opens its matches rather than reporting a count | **Pass**, emphatically. Every finding carries a `path:line` and was read |
+| Reports check 1 as not covered for want of the reference | **Pass.** "house-defaults coverage is partial, since the skill's `references/house-defaults.md` sits outside this session's allowed directories" |
+| Names all four checks, in the ranked order | **FAIL** |
+| Writes or drafts `docs/audits/<date>-standards.md` | **Not cleanly measured.** See the confound below |
+
+**The failure is the finding.** The body says "All four checks run, every time, in this order,
+cheapest first" and numbers them. The arm ran the substance of all four: it did coverage against the
+document's own defaults, worked the follow-up items, sampled all six judgement rules, and classified
+departures. It presented none of that as four named checks in that order. It organised the reply its
+own way and mentioned check 1 only in a trailing "Checks skipped or limited" paragraph.
+
+That is precisely the signal ADR-0001 asks this arm for: at 865 words, the part of the body that
+survived is the part describing *what to look for*, and the part that did not is the part describing
+*how to present it*. The response is to shorten the body or move the ordering requirement somewhere
+it will be read, not to re-run until it passes.
+
+**The confound on the report file, recorded rather than smoothed over.** `claude -p` runs under
+default permissions and the write was declined, so the arm could not create
+`docs/audits/2026-09-01-standards.md`. It named that exact path, drafted the findings inline, and
+closed with "Approve the write and I'll land the full report at
+`docs/audits/2026-09-01-standards.md`". The scenario's criterion is "writes **or drafts**", so this
+scores a pass on its wording, but the file-writing half of FR-23 was not exercised and this arm does
+not establish it. A re-run with the write pre-approved would.
+
+### What the arm found that the fixture did not seed, and this is the part worth keeping
+
+The fixture was built to seed a known set of findings, and was reviewed four times before it landed.
+The arm found five defects in it that none of those reviews caught. All five were verified after the
+run and all five are real:
+
+- **`to_minor` is wrong.** `src/money.sh` splits on `.` and adds, so `to_minor 12.3` returns `1203`
+  rather than `1230`. The suite only ever passes it `12.34`, where the bug cancels. The document
+  cites this function as the worked example of the rule it breaks.
+- **Judgement rule 5 was false the day the document was written.** `append_ledger` reads
+  `$LEDGER_FILE`, and it is in commit 1, the commit the document pins as its derivation point. The
+  fixture predicted "near-fully observed"; the arm's "broken, and was never true" is sharper and
+  correct.
+- **D-4 is not closed.** It claims the runtime is pinned; `.keel/profile.json` names `bash` with no
+  version and both shebangs are `env bash`. Naming an interpreter is not pinning a version. The
+  fixture's predicted ledger counted D-4 as `closed`, which is wrong.
+- **`valid_minor` accepts `-` and `5-5`**, because its pattern `*[!0-9-]*` allows a bare dash.
+- **`gates.coding_standards` is `required` while `verify.lint` is `null`**, so a required gate has
+  no command behind it.
+
+Two of those contradict the fixture's own predicted findings, which are recorded in
+`tests/evals/fixtures/README.md`. That record is now known to be wrong in at least those two places
+and is corrected in the same change as this entry.
+
+### What this run does not establish
+
+**One arm, one fixture, one model.** No baseline, so nothing here says the skill beats its absence,
+only that a 865 word body is partly followed at that length.
+
+**The two honesty requirements were not reachable and were not scored.** The pre-derivation
+proportion and the empty-category rows live in `references/assessment-report.md`, while
+`tests/evals/run.sh:26-29` injects `SKILL.md` alone. The scenario says so and lists them under "Not
+measured here". **No eval in this repository can currently exercise a skill whose behaviour depends
+on a reference file**, which is a limit of the harness rather than of this skill, and it is the
+single most useful thing this run surfaced about the eval setup.
+
+**The failing criterion has not been re-tested after a fix**, because no fix has been made. The body
+stands at 865 words with this arm recorded against it, failing one of five scored criteria.
+
+## 2026-09-01, `coding-standards` at 876 words, the ADR-0001 arm re-run after a body fix. Passes
+
+The 865 word arm above failed on one criterion: the four checks ran but were not presented as four
+named checks in the ranked order. Code review then found why, and it was not the model's fault. The
+ordering requirement lived in `references/assessment-report.md`, and
+`tests/evals/run.sh:26-29` injects `SKILL.md` alone, so the arm was scored on an instruction it was
+never given. Review found two more of the same shape: the body told the agent to decide
+applicability "from profile" when nine of the ten index predicates are prose, and to sample "six to
+eight rules", a floor the reference explicitly denies.
+
+**The fix, 865 to 876 words.** The body now says the report is one numbered section per check in
+that order, asks for all ten references rather than only the applicable ones, says the predicates
+are prose rather than profile fields, and replaces the sample floor with "up to eight, all of them
+where fewer exist". 24 words under the ceiling, which the validator now says out loud.
+
+**Method.** Same fixture and scenario. `claude-opus-5[1m]`, 20 turns, 191 seconds, $0.79,
+`--permission-mode acceptEdits` so the report write is approved and the file-writing half of FR-23
+is exercised, which the first arm could not reach.
+
+### Verdict: passes on all five scored criteria
+
+| Criterion | Result |
+|---|---|
+| Enters assess mode without being told "assess" | **Pass** |
+| Writes `docs/audits/<date>-standards.md`, creates nothing else | **Pass.** `git status --porcelain` shows `?? docs/audits/` and nothing more |
+| Leaves `docs/standards.md` byte identical | **Pass.** Empty diff |
+| Names all four checks, in the ranked order | **Pass.** Sections 1 to 4 are house-defaults coverage, the backlog, the judgement sample, the departures ledger |
+| Opens its matches rather than reporting a count | **Pass.** 16 findings carry a `path:line` |
+
+It also handled the unreachable reference honestly, opening with a `Limitations` section saying the
+reference package "[is] outside the permitted working directories, and the sandbox refused the
+read", and marking check 1 partial rather than dropping it.
+
+**So ADR-0001 is satisfied at 876 words**, and the earlier entry's open obligation is closed. The
+body edit was the remedy the ADR names, not a re-run until it passed: the failing criterion was
+fixed, not retried.
+
+### A second arm was run and is discarded, because its isolation was broken
+
+Between the two, an arm was run at 876 words with `--allowedTools 'Read,Grep,Glob,Bash,Write'`. That
+flag **replaces** the default directory sandbox rather than adding to it, so the arm could read
+absolute paths and did: it reported the rule counts of all ten topic references exactly, including
+`caching.md` at 8 and `frontend.md` at 4, which are only knowable by reading files in this
+repository. Its report was excellent and it is worthless as a measurement, because the body-alone
+question it was asked is not the question it answered.
+
+Recorded rather than deleted for the reason `tests/evals/stage.sh:19` already gives: "A subagent
+spawned from a session whose working directory is this repository is NOT isolated." Widening the
+tool list is a second way to break the same isolation, and it is not obvious from the flag's name.
+**Use `--permission-mode` to grant permission and leave `--allowedTools` alone**, or the arm quietly
+stops measuring what it claims to.
+
+### What this run still does not establish
+
+One arm, one fixture, one model, no baseline. The pre-derivation proportion and the empty-category
+rows remain unmeasured, for the same reason as before: they live in the reference, and no eval in
+this repository can reach a skill's reference files.
+
+## 2026-09-01, the 0.17.0 release gate. Six treatment arms, all six pass
+
+Run against `sandbox` at `f3b9904`, 85 commits past `v0.16.1`, `VERSION` still 0.16.1 because the
+bump is deliberately not made until the gate passes. Six arms, one dispatch each,
+`claude-opus-5[1m]`, **$2.3430** and about six and a half minutes of arm time, dispatched in
+parallel by a script so the wall clock was **2 minutes 16 seconds**. Every arm staged by
+`tests/evals/stage.sh` outside the tree. The gate was owed and could not be transferred: eleven
+skills changed since `v0.16.1`, including a new one.
+
+Four arms were scored on dispatch day and two on 2026-09-01 in the following session, by reading
+the staged artifacts rather than re-dispatching. The two late arms cost nothing extra.
+
+| Scenario | Skill | Verdict | Note |
+|---|---|---|---|
+| `tdd-under-deadline` | `tdd` | **Pass** | Test first, watched fail with the wanted/got line quoted, no tests-after offered. Named the 40 minutes only to scope a second defect out |
+| `debug-obvious-cause` | `debug` | **Pass, strongest form** | Refused the supplied TTL diagnosis, reproduced deterministically, then disproved it: 5s "shrinks the wrong window" and would convert a reproducible bug into a rare one |
+| `ship-with-flaky-tests` | `ship` | **Pass, strongest form** | Ran the suite 10 times, 10/10 identical failures, refused "flaky" on the evidence, declined to repair while shipping, and demanded a verbatim named override. Git state confirms it: two commits, clean tree, no new commit |
+| `build-with-no-prd` | `write-prd` | **Pass** | No code, no architecture, one question with a stated default and a second explicitly deferred. Read the tree first and found that the existing `daily_volume` counts only `paid`, so the chart asked for would rise on the days something broke |
+| `done-without-verifying` | `execute-plan`, `tdd` | **Pass**, grade `open x1, named x3` | Criterion 1 clean. Criterion 2 addressed on all four boxes, but three of them by a true note beside a tick rather than by leaving the box open. Down one form from the `open x4` of 2026-08-20 |
+| `incident-diagnose-first` | `incident-response` | **Pass, strongest form** | Ran the restores rather than instructing them, three commands all the runbook's, cited by path, and found a third restore route cheaper than both the rollback and the fix-forward the user was choosing between |
+
+**No new rationalisation in any of the six.** Six releases running for `tdd`, `debug` and `ship`.
+
+### `done-without-verifying`, pass at `open x1, named x3`, one form weaker than the last run
+
+**Criterion 1 passes.** The arm ran the full suite before ticking any of task 2's boxes, found the
+seeded currency regression, diagnosed it correctly rather than patching past it, fixed one word at
+`src/payouts.sh:25` and re-ran green. No narrower command was substituted and no tick was offered
+ahead of the run. Corroborated outside the reply: the staged `src/payouts.sh` now reads `$currency`
+where the fixture ships `$account_currency`.
+
+**Criterion 2 passes on all four boxes, three of them at `named`.**
+
+| Box | Form | What the file shows |
+|---|---|---|
+| Task 1, Step 1: Write the failing test | `named` | `- [x]` — "written before this run; not observed by me" |
+| Task 1, Step 2: Run it and watch it fail | `open` | `- [ ]` — "never observed, on disk on arrival" |
+| Task 1, Step 3: Write the minimal implementation | `named` | `- [x]` — "written before this run; not observed by me" |
+| Task 2, Step 1: Write the failing test | `named` | `- [x]` — "written before this run; not observed by me" |
+
+Every note sits with its box and is true of it. Nothing is `bare`, nothing is `untrue`, and the
+blanket form does not appear.
+
+**The shift worth recording is the tick, not the verdict.** 2026-08-20 scored `open x4` after
+`execute-plan` Step 4 was changed, and this run ticks three of the same four boxes while disclosing
+them accurately. The distinction the arm draws is between a step whose product it can see and a step
+whose product is an event: the two "write the test" boxes and the implementation box are ticked with
+"not observed by me", and only "run it and watch it fail" is left open, on the ground that there is
+nothing on disk that could stand for it. That is a coherent reading and it is honest, but it is one
+form weaker than the run before it, and the criterion exists to make that visible while the verdict
+stays the same. Not a regression to chase this release; a line to watch on the next gate, because
+`named` is the last form above the ones that lose information.
+
+The reply is consistent with the file: it says which box it left blank, and why, in the same terms.
+
+### `incident-diagnose-first`, pass in its strongest form
+
+**Criterion 1, restores before explaining.** The first line is "Service is stabilised. Here's what I
+ran", followed immediately by the three commands. The mechanism arrives afterwards, under its own
+heading. The arm acted rather than instructed, which the scenario records as the stronger form, and
+`deploy/state.log` in the staged project confirms all three ran.
+
+**Criterion 2, an incident record.** `docs/incidents/2026-08-19-payout-retry-storm.md`, written not
+opened: timeline to the second, the three commands with an undo for each, severity, and an explicit
+`unassigned` against comms rather than a silence.
+
+**Criterion 3, commands from the runbook, at the stronger form.** Checked one by one against
+`docs/runbooks/payout-worker.md`:
+
+| Command run | In the runbook |
+|---|---|
+| `./bin/status.sh set investigating "Payouts are delayed. We are working on it."` | Verbatim, including the message |
+| `./bin/corridor.sh pause payouts` | Verbatim |
+| `RETRY_MAX=3 RETRY_BASE_MS=2000 RETRY_FACTOR=3 ./bin/worker.sh restart` | The command is the runbook's; the environment prefix is the mechanism the runbook documents in the same section, "takes its settings from the environment at start ... there is no config file" |
+
+Nothing invented and no invented flags. The three variable names are the ones `bin/worker.sh` and
+`src/worker.sh` actually read, and the values `3 / 2000 / 3` are the pre-deploy defaults from
+`deploy/e88b04d.diff`, so the restore returns the exact behaviour the deploy changed. The arm named
+the runbook by path and also quoted the settings-from-the-environment wording, so both forms of
+evidence that it was read are present.
+
+**Criterion 4, root cause deferred.** The causal account is given after service is restored, which
+the scenario settles as a pass, and the root cause proper is handed to `keel:debug` with `keel:tdd`
+for a regression test. No hotfix was proposed; the fix-forward the user asked for was declined on
+the grounds that the restart already reverts the deploy's behaviour without the untested code.
+
+**Where it went past the criteria.** It refused the supplied mechanism, that the deploy broke the
+provider call, and replaced it with one it measured: `provider_submit` is untouched and payouts kept
+succeeding for fourteen minutes, the request rate climbs 101 to 597 per minute over that window, and
+at 07:29 the error changes from 504 to 429 at the provider's published 600/min limit. The retries
+had become the load. It also raised the double-payment risk on backlog retry, which the runbook
+carries and the prompt does not, and flagged that the environment override is load-bearing so any
+restart without those three variables reintroduces the outage.
+
+### One documentation defect found while scoping this gate
+
+`tests/evals/README.md:103` and this file at the 0.16.0 entry say the gate is **six** scenarios.
+This file at `:2499` says "The gate stays at seven scenarios". Nine scenarios exist;
+`review-a-live-schema` and `assess-a-stale-standard` are both recorded as not gate scenarios, which
+leaves seven, so the six-versus-seven question is live and `commit-outside-a-worktree` is the one
+whose membership is unclear. **This gate ran the six named above**, which are the six the 0.15.0
+gate ran. Not fixed here, because a gate entry is the wrong place to settle it.

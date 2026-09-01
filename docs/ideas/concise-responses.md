@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-08-16 |
-| Status | agreed, 2026-08-16, after the requester separated the two dials |
+| Status | **built 2026-08-16.** `conventions.response_style` is written at init, `bin/keel:436`, and is in the schema. Both named plans are fully ticked. Status corrected 2026-08-30, which is when anyone noticed the record still read as outstanding |
 | Recommendation | SUPERSEDED. Was: an opt-in output style. Now: terse by default, verbose on request |
 | Next | `docs/plans/2026-08-16-terse-chat-output.md`, then `docs/plans/2026-08-16-terse-by-default.md` |
 

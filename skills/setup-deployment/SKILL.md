@@ -78,6 +78,9 @@ host or credential unless recorded as a decision; sharing means one incident tak
 Migrations need a stated position: when they run, what happens when a deploy is rolled back, and
 whether a failed candidate has already migrated shared state.
 
+Read [references/release-operations.md](references/release-operations.md) before provisioning
+anything, and again before calling a release done.
+
 ## Step 7: Write the runbook, then test it
 
 Write `<docs_root>/runbooks/deploy.md`: how to deploy, how to roll back, where the logs are, the

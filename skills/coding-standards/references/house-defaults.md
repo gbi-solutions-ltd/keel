@@ -24,7 +24,7 @@ all: most projects need four or five.
 | [api-contracts.md](api-contracts.md) | It has a consumer you cannot deploy: a partner, an app in the field |
 | [caching.md](caching.md) | Anything is cached, or somebody is proposing it |
 | [data-protection.md](data-protection.md) | Personal data is stored anywhere |
-| [frontend.md](frontend.md) | `profile.stack.has_ui` is true |
+| [frontend.md](frontend.md) | `profile.stack.has_ui` is true and `profile.stack.framework` is not `flutter` |
 
 ## Writing, in code and out of it
 

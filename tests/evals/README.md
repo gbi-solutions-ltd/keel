@@ -65,7 +65,7 @@ fine either way. That nearly happened on 2026-08-16 and is recorded in `results.
 
 **Arms can be dispatched concurrently, and a full gate should be.** Staging once per arm is what makes
 that safe: each arm's working directory is its own, outside the tree, so nothing is shared to race on.
-The seven-arm gate on 2026-08-20 ran in about two and a half minutes of wall clock rather than nine,
+The six-arm gate on 2026-08-20 ran in about two and a half minutes of wall clock rather than nine,
 at the same cost, because the dispatches overlapped. Wait on all of them and score afterwards; a
 dispatch takes one to three minutes, so a foreground timeout under about five is a timeout on work
 that is still running, and re-dispatching on it pays for every arm twice.
@@ -100,7 +100,8 @@ repository, and which `commit-outside-a-worktree` is scored on.
 
 ## Running all of them before a release
 
-Seven scenarios, one dispatch each. Record the result in `results.md` with the date, and in
+Nine scenarios exist; six are dispatched at the release gate, one dispatch each. Record the result
+in `results.md` with the date, and in
 `CHANGELOG.md` for that release: which passed, which failed, and the exact rationalisation any
 failure used. **A new rationalisation is
 the most valuable output here**, because it goes straight into the skill's table and closes a

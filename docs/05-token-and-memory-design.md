@@ -70,7 +70,13 @@ a second budget line.
 
 Total always-loaded keel cost, measured 2026-08-19: **1,891 tokens** at 24 skills, being 1,066 for
 the descriptions, 469 for the CLAUDE.md block as this repository renders it, and 356 for the
-SessionStart injection. The injection
+SessionStart injection.
+
+**Re-measured 2026-08-30 at 25 skills: 1,941 tokens**, being 1,121 for the descriptions, 469
+unchanged, and 351 for the injection. The descriptions grew by one skill and the injection shrank,
+because adding `design-database` to the router needed 17 characters against the 1 it had spare and
+four phrases were trimmed to pay for it. The net is 50 tokens for a skill, which is what the
+mechanism below is meant to cost. The injection
 was 300 until the brevity rule was made the default later the same day; see below. For comparison,
 superpowers injects its entire `using-superpowers` skill body at session start, which is around 900
 tokens on its own, and gstack's tier-4 preamble runs into several thousand.
@@ -133,7 +139,7 @@ rule already forbids.
 
 ## Progressive disclosure
 
-The mechanism that makes 24 skills cost what 24 descriptions cost.
+The mechanism that makes 25 skills cost what 25 descriptions cost.
 
 ```
 Always loaded         ->  24 descriptions (~1,066 tokens, ceiling 1,320)
@@ -201,7 +207,7 @@ docs/keel/
   plans/                 # implementation plans, checkboxes ticked as work proceeds
   port/                  # port assessments for a non-APEX codebase
   runbooks/              # operational docs
-  audits/                # security audit history
+  audits/                # security and standards audit history
   context-audit.md       # output of context-budget
 ```
 

@@ -17,8 +17,8 @@ set -uo pipefail
 # Per ADR-0001. The ceiling was 700 with 400 and 600 documented as targets, and because the ceiling
 # was the only number enforced, bodies migrated to it: 15 of 24 skills landed within 20 words of it
 # and none met 400. The remedy the standard named, moving substance into references/, is exhausted,
-# which coding-standards demonstrates at 12 reference files and 17,816 reference words with a body
-# still at 683. So the ceiling moves and the target below it is enforced as a warning, because a
+# which coding-standards demonstrated at 12 reference files and 17,816 reference words with a body
+# still at 683, measured 2026-08-16. It is 13, 20,118 and 876 today. So the ceiling moves and the target below it is enforced as a warning, because a
 # ceiling with nothing under it is simply where bodies settle.
 CEILING_WORDS=900
 TARGET_WORDS=700
@@ -32,7 +32,7 @@ HEADROOM_WORDS=30
 #
 # The target in doc 05 is 40 tokens and it is not reachable for most skills: a description's whole
 # job is to carry the phrasings a user might actually use, and four distinct triggers do not fit in
-# 144 characters. Measured across 24 skills after removing every intra-description synonym, the mean
+# 144 characters. Measured across 24 skills on 2026-08-16, after removing every intra-description synonym, the mean
 # is 44. Only the four skills with the narrowest trigger surface come in under 40. So the ceiling is
 # enforced and the target is documented as aspirational, rather than pretending 22 skills are in
 # violation of something.
@@ -40,7 +40,8 @@ DESC_MAX_CHARS=216
 
 # The sum of the descriptions, which the per-skill ceiling above does not bound. Every description
 # sits in the prefix of every request in every keel project, and the total scales with the skill
-# count: 1,066 tokens at 24 skills, and 1,440 if all 24 sat legally at 216 chars.
+# count: 1,066 tokens at 24 skills when this was written, about 1,130 at 25 today, and 1,440 if
+# every skill sat legally at 216 chars.
 #
 # 1,320 is 30 skills at the measured 44-token mean. The number comes from decision 6 in
 # docs/07-open-decisions.md, which says to revisit skill granularity before the count reaches 30,
@@ -406,7 +407,7 @@ fi
 # The languages come from detect_languages' assignments, which is the function whose entire job is
 # to produce the list. lang_profile's case labels were the obvious source and they are wrong: its
 # typescript branch contains an inner `case "$f" in nest)` for framework detection, so the labels
-# yield `nest` as a fourteenth language and this rule would demand a tool row for NestJS. Checked
+# yield `nest` as a sixteenth language and this rule would demand a tool row for NestJS. Checked
 # before the rule was written, which is the only reason it is not in it.
 #
 # Both files are guarded on existence, like the checks above, because tests/test-validate-skills.sh

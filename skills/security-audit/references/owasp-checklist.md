@@ -148,6 +148,11 @@ outcome on this page. Detail is in the `coding-standards` reference `caching.md`
 
 - Is an inbound webhook's authenticity verified, or only its sender's key? A shared key
   authenticates the sender and does not bind the message.
+- Is the signature verified over the raw request bytes, as received, rather than over a body that
+  was parsed and re-serialised? One byte of whitespace or a reordered key produces a valid message
+  that fails, or an invalid one that passes, depending on which side normalised.
+- Does a failed verification return before reading or writing anything? A handler that records the
+  event first has already accepted it.
 - Is a build artifact reproducible, and is the pipeline itself protected?
 - Does the deploy verify what it is deploying?
 

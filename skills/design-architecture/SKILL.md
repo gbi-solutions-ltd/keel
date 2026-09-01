@@ -1,6 +1,6 @@
 ---
 name: design-architecture
-description: Use when deciding how to build something, choosing a stack or datastore, designing system structure or service boundaries, recording a technical decision, or restructuring a running system.
+description: Use when deciding how to build something, choosing a stack or datastore though not its schema, designing system structure or service boundaries, recording a technical decision, or restructuring a running system.
 allowed-tools: [Read, Write, Grep, Glob, Bash, Agent, AskUserQuestion]
 ---
 

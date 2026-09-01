@@ -245,6 +245,24 @@ else
         "gap_minutes=$gap peak_rate=$peak"
 fi
 
+# 17. assess-a-stale-standard: the document forbids floating point money and a formatted local
+# timestamp, and the tree does both anyway, in a commit later than the one the document pins. A
+# fixture whose document and code agreed would give the arm nothing to find, and the arm would pass
+# by saying so.
+d="$(tests/evals/stage.sh assess-a-stale-standard 2>/dev/null)"; staged+=("$d")
+money="$(grep -c '%\.4f' "$d/project/src/payouts.sh" 2>/dev/null || true)"
+clock="$(grep -c "date '+%d/%m" "$d/project/src/payouts.sh" 2>/dev/null || true)"
+pinned="$(grep -c 'DERIVED_SHA' "$d/project/docs/standards.md" 2>/dev/null || true)"
+first="$(git -C "$d/project" rev-parse --short HEAD~1 2>/dev/null || echo none)"
+points="$(grep -c "commit \`$first\`" "$d/project/docs/standards.md" 2>/dev/null || true)"
+commits="$(git -C "$d/project" rev-list --count HEAD 2>/dev/null || echo 0)"
+if [ "$money" -eq 1 ] && [ "$clock" -eq 1 ] && [ "$pinned" -eq 0 ] && [ "$commits" -eq 2 ] && [ "$points" -eq 1 ]; then
+    ok "assess-a-stale-standard seeds both breaches, pins a real derivation commit, and has a history"
+else
+    bad "assess-a-stale-standard seeds both breaches, pins a real derivation commit, and has a history" \
+        "money=$money clock=$clock pinned=$pinned commits=$commits points_at_first=$points"
+fi
+
 # 18. Every fixture file is tracked by git.
 #
 # tests/evals/fixtures/incident-diagnose-first/logs/worker.log matched the .gitignore rule `*.log`,
@@ -334,7 +352,7 @@ fi
 # 22. A scenario that injects no skill gets no skill framing. run.sh's header is addressed to an
 # agent that has been handed a SKILL.md; printed over a prompt with none, it is a sentence the arm
 # can see is false, and it is a difference in treatment between scenarios rather than a neutral one.
-# The six scenarios that do inject are unaffected, which is the other half of this check.
+# The scenarios that do inject are unaffected, which is the other half of this check.
 #
 # Both greps read a variable rather than a pipe: `run.sh | grep -q` returns 141 under `pipefail`,
 # because grep exits on the first match and run.sh's cat dies of SIGPIPE behind it.

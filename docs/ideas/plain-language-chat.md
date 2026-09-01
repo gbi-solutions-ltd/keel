@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-08-18 |
-| Status | shaping |
+| Status | **built 2026-08-18.** `conventions.explain_level` is written at init, `bin/keel:436`, and is in the schema; doctor's handling of it is asserted in the suite. The record still said `shaping`, which was true only until the PRD it names was approved. Status corrected 2026-08-30 |
 | Recommendation | Build something smaller: a separate `conventions.explain_level` key that **swaps** the injected paragraph rather than adding one, because the always-loaded budget has 44 tokens of headroom and the rule costs 66 |
 | Next | `write-prd` done: `docs/prd/plain-language-chat.md`, 2026-08-18. All four open questions are answered |
 

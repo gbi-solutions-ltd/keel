@@ -1,6 +1,6 @@
 # Skill Catalog
 
-24 skills. Each row below is a build specification: the name, the trigger conditions that
+25 skills. Each row below is a build specification: the name, the trigger conditions that
 go in the `description` frontmatter, what it reads, what it writes, and which of your 14
 requirements it satisfies.
 
@@ -66,7 +66,7 @@ the vendor sits behind the exporter and a switch is configuration rather than a 
 | 6 | Deployment setup | `setup-deployment` |
 | 7 | Implementation plan execution | `execute-plan` |
 | 8 | Debugging and root cause analysis | `debug` |
-| 9 | Coding standards enforcement | `coding-standards` |
+| 9 | Coding standards derived and documented, the mechanical ones moved into the linter. Enforced by nothing at coding time | `coding-standards`, checked against a diff by `review-code` |
 | 10 | Architecture and stack choices | `design-architecture` |
 | 11 | Repository snapshots | `repo-snapshot` |
 | 12 | Review, refactor, performance | `review-code`, `refactor`, `optimize-performance` |
@@ -146,7 +146,7 @@ number pass as an assessed one.
 ### `write-prd`
 **Trigger:** a product idea, a feature to specify, "write requirements", "we need a PRD",
 or an existing PRD that needs improving.
-**Reads:** `<docs_root>/snapshot.md` if present, existing PRD if refactoring.
+**Reads:** the snapshot at `profile.artifacts.snapshot` if that is set, otherwise `<docs_root>/snapshot.md`; existing PRD if refactoring.
 **Writes:** `<docs_root>/prd/<slug>.md`.
 **Does:** three modes, picked by what the user has.
 
@@ -189,6 +189,22 @@ worse than no PRD. The gap between the two is the deliverable.
 statement, Gherkin acceptance criteria, a size estimate, dependencies, and the PRD
 requirement ID it traces to. That traceability field is what lets `write-plan` prove
 coverage later.
+
+### `design-database`
+**Trigger:** "design a schema", "review this database", "normalise these tables", "what column
+type", indexes or partitioning for a database.
+**Reads:** the schema, from the database where possible, plus row counts.
+**Writes:** a schema review whose sections are all filled, handed to `write-docs` to publish.
+**Does:** owns schema design and review of an existing database, and hands off everything that
+already has an owner: engine choice to `design-architecture`, query latency to
+`optimize-performance`, the document to `write-docs`, the ERD to `mermaid-patterns.md`.
+
+Its content is a required-sections template rather than review technique, and the reason is
+measured. A `create-skill` Step 1 baseline on 2026-08-19, recorded in `tests/evals/results.md`,
+found an unseeded 32 bit key three months from exhaustion, a PCI exposure and two double-payment
+paths with no skill at all. What it omitted was the sweep: column types were never swept,
+denormalisation went unmentioned, no ERD was drawn, and partitioning appeared once in passing. So
+the skill fixes the shape of the output, not the reasoning, per `create-skill` Step 2.
 
 ### `design-architecture`
 **Trigger:** "how should we build this", stack choice, system design, "what database",
@@ -275,11 +291,13 @@ code, and pure config are exempt, but the exemption must be stated out loud and 
 deleted before the real implementation starts.
 
 ### `coding-standards`
-**Trigger:** "what are our conventions", a new contributor or a new service, review
-feedback about style, or before the first commit in an unfamiliar repo.
+**Trigger:** "what are our conventions", "does the code still follow our standards", a new
+contributor or a new service, review feedback about style, or before the first commit in an
+unfamiliar repo.
 **Reads:** the codebase, `.keel/profile.json`, existing lint and format configs.
-**Writes:** `<docs_root>/standards.md`, and lint/format/hook config when missing.
-**Does:** two distinct jobs.
+**Writes:** `<docs_root>/standards.md`, `<docs_root>/audits/YYYY-MM-DD-standards.md`, and lint or
+format config when missing.
+**Does:** three distinct jobs.
 
 1. **Derive.** Infer the repo's actual conventions from the code rather than imposing a
    generic style guide, then write them down. Naming, file layout, error handling, logging,
@@ -287,6 +305,10 @@ feedback about style, or before the first commit in an unfamiliar repo.
 2. **Enforce.** Wire the mechanical parts into linters, formatters, and CI so they stop
    being a prompting problem. Anything a regex can check should never be a skill
    instruction. What remains in `standards.md` is only the judgement calls.
+3. **Assess.** Given a `standards.md` that already exists, check it against the tree and write a
+   dated report to `<docs_root>/audits/YYYY-MM-DD-standards.md`. Four checks, always all four, in
+   one order: house-defaults coverage, the follow-up backlog, a judgement sample, the departures
+   ledger. It never edits the document it is checking.
 
 Also emits the GBi-wide defaults: conventional commits, no secrets in code, structured
 logging, no `any` escape hatches without a comment explaining why.
@@ -353,10 +375,18 @@ Given GBi is in payments, this skill also carries a payments-specific checklist:
 on money-moving endpoints, webhook signature verification, amount and currency handling,
 PII at rest and in logs, and audit trail completeness.
 
+Two rules govern how the audit is conducted rather than what it looks for. **Parallel reviewers are
+briefed on their own phase and nothing else**, because agreement between agents that can see each
+other is an echo rather than corroboration. **Nothing in an audit modifies what is being audited**:
+no configuration edit, no install, no migration, and no write request sent to find out what it
+does. A check that needed a change in order to pass was not run, and it belongs under "Not covered"
+by its real name.
+
 ### `refactor`
 **Trigger:** "clean this up", code that is hard to change, duplication, a file that has
 grown too large, or preparation before adding a feature to messy code.
-**Reads:** the target code, tests, `<docs_root>/standards.md`.
+**Reads:** the target code and its tests. Not `<docs_root>/standards.md`, which this line claimed
+until 2026-09-01: nothing under `skills/refactor/` mentions it.
 **Writes:** refactored code, same behaviour.
 **Does:** the non-negotiable precondition first: tests must exist and pass before touching
 anything. If they do not, write them first via `tdd`, and that is the whole task for now.
@@ -398,6 +428,11 @@ new environment gets provisioned.
 
 The runbook is a deliverable, not an afterthought. It covers deploying, rolling back,
 reading logs, common failures, and who to call.
+
+`references/release-operations.md` covers the three moments either side of that pipeline: recording
+every resource a provisioning run creates, as it creates it; deciding, per variable, whether a
+configuration value is copied, transformed, regenerated, refused or asked for; and deciding whether
+a release worked, against the running system rather than the repository.
 
 ### `ship`
 **Trigger:** "ship it", "open a PR", "let's land this", work believed complete.
@@ -449,6 +484,14 @@ Every document states the current state rather than the review history that prod
 `references/current-state-prose.md` carries the tells and the rewrites, and section 8 of
 `review-code`'s rubric checks a diff for them.
 
+`references/claims-audit.md` is the other direction: auditing what a repository already claims
+about itself rather than writing something new. **It produces findings, not a document**, so there
+is no output path to look for, and fixing what it finds is a separate ask. It sweeps the README,
+the docs root, public copy, an API reference, a changelog, a privacy page and the project's own
+configuration, and it covers discoverability artifacts (a sitemap, `robots.txt`, `llms.txt`, page
+metadata) as machine-readable claims about which routes exist. Ranking and keyword advice are out
+of scope and the reference says so.
+
 ---
 
 ## 8. Meta
@@ -492,7 +535,8 @@ before it is discarded, since that file is git-ignored and anything durable left
 **Trigger:** production is broken now, an outage is in progress, customers are affected, or the
 user is on call and does not know where to start. Fires before `debug`.
 **Reads:** `<docs_root>/runbooks/`, logs, dashboards, the recent deploy history.
-**Writes:** `<docs_root>/audits/` incident record, opened during the incident rather than after.
+**Writes:** `<docs_root>/incidents/YYYY-MM-DD-<slug>.md`, opened during the incident rather than
+after.
 **Does:** inverts `debug` deliberately. Restoring outranks explaining, so it acts on the most
 reversible route available before the cause is known, opens the record in the first two minutes,
 reconciles before any bulk retry, and hands off to `debug` for the root cause once service is back.

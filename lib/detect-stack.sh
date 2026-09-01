@@ -90,7 +90,7 @@ find_marker() {   # find_marker <maxdepth> <pattern>...
 # What that saves is a census measured at 0.024 seconds on a 2,200 file tree, and has_oracle_token
 # behind it, which is the more expensive walk: its worst case is a large manifest-less SQL tree with
 # no Oracle token anywhere, where grep reads every file and finds nothing, measured at 102 ms over
-# 800 .sql files. FR-04 already bounded both, since a repository declaring any of the thirteen never
+# 800 .sql files. FR-04 already bounded both, since a repository declaring any of the fourteen never
 # reaches this function at all; the cache bounds the repository that does not.
 is_plsql_tree() {
     local census sqlc othermax
@@ -309,6 +309,11 @@ detect_languages() {
         return 0
     fi
     local out=""
+    # Dart, first in the chain because the first line is the primary and drives the verify commands.
+    # A pubspec.yaml at the root is an unambiguous declaration that the root is a Dart package, and
+    # this check reads the root only, so a Flutter app inside a Node repository cannot claim it.
+    # Position decided 2026-08-29, S-11. FR-01, FR-19.
+    [ -f pubspec.yaml ] && out="$out dart"
     if [ -f package.json ]; then
         if [ -f tsconfig.json ] || grep -q '"typescript"' package.json 2>/dev/null
         then out="$out typescript"; else out="$out javascript"; fi
@@ -417,6 +422,13 @@ lang_profile() {
         [ -f meson.build ] && pm=meson
         printf 'cpp native none %s\n' "$pm" ;;
       lua)    printf 'lua lua none luarocks\n' ;;
+      dart)
+        # Flutter is the framework and Dart the language, which is the shape every other row uses.
+        # runtime is `dart` and not `flutter`, mirroring `php php`, `python python`, `ruby ruby`
+        # and `rust rust`: the runtime is the language's own VM. FR-04, FR-05.
+        local fw=none
+        is_flutter && fw=flutter
+        printf 'dart dart %s pub\n' "$fw" ;;
       plsql)
         # The framework marker is keel's own apex-export output, written by lib/apex_render.py, so
         # it is self-declaring and cannot be claimed by another tool's manifest.json. The
@@ -449,6 +461,79 @@ detect_also() {
 # it produces an empty profile on every fresh clone.
 composer_declares() {   # composer_declares <package>
     grep -qs "\"$1" composer.json
+}
+
+# True when pubspec.yaml declares the Flutter SDK dependency, which is what separates a Flutter
+# application from a plain Dart package. The two take different commands, and the asymmetry is
+# measured rather than assumed: `dart test` cannot drive a Flutter project, exiting non-zero on
+# `dart:ui` even once `package:test` is declared, while `flutter test` does run in a plain package.
+# So the split is not about what is possible. It is so a plain package is not made to depend on the
+# Flutter SDK to run its own tests.
+#
+# Matched as the `sdk: flutter` line rather than the bare word. `flutter_lints` is a dev dependency
+# in 7 of the 15 repositories the requirement was measured against on 2026-08-29, and a bare-word
+# match calls every one of them Flutter whether or not they are. Verified the other way too: the
+# `sdk: flutter` form matched 15 of 15 real Flutter applications.
+#
+# grep and not a parse, because this file has no YAML parser and must not gain one. CON-05, NFR-01.
+#
+# Not memoised, unlike PKG_SCRIPTS and DETECTED_LANGS, and that is measured rather than assumed:
+# measured 2026-08-30 by shadowing grep on PATH, one `keel init` on a Flutter project runs 15
+# is_flutter greps of a ten-line file, and dart_declares_test runs 2 on a plain package. Most of
+# those come from detect_verify, which adds ten on top of the five from lang_profile, because it is
+# called once per verify key. That is still only tens of milliseconds of grep forks. Those two
+# caches exist for a 24 ms tree walk and a 102 ms one. A third would also need write_profile's
+# priming to survive the subshell, which is real complexity for that.
+#
+# There is deliberately no end anchor. A CRLF checkout ends the line `flutter\r`, so tightening this
+# to `flutter[[:space:]]*$` would silently stop matching every repository checked out on Windows.
+is_flutter() {
+    grep -qE '^[[:space:]]*sdk:[[:space:]]*flutter' pubspec.yaml 2>/dev/null
+}
+
+# True when pubspec.yaml declares a dependency on package:test, which `dart test` needs and which the
+# Dart SDK does not ship. Measured 2026-08-29: in a package that has not declared it, `dart test`
+# exits non-zero with "Could not find package `test`". Flutter bundles `flutter_test`, so this gate
+# applies to the plain Dart branch only.
+#
+# Scoped to a dependency block, not just to any indented line. Leading whitespace alone was the
+# first shape of this and it was wrong: a melos workspace root, which is the common Dart monorepo
+# layout, declares `melos:` -> `scripts:` -> `test:` and depends on no package:test, and an
+# `executables:` entry named `test` reads the same. Both were handed `dart test`, which then failed
+# with the very error this gate exists to prevent. Found in review and measured against the SDK,
+# 2026-08-30. `flutter_test:` still does not match, because the character before `test:` is an
+# underscore rather than whitespace.
+#
+# awk and not grep, because the condition is a line's position inside a block and grep has no
+# memory of the line before. Still not a YAML parser, and must not become one: it tracks one bit,
+# which top-level key it is under. CON-05, NFR-01. The three block names are the only ones pub
+# resolves dependencies from.
+# True when there is a test for the runner to run. Neither spelling checks this itself and both
+# fail without it, measured against the real SDK on 2026-08-30: `flutter test` exits 1 with `Test
+# directory "test" not found.`, and `dart test` exits 65 with the same complaint in its own words,
+# even in a package that declares package:test. So `flutter test` being bundled and `dart test`
+# being declared are both necessary and neither is sufficient.
+#
+# The condition is the SDK's own, quoted from the error it prints on an empty directory: "Test files
+# must be in that directory and end with the pattern "_test.dart"". That is why this is not
+# `[ -d test ]`. A directory holding only a helper exits 1 the same way an absent one does, measured
+# in the same run, and a `[ -d test ]` gate would have called that project testable.
+#
+# Depth 3 below test/, so test/unit/a_test.dart and test/src/unit/a_test.dart both count. Scoped to
+# test/ rather than run over the tree, because integration_test/ is a separate Flutter target with
+# its own runner and a file there is not something `flutter test` will execute.
+dart_has_test_files() {
+    [ -d test ] || return 1
+    [ -n "$(find test -maxdepth 3 -name '*_test.dart' -print -quit 2>/dev/null)" ]
+}
+
+dart_declares_test() {
+    awk '
+        /^(dependencies|dev_dependencies|dependency_overrides):/ { inblock = 1; next }
+        /^[^[:space:]#]/                                        { inblock = 0 }
+        inblock && /^[[:space:]]+test:/                         { found = 1; exit }
+        END { exit !found }
+    ' pubspec.yaml 2>/dev/null
 }
 
 # Echo one verify command for $1, or the empty string when the project declares none.
@@ -689,6 +774,31 @@ detect_verify() {
           format)     { [ -f stylua.toml ] || [ -f .stylua.toml ]; } && printf 'stylua --check .' ;;
           format_fix) { [ -f stylua.toml ] || [ -f .stylua.toml ]; } && printf 'stylua .' ;;
         esac ;;
+      dart)
+        # The analyzer and the formatter ship with the SDK and need no declaration, so they are
+        # unconditional. The runner is not, and it takes two conditions rather than one: the command
+        # has to exist, which is what separates the bundled `flutter test` from the declared
+        # `dart test`, and there has to be a test for it to run, which neither spelling checks for
+        # itself and both fail without. FR-07, FR-08 as amended 2026-08-29 and again 2026-08-30.
+        #
+        # build, typecheck, e2e, security and test_integration have no branch and that is the
+        # requirement, not an omission. `flutter build` needs a target and there are eight; the
+        # analyzer is already lint. FR-13, FR-14.
+        local dc=dart
+        is_flutter && dc=flutter
+        case "$what" in
+          test)     { [ "$dc" = flutter ] || dart_declares_test; } && dart_has_test_files \
+                      && printf '%s test' "$dc" ;;
+          test_one) { [ "$dc" = flutter ] || dart_declares_test; } && dart_has_test_files \
+                      && printf '%s test {path}' "$dc" ;;
+          # Ungated by analysis_options.yaml: the analyzer applies the SDK's default lint set with
+          # or without it, and 8 of the 15 repositories measured have no such file. FR-10.
+          lint)     printf '%s analyze' "$dc" ;;
+          # `dart` for both kinds of project: `flutter format` was removed from the SDK, so there is
+          # only one spelling left. Check-only, because a command that rewrites cannot gate. NFR-04.
+          format)     printf 'dart format --output=none --set-exit-if-changed .' ;;
+          format_fix) printf 'dart format .' ;;
+        esac ;;
     esac
 }
 
@@ -699,9 +809,10 @@ detect_verify() {
 # wrote a hardcoded false. Every project, including a Next.js one, was told it had no UI.
 detect_has_ui() {
     local fw; fw="$(detect_stack | cut -d' ' -f3)"
-    # apex is a UI, but not a local one: its pages are stored in the database, so a repository can
-    # be a genuine APEX application with no public/ or index.html for the fallback below to find.
-    case "$fw" in next|react|vue|svelte|angular|apex) printf 'true'; return 0 ;; esac
+    # apex and flutter are both user interfaces that are not local web ones: an APEX application's
+    # pages live in the database, and a Flutter application's are `lib/main.dart`. Either can be a
+    # genuine UI with no public/ or index.html for the fallback below to find.
+    case "$fw" in next|react|vue|svelte|angular|apex|flutter) printf 'true'; return 0 ;; esac
     if [ -d public ] || [ -f index.html ]; then printf 'true'; else printf 'false'; fi
 }
 
@@ -726,7 +837,7 @@ detect_datastores() {   # detect_datastores [lang]
     local lang="${1:-}" files='' f pair
     [ -n "$lang" ] || lang="$(detect_stack | cut -d' ' -f1)"
     for f in package.json requirements.txt pyproject.toml Pipfile go.mod composer.json Gemfile \
-             Cargo.toml pom.xml build.gradle build.gradle.kts \
+             Cargo.toml pom.xml build.gradle build.gradle.kts pubspec.yaml \
              docker-compose.yml docker-compose.yaml compose.yml compose.yaml; do
         [ -f "$f" ] && files="$files $f"
     done
@@ -738,11 +849,32 @@ detect_datastores() {   # detect_datastores [lang]
     [ "$lang" = plsql ] && printf 'oracle\n'
     [ -z "$files" ] && return 0
     # `"pg"` is quoted rather than bare: the bare token appears inside half the package names on npm.
-    for pair in 'postgres:postgres|psycopg|pgx|npgsql|"pg"' \
+    #
+    # `mongo` is not a bare token either, and for the same reason: it is a prefix of ordinary words.
+    # `mongol`, a real pub.dev package for Mongolian vertical text, was profiled as MongoDB, found
+    # over a corpus of about 100 real pub.dev names. No suffix rule separates the two, because
+    # mongodb, mongoose and mongol are all `mongo` plus letters, so the drivers are listed by name
+    # and the last alternative catches the bare declaration in every manifest shape: `gem "mongo"`,
+    # `image: mongo:5`. Written [^a-zA-Z] rather than [^a-z] because the search is -i, and a negated
+    # class under -i excludes both cases. Tightened 2026-08-30, D3.
+    # The Dart names, added 2026-08-30 under D2. Each maps onto the backend it actually talks to
+    # rather than onto its own package name: drift and sembast are SQLite, supabase is Postgres.
+    # `supabase` is deliberately not anchored to Dart, because supabase-js is Postgres too and this
+    # loop is not language scoped. `drift` is written as a declaration rather than a bare token, the
+    # shape `"pg"` uses and for the same reason: it is an ordinary English word, and bare it matched
+    # `drift-zoom` on npm and `driftctl` in a go.mod. A non-letter boundary does not separate those,
+    # since `drift-zoom` has one; the trailing colon does, and it is present in both shapes the
+    # package is really declared in, `drift: ^2` in a pubspec and `"drift":` in a package.json.
+    # `sembast` is left bare: it is not a word. hive, isar and objectbox are left out: they are
+    # embedded libraries with no server behind them, so there is nothing to map them onto, and
+    # inventing three names no other language emits is a vocabulary decision rather than a
+    # detection one.
+    for pair in 'postgres:postgres|psycopg|pgx|npgsql|supabase|"pg"' \
                 'mysql:mysql|mariadb' \
                 'redis:redis' \
-                'mongodb:mongo' \
-                'sqlite:sqlite' \
+                'mongodb:mongodb|mongoose|pymongo|mongoid|mongo_dart|mongo-driver|(^|[^a-zA-Z])mongo([^a-zA-Z]|$)' \
+                'sqlite:sqlite|sqflite|(^|[^a-zA-Z])drift:|sembast' \
+                'firestore:cloud_firestore|firebase_firestore' \
                 'elasticsearch:elasticsearch|opensearch' \
                 'cassandra:cassandra' \
                 'dynamodb:dynamodb'; do
@@ -776,10 +908,33 @@ lang_lsp() {
 # because the reason to have one at all is diagnostics in the file being edited, and that file is
 # as likely to be in the second language as the first.
 detect_plugins() {
-    local l s
+    local l s fw
     for l in $(detect_languages); do
         s="$(lang_lsp "$l")"
         [ -n "$s" ] && printf '%s\n' "$s"
     done
-    if [ "$(detect_has_ui)" = true ]; then printf 'frontend-design\nplaywright\n'; fi
+    if [ "$(detect_has_ui)" = true ]; then
+        # Bound here rather than at the top: this is its only use site, so a repository with no UI
+        # never pays for it. detect_has_ui has already called detect_stack by this point, and the
+        # cache note above records that the tree cache cannot be filled from inside a $( ), which is
+        # where this function runs, so this is one more walk on the init path either way.
+        fw="$(detect_stack | cut -d' ' -f3)"
+        printf 'frontend-design\n'
+        # playwright drives browsers. A Flutter application's UI is painted by the engine on a
+        # device, so there is no page for it to open, and its end-to-end story is the SDK's
+        # integration_test package. docs/04-plugin-strategy.md scopes this plugin to "browser flows
+        # worth testing", which apex satisfies and flutter does not; has_ui alone was answering a
+        # different question. Added 2026-08-30, after keel init on a Flutter repository was measured
+        # writing playwright into settings.json and plugins.recommended.
+        #
+        # `fw` is the primary framework, and dart sits first in the marker chain, so a root carrying
+        # both a pubspec.yaml and a web app resolves to flutter and the web half was losing its
+        # driver. Found in review 2026-08-30. The suppression is about there being no browser to
+        # drive, so it yields to a repository that has one, tested with the same two signals
+        # detect_has_ui already falls back on rather than a second list that could disagree with it.
+        case "$fw" in
+          flutter) { [ -d public ] || [ -f index.html ]; } && printf 'playwright\n' ;;
+          *)       printf 'playwright\n' ;;
+        esac
+    fi
 }

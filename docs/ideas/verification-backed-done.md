@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-08-16 |
-| Status | agreed, 2026-08-16, both stages |
+| Status | **both stages built 2026-08-16**, via `docs/plans/2026-08-16-done-conditions-model-pins-and-install-docs.md` tasks 3 to 5, fully ticked. Per-task done conditions are in the plan template; the structural Stop hook is `hooks/done-guard`. Status corrected 2026-08-30 |
 | Recommendation | Build something smaller, in two stages: a per-task done condition first, a structural Stop hook second |
 | Next | `docs/plans/2026-08-16-done-conditions-model-pins-and-install-docs.md`, tasks 3, 4 and 5 |
 

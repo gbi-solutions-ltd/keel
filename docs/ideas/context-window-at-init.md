@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-08-18 |
-| Status | agreed, 2026-08-18. Pieces one and two are specified in `docs/prd/context-window-at-init.md`; piece three remains unscoped |
+| Status | **pieces one and two built 2026-08-18**, via `docs/plans/2026-08-18-context-window-at-init.md`, fully ticked. `gates.context_window` is written at init, `bin/keel:430`, and read as a floor by doctor, `bin/keel:1509`. **Piece three, the session-start pointer, is not built and is not scoped:** that plan puts it out of scope at line 1015, blocked on the PRD's open question 3. Status corrected 2026-08-30 |
 | Recommendation | Build it, in three independent pieces, and only in this order: make a configured window a floor rather than a ceiling, then write it at init, then inject a bounded pointer at session start. The `/clear` itself cannot be automated |
 | Next | `docs/prd/context-window-at-init.md` (draft, awaiting approval). Piece three still depends on open question 2 |
 

@@ -102,3 +102,14 @@ failures and tells the team which controls to keep when they refactor.
 
 An audit that implies completeness it does not have is worse than a narrow one, because it stops
 the next person looking.
+
+**Nothing in an audit modifies what is being audited.** No configuration edit, no install, no
+migration, and no request to a write endpoint to find out what it does. A check that needed a change
+to the system in order to pass was not run, and it belongs in this section under its real name
+rather than in the findings. Without that rule the sentence above is unenforceable, because a check
+can be made to pass and then honestly reported as passing.
+
+On a client system this is not a style point. Running a write to see what happens is a change to
+somebody's data made without asking. `CONTRIBUTING.md` records the milder form happening here: a
+probe ran `git init` in a project as a side effect of a read-only check, which it had no business
+doing.

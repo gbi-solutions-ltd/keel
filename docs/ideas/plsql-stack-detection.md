@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-08-18 |
-| Status | shaping |
+| Status | **built 2026-08-18.** PL/SQL detection is in `lib/detect-stack.sh` with `oracle` as its datastore, specified in `docs/prd/plsql-stack-detection.md` and covered by nine fixtures in the suite. Status corrected 2026-08-30 |
 | Recommendation | Build something smaller: detect the language and the datastore, leave every verify command null. No language server exists, so the LSP half needs no code |
 | Next | `write-prd` done: `docs/prd/plsql-stack-detection.md`, 2026-08-18. All four open questions are answered |
 

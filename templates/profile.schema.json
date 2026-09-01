@@ -85,7 +85,7 @@
         },
         "has_ui": {
           "type": "boolean",
-          "description": "When true, the frontend standard applies. See skills/coding-standards/references/frontend.md."
+          "description": "When true, the project has a user interface of some kind. It is read by three callers that each ask a different question of it, so each gates on it plus what it needs: the frontend standard applies when this is true and stack.framework is not flutter, because that reference is about the browser. See skills/coding-standards/references/frontend.md."
         }
       }
     },

@@ -18,7 +18,7 @@
 Machine level (once per engineer)
   /plugin marketplace add gbi-solutions-ltd/keel
   /plugin install keel@gbi
-  -> installs 24 skills, the SessionStart hooks, and bin/keel on the Bash tool's PATH
+  -> installs 25 skills, the SessionStart hooks, and bin/keel on the Bash tool's PATH
   ln -sfn <cache-or-clone>/bin/keel ~/.local/bin/keel
   -> optional: puts keel on your login shell's PATH. The plugin already put it
      on the Bash tool's
@@ -209,13 +209,14 @@ Detection matrix:
 
 | Signal | Inferred |
 |--------|----------|
+| `pubspec.yaml` | Dart, `flutter test` for a Flutter project or `dart test` for a plain package that declares `package:test`, either one only where `test/` holds a file ending `_test.dart` for it to run, the analyzer and `dart format`, and no language server plugin, because the catalogue has none for it. `flutter` as the framework where the manifest declares the Flutter SDK, which also sets `has_ui` |
 | `package.json` with `typescript` dep | TypeScript, plus `typescript-lsp` |
 | `package.json` scripts | `verify.test`, `verify.lint`, `verify.build` read directly from `scripts` |
 | `go.mod` | Go, `go test ./...`, plus `gopls-lsp` |
 | `composer.json` | PHP, plus `php-lsp` |
 | `pyproject.toml`, `requirements.txt` or `setup.py` | Python, plus `pyright-lsp` |
-| `pom.xml` or `build.gradle` | Java, plus `jdtls-lsp` |
 | `build.gradle.kts`, or `kotlin` in a Gradle build | Kotlin, plus `kotlin-lsp` |
+| `pom.xml` or `build.gradle` | Java, plus `jdtls-lsp` |
 | `Cargo.toml` | Rust, plus `rust-analyzer-lsp` |
 | `*.csproj`, `*.sln` or `global.json` | C#, `dotnet test`, plus `csharp-lsp` |
 | `Gemfile` | Ruby, plus `ruby-lsp` |
@@ -225,7 +226,7 @@ Detection matrix:
 | No manifest for any of the above, and `.sql` plus `.plsql` dominating the tree with an Oracle-exclusive token present | PL/SQL, `oracle` as the datastore, and no language server, because none exists for it |
 | More than one of the above | The first is `stack.language` and drives the verify commands; the rest are `stack.also`, and each gets its language server |
 | `Dockerfile`, `.github/workflows/` | deployment already set up, `setup-deployment` runs in audit mode |
-| any of `next.config`, `vite.config`, `angular.json`, a `public/` dir | has a UI, so recommend `frontend-design` and `playwright` |
+| any of `next.config`, `vite.config`, `angular.json`, a `public/` dir, an APEX manifest, or `flutter` as the framework | has a UI, so recommend `frontend-design`, and `playwright` where that UI is browser-rendered. A Flutter application gets `frontend-design` only: `playwright` drives browsers and Flutter's own end-to-end tool is the SDK's `integration_test`. Unless the same root also carries a browser UI of its own, a `public/` dir or an `index.html`, in which case it gets both: the exclusion is about there being no browser to drive, not about Flutter being present |
 
 Anything it cannot detect, it asks about interactively, and each question has a sensible
 default so `keel init -y` works in CI.
@@ -364,6 +365,7 @@ decision 4.
 ```
 keel profile get <dotted.path>
 keel profile set <dotted.path> <value>
+keel profile sync
 ```
 Reads and writes one field of `.keel/profile.json`. `init` writes the profile once and then defends
 every human value in it, which is right for a re-init and wrong for a fact that has changed since, so
@@ -372,6 +374,15 @@ and `null` are written as JSON literals rather than the strings that spell them,
 a number. A path that does not already exist is refused, since a typo would otherwise write a key
 nothing reads while the caller walks away believing the fact was recorded. `keel_version` and
 `schema_version` are refused too: `init` owns both.
+
+`sync` is the same map filled from the other direction. It records where this project's documents
+already are, for the three artifact keys whose default is one unambiguous location: `snapshot`,
+`decisions` and `plans`. A key that already holds a value is never touched, since that value is the
+override the map exists for, and a directory holding nothing but `init`'s own `ADR-0000-template.md`
+is not a document set. `prd`, `stories` and `architecture` are deliberately never filled: each
+defaults to one file per slug, so a repository with five PRDs has no single path a string key could
+hold. `keel doctor` warns when a fillable key is null and its documents are there, which is how
+anyone finds out the command exists.
 
 ```
 keel new <name> [--stack node|python|go|minimal]

@@ -75,8 +75,8 @@
     "prd": null,
     "stories": null,
     "architecture": null,
-    "decisions": null,
-    "plans": null
+    "decisions": "docs/decisions",
+    "plans": "docs/plans"
   },
   "_note": "keel dogfoods itself. Written by hand until `keel init` exists (plan task 1.6).",
   "verify_notes": {

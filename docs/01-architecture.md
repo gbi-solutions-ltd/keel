@@ -5,7 +5,7 @@
 Three layers, each with a different lifetime and a different token cost.
 
 ```
-Layer 3  SKILLS          24 markdown files, loaded on demand, ~660 words each
+Layer 3  SKILLS          25 skill bodies, loaded on demand, ~690 words each
          (in the plugin)  Cost: ~40 tokens each for the description line, body only when invoked
 
 Layer 2  PROJECT CONFIG  .keel/profile.json + a CLAUDE.md block + docs/keel/
@@ -92,7 +92,9 @@ after a `/clear` and what keeps token use flat as a project grows.
 | `design-architecture` | PRD, stories, snapshot | `<docs_root>/architecture/<slug>.md`, `<docs_root>/decisions/ADR-NNNN-*.md` |
 | `write-plan` | architecture, stories | `<docs_root>/plans/YYYY-MM-DD-<slug>.md` |
 | `execute-plan` | plan | code, commits, checked boxes in the plan |
+| `coding-standards` | the codebase, or an existing `standards.md` | `<docs_root>/standards.md`, or `<docs_root>/audits/YYYY-MM-DD-standards.md` in assess mode |
 | `security-audit` | diff or whole repo | `<docs_root>/audits/YYYY-MM-DD-security.md` |
+| `incident-response` | the running system, runbooks | `<docs_root>/incidents/YYYY-MM-DD-<slug>.md` |
 | `setup-deployment` | profile, architecture | `.github/workflows/*`, `Dockerfile`, `<docs_root>/runbooks/deploy.md` |
 | `write-docs` | everything above | `README.md`, `<docs_root>/runbooks/*`, process-flow diagrams |
 | `create-skill` | the session transcript | a new skill in the keel repo, as a PR |

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-08-18 |
-| Status | shaping |
+| Status | **built 2026-08-18**, via `docs/plans/2026-08-18-usable-profile.md`, fully ticked. `docs/profile-keys.md` documents 60 keys and is generated from the schema by `tests/generate-profile-keys.sh`, with a suite check that fails when the two drift. Status corrected 2026-08-30 |
 | Recommendation | Build it, but the generator is the small half: 35 of 59 keys have no description to generate from, so this is a writing job first and a tooling job second |
 | Next | `docs/prd/usable-profile.md` (draft, awaiting approval), written jointly with `stack-plugins-on-existing-repos.md` |
 

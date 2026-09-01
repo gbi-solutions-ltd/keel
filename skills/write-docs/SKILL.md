@@ -28,6 +28,9 @@ context.
 Each has a different reader in a different state. A README written for the 3am reader is
 unreadable, and a runbook written for the browsing reader is useless.
 
+Auditing what the docs already claim, rather than writing them, is
+[references/claims-audit.md](references/claims-audit.md).
+
 ## Step 2: Generate what can be generated
 
 Prose restating what the code already declares goes stale silently. Prefer the generator, and commit
@@ -79,9 +82,8 @@ State what the reader must know to avoid harm, early. A destructive command, a s
 a step that cannot be undone.
 
 Write the current state. A document says what is true now, never the review history that produced
-it. Durable tradeoffs go to an ADR, stated as properties of the option. When feedback shows a
-section is wrong, delete it and write it again from the code: patching the sentence that carried
-the wrong claim keeps its frame. Reread against the tells in
+it. Durable tradeoffs go to an ADR. When a section is wrong, delete it and write it again from the
+code. Reread against the tells in
 [references/current-state-prose.md](references/current-state-prose.md).
 
 ## Step 6: Say when it was true

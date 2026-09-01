@@ -3,7 +3,7 @@
 GBi's standard operating procedure for AI-assisted software delivery, packaged as a
 Claude Code plugin plus a thin per-project bootstrap.
 
-**Status:** installable, 24 skills built, `keel` CLI and session hook working. **Not 1.0.0:**
+**Status:** installable, 25 skills built, `keel` CLI and session hook working. **Not 1.0.0:**
 that needs two pilots and a verified install from a second machine.
 
 ## Install
@@ -180,9 +180,9 @@ writing it and hoping.
 | [`skills/security-audit`](skills/security-audit/SKILL.md) | Built | Phase order re-found every known issue in the Spring Boot service, including 6 keystores inside the built jar |
 | [`skills/refactor`](skills/refactor/SKILL.md) | Built | Its precondition, against a real target with no tests. Correctly stopped and routed to `tdd` |
 | [`skills/optimize-performance`](skills/optimize-performance/SKILL.md) | Built | Its precondition, against a service with no target and no baseline. Correctly refused |
-| [`skills/setup-deployment`](skills/setup-deployment/SKILL.md) | Built | Built CI and a runbook for a service that had neither. Its own artifact guard had a bug, caught by testing it |
+| [`skills/setup-deployment`](skills/setup-deployment/SKILL.md) | Built | Built CI and a runbook for a service that had neither. Its own artifact guard had a bug, caught by testing it. Carries `references/release-operations.md`: the provisioning ledger, the five dispositions for a configuration value, and the four states a release check reports |
 | [`skills/ship`](skills/ship/SKILL.md) | Built | Its gate, against this repo. Correctly refused on check 8, which found a real departure |
-| [`skills/write-docs`](skills/write-docs/SKILL.md) | Built | Replaced a NestJS service's default-template README, every command executed first |
+| [`skills/write-docs`](skills/write-docs/SKILL.md) | Built | Replaced a NestJS service's default-template README, every command executed first. Carries `references/claims-audit.md`: auditing what a repository already claims against what it does, which produces findings rather than a document |
 | [`skills/create-skill`](skills/create-skill/SKILL.md) | Built | Describes the loop that produced the other 17. Not yet used to produce one |
 | [`skills/context-budget`](skills/context-budget/SKILL.md) | Built | A 38KB always-loaded file. Found a real cache hazard on line 3 |
 | [`skills/keel`](skills/keel/SKILL.md) | Built | All 24 routes resolve, the shipped cheatsheet lists every one, and the SessionStart injection names every one. All three enforced by the validator, the last two added after they had already drifted |
@@ -286,11 +286,16 @@ the machine.
 The evals in `tests/evals/` are the only thing that tests whether a discipline skill changes
 behaviour under pressure. The static suite checks shape; a skill can pass it and do nothing.
 
-7 scenarios exist. Six are dispatched at a release gate and score a reply. The seventh,
-`commit-outside-a-worktree`, was added on 2026-08-20 and scores git state instead: its fixture is
+9 scenarios exist. Six are dispatched at a release gate and score a reply.
+`commit-outside-a-worktree`, added on 2026-08-20, scores git state instead: its fixture is
 built into a real repository by `tests/evals/stage.sh`, and the arm passes or fails on whether
-`git log` moved. Results and the arguments they produced are in
-[`tests/evals/results.md`](tests/evals/results.md).
+`git log` moved. `review-a-live-schema`, added on 2026-08-30 with the `design-database` skill, is
+not in the release gate: it scores whether a review swept rather than what it found, because its
+own baseline showed a skill-less arm finding the urgent defects unaided. Results and the arguments
+they produced are in [`tests/evals/results.md`](tests/evals/results.md).
+`assess-a-stale-standard`, added on 2026-09-01, is also outside the gate: it is a treatment-only
+length measurement for ADR-0001 rather than a behaviour comparison, so there is no baseline arm to
+score it against.
 
 ## How to read this repo
 
@@ -299,7 +304,7 @@ Read in order. Each doc is self-contained but they build on each other.
 | Doc | What it answers |
 |-----|-----------------|
 | [`docs/01-architecture.md`](docs/01-architecture.md) | How the pieces fit together and why it is shaped this way. **Start here.** |
-| [`docs/02-skill-catalog.md`](docs/02-skill-catalog.md) | The 24 skills, their triggers, inputs, and outputs |
+| [`docs/02-skill-catalog.md`](docs/02-skill-catalog.md) | The 25 skills, their triggers, inputs, and outputs |
 | [`docs/03-install-and-distribution.md`](docs/03-install-and-distribution.md) | Install options compared, the recommendation, and the `keel` CLI spec |
 | [`docs/04-plugin-strategy.md`](docs/04-plugin-strategy.md) | Verdict on each of the nine third-party plugins and how skills call them |
 | [`docs/05-token-and-memory-design.md`](docs/05-token-and-memory-design.md) | Prompt caching, context budget, project memory |

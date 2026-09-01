@@ -363,7 +363,7 @@ PY
 project_kind() {
     [ "$(detect_stack | cut -d' ' -f1)" != "unknown" ] && { printf 'service'; return; }
     local src
-    src=$(git ls-files 2>/dev/null | grep -cE '\.(ts|js|py|go|java|kt|php|rs|rb|cs|swift|lua|c|cc|cpp|h|hpp)$' || true)
+    src=$(git ls-files 2>/dev/null | grep -cE '\.(ts|js|py|go|java|kt|php|rs|rb|cs|swift|lua|dart|c|cc|cpp|h|hpp)$' || true)
     [ "${src:-0}" -gt 0 ] && printf 'service' || printf 'docs'
 }
 
@@ -479,7 +479,7 @@ render_block() {
 
 scaffold_docs() {
     local root="$1"
-    mkdir -p "$root"/{ideas,prd,stories,architecture,decisions,plans,runbooks,audits,port}
+    mkdir -p "$root"/{ideas,prd,stories,architecture,decisions,plans,runbooks,audits,incidents,port}
     [ -f "$root/README.md" ] || cat > "$root/README.md" <<D
 # Project documentation
 
@@ -496,7 +496,11 @@ Written and read by keel skills. Committed on purpose: this is the project's mem
 | \`architecture/\`, \`decisions/\` | \`design-architecture\` |
 | \`plans/\` | \`write-plan\` |
 | \`runbooks/\` | \`setup-deployment\`, \`write-docs\` |
-| \`audits/\` | \`security-audit\` |
+| \`audits/\` | \`security-audit\`, \`coding-standards\` |
+| \`incidents/\` | \`incident-response\` |
+
+A dated report in \`audits/\` is named \`YYYY-MM-DD-<kind>.md\`, where \`<kind>\` is the noun of
+the skill that wrote it: \`security\`, \`standards\`. An incident record is named for its slug.
 
 See \`prompting.md\` for how to phrase a request so the right skill fires.
 D
@@ -1016,6 +1020,60 @@ PY
     return $rc
 }
 
+# A directory with nothing in it means the project has no documents of that kind, so the key stays
+# null. Hidden entries do not count: a lone `.gitkeep` is how an empty directory is kept in git, and
+# treating it as a document would record a set that does not exist.
+#
+# Neither does keel's own scaffolding. `init` writes <docs_root>/decisions/ADR-0000-template.md, so
+# that directory is never empty on a freshly initialised project, and counting the template would
+# set the key and make doctor warn on every new project before anyone had written anything. It is
+# named rather than listed because it is the only file init puts inside a directory any key looks
+# at, checked 2026-08-30. FR-06.
+dir_has_file() {   # dir_has_file <dir>
+    local d="$1" e
+    [ -d "$d" ] || return 1
+    for e in "$d"/*; do
+        [ -e "$e" ] || continue
+        case "${e##*/}" in ADR-0000-template.md) continue ;; esac
+        return 0
+    done
+    return 1
+}
+
+# Fill the artifact keys whose default location is one unambiguous place and is really there.
+#
+# Three keys, not six. `prd`, `stories` and `architecture` default to `<docs_root>/<key>/<slug>.md`,
+# one file per slug, and a repository with five PRDs has no single path to record. FR-03, FR-04.
+#
+# `json_get` rather than a fresh interpreter: json_load flattens the profile once and renders a null
+# as an empty string, so a null key is a cache hit and costs no interpreter start.
+profile_sync() {
+    local root; root="$(docs_root)"
+    local key path val filled=0
+    for key in snapshot decisions plans; do
+        # json_get separates the two cases this loop must not confuse: it returns zero with empty
+        # output for a key that is present and null, and non-zero for a key the profile does not
+        # have at all. The second is a profile older than the artifacts map, or a hand-written one,
+        # and it is skipped rather than attempted: profile_set would refuse it with a message about
+        # a typo the caller did not make, and abandon the keys after it. Found in review 2026-08-30.
+        val="$(json_get .keel/profile.json "artifacts.$key" 2>/dev/null)" || continue
+        [ -n "$val" ] && continue
+        case "$key" in
+          snapshot) path="$root/snapshot.md"; [ -f "$path" ] || continue ;;
+          *)        path="$root/$key"; dir_has_file "$path" || continue ;;
+        esac
+        profile_set "artifacts.$key" "$path" || return 1
+        say "  artifacts.$key -> $path"
+        filled=$((filled+1))
+    done
+    [ "$filled" -eq 0 ] && say "  no artifact key changed"
+    # Said every run, filled or not. These three default to <docs_root>/<key>/<slug>.md, one file
+    # per slug, so there is no single path a string key could hold. Silence here reads as an
+    # oversight and gets reported as a bug against a decision. FR-04.
+    say "  prd, stories and architecture are skipped: each defaults to one file per slug under $root, so there is no single path to record"
+    return 0
+}
+
 cmd_profile() {
     [ -f .keel/profile.json ] || die "no .keel/profile.json here. Run 'keel init'."
     have_python || die "python3 is absent, so the profile cannot be read or written safely."
@@ -1024,7 +1082,8 @@ cmd_profile() {
            json_get .keel/profile.json "$2" || die "no such field '$2' in .keel/profile.json" ;;
       set) { [ -n "${2:-}" ] && [ "$#" -ge 3 ]; } || die "usage: keel profile set <dotted.path> <value>"
            profile_set "$2" "$3" ;;
-      *)   die "unknown profile subcommand '${1:-}'. Try get or set." ;;
+      sync) profile_sync ;;
+      *)   die "unknown profile subcommand '${1:-}'. Try get, set or sync." ;;
     esac
 }
 
@@ -1340,6 +1399,28 @@ for k,v in d.items():
     if k.startswith('_') or not v: continue
     print(f'{k}={v}')
 " 2>/dev/null)
+    fi
+
+    # The other half of the map: a key that is null while its default is sitting there. The profile
+    # does not know about a document the repository has, and a skill reading the map gets the
+    # fallback. A warning and never a failure, because nothing is broken.
+    #
+    # The same three keys `profile sync` fills, and no more. prd, stories and architecture default
+    # to one file per slug, so sync will not fill them by decision, and naming a remedy that does
+    # nothing for them is worse than saying nothing. FR-10, FR-11.
+    #
+    # json_get answers from json_load's flat cache, where a null renders as an empty string, so this
+    # loop adds no interpreter start to the budget asserted in tests/test-keel.sh.
+    if have_python; then
+        local akey apath
+        for akey in snapshot decisions plans; do
+            [ -n "$(json_get .keel/profile.json "artifacts.$akey" 2>/dev/null || true)" ] && continue
+            case "$akey" in
+              snapshot) apath="$root/snapshot.md"; [ -f "$apath" ] || continue ;;
+              *)        apath="$root/$akey"; dir_has_file "$apath" || continue ;;
+            esac
+            warn "artifacts.$akey is null but '$apath' exists, so the profile does not know about it. Record it with: keel profile sync"
+        done
     fi
 
     if [ "$kind" != "docs" ] && have_python; then
@@ -1879,6 +1960,7 @@ case "${1:-}" in
         say "  new <name> [--stack node|python|go|minimal]   create a new project"
         say "  doctor [--fast]      check this project; non-zero on any problem. --fast checks that the verify commands are set without running them"
         say "  profile get|set <dotted.path> [value]   read or correct one profile field"
+        say "  profile sync         record where this project's documents already are"
         say "  apex-export --app <id>   export an Oracle APEX application for porting"
         say "  scan                 supply chain scan of this tree; non-zero on any finding"
         say "  guard install|status|uninstall   pre-push hook: the scan, and no pushes to the default branch, plus a pre-commit hook that stays off until gates.commit_guard turns it on"

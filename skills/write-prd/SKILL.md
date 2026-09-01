@@ -25,7 +25,7 @@ If overridden, write down what you assumed and carry on.
 | Mode | When | First read |
 |---|---|---|
 | `from-idea` | A rough idea, nothing written | `<docs_root>/ideas/<slug>.md` if one exists |
-| `from-repo` | The system exists, requirements never were | `<docs_root>/snapshot.md` |
+| `from-repo` | The system exists, requirements never were | `profile.artifacts.snapshot`, else `<docs_root>/snapshot.md` |
 | `revise` | A PRD exists and is vague, contradictory, or overtaken | The existing PRD |
 
 **Check `profile.artifacts.prd` first.** If it maps to an existing document, this is a `revise`, not

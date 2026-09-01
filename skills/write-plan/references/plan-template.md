@@ -25,11 +25,13 @@ that has loaded nothing else.
 
 ## Global constraints
 
-Copied verbatim from the stories, ADRs, and profile. Every task inherits these.
+Copied verbatim from the stories, ADRs, the standards document, and profile. Every task inherits
+these.
 
 - Verify commands: test `npm test`, one test `npm test -- {path}`, lint `npm run lint`
 - Never start on `main`
 - ADR-0003 requires that a missing or empty credential fails startup
+- `<docs_root>/standards.md` requires a named exception type, never a bare catch
 
 ---
 ```

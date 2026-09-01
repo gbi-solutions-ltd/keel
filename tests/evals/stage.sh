@@ -43,10 +43,10 @@ if [ -d "$fixture" ]; then
 fi
 
 # A fixture that needs more than files carries a setup.sh, run here with the staged project/ as its
-# working directory. One scenario needs it: a fixture cannot ship a .git directory, because a nested
-# repository cannot be committed inside this one, so a scenario scored on git state has to build the
-# repository at staging time. Its output goes to stderr, because stdout is the path this script
-# returns.
+# working directory. Three scenarios need it: a fixture cannot ship a .git directory, because a
+# nested repository cannot be committed inside this one, so a scenario scored on git state has to
+# build the repository at staging time. Its output goes to stderr, because stdout is the path this
+# script returns.
 #
 # The script is not left in the working directory, for the reason prompt.md is not: it is not one of
 # the files the arm should find lying around in the project it is working on, and a setup script that

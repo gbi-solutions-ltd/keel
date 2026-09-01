@@ -1,21 +1,23 @@
 # Repo Layout
 
-The `keel` repo as it actually is, at 0.5.0. 121 files, excluding `resources/` and `zips/`.
+The `keel` repo as it actually is, at 0.16.1. 293 tracked files.
 
 **This document was a plan until 0.5.0, and it had drifted.** It described the tree "as it should
 exist when Phase 6 is done" and listed files that were never created: `lib/write-profile.sh`,
 `lib/doctor-checks.sh`, `templates/settings.template.json`, `templates/docs-keel-skeleton/`,
 `tests/test-init.sh`, `tests/test-doctor.sh`, per-stack `tests/fixtures/`, and two references under
 names the skills never used. A layout that lists files nobody wrote is worse than none: it sends a
-reader hunting for helpers that do not exist. Generated from the tree now.
+reader hunting for helpers that do not exist. Regenerated from `git ls-files` on 2026-09-01, which
+is the only way it stays true: the 2026-08 version was hand-maintained and had silently lost a whole
+skill, a hook, nine test files and this repository's entire self-hosted docs root.
 
 ```
 keel/
 ├── .claude-plugin/
-│   ├── marketplace.json                    # the repo is its own marketplace
-│   └── plugin.json                         # plugin manifest. Its version keys the install cache
+│   ├── marketplace.json                # the repo is its own marketplace
+│   └── plugin.json                     # plugin manifest. Its version keys the install cache
 │
-├── skills/                             # 24 skills, flat namespace
+├── skills/                             # 25 skills, flat namespace
 │   ├── apex-export/
 │   │   ├── SKILL.md
 │   │   └── references/connection-and-privileges.md
@@ -26,6 +28,7 @@ keel/
 │   ├── coding-standards/
 │   │   ├── SKILL.md
 │   │   ├── references/api-contracts.md
+│   │   ├── references/assessment-report.md
 │   │   ├── references/async-work.md
 │   │   ├── references/authorisation.md
 │   │   ├── references/caching.md
@@ -37,7 +40,8 @@ keel/
 │   │   ├── references/resilience.md
 │   │   ├── references/standards-template.md
 │   │   └── references/time-and-dates.md
-│   ├── context-budget/SKILL.md
+│   ├── context-budget/
+│   │   └── SKILL.md
 │   ├── create-skill/
 │   │   ├── SKILL.md
 │   │   └── references/skill-anatomy.md
@@ -49,21 +53,35 @@ keel/
 │   │   ├── SKILL.md
 │   │   ├── references/adr-template.md
 │   │   ├── references/design-template.md
+│   │   ├── references/existing-mode.md
 │   │   └── references/mermaid-patterns.md
+│   ├── design-database/
+│   │   ├── SKILL.md
+│   │   ├── references/indexing-and-partitioning.md
+│   │   ├── references/normalisation.md
+│   │   ├── references/oracle.md
+│   │   ├── references/postgres.md
+│   │   ├── references/review-template.md
+│   │   └── references/type-selection.md
 │   ├── execute-plan/
 │   │   ├── SKILL.md
+│   │   ├── references/parallel-batches.md
+│   │   ├── references/preconditions.md
 │   │   └── references/subagent-prompts.md
-│   ├── keel/
-│   │   ├── SKILL.md
-│   │   └── references/asking-questions.md
 │   ├── incident-response/
 │   │   ├── SKILL.md
 │   │   └── references/incident-record.md
-│   ├── optimize-performance/SKILL.md
+│   ├── keel/
+│   │   ├── SKILL.md
+│   │   ├── references/asking-questions.md
+│   │   └── references/tool-choices.md
+│   ├── optimize-performance/
+│   │   └── SKILL.md
 │   ├── port-assess/
 │   │   ├── SKILL.md
 │   │   └── references/assessment-template.md
-│   ├── refactor/SKILL.md
+│   ├── refactor/
+│   │   └── SKILL.md
 │   ├── repo-snapshot/
 │   │   ├── SKILL.md
 │   │   └── references/section-templates.md
@@ -78,67 +96,83 @@ keel/
 │   │   └── references/stride.md
 │   ├── setup-deployment/
 │   │   ├── SKILL.md
-│   │   └── references/pipeline-patterns.md
+│   │   ├── references/pipeline-patterns.md
+│   │   └── references/release-operations.md
 │   ├── shape-idea/
 │   │   ├── SKILL.md
 │   │   └── references/idea-template.md
-│   ├── ship/SKILL.md
+│   ├── ship/
+│   │   └── SKILL.md
 │   ├── tdd/
 │   │   ├── SKILL.md
+│   │   ├── references/no-test-tooling.md
 │   │   └── references/writing-good-tests.md
 │   ├── write-docs/
 │   │   ├── SKILL.md
+│   │   ├── references/claims-audit.md
+│   │   ├── references/current-state-prose.md
 │   │   ├── references/readme-structure.md
 │   │   └── references/runbook-structure.md
 │   ├── write-plan/
 │   │   ├── SKILL.md
+│   │   ├── references/plan-review.md
 │   │   └── references/plan-template.md
 │   ├── write-prd/
 │   │   ├── SKILL.md
 │   │   ├── references/prd-template.md
 │   │   └── references/questionnaire.md
-│   ├── write-user-stories/
-│   │   ├── SKILL.md
-│   │   └── references/story-template.md
+│   └── write-user-stories/
+│       ├── SKILL.md
+│       └── references/story-template.md
 │
-├── hooks/
-│   ├── context-watch                       # context watchdog, silent below 70% of the window
-│   ├── hooks.json                          # registers SessionStart, UserPromptSubmit, PreToolUse, PreCompact
-│   ├── sensitive-guard                     # hard block on hard_block_paths, silent unless a repo declares them
-│   └── session-start                       # static router pointer, names every skill
+├── hooks/                         # session-start injects the router; the guards fire per tool call
+│   ├── context-watch
+│   ├── done-guard
+│   ├── hooks.json
+│   ├── sensitive-guard
+│   └── session-start
 │
-├── bin/
-│   └── keel                                # the CLI, bash
-│
-├── lib/                               # sourced by bin/keel, plus the Python it needs
+├── lib/                           
 │   ├── apex-export.sh
-│   ├── apex_export.py                      # all APEX I/O
-│   ├── apex_render.py                      # pure renderer, which is what makes the offline suite possible
-│   ├── context_watch.py                    # occupancy from the transcript, and the handoff
+│   ├── apex_export.py
+│   ├── apex_render.py
+│   ├── context_watch.py
 │   ├── detect-stack.sh
 │   └── merge-claude-md.sh
 │
-├── templates/                         # what keel init writes into a project
+├── templates/                     
 │   ├── keel-profile.example.json
 │   ├── profile.schema.json
 │   ├── project-claude-md-block.md
 │   └── prompting-cheatsheet.md
 │
+├── output-styles/                 
+│   └── keel-terse.md
+│
 ├── tests/
-│   ├── no-internal-leaks.sh                # no client or partner identifiers
-│   ├── run-tests.sh                        # all of the above, plus the lint from the profile
-│   ├── supply-chain-scan.sh                # refuse to ship what would run on an installing machine
+│   ├── export-public.sh
+│   ├── generate-profile-keys.sh
+│   ├── no-internal-leaks.sh
+│   ├── run-tests.sh
+│   ├── supply-chain-scan.sh
 │   ├── test-apex-export.sh
+│   ├── test-cache-install.sh
 │   ├── test-context-watch.sh
+│   ├── test-doc-claims.sh
+│   ├── test-done-guard.sh
+│   ├── test-eval-harness.sh
 │   ├── test-keel.sh
 │   ├── test-no-leaks.sh
+│   ├── test-profile-keys.sh
+│   ├── test-sensitive-guard.sh
+│   ├── test-session-start.sh
 │   ├── test-supply-chain.sh
 │   ├── test-validate-skills.sh
-│   └── validate-skills.sh                  # frontmatter, budgets, links, router and injection agreement
-│   ├── evals/                         # behavioural, costs tokens, run before a release
-│   └── fixtures/apex/capture/         # the only committed fixture: an APEX capture
+│   ├── validate-skills.sh
+│   ├── fixtures/                       # per-stack detection fixtures, and an APEX capture
+│   └── evals/                          # 9 scenarios, 9 fixtures, results.md
 │
-├── docs/
+├── docs/                               # keel's own docs_root, written by keel's own skills
 │   ├── 01-architecture.md
 │   ├── 02-skill-catalog.md
 │   ├── 03-install-and-distribution.md
@@ -146,17 +180,28 @@ keel/
 │   ├── 05-token-and-memory-design.md
 │   ├── 06-repo-layout.md
 │   ├── 07-open-decisions.md
-│   └── standards.md
+│   ├── README.md
+│   ├── profile-keys.md
+│   ├── prompting.md
+│   ├── standards.md
+│   ├── audits/
+│   ├── decisions/
+│   ├── ideas/
+│   ├── plans/
+│   ├── prd/
+│   ├── runbooks/
+│   └── stories/
 │
-├── .github/workflows/ci.yml           # validate, supply chain as its own job, shellcheck
-├── .keel/profile.json                  # this repo's own profile. CI reads its lint command
-│
-├── README.md
+├── .gitignore
+├── AGENTS.md
+├── CHANGELOG.md
+├── CLAUDE.md
 ├── CONTRIBUTING.md
+├── LICENSE
+├── NOTICE
+├── README.md
 ├── SOURCES.md
 ├── THIRD-PARTY-LICENSES.md
-├── LICENSE
-├── CHANGELOG.md
 └── VERSION
 ```
 
@@ -205,10 +250,11 @@ project/
 └── docs/keel/
     ├── README.md                   # what this directory is, for humans
     ├── prompting.md                # the cheatsheet
-    └── decisions/ADR-0000-template.md
+    ├── decisions/ADR-0000-template.md
+    └── ideas/ prd/ stories/ architecture/ plans/ runbooks/ audits/ incidents/ port/
 ```
 
-Five files and two directories. Everything else in `docs/keel/` appears as skills produce
+Five files, and ten directories created empty for skills to write into. Everything else in `docs/keel/` appears as skills produce
 it. Nothing under `skills/` is ever copied.
 
 ## Testing strategy

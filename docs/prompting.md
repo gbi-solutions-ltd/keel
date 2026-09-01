@@ -27,10 +27,11 @@ If nothing fires and you expected it to, say `/keel` and describe the task.
 | "I want to build X", "write requirements", "we need a PRD", "spec this out" | `write-prd` | `docs/prd/<slug>.md` |
 | "break this into stories", "create tickets", "write epics" | `write-user-stories` | `docs/stories/<slug>.md` |
 | "how should we build this", "what stack", "which database", "design the system" | `design-architecture` | architecture doc plus ADRs |
+| "design a schema", "review this database", "normalise these tables", "what column type" | `design-database` | a schema review with every section filled |
 | "write the implementation plan", "plan this out" | `write-plan` | `docs/plans/<date>-<slug>.md` |
 | "execute the plan", "start building", "go" | `execute-plan` | code and commits |
 | "implement X", "add feature Y", "fix bug Z" | `tdd` | failing test first, then code |
-| "what are our conventions", "set up linting", "enforce style" | `coding-standards` | `docs/standards.md` plus lint config |
+| "what are our conventions", "set up linting", "enforce style", "does the code still follow our standards" | `coding-standards` | `docs/standards.md` plus lint config, or `docs/audits/<date>-standards.md` |
 | "production is down", "we have an outage", "customers are affected" | `incident-response` | a restored service, then an incident record |
 | "this is broken", "why does X fail", "this test is flaky", "wtf" | `debug` | root cause, then a failing test, then the fix |
 | "review my changes", "look at this diff", "check this PR" | `review-code` | ranked findings |

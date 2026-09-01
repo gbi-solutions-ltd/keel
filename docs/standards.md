@@ -56,7 +56,8 @@ were under 600, and fifteen of 24 sat within 20 words of the ceiling. **A ceilin
 number under it is not a limit, it is where bodies settle.**
 
 **Example:** `skills/coding-standards/SKILL.md` is the case that shows moving detail out has a
-floor: 12 reference files carrying 17,816 words, and a body still at 683. Reach for a reference
+floor: `coding-standards` carried 12 reference files and 17,816 words against a body of 683 when
+ADR-0001 measured it, and carries 13 and 20,118 against 876 today. Reach for a reference
 because a reader needs it at one step, not as a way to buy words.
 
 ## Subagent briefs stay in the body; everything else can move

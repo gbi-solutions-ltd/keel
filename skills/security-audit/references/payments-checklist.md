@@ -77,3 +77,18 @@ because every item is business logic.
 - Is there a report that would surface a discrepancy, and does anyone read it?
 - Are stuck transactions countable? An unbounded `pending` state with no alert is where money
   goes missing quietly.
+
+## Going live
+
+- Is the switch from test to live a separate, explicitly confirmed act, rather than a consequence
+  of a general go-ahead? It is the only step that can charge a real card, and
+  `docs/07-open-decisions.md` decision 3 resolved that money movement is not overridable by a
+  sentence in chat.
+- Is the current mode visible to whoever is operating the system, rather than inferable only from a
+  credential prefix?
+- Before an integration endpoint is created, is the existing set listed first? A second endpoint on
+  the same address delivers every event twice, and the stored signing secret matches one delivery
+  and fails the other, so the symptom is intermittent rather than obvious.
+- Are amounts and currencies read back and confirmed before anything is created live? A live price
+  is usually deactivatable and not deletable, so a wrong figure is a permanent record and a
+  business event rather than a bug.

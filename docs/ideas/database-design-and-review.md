@@ -3,9 +3,40 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-08-19 |
-| Status | agreed in shape, not built. Scope decided 2026-08-19 |
+| Status | **built 2026-08-30**, to `docs/plans/2026-08-30-design-database.md`. Scope decided 2026-08-19 |
 | Recommendation | One skill, `design-database`, scoped to what a baseline agent omits rather than to database review as a whole |
-| Next | A plan under `docs/plans/`, after the release in flight |
+| Next | nothing. See "What landed" below for what stayed out |
+
+## What landed, 2026-08-30
+
+`skills/design-database`, the 25th skill. A body of 544 words carrying the routing seams and the
+required output shape, plus five references: `review-template.md`, `normalisation.md`,
+`type-selection.md`, `indexing-and-partitioning.md`, `postgres.md` and `oracle.md`.
+
+**It passes `create-skill` Step 4 on all four criteria**, measured 2026-08-30 with both arms run
+against a rebuilt fixture and written up in `tests/evals/results.md`. The margin is the sweep: a
+subsection per table and a row per column against the baseline's bullet list, plus the ERD the
+baseline again omitted. The ERD earned its place by producing findings rather than by being filled
+in, which is the best evidence this record's "structural, not prose" call was right.
+
+**The cost prediction in this record was wrong in the cheap direction.** It expected a body of
+roughly 700 words and got 544, and it named five reference files where six were written.
+
+**What stayed out, and why:**
+
+- **SQL Server, MySQL, MariaDB and MongoDB references.** Decided here on 2026-08-19: writing five
+  engine references on speculation is content nobody has validated. MongoDB is further out than the
+  other three, because the template's sections assume a relational model.
+- **The "documenting database objects" half of the original ask.** `write-docs` owns producing
+  documents. The review template is a review output, not a reference document for a schema.
+- **A second Step 4 pass.** The treatment complied at the first attempt, so there was no loophole to
+  close. Stability is therefore unmeasured.
+
+**One thing this record assumed that no longer holds.** Its case rests on a 2026-08-19 baseline that
+omitted all four sweeps. Re-run on 2026-08-30 against the rebuilt fixture, a skill-less arm named
+denormalisation, found three type defects and gave two of the three partitioning answers. The skill
+still wins, but by less than this record predicts, and the fixture the original was measured on no
+longer exists to settle whether the model moved or the rebuild is easier.
 
 **The ask.** An agency with many running databases and new ones to design wants one place for:
 designing a fresh schema, reviewing an existing one and remediating gaps and normalisation,

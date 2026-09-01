@@ -26,6 +26,9 @@ Implement exactly this task and nothing more.
 === GLOBAL CONSTRAINTS (verbatim from the plan header) ===
 <paste the whole Global constraints block, including the verify commands>
 
+=== PROJECT STANDARDS ===
+<paste the rules from <docs_root>/standards.md this task could breach>
+
 === RULES ===
 - Follow the steps in order. Do not skip the step that runs the test and watches it fail.
 - Use only the verify commands above. Do not substitute the command you would expect this stack to
@@ -62,6 +65,12 @@ re-dispatched, which costs more than saying you skipped it.
 
 Paste the constraints in full rather than summarising them. A summary is where "never start on the
 default branch" quietly disappears.
+
+Paste the standards too, and not a path to them. The review prompt below offers the path as an
+option because a reviewer goes looking for what to judge against; an implementer writes to what is
+in front of it, and by the paragraph above, this brief is all of that there is. Send the rules the
+task can actually breach, not the whole document: a paste nobody can finish reading is the same
+omission with more tokens.
 
 ## 2. Spec compliance review
 

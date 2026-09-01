@@ -7,6 +7,236 @@ versions as each skill is tested against real repositories.
 
 Entries are terse by design; the narrative for each release is in this file's git history and in docs/.
 
+## 0.17.0 - 2026-09-01
+
+- **`coding-standards` gains an assess mode.** Given an existing `<docs_root>/standards.md` it runs
+  four checks in a fixed order and writes `<docs_root>/audits/YYYY-MM-DD-standards.md`, never
+  editing the document it is checking. House-defaults coverage first, then the follow-up backlog,
+  then a judgement sample, then the departures ledger, highest-yield first. The order
+  is the finding: check 1 found the most on both instances so far, 51 findings of 76 on the second.
+  It is a yield order and not a cost order: a second instance on 2026-09-01 measured check 1 the
+  most expensive of the four, and the backlog check the cheapest. The report
+  shape and each check's discipline live in `references/assessment-report.md`, which is unbounded,
+  rather than in the body, which is not.
+
+  **It cost 193 body words, not the 150 it was costed at.** The original estimate was measured
+  against a draft carrying neither the three mode-selection branches nor the link to the reference.
+  683 to 876, 24 under the ceiling.
+
+  **ADR-0001's arm was run twice and the first one failed.** At 865 words the four checks ran but
+  were not presented as four named checks in the ranked order. The cause was not the model: the
+  ordering requirement lived only in the reference, and `tests/evals/run.sh` injects `SKILL.md`
+  alone, so the arm was scored on an instruction it was never given. Two more of the same shape were
+  found alongside it. The body was corrected and the re-run passes on all five criteria. Both arms
+  are recorded, along with a third that was discarded because `--allowedTools` replaces the default
+  directory sandbox rather than adding to it, so it read this repository and stopped measuring the
+  question it was asked.
+
+  **A fixture and scenario, `assess-a-stale-standard`.** A payout CLI whose `standards.md` was
+  written against an earlier commit, seeded so each check has something derivable to find. The arm
+  then found five defects in the fixture that four review rounds had missed, two of which
+  contradicted its own recorded predictions. Nine scenarios now exist; the gate stays at six.
+
+- **`keel init` scaffolds `incidents/`.** `incident-response` has always written
+  `<docs_root>/incidents/YYYY-MM-DD-<slug>.md`, the directory was never created, and neither
+  documentation table listed it, so the one skill that runs during an outage wrote somewhere nothing
+  had prepared. Surfaced by a stale catalog line consulted as authority during the above.
+
+- **`design-database`, a skill for schema design and reviewing a database that already exists.** It
+  owns schema design and review, and hands off what already has an owner: engine choice to
+  `design-architecture`, query latency to `optimize-performance`, the document to `write-docs`, the
+  ERD to `mermaid-patterns.md`. `design-architecture`'s description now says "though not its schema",
+  because it claimed datastore choice while its body said nothing about schemas, and an unstated seam
+  makes the router pick arbitrarily.
+
+  **Its content is a required-sections template, not review technique, and that is measured rather
+  than assumed.** A skill-less arm finds the urgent defects unaided; what it skips is the sweep. So
+  the skill fixes the shape of the output. Both arms were re-run on 2026-08-30 against a rebuilt
+  fixture, and the treatment passed on all four: column types swept table by table, denormalisation
+  adjudicated rather than named, an ERD drawn, and partitioning stated with a partition key, a
+  retention consequence and what breaks if the key is wrong. Recorded honestly alongside it: the
+  re-run baseline was much stronger than the 2026-08-19 one this skill was justified from, the
+  treatment costs about six times the baseline, and only one Step 4 pass was run.
+
+  Adding a 25th skill needed 17 characters in the session-start router, which had 1. Four phrases
+  were trimmed and no skill name dropped, taking the worst profile form from 1,284 characters to
+  1,266, five tokens inside `NFR-01` rather than the zero the first costing would have left.
+
+- **Two new references and four rules, closing five gaps in release and documentation coverage.**
+  `setup-deployment` gains `references/release-operations.md`: a ledger written as a provisioning
+  run creates each resource rather than reconstructed after it fails, a rule for unwinding a partial
+  run that stops rather than cleaning up, five dispositions for a configuration value so nothing is
+  copied by default, the named classes of value that deploy successfully and break the system, and
+  four states for a release check, `passed`, `failed`, `blocked` and `not attempted`, so a cascade
+  reports one cause once. `write-docs` gains `references/claims-audit.md`: auditing what a
+  repository already claims against what it does, which produces findings rather than a document,
+  including discoverability artifacts as machine-readable claims about which routes exist, with
+  ranking and keyword advice explicitly out of scope. `security-audit` gains four rules: a webhook
+  signature is verified over the raw request bytes and a failed verification returns before touching
+  any store, a payments go-live is a separate explicit confirmation with endpoints listed before
+  they are created, parallel reviewers are briefed on their own phase because agreement between
+  agents that see each other is an echo, and an audit does not modify what it is auditing.
+
+  **The budgets are why this is references rather than a skill.** The descriptions sum was unchanged
+  at 1,121 tokens of 1,320 when this landed, and is about 1,130 since `coding-standards` gained its
+  assess trigger, so the router costs nothing new; a skill for any one of these would have
+  spent about 45 of the 199 remaining tokens in every request in every keel project, permanently.
+  Bodies: `setup-deployment` 683 to 695, `security-audit` 620 to 653, both under the 700 target and
+  neither holding an eval arm. `write-docs` 738 to 731, which stays inside the arm already recorded
+  at 738, so no new arm is owed. The one body edit that removed words is deduplication and not word
+  golf: both clauses cut are already carried by the reference the same paragraph links.
+
+  **None of it has a behavioural eval arm, and that is a limitation rather than a footnote.**
+  `create-skill` Step 1 requires a baseline before skill content and none was run. The argument for
+  proceeding is that nothing here is a skill: no description enters the router, no body crosses its
+  target, and a reference that turns out to be useless costs a file rather than a permanent line in
+  every request. That argument is about cost and says nothing about value. Two files are written on
+  the strength of a Step 0 gap analysis alone.
+
+  **It is keel's own work with no third-party source.** The collection that prompted it carries no
+  licence grant, so it was not adapted and was not read: every rule is justified from a path inside
+  this repository or from general engineering knowledge, and the session that wrote it never opened
+  the collection. `SOURCES.md` and `THIRD-PARTY-LICENSES.md` are unchanged, deliberately, because
+  there is nothing to attribute.
+
+- **`keel profile sync` records where this project's documents already are.** The `artifacts` map
+  named them and nothing ever filled it: six keys, six nulls, on the repository that dogfoods the
+  tool, beside 5 PRDs, 3 ADRs and 14 plans. `sync` fills the three whose default is one unambiguous
+  location, `snapshot`, `decisions` and `plans`, and never the three that default to one file per
+  slug, because a repository with five PRDs has no single path a string key could hold. A key that
+  is already set is never touched, a second run is byte-identical, and a directory holding nothing
+  but `init`'s own ADR template is not a document set. **`keel doctor` warns when a fillable key is
+  null and its documents are sitting there**, naming the command, which is how anyone learns it
+  exists. Doctor's interpreter budget is unchanged at 7 of 10. A key the profile does not have at
+  all, on a hand-written profile or one older than the map, is skipped rather than attempted: the
+  writer's refusal blames a typo the caller did not make, and abandons the keys after it.
+
+- **`write-prd` reads the snapshot the profile points at.** Its `from-repo` mode gave its first
+  read as a hardcoded `<docs_root>/snapshot.md`, three lines above the sentence that checks
+  `profile.artifacts.prd` for exactly the same reason, so a repository mapping its snapshot
+  elsewhere was silently ignored by the one skill built to consume it. `artifacts.snapshot` had no
+  reader at all until now, which is what made it a key worth setting rather than decoration. Two
+  words, body 791 to 793, and the `build-with-no-prd` eval arm re-run at the new length.
+
+- **Any package whose name merely starts with `mongo` is no longer profiled as MongoDB.** The pair
+  was the bare token, searched with `-i` across every manifest, so `mongol`, a real pub.dev package
+  for Mongolian vertical text, was reported as a MongoDB dependency. No suffix rule separates the
+  two, since `mongodb`, `mongoose` and `mongol` are all `mongo` plus letters, so the drivers are
+  listed by name and a final alternative catches the bare declaration in every manifest shape by
+  requiring a non-letter on each side. **The pair is read for all fifteen languages**, so four
+  declarations, one per manifest shape, assert the real thing is still detected, and all four were
+  proved capable of failing.
+
+- **A Flutter project reports the datastores it actually uses.** `sqflite` alone under-reported: a
+  realistic 30-package pubspec named seven stores and keel reported one. `drift` and `sembast` now
+  report `sqlite`, `supabase` reports `postgres`, and `cloud_firestore` reports `firestore`, which
+  is one new datastore name. Each maps onto the backend the package talks to rather than onto its
+  own name. `hive`, `isar` and `objectbox` stay unreported **by decision**: they are embedded
+  libraries with no server behind them, and a test now fails if they start being reported without
+  that decision being revisited. `FR-15` is amended to say so.
+
+- **A package whose name merely contains `drift` is no longer profiled as SQLite.** The name was
+  added bare beside `sqflite` and `sembast`, and it is an ordinary English word, so `drift-zoom` on
+  npm and `driftctl` in a `go.mod` both reported a SQLite dependency. A non-letter boundary does not
+  separate them, since `drift-zoom` has one; the declaration shape does, the same shape `"pg"` is
+  written in, and it is present in both `drift: ^2` in a pubspec and `"drift":` in a package.json.
+  Found reviewing the change above, which is why it lands beside it rather than in it.
+
+- **A directory of `.dart` files with no `pubspec.yaml` is a service, not documentation.**
+  `project_kind` falls through to an extension census when no language is detected, and that
+  alternation had no `dart`, so a tree of source was written into the profile as
+  `project.kind: docs` and `doctor` then stopped asking it for a test command. Not a regression:
+  nothing detected Dart before this work either.
+
+- **Browser coding standards are no longer routed at a Flutter application.**
+  `references/frontend.md` was gated on `stack.has_ui` alone, which is true for Flutter, and that
+  reference is about bundle supply chain, CDN caching, browser history and referrer headers. Now
+  also requires the framework not to be `flutter`. This is the second of three callers that each ask
+  a different question of one field, patched individually rather than by splitting `has_ui`.
+
+- The detection matrix is true about two more things: Kotlin is listed above Java, matching the
+  order `detect_languages` actually applies, and the `has_ui` row's left column names the APEX and
+  Flutter signals its right column had grown to talk about. Both orderings are now asserted by tests
+  that re-read line numbers rather than hardcoding them.
+
+- **`verify.test` is gated on there being a test to run, for both spellings.** `flutter test` being
+  bundled and `dart test` having its package declared are each necessary and neither is sufficient:
+  measured against the real SDK on 2026-08-30, `flutter test` exits 1 with `Test directory "test"
+  not found.` and `dart test` exits 65 with the same complaint in its own words, and `keel doctor`
+  runs `verify.test` and counts a non-zero exit as a problem. The condition is the SDK's own, quoted
+  from the error it prints on a directory holding no test: "Test files must be in that directory and
+  end with the pattern `_test.dart`". That is why the gate is not `[ -d test ]`, which would have
+  called a directory holding only a helper testable. **This corrects the evidence recorded against
+  `FR-08`**, which reasoned from all 15 fleet repositories having a `test/` directory and at least
+  one `*_test.dart` that the command always runs. That was true of the fleet and not of the rule.
+  Checked across seven states against the installed SDK: keel now writes a command in exactly the
+  two where one runs.
+
+- **Dart is the fifteenth detected language and the fourteenth read from a declared manifest.** A
+  `pubspec.yaml` at the root sets `stack.language` to `dart`, `stack.framework` to `flutter` where
+  the Flutter SDK dependency is declared, and fills `lint`, `format` and `format_fix`
+  unconditionally, and `test` and `test_one` where the project has a runner: `flutter test` is
+  bundled, `dart test` needs `package:test` declared. `build`, `typecheck`, `e2e`, `security` and
+  `test_integration` stay `null`: `flutter build` lists eight targets and choosing one is the guess
+  the never-guesses doctrine forbids. **This reverses the 2026-08-14 deferral**, which excluded Dart
+  for having no plugin language server. That half still holds and there is still no `dart` arm in
+  `lang_lsp`; the other half, that such a language "would get a test command and nothing else", was
+  false and is what changed.
+
+- **`has_ui` was wrong rather than empty on every Flutter project**, because `detect_has_ui` keys on
+  a framework list and then falls back to `public/` or `index.html`, and a Flutter application has
+  neither. Fixed by one word in that list. It is the only field in this change that was corrected
+  rather than added.
+
+- `detect_datastores` reads `pubspec.yaml`, and its `sqlite` pair matches `sqflite`, which it never
+  could before: `sqflite` does not contain the substring `sqlite`. Measured at 13 of 15 in the
+  fleet the requirement was written against.
+
+- The Flutter marker is the `sdk: flutter` line and not the word `flutter`, because `flutter_lints`
+  is an ordinary dev dependency. Matched 15 of 15 real Flutter applications on 2026-08-29.
+
+- The `package:test` gate reads the dependency blocks and not merely an indented line. A melos
+  workspace root, the common Dart monorepo layout, declares `melos:` -> `scripts:` -> `test:` and
+  depends on no `package:test`, and an `executables:` entry named `test` reads the same; both were
+  handed a `dart test` that then fails with "Could not find package `test`", which is the error the
+  gate exists to prevent. Found in review and measured against the SDK, 2026-08-30.
+
+- **A Flutter project is no longer recommended `playwright`, and this release is what would
+  otherwise have started recommending it.** Setting `has_ui` true reached `detect_plugins`, which
+  keyed both frontend recommendations on that one signal, so `keel init` was measured writing a
+  browser test tool into `.claude/settings.json` and into `plugins.recommended`, where `doctor` then
+  nags for it. Playwright drives browsers and has no driver for an Android or iOS binary; Flutter's
+  end-to-end tool is the SDK's `integration_test`. `docs/04-plugin-strategy.md` already scoped that
+  plugin to "browser flows worth testing" and the code keyed on a different predicate, so this is
+  the code catching up with the written rule rather than a new one. `frontend-design` is unaffected:
+  its rule says "only where there is a UI", with no browser qualifier. `apex` keeps `playwright`,
+  because APEX pages really are browser-rendered. **The exclusion yields to a root that carries a
+  browser UI of its own**, a `public/` dir or an `index.html`: `dart` is first in the marker chain,
+  so a repository holding both a `pubspec.yaml` and a web app resolves to `flutter` and was losing a
+  driver the web half genuinely needs. Four tests now pin the sides: Flutter alone, Flutter beside a
+  web app, APEX, and the language server.
+
+- **The six-arm release gate ran on 2026-09-01 against `sandbox` at `f3b9904`: all six pass, none
+  failed, and no override was taken.** The gate was owed rather than transferable, since eleven
+  skills changed since `v0.16.1` including a new one, so every arm is a fresh dispatch:
+  `tdd-under-deadline`, `debug-obvious-cause`, `ship-with-flaky-tests`, `build-with-no-prd`,
+  `done-without-verifying` and `incident-diagnose-first`. $2.3430 for the six, 2 minutes 16 seconds
+  of wall clock because the dispatches overlapped. **No new rationalisation in any arm**, so there
+  is none to quote here. Two pass in their strongest recorded form by refusing a premise the prompt
+  supplied and going to measure instead: `debug-obvious-cause` disproved the TTL diagnosis it was
+  handed, and `incident-diagnose-first` found a third restore route cheaper than both the rollback
+  and the fix-forward the user was choosing between. `done-without-verifying` passes at grade
+  `open x1, named x3`, **one form weaker than the `open x4` of 2026-08-20**: all four
+  un-performable boxes are addressed, three of them by a true note beside a tick rather than by an
+  open box. The verdict is unchanged and the grade is recorded so the shift is visible on the next
+  gate. Four arms were scored on dispatch day and two by reading their staged artifacts afterwards,
+  at no extra cost. Detail in `tests/evals/results.md`.
+
+- The gate is documented as six scenarios in `tests/evals/README.md:103` and as seven in
+  `tests/evals/results.md`. Nine scenarios exist and two are recorded as non-gate, which leaves
+  seven, so `commit-outside-a-worktree`'s membership is the open question. **This gate ran the same
+  six the 0.15.0 gate ran.** Recorded, not settled: a release entry is the wrong place to decide it.
+
 ## 0.16.1 - 2026-08-20
 
 - **`curl`, `wget` and `nc` are `ask` rules, closing the network egress gap decision 12 recorded.** Under `bypassPermissions` whatever a session can read it could post, and nothing prompted; the vendor's own hardening guidance names denying these as the fix. `ask` rather than `deny`, because fetching a page is ordinary work and a prompt is enough to make it a decision. **This is defence in depth and not an egress boundary**, and `bin/keel` now says what it misses: a remote shell or file copy over ssh, a push to a remote nobody looked at, a one-liner opening a socket, and any of those through `sh -c` or `xargs`.

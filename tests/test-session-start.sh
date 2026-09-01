@@ -129,8 +129,14 @@ fi
 size_of() {   # size_of <cwd>
     ( cd "$1" && "$HOOK" ) 2>/dev/null | wc -c | tr -d ' '
 }
-for spec in "b:1284:terse and technical" "g:1283:terse and plain" \
-            "c:1082:verbose and technical" "h:1273:verbose and plain"; do
+# Re-measured 2026-08-30 when design-database was added to the router. Adding a skill name costs 17
+# characters against the 1 the worst form had spare, so four phrases were trimmed in the same edit:
+# "Unsure which fits:" to "Unsure:", "for Oracle APEX" dropped from a line whose two skill names
+# already carry the word, "is down now:" to "is down:", and "when no skill fits" to "when none fits".
+# No skill name was dropped. The four forms fell by 18 characters each and the worst is now 1266,
+# 351 tokens, which is 5 tokens inside NFR-01 rather than the 0 the first costing would have left.
+for spec in "b:1266:terse and technical" "g:1265:terse and plain" \
+            "c:1064:verbose and technical" "h:1255:verbose and plain"; do
     dir="${spec%%:*}"; rest="${spec#*:}"; want="${rest%%:*}"; label="${rest#*:}"
     got="$(size_of "$tmp/$dir")"
     if [ "$got" = "$want" ]; then

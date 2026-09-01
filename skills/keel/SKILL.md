@@ -25,7 +25,7 @@ Route to one skill, then stop. Do not do the work here.
 | implement X, add feature Y, fix bug Z | `tdd` |
 | **production is down right now**, on call, outage, customers affected | `incident-response` |
 | this is broken, why does X fail, this test is flaky | `debug` |
-| what are our conventions, set up linting | `coding-standards` |
+| what are our conventions, set up linting, does the code still follow our standards | `coding-standards` |
 | review my changes, look at this diff, check this PR | `review-code` |
 | is this secure, security audit, check for vulnerabilities | `security-audit` |
 | clean this up, reduce duplication, this file is a mess | `refactor` |
@@ -35,6 +35,7 @@ Route to one skill, then stop. Do not do the work here.
 | write the README, document this, draw the flow, write a runbook | `write-docs` |
 | make this a skill, we do this every time | `create-skill` |
 | too many tokens, context audit, sessions keep compacting | `context-budget` |
+| design a schema, review this database, normalise these tables | `design-database` |
 
 ## Rules
 

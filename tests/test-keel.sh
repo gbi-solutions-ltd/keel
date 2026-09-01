@@ -135,6 +135,143 @@ P
           # and outvote .sql, which is the same defect the pks exclusion closed from the other side.
           i=1; while [ "$i" -le 12 ]; do printf 'v VARCHAR2(9);\n' > "s$i.sql"; i=$((i+1)); done
           i=1; while [ "$i" -le 40 ]; do : > "f$i."; i=$((i+1)); done ;;
+        dart-flutter)
+          cat > pubspec.yaml <<'P'
+name: f
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+dependencies:
+  flutter:
+    sdk: flutter
+  sqflite: ^2.3.0
+dev_dependencies:
+  flutter_lints: ^3.0.0
+P
+          mkdir -p test android ios lib
+          printf "void main() {}\n" > test/widget_test.dart ;;
+        dart-pure)
+          # No Flutter SDK dependency, so the commands must use the `dart` spelling. FR-07.
+          # flutter_lints is deliberately absent here: it is the dev dependency that would make a
+          # bare-word `flutter` match call this package a Flutter application. One assertion appends
+          # it to a copy of this fixture to hold that line.
+          cat > pubspec.yaml <<'P'
+name: f
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+dev_dependencies:
+  test: ^1.24.0
+P
+          mkdir -p test lib
+          printf "void main() {}\n" > test/f_test.dart ;;
+        dart-pure-notest)
+          # A plain Dart package that never added package:test. `dart test` fails here with
+          # "Could not find package `test`", measured 2026-08-29, so verify.test must be null and
+          # the skill must ask. The analyzer still runs, so verify.lint is not null.
+          cat > pubspec.yaml <<'P'
+name: f
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+P
+          mkdir -p lib ;;
+        dart-orphan)
+          # Dart source with no manifest at any level. The false positive the marker exists to
+          # survive: a real directory of this shape was found on 2026-08-29.
+          mkdir -p lib/screens
+          i=1; while [ "$i" -le 10 ]; do printf 'void f%s() {}\n' "$i" > "lib/screens/s$i.dart"; i=$((i+1)); done ;;
+        dart-polyglot)
+          # Both manifests at one root. Nothing in current work has this shape, so this fixture is
+          # the only thing that pins FR-19's ordering.
+          cat > pubspec.yaml <<'P'
+name: f
+dependencies:
+  flutter:
+    sdk: flutter
+P
+          printf '{"name":"f","devDependencies":{"typescript":"^5"}}\n' > package.json
+          echo '{}' > tsconfig.json ;;
+        dart-polyglot-web)
+          # The same two manifests, plus the browser UI the Node half really has. Separate from
+          # dart-polyglot because that fixture pins the marker order and this one pins what the
+          # plugin list does with it: dart wins the primary slot either way, and the web app still
+          # needs a browser driver.
+          cat > pubspec.yaml <<'P'
+name: f
+dependencies:
+  flutter:
+    sdk: flutter
+P
+          printf '{"name":"f","devDependencies":{"typescript":"^5"}}\n' > package.json
+          echo '{}' > tsconfig.json
+          echo 'module.exports = {}' > next.config.js
+          mkdir -p public ;;
+        dart-flutter-notests)
+          # A Flutter package that has not written a test yet. `flutter test` is bundled and needs
+          # no dev dependency, which is why it was ungated, but bundled is not the same as runnable:
+          # measured 2026-08-30, it exits 1 with `Test directory "test" not found.`
+          cat > pubspec.yaml <<'P'
+name: f
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+dependencies:
+  flutter:
+    sdk: flutter
+P
+          mkdir -p lib ;;
+        dart-flutter-nottests)
+          # A test/ directory holding no test file. The SDK names the condition itself: "Test files
+          # must be in that directory and end with the pattern "_test.dart"". Measured 2026-08-30,
+          # this exits 1 too, which is why the gate cannot be `[ -d test ]`.
+          cat > pubspec.yaml <<'P'
+name: f
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+dependencies:
+  flutter:
+    sdk: flutter
+P
+          mkdir -p lib test
+          printf 'int helper() => 1;\n' > test/helper.dart ;;
+        dart-flutter-nested)
+          # Tests one directory down, which is an ordinary Dart layout. The counter-case to the two
+          # above: the gate must not be so shallow that it nulls a project that does have tests.
+          cat > pubspec.yaml <<'P'
+name: f
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+dependencies:
+  flutter:
+    sdk: flutter
+P
+          mkdir -p lib test/unit
+          printf "void main() {}\n" > test/unit/widget_test.dart ;;
+        dart-pure-notestfiles)
+          # Declares package:test and never wrote a test. The plain branch fails the same way the
+          # Flutter one does, rc=65: "No test files were passed and the default "test/" directory
+          # doesn't exist." Measured 2026-08-30. The dependency gate alone does not catch it.
+          cat > pubspec.yaml <<'P'
+name: f
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+dev_dependencies:
+  test: ^1.24.0
+P
+          mkdir -p lib ;;
+        dart-melos)
+          # A melos workspace root, which is the common Dart monorepo layout. It declares a script
+          # named `test` and no dependency on package:test, so `dart test` fails here exactly as it
+          # does in dart-pure-notest. Measured against the real SDK on 2026-08-30:
+          # "Could not find package `test` or file `test:test`".
+          cat > pubspec.yaml <<'P'
+name: workspace
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+dev_dependencies:
+  melos: ^3.0.0
+melos:
+  scripts:
+    test: melos exec -- dart test
+P
+          mkdir -p packages ;;
         bare) : ;;
       esac
       git add -A >/dev/null 2>&1; git commit -qm init >/dev/null 2>&1 || true )
@@ -189,6 +326,378 @@ for stack in node-ts go php python csharp ruby kotlin swift cpp lua; do
     [ "$got" = "$want" ] && ok "detects $stack as $want" || bad "detects $stack" "got '$got', want '$want'"
     rm -rf "$d"
 done
+
+# ---- dart -----------------------------------------------------------------
+# Dart is read from pubspec.yaml, which is a declaration, so it needs none of the inference PL/SQL
+# does. The orphan case is the one that matters: ten .dart files and no manifest must detect as
+# nothing, because a marker keyed on source files would have called it Dart.
+#
+# The first cases read detect_languages rather than detect_stack, deliberately: they test the marker
+# and the chain position that puts dart first. The detect_stack cases below test the tuple
+# lang_profile builds from it. Both levels are asserted because a correct marker with no
+# lang_profile arm was a real intermediate state here, and it looked green at one level.
+d="$(fixture dart-flutter)"
+got="$(detect_in "$d" 'detect_languages | tr "\n" " "')"
+[ "$got" = "dart " ] && ok "a Flutter project detects as dart, and only dart" \
+  || bad "dart" "got '$got', want 'dart '"
+rm -rf "$d"
+
+d="$(fixture dart-pure)"
+got="$(detect_in "$d" 'detect_languages | head -n 1')"
+[ "$got" = "dart" ] && ok "a pure Dart package detects as dart" \
+  || bad "dart" "got '$got', want dart"
+rm -rf "$d"
+
+# This case passes before the implementation as well, because a tree nothing detects already returns
+# an empty language list. It is kept because it is the regression guard for the marker, not evidence
+# that the marker works. Step 2 says so rather than counting it among the failures.
+d="$(fixture dart-orphan)"
+got="$(detect_in "$d" 'detect_languages | tr "\n" " "')"
+case "$got" in
+  *dart*) bad "dart" "orphan tree got '$got', want no dart" ;;
+  *)      ok "Dart source with no pubspec.yaml detects as nothing" ;;
+esac
+rm -rf "$d"
+
+# A directory of Dart source with no manifest detects as no language, asserted above, which drops
+# project_kind through to its extension census. That alternation had no `dart`, so a tree of source
+# was classified `docs` and doctor then stopped asking it for a test command. Not a regression:
+# before PR #49 nothing detected Dart either. Found in the review of PR #49, 2026-08-30.
+#
+# The profile-exists guard is not ceremony. `prof_of` swallows every error and returns the empty
+# string, so without it a crashed `keel init` gives got='' and this case fails for the wrong reason
+# rather than saying so.
+d="$(fixture dart-orphan)"
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+if [ ! -f "$d/.keel/profile.json" ]; then
+    bad "project_kind" "dart-orphan wrote no .keel/profile.json; keel init failed"
+else
+    got="$(prof_of "$d" project.kind)"
+    [ "$got" = "service" ] && ok "a manifest-less Dart tree is a service, not docs" \
+      || bad "project_kind" "dart-orphan got project.kind '$got', want service"
+fi
+rm -rf "$d"
+
+d="$(fixture dart-polyglot)"
+got="$(detect_in "$d" 'detect_languages | head -n 1')"
+[ "$got" = "dart" ] && ok "dart is primary when another manifest is also present" \
+  || bad "dart" "polyglot got '$got', want dart"
+got="$(detect_in "$d" 'detect_also | tr "\n" " "')"
+[ "$got" = "typescript " ] && ok "the other language is kept in stack.also, and nothing else is" \
+  || bad "dart" "also got '$got', want 'typescript '"
+rm -rf "$d"
+
+# The build rule in tests/validate-skills.sh extracts languages by matching this exact spelling.
+# A rename inside detect_languages disables that rule silently rather than breaking it, which is
+# why the spelling is pinned here rather than left to review. FR-03.
+awk '/^detect_languages\(\)/{f=1} f&&/^}/{f=0} f' "$ROOT/lib/detect-stack.sh" \
+  | grep -q 'out="$out dart"' \
+  && ok "dart uses the accumulator spelling the tool-table rule extracts" \
+  || bad "dart" "detect_languages does not contain out=\"\$out dart\""
+
+d="$(fixture dart-flutter)"
+got="$(detect_in "$d" 'detect_stack')"
+[ "$got" = "dart dart flutter pub" ] && ok "a Flutter project's stack tuple" \
+  || bad "dart" "got '$got', want 'dart dart flutter pub'"
+rm -rf "$d"
+
+d="$(fixture dart-pure)"
+got="$(detect_in "$d" 'detect_stack')"
+[ "$got" = "dart dart none pub" ] && ok "a pure Dart package's stack tuple" \
+  || bad "dart" "got '$got', want 'dart dart none pub'"
+rm -rf "$d"
+
+# flutter_lints is a dev dependency in 7 of the 15 repositories this was measured against. A marker
+# matching the bare word would call a plain package a Flutter application, so the marker is the
+# `sdk: flutter` line and this case is what holds it there. It appends to $d, the copy handed out
+# by fixture(), never to the template under $FIXTURE_CACHE.
+d="$(fixture dart-pure)"
+printf '  flutter_lints: ^3.0.0\n' >> "$d/pubspec.yaml"
+got="$(detect_in "$d" 'detect_stack')"
+[ "$got" = "dart dart none pub" ] && ok "flutter_lints alone does not make a package a Flutter application" \
+  || bad "dart" "got '$got', want 'dart dart none pub'"
+rm -rf "$d"
+
+# The end to end claim, which no assertion above makes: the tuple has to survive write_profile to be
+# worth anything. The PL/SQL work added exactly this after a run where the detector had classified a
+# repository correctly and the profile still said `unknown`. S-03 scenario 3.
+d="$(fixture dart-flutter)"
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+{ read -r p_lang; read -r p_rt; read -r p_fw; read -r p_pm; } <<EOF
+$(prof_of "$d" stack.language stack.runtime stack.framework stack.package_manager)
+EOF
+[ "$p_lang $p_rt $p_fw $p_pm" = "dart dart flutter pub" ] \
+  && ok "keel init writes the Dart stack into the profile" \
+  || bad "dart" "profile got '$p_lang $p_rt $p_fw $p_pm', want 'dart dart flutter pub'"
+rm -rf "$d"
+
+# The SDK ships the runner, the analyzer and the formatter, so these are unconditional. lint is
+# ungated by analysis_options.yaml on purpose: the analyzer runs against the SDK default set whether
+# or not that file exists, and 8 of the 15 repositories measured on 2026-08-29 have no such file.
+# Gating on it would null out the majority. FR-08, FR-09, FR-10.
+d="$(fixture dart-flutter)"
+v_test="$(detect_in "$d" 'detect_verify test')"
+v_one="$(detect_in "$d" 'detect_verify test_one')"
+v_lint="$(detect_in "$d" 'detect_verify lint')"
+v_fmt="$(detect_in "$d" 'detect_verify format')"
+v_fix="$(detect_in "$d" 'detect_verify format_fix')"
+[ "$v_test" = "flutter test" ] && ok "a Flutter project's test command" \
+  || bad "dart" "test got '$v_test', want 'flutter test'"
+[ "$v_one" = "flutter test {path}" ] && ok "a Flutter project's single-test command" \
+  || bad "dart" "test_one got '$v_one', want 'flutter test {path}'"
+[ "$v_lint" = "flutter analyze" ] && ok "a Flutter project lints with no config file present" \
+  || bad "dart" "lint got '$v_lint', want 'flutter analyze'"
+[ "$v_fmt" = "dart format --output=none --set-exit-if-changed ." ] \
+  && ok "a Dart format command is check-only" \
+  || bad "dart" "format got '$v_fmt', want the check-only dart format"
+[ "$v_fix" = "dart format ." ] && ok "a Dart format_fix command writes" \
+  || bad "dart" "format_fix got '$v_fix', want 'dart format .'"
+
+# FR-13 and FR-14. `flutter build` is not a command on its own: `flutter build --help` lists eight
+# targets, so choosing one is the guess CON-02 forbids. Decided by Bernard, 2026-08-29. typecheck is
+# null because the analyzer is already verify.lint.
+for k in build typecheck e2e security test_integration; do
+    got="$(detect_in "$d" "detect_verify $k")"
+    [ -z "$got" ] && ok "a Dart project's verify.$k is null" \
+      || bad "dart" "verify.$k got '$got', want empty"
+done
+
+# The stories assert on the written profile, not on the function, because that is what a skill
+# reads. S-04 and S-05 scenario 1 in their own words.
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+{ read -r p_test; read -r p_lint; read -r p_build; } <<EOF
+$(prof_of "$d" verify.test verify.lint verify.build)
+EOF
+[ "$p_test|$p_lint|$p_build" = "flutter test|flutter analyze|None" ] \
+  && ok "keel init writes the Dart verify commands" \
+  || bad "dart" "profile verify got '$p_test|$p_lint|$p_build'"
+rm -rf "$d"
+
+# The `dart` spelling, which is the half of FR-07 no repository in current work exercises.
+d="$(fixture dart-pure)"
+v_test="$(detect_in "$d" 'detect_verify test')"
+v_one="$(detect_in "$d" 'detect_verify test_one')"
+v_lint="$(detect_in "$d" 'detect_verify lint')"
+v_fmt="$(detect_in "$d" 'detect_verify format')"
+[ "$v_test" = "dart test" ] && ok "a pure Dart package's test command" \
+  || bad "dart" "test got '$v_test', want 'dart test'"
+[ "$v_one" = "dart test {path}" ] && ok "a pure Dart package's single-test command" \
+  || bad "dart" "test_one got '$v_one', want 'dart test {path}'"
+[ "$v_lint" = "dart analyze" ] && ok "a pure Dart package's lint command" \
+  || bad "dart" "lint got '$v_lint', want 'dart analyze'"
+# The formatter is the same command for both, because `flutter format` was removed from the SDK.
+# Running it on 2026-08-29 gives "Could not find a command named format".
+[ "$v_fmt" = "dart format --output=none --set-exit-if-changed ." ] \
+  && ok "the formatter is the dart spelling for both kinds of project" \
+  || bad "dart" "format got '$v_fmt'"
+rm -rf "$d"
+
+# The gate. `dart test` needs package:test declared and does not ship with it, measured 2026-08-29,
+# so a plain package that never added it gets null and the skill asks. CON-02. The analyzer needs no
+# dependency, so lint is still filled: this fixture separates the two.
+d="$(fixture dart-pure-notest)"
+v_test="$(detect_in "$d" 'detect_verify test')"
+v_one="$(detect_in "$d" 'detect_verify test_one')"
+v_lint="$(detect_in "$d" 'detect_verify lint')"
+[ -z "$v_test" ] && ok "a plain package without package:test gets no test command" \
+  || bad "dart" "test got '$v_test', want empty"
+[ -z "$v_one" ] && ok "and no single-test command either" \
+  || bad "dart" "test_one got '$v_one', want empty"
+[ "$v_lint" = "dart analyze" ] && ok "but it still gets a lint command, which needs no dependency" \
+  || bad "dart" "lint got '$v_lint', want 'dart analyze'"
+rm -rf "$d"
+
+# The same gate, against the shape that got through it. A `test:` key is not a dependency wherever
+# it happens to sit: a melos workspace declares one under `melos:` -> `scripts:` and depends on no
+# package:test, and an `executables:` entry named `test` does the same. Found in review 2026-08-30,
+# and measured against the real SDK: `dart test` in this fixture prints "Could not find package
+# `test`", which is the failure FR-08 was amended to prevent. lint is asserted alongside so a
+# regression that nulls the whole Dart arm cannot pass this case.
+d="$(fixture dart-melos)"
+v_test="$(detect_in "$d" 'detect_verify test')"
+v_one="$(detect_in "$d" 'detect_verify test_one')"
+v_lint="$(detect_in "$d" 'detect_verify lint')"
+[ -z "$v_test" ] && ok "a melos script named test is not a package:test dependency" \
+  || bad "dart" "melos test got '$v_test', want empty"
+[ -z "$v_one" ] && ok "and it gets no single-test command either" \
+  || bad "dart" "melos test_one got '$v_one', want empty"
+[ "$v_lint" = "dart analyze" ] && ok "and the melos root still lints" \
+  || bad "dart" "melos lint got '$v_lint', want 'dart analyze'"
+rm -rf "$d"
+
+# The runner needs a test to run, and neither spelling checks for one itself. `flutter test` is
+# bundled and `dart test` is gated on its package, but bundled and declared both stop short of
+# runnable: measured against the real SDK on 2026-08-30, all four of these states exit non-zero, and
+# `keel doctor` runs verify.test and counts a non-zero exit as a problem. The condition is the SDK's
+# own: a test/ directory holding at least one file ending `_test.dart`. FR-08, amended 2026-08-30.
+#
+# lint is asserted in each case, because it needs no test file and must survive the gate. Without it
+# a regression that nulled the entire Dart arm would read as four passes here.
+for f in dart-flutter-notests dart-flutter-nottests dart-pure-notestfiles; do
+    d="$(fixture "$f")"
+    v_test="$(detect_in "$d" 'detect_verify test')"
+    v_one="$(detect_in "$d" 'detect_verify test_one')"
+    v_lint="$(detect_in "$d" 'detect_verify lint')"
+    [ -z "$v_test" ] && ok "$f gets no test command, because there is no test to run" \
+      || bad "dart" "$f test got '$v_test', want empty"
+    [ -z "$v_one" ] && ok "$f gets no single-test command either" \
+      || bad "dart" "$f test_one got '$v_one', want empty"
+    [ -n "$v_lint" ] && ok "$f still lints, which needs no test file" \
+      || bad "dart" "$f lint got '$v_lint', want a command"
+    rm -rf "$d"
+done
+
+# The counter-case, and the one that stops the gate being written too shallow. A test one directory
+# down is an ordinary layout, and `flutter test` runs it.
+d="$(fixture dart-flutter-nested)"
+v_test="$(detect_in "$d" 'detect_verify test')"
+[ "$v_test" = "flutter test" ] && ok "a test file one directory down still fills verify.test" \
+  || bad "dart" "nested test got '$v_test', want 'flutter test'"
+rm -rf "$d"
+
+# CON-03: there is no Dart language server in claude-plugins-official. Checked 2026-08-29 against
+# the catalogue: twelve language server ids, the same twelve lang_lsp maps, none for Dart. An id
+# that does not resolve fails in settings.json, which lang_lsp's own comment calls worse than
+# suggesting nothing. FR-18.
+#
+# Both cases assert an absence, so both are guarded against passing on nothing: the first requires
+# the fixture to have produced some plugin at all, the second requires the settings file to exist.
+# Measured 2026-08-30: without the second guard, a `keel init` that never ran reported PASS.
+d="$(fixture dart-flutter)"
+got="$(detect_in "$d" 'detect_plugins | tr "\n" " "')"
+case "$got" in
+  "")     bad "dart" "detect_plugins produced nothing, so this case proves nothing" ;;
+  *-lsp*) bad "dart" "a Dart project was recommended a language server: '$got'" ;;
+  *)      ok "a Dart project is recommended no language server" ;;
+esac
+
+# S-09 scenario 2: what detect_plugins feeds. The settings file is what a user actually gets, and an
+# unresolvable id fails there rather than in the function.
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+if [ ! -f "$d/.claude/settings.json" ]; then
+    bad "dart" "keel init wrote no settings.json, so this case proves nothing"
+elif grep -qi dart "$d/.claude/settings.json"; then
+    bad "dart" "settings.json names a dart plugin"
+else
+    ok "keel init writes no dart language server into settings.json"
+fi
+rm -rf "$d"
+
+# Task 6 made has_ui true for Flutter, and detect_plugins keys the frontend recommendations on that.
+# playwright drives browsers and has no driver for an Android or iOS binary, so a Flutter project
+# must not be recommended it. docs/04-plugin-strategy.md already scopes that plugin to "browser
+# flows worth testing"; this is the code catching up with the rule, not a new rule.
+d="$(fixture dart-flutter)"
+got="$(detect_in "$d" 'detect_plugins | tr "\n" " "')"
+case "$got" in
+  "")           bad "dart" "detect_plugins produced nothing, so this case proves nothing" ;;
+  *playwright*) bad "dart" "a Flutter project was recommended playwright: '$got'" ;;
+  *)            ok "a Flutter project is not recommended a browser test tool" ;;
+esac
+case "$got" in
+  *frontend-design*) ok "but it is still recommended frontend-design, because it has a UI" ;;
+  *)                 bad "dart" "frontend-design was dropped too: '$got'" ;;
+esac
+
+# The defect was in the written artefacts, not the function, so pin it there too. The sibling case
+# above does the same for the language server.
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+if [ ! -f "$d/.claude/settings.json" ]; then
+    bad "dart" "keel init wrote no settings.json, so this case proves nothing"
+elif grep -q playwright "$d/.claude/settings.json"; then
+    bad "dart" "settings.json recommends playwright to a Flutter project"
+else
+    ok "keel init writes no playwright into a Flutter project's settings"
+fi
+rm -rf "$d"
+
+# The other side of the same rule: a browser-rendered UI still gets playwright. apex is the case
+# that most resembles Flutter and must keep it, because APEX pages really are browser-rendered.
+# There is no apex fixture: the has_ui case below builds one the same way, from the plsql fixture
+# plus the manifest that names an APEX version.
+d="$(fixture plsql)"
+printf '{"apex_version":"23.2"}\n' > "$d/manifest.json"
+got="$(detect_in "$d" 'detect_plugins | tr "\n" " "')"
+case "$got" in
+  *playwright*) ok "a browser-rendered UI still gets playwright" ;;
+  *)            bad "dart" "apex lost playwright: '$got'" ;;
+esac
+rm -rf "$d"
+
+# The third side of it, and the one the suppression got wrong. `fw` is the *primary* framework, and
+# dart is first in the marker chain, so a root carrying both manifests resolves to flutter and the
+# Node half lost its browser driver. Measured 2026-08-30: this shape produced
+# `typescript-lsp frontend-design` where the base produced that plus playwright. The suppression is
+# about there being no browser to drive, so it has to yield to a repository that has one.
+d="$(fixture dart-polyglot-web)"
+got="$(detect_in "$d" 'detect_plugins | tr "\n" " "')"
+case "$got" in
+  "")           bad "dart" "detect_plugins produced nothing, so this case proves nothing" ;;
+  *playwright*) ok "a Flutter root with a browser UI beside it keeps playwright" ;;
+  *)            bad "dart" "polyglot web root lost playwright: '$got'" ;;
+esac
+rm -rf "$d"
+
+# D1. frontend.md is browser-specific prose, about bundle supply chain, CDN caching, browser history
+# and referrer headers, and its gate read has_ui alone, which PR #49 set true for Flutter. That is
+# the same root cause PR #49 fixed for playwright, in the second of three callers that each ask a
+# different question of one field. The condition is pinned here rather than left to review because
+# it is one table cell in a reference file, which is exactly the kind of line an unrelated edit
+# reformats away.
+hd="$ROOT/skills/coding-standards/references/house-defaults.md"
+row="$(grep -F '[frontend.md](frontend.md)' "$hd" | head -1)"
+if [ -z "$row" ]; then
+    bad "coding-standards" "no frontend.md row in house-defaults.md, so this case proves nothing"
+elif printf '%s' "$row" | grep -q 'flutter'; then
+    ok "the frontend.md gate excludes flutter, whose UI is not browser-rendered"
+else
+    bad "coding-standards" "the frontend.md gate still reads has_ui alone: $row"
+fi
+
+# FR-19's ordering is the one thing in the detection matrix a reader can get wrong in a way that
+# costs them: the table's own polyglot row says the first signal listed wins, and dart-polyglot
+# asserts dart beats package.json. Pinned here rather than left to review, because a table row is
+# the kind of thing a later edit reorders without noticing what depends on it.
+mtx="$ROOT/docs/03-install-and-distribution.md"
+pub="$(grep -n '^| `pubspec.yaml`' "$mtx" | head -1 | cut -d: -f1)"
+pkg="$(grep -n '^| `package.json` with' "$mtx" | head -1 | cut -d: -f1)"
+if [ -z "$pub" ] || [ -z "$pkg" ]; then
+    bad "docs" "the detection matrix has no pubspec.yaml or package.json row, so this case proves nothing"
+elif [ "$pub" -lt "$pkg" ]; then
+    ok "the detection matrix lists pubspec.yaml above package.json, as the chain orders them"
+else
+    bad "docs" "pubspec.yaml is listed at line $pub, below package.json at $pkg, but detect_languages puts dart first"
+fi
+
+# The same rule for the other pair the table gets wrong. detect_languages matches kotlin before
+# java, and its own comment says why: "a Gradle build is the marker for both and Kotlin is the
+# specific case". A table claiming the reverse misleads a reader about exactly the case its polyglot
+# row exists to explain. Pre-existing, and out of scope for the Dart work that added the assertion
+# above, which is why it is a follow-up rather than part of PR #49.
+kt="$(grep -n '^| `build.gradle.kts`' "$mtx" | head -1 | cut -d: -f1)"
+jv="$(grep -n '^| `pom.xml` or `build.gradle`' "$mtx" | head -1 | cut -d: -f1)"
+if [ -z "$kt" ] || [ -z "$jv" ]; then
+    bad "docs" "the detection matrix has no kotlin or java row, so this case proves nothing"
+elif [ "$kt" -lt "$jv" ]; then
+    ok "the detection matrix lists kotlin above java, as the chain orders them"
+else
+    bad "docs" "kotlin is listed at line $kt, below java at $jv, but detect_languages matches kotlin first"
+fi
+
+# `write-prd`'s mode table gives `from-repo`'s first read as a hardcoded `<docs_root>/snapshot.md`,
+# three lines above the sentence that checks `profile.artifacts.prd` for exactly the same reason. A
+# repository that maps its snapshot elsewhere is therefore ignored by the one skill built to consume
+# it, and `artifacts.snapshot` is a key nothing reads. Pinned here because the asymmetry lived in one
+# table on one screen for fourteen weeks without anyone seeing it.
+wp="$ROOT/skills/write-prd/SKILL.md"
+row="$(grep -F '| `from-repo` |' "$wp" | head -1)"
+if [ -z "$row" ]; then
+    bad "docs" "no from-repo row in write-prd/SKILL.md, so this case proves nothing"
+elif printf '%s' "$row" | grep -q 'artifacts.snapshot'; then
+    ok "write-prd's from-repo mode reads artifacts.snapshot before the default path"
+else
+    bad "docs" "write-prd's from-repo row still hardcodes the snapshot path: $row"
+fi
 
 # PL/SQL is the first language keel infers rather than reads from a manifest, so each clause of the
 # marker gets its own assertion. A single happy-path test would pass with any one of them broken.
@@ -344,10 +853,11 @@ rm -rf "$d"
 d="$(fixture python)"
 printf 'psycopg2-binary==2.9\n' > "$d/requirements.txt"
 got="$( cd "$d" && bash -c '. "$1"; detect_datastores | tr "\n" " "' _ "$ROOT/lib/detect-stack.sh" 2>/dev/null )"
-case "$got" in
-  *postgres*) ok "the existing manifest-based datastore detection still works" ;;
-  *)          bad "datastores" "a psycopg project gave '$got', want postgres" ;;
-esac
+# Exact, not a substring. A `*postgres*` match passes while a second store appears beside it, and
+# task 3 widened the postgres pair with `supabase`, so the thing this case is least able to afford
+# is silence about what else it now matches.
+[ "$got" = "postgres " ] && ok "the existing manifest-based datastore detection still works" \
+  || bad "datastores" "a psycopg project gave '$got', want exactly 'postgres '"
 rm -rf "$d"
 
 # CON-02 and FR-08. utPLSQL runs inside a database and the connection string, schema and credentials
@@ -952,6 +1462,21 @@ got="$(detect_in "$d" detect_has_ui)"
   || bad "has_ui" "APEX export got '$got', want true"
 rm -rf "$d"
 
+# The only field that was wrong rather than empty. detect_has_ui keys on a framework list and then
+# falls back to public/ or index.html, and a Flutter application has neither, so every mobile app
+# reported has_ui false. FR-06.
+d="$(fixture dart-flutter)"
+got="$(detect_in "$d" detect_has_ui)"
+[ "$got" = "true" ] && ok "a Flutter application has has_ui true" \
+  || bad "has_ui" "Flutter project got '$got', want true"
+rm -rf "$d"
+
+d="$(fixture dart-pure)"
+got="$(detect_in "$d" detect_has_ui)"
+[ "$got" = "false" ] && ok "a pure Dart package has has_ui false" \
+  || bad "has_ui" "pure Dart got '$got', want false"
+rm -rf "$d"
+
 # ---- datastores -----------------------------------------------------------
 # The same defect has_ui had, in the field beside it: stack.datastores was written as a hardcoded
 # empty list. Found on the existing-service pilot, whose repository declared postgres and redis
@@ -992,6 +1517,174 @@ got="$(detect_in "$d" 'detect_datastores | sort | tr "\n" " "')"
 [ -z "$got" ] && ok "a project with no datastore reports none" \
   || bad "datastores" "a storeless project got '$got', want nothing"
 rm -rf "$d"
+
+# The pair matched a bare `mongo` under -i, so any package whose name merely starts with those five
+# letters was profiled as MongoDB. `mongol`, a real pub.dev package for Mongolian vertical text,
+# was the instance found, over a corpus of about 100 real pub.dev names. Tightened 2026-08-30, D3.
+d="$(fixture dart-pure)"
+printf '  mongol: ^2.0.0\n' >> "$d/pubspec.yaml"
+got="$(detect_in "$d" 'detect_datastores | tr "\n" " "')"
+case "$got" in
+  *mongodb*) bad "datastores" "mongol was profiled as mongodb: '$got'" ;;
+  *)         ok "a package merely starting with mongo is not MongoDB" ;;
+esac
+rm -rf "$d"
+
+# The other side, and the reason this is a separate task: the pair is shared by all fifteen
+# languages, so tightening it has to be shown not to have stopped detecting the real thing. One
+# declaration per manifest shape, because the shapes differ and a single case would pass with the
+# alternation broken for four of them.
+for spec in 'node-ts|package.json|{"name":"m","dependencies":{"mongodb":"^6"}}' \
+            'python|requirements.txt|pymongo==4.6' \
+            'ruby|Gemfile|gem "mongo"' \
+            'go|go.mod|require go.mongodb.org/mongo-driver v1.13.1'; do
+    fx="${spec%%|*}"; rest="${spec#*|}"; file="${rest%%|*}"; line="${rest#*|}"
+    d="$(fixture "$fx")"
+    printf '%s\n' "$line" >> "$d/$file"
+    got="$(detect_in "$d" 'detect_datastores | tr "\n" " "')"
+    case "$got" in
+      *mongodb*) ok "$fx still detects a real MongoDB declaration" ;;
+      *)         bad "datastores" "$fx lost mongodb: '$got'" ;;
+    esac
+    rm -rf "$d"
+done
+
+# FR-15 named sqflite only, and a realistic 30-package pubspec reported nothing for seven common
+# stores. Widened 2026-08-30, D2, to the ones that map onto a backend keel already names, plus
+# firestore. Each maps onto what it actually talks to rather than onto its own package name.
+d="$(fixture dart-pure)"
+cat >> "$d/pubspec.yaml" <<'P'
+  drift: ^2.14.0
+  sembast: ^3.5.0
+  supabase_flutter: ^2.0.0
+  cloud_firestore: ^4.13.0
+P
+got="$(detect_in "$d" 'detect_datastores | tr "\n" " "')"
+for want in sqlite postgres firestore; do
+    case "$got" in
+      *"$want"*) ok "a Flutter pubspec naming its store reports $want" ;;
+      *)         bad "datastores" "wanted $want in '$got'" ;;
+    esac
+done
+rm -rf "$d"
+
+# The three deliberately left out. hive, isar and objectbox are embedded libraries with no server
+# product behind them, so there is no existing name to map them onto and inventing three would be a
+# vocabulary decision rather than a detection one. This case is what stops someone adding them
+# without one: it fails loudly if they appear, rather than going quietly out of date.
+d="$(fixture dart-pure)"
+cat >> "$d/pubspec.yaml" <<'P'
+  hive: ^2.2.3
+  isar: ^3.1.0
+  objectbox: ^2.5.0
+P
+got="$(detect_in "$d" 'detect_datastores | tr "\n" " "')"
+if [ ! -f "$d/pubspec.yaml" ]; then
+    bad "datastores" "the fixture lost its pubspec.yaml, so this case proves nothing"
+elif [ -n "$got" ]; then
+    bad "datastores" "an embedded-store pubspec reported '$got', want nothing. If this is deliberate, it is a vocabulary decision and needs one"
+else
+    ok "hive, isar and objectbox stay unreported, as D2 decided"
+fi
+rm -rf "$d"
+
+# The same rule D3 applied to `mongo`, for the name task 3 added beside it. `drift` is a five-letter
+# English word, so a bare substring matched `drift-zoom` on npm and `driftctl` in a go.mod, and the
+# pair is read for all fifteen languages. A non-letter boundary does not separate them, because
+# `drift-zoom` has one; the declaration shape does, and it is the same shape `"pg"` is written in.
+for spec in 'node-ts|package.json|{"name":"m","dependencies":{"drift-zoom":"^1.5"}}' \
+            'go|go.mod|require github.com/snyk/driftctl v0.40.0'; do
+    fx="${spec%%|*}"; rest="${spec#*|}"; file="${rest%%|*}"; line="${rest#*|}"
+    d="$(fixture "$fx")"
+    printf '%s\n' "$line" >> "$d/$file"
+    got="$(detect_in "$d" 'detect_datastores | tr "\n" " "')"
+    case "$got" in
+      *sqlite*) bad "datastores" "$fx: a package merely containing drift was profiled as sqlite: '$got'" ;;
+      *)        ok "$fx: a package merely containing drift is not SQLite" ;;
+    esac
+    rm -rf "$d"
+done
+
+# sqflite is SQLite on the device and appears in 13 of the 15 repositories measured on 2026-08-29.
+# The existing `sqlite` pair does not match it: `sqflite` does not contain the substring `sqlite`.
+# FR-15.
+d="$(fixture dart-flutter)"
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+[ "$(stores_of "$d")" = "sqlite" ] && ok "a Flutter project declaring sqflite names sqlite" \
+  || bad "datastores" "got '$(stores_of "$d")', want sqlite"
+rm -rf "$d"
+
+d="$(fixture dart-pure)"
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+# The profile-exists guard is not ceremony. `stores_of` swallows every error with 2>/dev/null and
+# returns the empty string when .keel/profile.json is missing or malformed, so a bare `[ -z ]` here
+# passes when `keel init` crashed and wrote nothing at all. That is why this case passed before the
+# implementation existed. Measured by task 7's review, 2026-08-30.
+got="$(stores_of "$d")"
+if [ ! -f "$d/.keel/profile.json" ]; then
+    bad "datastores" "dart-pure wrote no .keel/profile.json; keel init failed"
+elif [ -n "$got" ]; then
+    bad "datastores" "got '$got', want nothing"
+else
+    ok "a Dart package with no store dependency names no datastore"
+fi
+rm -rf "$d"
+
+# NFR-01. lib/detect-stack.sh uses no sed, sort, uniq or tr, and its own comment says a change must
+# not be the one that introduces them. The same property assertion tests/test-apex-export.sh makes
+# about lib/apex_render.py, for the same reason: a property nobody checks is one that drifts.
+for cmd in sed sort uniq tr; do
+    # Full-line comments are stripped before the search. Without that this check fails on
+    # unmodified code: the comment at lib/detect-stack.sh:102-104 names all four in prose, and the
+    # `nor tr` clause matches, so a whole-file grep fails on unmodified code. Verified against the
+    # unmodified file before this was written into the plan.
+    if grep -v '^[[:space:]]*#' "$ROOT/lib/detect-stack.sh" | grep -qE "(^|[^-_a-zA-Z])$cmd([[:space:]]|\$)"; then
+        bad "detect-stack purity" "lib/detect-stack.sh now invokes $cmd"
+    else
+        ok "lib/detect-stack.sh still invokes no $cmd"
+    fi
+done
+
+# NFR-02, in the form stated at the head of this task. This plan edited four shared functions:
+# detect_languages (the marker, evaluated on every repository), detect_datastores (the manifest list
+# and the `sqlite` pair), detect_has_ui (the framework list) and detect_plugins (the `fw` binding and
+# the `playwright` arm). is_plsql_tree changed by a comment only.
+#
+# These four fixtures are chosen on detect_datastores' manifest gate, which is what actually
+# discriminates: every fixture in the suite reaches detect_has_ui, so "reaches a shared function"
+# would select nothing. node-ts, python, go and ruby contribute package.json, pyproject.toml, go.mod
+# and Gemfile, so all four reach the eight-pair grep loop, whereas csharp, swift, cpp and lua hit
+# `[ -z "$files" ] && return 0` and would prove nothing.
+#
+# The honest limit: all four expect has_ui false, so this block never reaches detect_plugins' edited
+# branch, which is gated on has_ui being true. That branch is covered by the apex case in the
+# `---- dart ----` block, not here.
+for f in node-ts python go ruby; do
+    d="$(fixture "$f")"
+    ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+    { read -r p_lang; read -r p_ui; } <<EOF
+$(prof_of "$d" stack.language stack.has_ui)
+EOF
+    case "$f:$p_lang $p_ui" in
+      "node-ts:typescript False"|"python:python False"|"go:go False"|"ruby:ruby False")
+        ok "$f keeps its stack under the Dart change" ;;
+      *) bad "regression" "$f got '$p_lang $p_ui'" ;;
+    esac
+    # Guarded on the profile existing, for the reason task 7's review measured: `stores_of` swallows
+    # errors and returns the empty string when .keel/profile.json is absent, so a bare `[ -z ]`
+    # passes when `keel init` crashed and wrote nothing. This block is the primary regression guard
+    # for the whole change, across four fixtures, so a check that green-lights a crashed init is the
+    # last thing it can afford to be.
+    stores="$(stores_of "$d")"
+    if [ ! -f "$d/.keel/profile.json" ]; then
+        bad "regression" "$f wrote no .keel/profile.json; keel init failed"
+    elif [ -n "$stores" ]; then
+        bad "regression" "$f datastores got '$stores', want nothing"
+    else
+        ok "$f keeps an empty datastore list"
+    fi
+    rm -rf "$d"
+done
 
 # ---- profile ---------------------------------------------------------------
 
@@ -1147,6 +1840,266 @@ esac
 got="$(prof_of "$d" keel_version)"
 [ "$got" != "9.9.9" ] && ok "keel_version was left alone" || bad "keel_version" "it was rewritten"
 rm -rf "$d"
+
+# ---- profile sync ----------------------------------------------------------
+# S-01. The artifacts map named where a project's documents live and nothing ever filled it: six
+# keys, six nulls, on the repository that dogfoods the tool. sync fills the three whose default is
+# one unambiguous location. FR-01, FR-03, FR-05, FR-09, FR-15.
+#
+# The root is read from the profile rather than written as `docs`: a fresh init writes
+# `docs/keel`, bin/keel:55, and this repository's own profile says `docs`, so a hardcoded spelling
+# passes here and fails for the next person who runs it somewhere else.
+d="$(fixture node-ts)"
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+root="$(prof_of "$d" docs_root)"
+mkdir -p "$d/$root/decisions" "$d/$root/plans"
+printf 'x\n' > "$d/$root/snapshot.md"
+printf 'x\n' > "$d/$root/decisions/ADR-0001-x.md"
+printf 'x\n' > "$d/$root/plans/2026-01-01-x.md"
+( cd "$d" && "$KEEL" profile sync >/dev/null 2>&1 )
+got="$(prof_of "$d" artifacts.snapshot artifacts.decisions artifacts.plans | tr '\n' ' ')"
+want="$root/snapshot.md $root/decisions $root/plans "
+[ "$got" = "$want" ] && ok "keel profile sync fills the keys whose default is present" \
+  || bad "profile sync" "got '$got', want '$want'"
+rm -rf "$d"
+
+# FR-05. A default location that is not there leaves the key null. Writing an absent path would
+# convert a silent gap into a hard doctor failure, bin/keel:1335.
+d="$(fixture node-ts)"
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+root="$(prof_of "$d" docs_root)"
+mkdir -p "$d/$root/plans"
+printf 'x\n' > "$d/$root/plans/2026-01-01-x.md"
+( cd "$d" && "$KEEL" profile sync >/dev/null 2>&1 )
+got="$(prof_of "$d" artifacts.snapshot artifacts.plans | tr '\n' ' ')"
+[ "$got" = "None $root/plans " ] && ok "sync leaves a key null when its default is absent" \
+  || bad "profile sync" "got '$got', want 'None $root/plans '"
+rm -rf "$d"
+
+# S-02, FR-02. The map is documented as the user's override for a document that lives elsewhere.
+# A command that means to help must not discard a deliberate value, so a key that already holds one
+# is skipped even when the default is sitting there too.
+d="$(fixture node-ts)"
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+root="$(prof_of "$d" docs_root)"
+mkdir -p "$d/wiki"; printf 'x\n' > "$d/wiki/overview.md"
+printf 'x\n' > "$d/$root/snapshot.md"
+( cd "$d" && "$KEEL" profile set artifacts.snapshot wiki/overview.md >/dev/null 2>&1 )
+( cd "$d" && "$KEEL" profile sync >/dev/null 2>&1 )
+got="$(prof_of "$d" artifacts.snapshot)"
+[ "$got" = "wiki/overview.md" ] && ok "sync leaves a key that is already set" \
+  || bad "profile sync" "sync overwrote a deliberate override with '$got'"
+rm -rf "$d"
+
+# S-02, FR-07. Idempotent, asserted byte for byte. A second run that rewrites the same values
+# through a JSON dump can still reorder or reformat, and on a tracked file that is a spurious diff
+# somebody has to read. "No key changed" is the weaker claim and it is not the one that matters.
+d="$(fixture node-ts)"
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+root="$(prof_of "$d" docs_root)"
+mkdir -p "$d/$root/plans"; printf 'x\n' > "$d/$root/plans/2026-01-01-x.md"
+( cd "$d" && "$KEEL" profile sync >/dev/null 2>&1 )
+before="$(cat "$d/.keel/profile.json")"
+out="$( cd "$d" && "$KEEL" profile sync 2>&1 )"
+after="$(cat "$d/.keel/profile.json")"
+[ "$before" = "$after" ] && ok "a second sync run changes nothing" \
+  || bad "profile sync" "a second run rewrote .keel/profile.json"
+case "$out" in
+  *"no artifact key changed"*) ok "sync says so when it changed nothing" ;;
+  *) bad "profile sync" "a no-op run said nothing useful: '$out'" ;;
+esac
+rm -rf "$d"
+
+# S-05, FR-16. Filling nothing is the correct outcome on a repository already in order, and a
+# non-zero exit there would fail a pre-push hook for a state that is fine.
+d="$(fixture node-ts)"
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+( cd "$d" && "$KEEL" profile sync >/dev/null 2>&1 ) \
+  && ok "sync exits 0 when it fills nothing" \
+  || bad "profile sync" "sync exited non-zero on a repository with nothing to fill"
+rm -rf "$d"
+
+# S-03, FR-04. prd, stories and architecture default to one file per slug, so a repository with
+# five PRDs has no single path to record. Skipping them silently reads as a bug, so the command
+# says which it skipped and why.
+#
+# The one-PRD case is the one that fails quietly. A repository with exactly one PRD looks fillable,
+# and filling it would be right today and wrong the moment a second PRD is written: the rule is
+# about the shape of the default, not about how many documents happen to be there.
+for n in 5 1; do
+    d="$(fixture node-ts)"
+    ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+    root="$(prof_of "$d" docs_root)"
+    mkdir -p "$d/$root/prd"
+    i=0; while [ "$i" -lt "$n" ]; do printf 'x\n' > "$d/$root/prd/p$i.md"; i=$((i+1)); done
+    out="$( cd "$d" && "$KEEL" profile sync 2>&1 )"
+    got="$(prof_of "$d" artifacts.prd)"
+    [ "$got" = "None" ] && ok "sync leaves prd null with $n PRD(s) present" \
+      || bad "profile sync" "sync filled artifacts.prd with '$got' from $n file(s)"
+    case "$out" in
+      *prd*stories*architecture*) ok "sync says why it skips prd, stories and architecture" ;;
+      *) bad "profile sync" "sync skipped three keys and said nothing: '$out'" ;;
+    esac
+    rm -rf "$d"
+done
+
+# S-07, FR-13. repo-snapshot emits snapshot-<unit>.md per unit in a monorepo and the key is a single
+# string, so it cannot hold them and stays null. The second case is what stops a naive glob:
+# `snapshot*.md` would match the per-unit files and pick one.
+d="$(fixture node-ts)"
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+root="$(prof_of "$d" docs_root)"
+printf 'x\n' > "$d/$root/snapshot-api.md"; printf 'x\n' > "$d/$root/snapshot-web.md"
+( cd "$d" && "$KEEL" profile sync >/dev/null 2>&1 )
+got="$(prof_of "$d" artifacts.snapshot)"
+[ "$got" = "None" ] && ok "a monorepo leaves snapshot null" \
+  || bad "profile sync" "per-unit snapshots filled artifacts.snapshot with '$got'"
+printf 'x\n' > "$d/$root/snapshot.md"
+( cd "$d" && "$KEEL" profile sync >/dev/null 2>&1 )
+got="$(prof_of "$d" artifacts.snapshot)"
+[ "$got" = "$root/snapshot.md" ] && ok "a root snapshot beside per-unit ones is still recorded" \
+  || bad "profile sync" "got '$got', want '$root/snapshot.md'"
+rm -rf "$d"
+
+# S-04, FR-06. An empty docs/decisions means the project has no decision records. Setting the key
+# would be literally true, useless to every reader, and would silence doctor's warning for a
+# directory with nothing in it.
+d="$(fixture node-ts)"
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+root="$(prof_of "$d" docs_root)"
+mkdir -p "$d/$root/decisions"
+rm -f "$d/$root/decisions/"*
+( cd "$d" && "$KEEL" profile sync >/dev/null 2>&1 )
+got="$(prof_of "$d" artifacts.decisions)"
+[ "$got" = "None" ] && ok "an empty docs directory leaves its key null" \
+  || bad "profile sync" "an empty decisions directory was recorded as '$got'"
+
+# keel init scaffolds decisions/ADR-0000-template.md, so this directory is never empty on a fresh
+# project. Counting the template would set the key and warn on every newly initialised repository
+# before anyone had written a decision. Found by prototyping, 2026-08-30, and FR-06 amended for it.
+printf 'x\n' > "$d/$root/decisions/ADR-0000-template.md"
+( cd "$d" && "$KEEL" profile sync >/dev/null 2>&1 )
+got="$(prof_of "$d" artifacts.decisions)"
+[ "$got" = "None" ] && ok "a directory holding only keel's own template leaves its key null" \
+  || bad "profile sync" "the scaffolded ADR template was counted as a document: '$got'"
+
+# A directory kept in git by a lone .gitkeep is still empty of documents.
+printf '' > "$d/$root/decisions/.gitkeep"
+( cd "$d" && "$KEEL" profile sync >/dev/null 2>&1 )
+got="$(prof_of "$d" artifacts.decisions)"
+[ "$got" = "None" ] && ok "a directory holding only .gitkeep leaves its key null" \
+  || bad "profile sync" "a .gitkeep-only directory was recorded as '$got'"
+
+printf 'x\n' > "$d/$root/decisions/ADR-0001-x.md"
+( cd "$d" && "$KEEL" profile sync >/dev/null 2>&1 )
+got="$(prof_of "$d" artifacts.decisions)"
+[ "$got" = "$root/decisions" ] && ok "one document is enough to record the directory" \
+  || bad "profile sync" "got '$got', want '$root/decisions'"
+rm -rf "$d"
+
+# S-06, FR-14. cmd_profile already refuses both cases for get and set, and sync inherits them by
+# entering through the same function. This is the assertion proving it, so that a later refactor
+# that gives sync its own entry point is caught rather than shipped.
+d="$(mktemp -d)"
+out="$( cd "$d" && "$KEEL" profile sync 2>&1 )"
+case "$out" in
+  *"Run 'keel init'"*) ok "profile sync refuses without a profile" ;;
+  *) bad "profile sync" "no profile gave '$out', want the shared 'Run keel init' refusal" ;;
+esac
+rm -rf "$d"
+
+# FR-01. A subcommand whose own sibling error message denies it exists is not beside get and set.
+d="$(fixture node-ts)"
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+out="$( cd "$d" && "$KEEL" profile frobnicate 2>&1 )"
+case "$out" in
+  *get*set*sync*) ok "an unknown profile subcommand names sync" ;;
+  *) bad "profile sync" "the unknown-subcommand message does not name sync: '$out'" ;;
+esac
+rm -rf "$d"
+
+# FR-16. A profile whose artifacts object is missing a key is not a typo the caller made, but
+# profile_set's refusal says it is: "a path that does not exist is far more often a typo". sync
+# reaches that message on a hand-written profile or one older than the artifacts map, and keel's own
+# profile says it was hand-written. json_get already separates the two cases, returning non-zero for
+# an absent key and zero with empty output for a null, so an absent key is skipped rather than
+# attempted. Found in review, 2026-08-30.
+d="$(fixture node-ts)"
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+root="$(prof_of "$d" docs_root)"
+mkdir -p "$d/$root/plans" "$d/$root/decisions"
+printf 'x\n' > "$d/$root/plans/p.md"
+printf 'x\n' > "$d/$root/decisions/ADR-0001-x.md"
+python3 - "$d" <<'PY_DROP'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".keel/profile.json"
+j = json.loads(p.read_text()); j["artifacts"].pop("plans", None)
+p.write_text(json.dumps(j, indent=2) + "\n")
+PY_DROP
+out="$( cd "$d" && "$KEEL" profile sync 2>&1 )"; rc=$?
+[ "$rc" -eq 0 ] && ok "sync skips an artifact key the profile does not have" \
+  || bad "profile sync" "sync exited $rc on a profile missing artifacts.plans: '$out'"
+case "$out" in
+  *typo*) bad "profile sync" "sync blamed the caller for a key the profile never had: '$out'" ;;
+  *) ok "sync does not report a missing key as a typo" ;;
+esac
+# The keys that are there are still filled: skipping one must not abandon the run.
+got="$(prof_of "$d" artifacts.decisions)"
+[ "$got" = "$root/decisions" ] && ok "sync fills the remaining keys when one is absent" \
+  || bad "profile sync" "got '$got', want '$root/decisions'"
+rm -rf "$d"
+
+# S-08, FR-10, FR-11, NFR-03. A null key whose default is present means the profile does not know
+# about a document sitting in docs_root. A warning and never a failure, because nothing is broken
+# and the remedy is one command. Shape follows the stack.has_ui warning at bin/keel:1390.
+d="$(fixture node-ts)"
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+root="$(prof_of "$d" docs_root)"
+mkdir -p "$d/$root/plans" "$d/$root/prd"
+printf 'x\n' > "$d/$root/plans/2026-01-01-x.md"
+printf 'x\n' > "$d/$root/prd/p0.md"
+out="$( cd "$d" && "$KEEL" doctor 2>&1 )"
+case "$out" in
+  *"artifacts.plans"*"keel profile sync"*) ok "doctor names profile sync for a fillable null key" ;;
+  *) bad "doctor" "no sync warning for a null artifacts.plans beside $root/plans" ;;
+esac
+# FR-11. prd has no remedy under FR-04, so naming one would send people to a command that
+# deliberately does nothing for them. This is the assertion that keeps the warning honest.
+case "$out" in
+  *artifacts.prd*) bad "doctor" "doctor warned about artifacts.prd, which sync will not fill" ;;
+  *) ok "doctor says nothing about a key sync cannot fill" ;;
+esac
+# FR-10. A warning, never a failure. Nothing here is broken.
+case "$out" in
+  *"FAIL"*"artifacts.plans"*) bad "doctor" "the sync nudge was raised as a failure, not a warning" ;;
+  *) ok "the sync nudge is a warning, not a failure" ;;
+esac
+# NFR-03. --fast is where most people will meet it, so it has to be reached there too.
+out="$( cd "$d" && "$KEEL" doctor --fast 2>&1 )"
+case "$out" in
+  *"keel profile sync"*) ok "doctor --fast reports it too" ;;
+  *) bad "doctor" "--fast did not print the sync warning" ;;
+esac
+rm -rf "$d"
+
+# S-09, FR-12. Without this the command is discoverable only from doctor's warning, which a user
+# reaches only if their tree already has the gap it solves.
+#
+# Asserted as `profile sync` rather than as one combined `get|set|sync` line. The first version
+# pinned the combined shape, and review then found that shape misleading: it reads as though sync
+# takes the <dotted.path> and [value] that only get and set take. The requirement is that --help
+# names the subcommand, not how the line is punctuated, so the assertion now tests the requirement.
+out="$( "$KEEL" --help 2>&1 )"
+case "$out" in
+  *"profile sync"*) ok "keel --help names profile sync" ;;
+  *) bad "help" "--help does not name profile sync" ;;
+esac
+# It must not claim sync takes the arguments only get and set take.
+case "$out" in
+  *"profile sync <dotted.path>"*|*"profile get|set|sync <dotted.path>"*)
+      bad "help" "--help implies profile sync takes a dotted path, which it does not" ;;
+  *)  ok "--help does not imply profile sync takes arguments" ;;
+esac
 
 # ---- formatters, and the check against write split ------------------------
 # A gate needs a command that reports without rewriting, which is what verify.format now holds;

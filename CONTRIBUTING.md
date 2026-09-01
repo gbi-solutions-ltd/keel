@@ -44,7 +44,8 @@ you are covered for.
   body.
 - Body within 700 words, which is the target rather than the ceiling: ADR-0001 allows up to 900, and
   anything over 700 requires a passing eval arm at that length recorded in `tests/evals/results.md`.
-  No body has ever bought that, so in practice 700 is the limit. Aim at 400 for one linear path, 600
+  One body has bought it: `coding-standards` at 876 words, on the arm recorded in
+  `tests/evals/results.md` for 2026-09-01. Assume 700 is the limit unless you are willing to run one. Aim at 400 for one linear path, 600
   when it fans out to subagents or carries modes.
 - No `@` links. They force-load at parse time and burn context before it is needed.
 - No literal `docs/keel`. Skills use `<docs_root>` and read `profile.docs_root`; templates use

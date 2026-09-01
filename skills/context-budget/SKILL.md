@@ -93,5 +93,5 @@ paragraph, whether it is state or knowledge. State goes; knowledge moves first.
 | "The context is bloated" | Give the number, per source, against a budget |
 | Injecting live git state at session start | Nothing volatile in the prefix, ever |
 | Trimming prose to save tokens | Move whole sections out. Trimming saves tens, moving saves thousands |
-| Ignoring skill descriptions | They load every session. 24 skills is about 1,066 tokens |
+| Ignoring skill descriptions | They load every session. 25 skills is about 1,130 tokens |
 | A recommendation with no saving attached | Quantify it, or it will not be actioned |

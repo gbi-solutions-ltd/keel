@@ -27,7 +27,10 @@ fact. Bodies migrate to whatever the validator permits.
 
 The lever the standard offers for relief is moving substance into `references/`. That lever is
 exhausted, and `coding-standards` proves it: **12 reference files carrying 17,816 words, and a body
-still at 683.** A body's floor is set by its number of steps and by the link-plus-when-to-read
+still at 683**, as measured on 2026-08-16. That skill has since gained a second mode and stands at
+13 references, 20,118 reference words, and a body of 876. The conclusion below is unchanged by that:
+moving substance out still did not pull the body under 680, and the growth came from a new mode
+rather than from failing to offload. A body's floor is set by its number of steps and by the link-plus-when-to-read
 sentence each reference costs, not by how much detail it holds. Moving more out does not pull a body
 below roughly 680, so the fifteen skills at the ceiling cannot be relieved by the remedy the
 standard names.

@@ -26,16 +26,16 @@ set -euo pipefail
 read -r -d '' CONTEXT <<'TXT' || true
 This project uses keel. Before starting substantive work, pick a skill.
 
-Discover and define: repo-snapshot, shape-idea, write-prd, write-user-stories, design-architecture.
+Discover and define: repo-snapshot, shape-idea, write-prd, write-user-stories, design-architecture, design-database.
 Build: write-plan, execute-plan, tdd, debug, coding-standards.
 Verify: review-code, security-audit, refactor, optimize-performance.
-Ship: setup-deployment, ship, write-docs. Production is down now: incident-response, before debug.
-Porting: port-assess, or apex-export then apex-port-plan for Oracle APEX.
-Meta: create-skill, context-budget. Unsure which fits: use the keel skill to route.
+Ship: setup-deployment, ship, write-docs. Production is down: incident-response, before debug.
+Porting: port-assess, or apex-export then apex-port-plan.
+Meta: create-skill, context-budget. Unsure: use the keel skill to route.
 
 Rules: process skills come first and may invoke others (debug before tdd for a bug, shape-idea
 before write-prd for a rough idea). Announce the skill in one line, then follow it.
-Answer directly when no skill fits; forcing one is worse.
+Answer directly when none fits; forcing one is worse.
 
 Project facts, verify commands, and gates are in .keel/profile.json. Read it before running any
 test, lint, or build command rather than assuming the stack's usual one.

@@ -1,6 +1,6 @@
 ---
 name: coding-standards
-description: Use when asked about a project's conventions, setting up linting or formatting, onboarding onto an unfamiliar codebase, or when review feedback keeps repeating the same style point.
+description: Use when asked about a project's conventions or assessing code against them, setting up linting or formatting, onboarding onto an unfamiliar codebase, or when review feedback keeps repeating the same style point.
 allowed-tools: [Read, Write, Edit, Bash, Grep, Glob]
 ---
 
@@ -12,6 +12,30 @@ Write down what this codebase already does, then move everything mechanical into
 
 **Core principle:** a convention a linter can check should never be a document anybody reads. Ink
 is for judgement calls only.
+
+## Step 0: Author or assess
+
+**Author** where no `<docs_root>/standards.md` exists, the default, and steps 1 to 5 follow.
+**Assess** where one exists and nobody knows whether the code still follows it, and step 0a replaces
+them. Choose from the request's words, before reading anything. Asked to assess with no document,
+say so and offer to author. Asked to author over one, name it and ask first. Ambiguous with a
+document present, ask once.
+
+## Step 0a: Assess
+
+Write `<docs_root>/audits/YYYY-MM-DD-standards.md`, following
+[references/assessment-report.md](references/assessment-report.md). Change nothing else, run nothing
+that alters the project, never edit `standards.md`. **The report is one numbered section per check,
+in this order:**
+
+1. **House-defaults coverage.** `standards.md` against all ten references the index lists,
+   applicable or not, each row saying what decided it. Those predicates are prose, not profile
+   fields. No code read.
+2. **The backlog.** Follow-ups and inconsistencies against HEAD, not the document's own status text.
+3. **A judgement sample.** Up to eight rules, all of them where fewer exist, source read for those
+   only, every imprecise match opened.
+4. **The departures ledger.** Each departure into one of six categories, three of which are
+   findings. Re-verify every kept departure's basis.
 
 ## Step 1: Derive, do not impose
 

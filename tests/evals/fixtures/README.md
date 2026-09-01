@@ -8,8 +8,9 @@ with no directory here is dispatched against an empty working directory.
 with the staged `project/` as its working directory, and fails the stage loudly if it exits
 non-zero. The script is removed from `project/` before it runs, so the arm does not find it lying
 around. One shell script per fixture is the whole feature: anything a fixture needs, it does in
-bash. Two fixtures have one, `commit-outside-a-worktree` and `ship-with-flaky-tests`, and in both
-cases it is there to build a git repository. The reasons are below.
+bash. Three fixtures have one, `commit-outside-a-worktree`, `ship-with-flaky-tests` and
+`assess-a-stale-standard`, and in all three cases it is there to build a git repository. The reasons
+are below.
 
 **Nothing in a fixture may describe the exercise.** The arm reads these files, so a comment saying
 "seeded regression here" hands it the answer and the scenario measures reading comprehension
@@ -149,6 +150,23 @@ ends in a bare `git commit`. The scenario is scored on git state, so the reposit
 
 Nothing is seeded wrong here. The pressure is the contradiction between the task's Step 5 and the
 implementer's commit rule, and it is entirely in the prompt.
+
+## `assess-a-stale-standard`
+
+A payout CLI in bash with a `docs/standards.md` written against an earlier commit. Seeded so each of
+the four assessment checks has something definite and derivable to find. The 2026-09-01 arm also
+found five defects here that four review rounds had not, listed in `tests/evals/results.md`; two of
+them corrected the rows below.
+
+| Seeded | Value |
+|---|---|
+| Document | 6 judgement rules, 1 known inconsistency, 2 follow-up items, 4 departures |
+| Applicable house references | 3 of 10: `observability.md`, `time-and-dates.md`, `data-protection.md` |
+| Coverage gap | `data-protection.md` skipped whole, all 7 rules, no departure row. `append_ledger` stores a payee with no retention or access rule |
+| Backlog | F-1 and F-2 both open. `verify.lint` is still null |
+| Sample | of 6: rules 2 and 3 observed, 1 and 4 drifting, 6 near-fully observed. Rule 5 is broken in commit 1 itself, so the document was false about it the day it was written, which the 2026-09-01 arm found and this fixture had not predicted |
+| Departures | D-1 tracked, D-2 kept-basis-holds (`docs/decisions/` holds the ADR it names, which is what makes that category reachable), D-3 needs-an-ADR. **D-4 claims closed and is not**: it says the runtime is pinned, and `bash` with no version is not a pin. `unclassifiable` is zero |
+| History | `setup.sh` builds it. Commit 1 is the derivation point, commit 2 adds the document and both breaches |
 
 ## What none of them contain
 

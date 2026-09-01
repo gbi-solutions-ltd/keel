@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-08-16 |
-| Status | agreed, 2026-08-16 |
+| Status | **built 2026-08-16**, via `docs/plans/2026-08-16-done-conditions-model-pins-and-install-docs.md`, fully ticked. `docs/03-install-and-distribution.md` documents the marketplace-first install. Status corrected 2026-08-30 |
 | Recommendation | Build it. The current documents state something that is no longer true |
 | Next | `docs/plans/2026-08-16-done-conditions-model-pins-and-install-docs.md`, tasks 1 and 2 |
 

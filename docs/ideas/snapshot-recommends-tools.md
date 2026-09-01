@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-08-17 |
-| Status | agreed, 2026-08-17, in the form below |
+| Status | **built 2026-08-17**, via `docs/plans/2026-08-17-release-readiness.md` task 7, fully ticked. The shared reference is `skills/keel/references/tool-choices.md`. Status corrected 2026-08-30 |
 | Recommendation | One shared reference of tool choices under `skills/keel/references/`, cited by the snapshot's section 10. Not a new skill, not a change to the snapshot body, not a CLI feature |
 | Next | `docs/plans/2026-08-17-release-readiness.md`, task 7 |
 
