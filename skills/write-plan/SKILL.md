@@ -85,34 +85,15 @@ planning.
 
 ## Step 5: Self-review, then have it reviewed
 
-**These four are mechanical. Run them yourself; a dispatch is slower and no more reliable.**
+**Run the self-review in [references/plan-template.md](references/plan-template.md) yourself.** It is
+mechanical, and a dispatch is slower and no more reliable.
 
-1. **Story coverage:** every story in scope maps to at least one task. Name any that do not.
-2. **Placeholder scan:** search for the phrases above. Fix each.
-3. **Name consistency:** a function called `clearLayers()` in task 3 and `clearFullLayers()` in
-   task 7 is a bug you are shipping into someone's afternoon.
-4. **Command accuracy:** every command that *verifies* comes from `profile.verify`, never from
-   your idea of what the stack uses. Investigative and read-only commands (`grep`, `git log`,
-   `ls`) need no profile entry.
-
-**Then dispatch a reviewer.** The four above compare the plan to itself; none opens the codebase, so
-a plan can pass all four and still be unbuildable. Measured: a run doing exactly these four passed a
-plan whose central story could not be delivered, catching it only by opening a file no item asked
-for. Brief in [references/plan-review.md](references/plan-review.md), model `inherit`, said in one
-line. Fix what it returns, or record why not.
+**Then dispatch a reviewer.** Those checks compare the plan to itself; none opens the codebase, so a
+plan can pass every one and still be unbuildable. Brief in
+[references/plan-review.md](references/plan-review.md), model `inherit`, said in one line. Fix what
+it returns, or record why not.
 
 ## Step 6: Hand off
 
 Report task count, story coverage, any concurrent batches, and anything the plan could not settle.
 Name `execute-plan` as next. Do not start it.
-
-## Common mistakes
-
-| Mistake | Instead |
-|---|---|
-| Steps that describe rather than instruct | Show the code. "Add validation" is not a step |
-| Guessing the test command | Read `profile.verify`. Guessing produces a plan that fails at step 2 |
-| Planning `verify` stories as new work | Its first task is a test for existing behaviour |
-| One giant task | If a reviewer could reject half of it, it is two tasks |
-| Skipping the failing-test step | Watching it fail is what proves the test works |
-| A done condition that describes rather than commands | Name the command and its expected result |

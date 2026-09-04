@@ -88,10 +88,10 @@ So:
 - The check is advisory. A CI runner has no marketplace registered and is a legitimate state.
 
 **"Private for now" has one design consequence worth acting on immediately.** If this may go
-public later, GBi-specific content should be extractable mechanically rather than tangled
+public later, house-specific content should be extractable mechanically rather than tangled
 through every skill. Cheapest version of that, and what I would do:
 
-- Keep GBi-specific content confined to named reference files, never inline in a SKILL.md.
+- Keep house-specific content confined to named reference files, never inline in a SKILL.md.
   Today that means `skills/security-audit/references/payments-checklist.md`,
   `skills/coding-standards/references/gbi-defaults.md`, and
   `skills/setup-deployment/references/pipeline-patterns.md`.
@@ -99,7 +99,7 @@ through every skill. Cheapest version of that, and what I would do:
   **Corrected 2026-08-13**, since this list is what a future public release would work from and a
   wrong name means a file gets missed: the last one is `pipeline-patterns.md`, not
   `pipeline-templates.md`, which never existed. Two more now belong on the list:
-  `skills/coding-standards/references/observability.md`, which names SigNoz as the GBi default, and
+  `skills/coding-standards/references/observability.md`, which names SigNoz as the house default, and
   `skills/coding-standards/references/authorisation.md`, whose separation-of-duties rules are written
   for a payments business.
 - Never hardcode an internal URL, registry path, project id, or environment name in a
@@ -119,17 +119,17 @@ generic patterns (developer paths, document identifiers) when the list is absent
 script itself so whoever publishes cannot miss it.
 
 **Enforced 2026-08-17, after the list had already drifted.** The five named files above were a good
-intention with no check behind it, and by 0.8.0 eight more files under `skills/` named GBi,
-including four `SKILL.md` bodies, which is the one thing this decision explicitly forbids. Neither
-`tests/no-internal-leaks.sh` nor `tests/validate-skills.sh` looked for the name: the scanner's deny
-list was built for client identifiers and GBi is not a client.
+intention with no check behind it, and by 0.8.0 eight more files under `skills/` named the
+organisation, including four `SKILL.md` bodies, which is the one thing this decision explicitly
+forbids. Neither `tests/no-internal-leaks.sh` nor `tests/validate-skills.sh` looked for the name:
+the scanner's deny list was built for client identifiers and the house is not a client.
 
 All eight are neutralised. The name now appears under `skills/` only in the five files above, and
 `tests/no-internal-leaks.sh` fails when it appears anywhere else under `skills/` or `templates/`.
 The wording changes were exchanges rather than deletions: `debug` now says "a service following the
-observability standard" rather than "a GBi service", which states the condition the name was
+observability standard" rather than naming the organisation, which states the condition the name was
 carrying implicitly, and `standards-template.md` says "the house defaults", which is what a
-generated document in a non-GBi repository should have said all along.
+generated document in a repository outside the house should have said all along.
 
 **Closed 2026-08-17 by removing the thing it was managing.** The five-file list existed so that
 publishing would be a deletion rather than an audit. Publishing turned out to need neither: all five
@@ -154,10 +154,12 @@ audit. It now says "a service whose coverage was low single digits".
 Two things the enforcement deliberately does not cover, so nobody assumes it does. The rule matches
 `\bGBi` and not `gbi-solutions`, because `templates/profile.schema.json` and
 `templates/keel-profile.example.json` carry `gbi-solutions-ltd` inside the canonical schema URL,
-where it is correct. And it is scoped to `skills/` and `templates/`: `docs/`, `README.md`,
-`CHANGELOG.md` and the audits name GBi and real client repositories freely, and the audits are the
-highest-risk documents in the tree. Both facts, and the rest of what publishing actually requires,
-are in `docs/runbooks/going-public.md`.
+where it is correct. And it is scoped to `skills/` and `templates/`: `docs/plans/`, `docs/audits/`
+and `CHANGELOG.md` name the organisation and real client repositories freely, and the audits are the
+highest-risk documents in the tree. The rest of `docs/`, `README.md` and `CONTRIBUTING.md` were
+brought to the same organisation-neutral wording as the shipped content on 2026-09-02, so the only
+names left outside the enforced scope are in the dated records and the licence files. Both facts,
+and the rest of what publishing actually requires, are in `docs/runbooks/going-public.md`.
 
 ---
 
@@ -171,7 +173,7 @@ Three postures, and the answer changes what Phase 1 builds:
 | **Enforced with escape hatches** | Skills refuse, the user can override by saying so explicitly, and the override is recorded | Most teams |
 | **Hard blocked** | Hooks physically prevent the action, no override in-session | Regulated or high-blast-radius work |
 
-**Recommendation: enforced with escape hatches**, with one exception. Given GBi is in
+**Recommendation: enforced with escape hatches**, with one exception. Because the house is in
 payments, `security-audit` on a diff touching auth, money movement, or PII should be hard
 blocked at the hook level, not overridable by a sentence in chat.
 

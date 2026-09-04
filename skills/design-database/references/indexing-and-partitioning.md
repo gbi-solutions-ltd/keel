@@ -38,8 +38,8 @@ and the second half is what makes it actionable.
 
 ## Partitioning, as a decision with three answers
 
-Partitioning appeared once in the baseline, in passing, as something to combine with a rebuild. That
-is the failure this section fixes: it was mentioned, not decided.
+Partitioning gets mentioned in passing, as something to combine with a rebuild one day. That is the
+failure this section fixes: mentioned, not decided.
 
 **A partitioning recommendation is incomplete unless all three are answered.** A blank is not an
 answer; `Not warranted, because` is a complete one for the whole section.

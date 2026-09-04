@@ -107,7 +107,7 @@ references, and its body should not spend words teaching review technique the ba
 
 Body of roughly 700 words plus references. Design and review and documentation and tuning across
 five engines cannot share one body under ADR-0001's 900 word ceiling; `coding-standards` is the
-precedent at 12 references, 17,816 words, and a body of 683. Expect `normalisation.md`,
+precedent at 17 references, 22,752 words, and a body of 795. Expect `normalisation.md`,
 `type-selection.md`, `indexing-and-partitioning.md`, a review output template, and `postgres.md` and
 `oracle.md`. Adding a skill also moves `tests/test-doc-claims.sh`'s pinned skill count and adds a
 body to the distribution ADR-0001 asks to re-measure at each release.

@@ -711,3 +711,47 @@ descriptions in `templates/profile.schema.json` should be reworded, which
 `tests/evals/results.md:2483-2484` explicitly leaves open on the grounds that "one run against two
 keys is not the evidence for rewriting five"; and whether `keel doctor` should warn when
 `gates.coding_standards` is `required` and no `standards.md` exists.
+
+## Decision, 2026-09-02: check 1 keeps its ten, house defaults get their own check
+
+Recorded before implementation rather than after, because the reasoning is the part that will be
+questioned later and a decision whose reasoning is reconstructed is a decision that gets reopened.
+
+**The shape, verified before deciding.** The index in `references/house-defaults.md` lists exactly
+ten topic references. `house-defaults.md` itself carries fourteen `##` sections, of which twelve are
+rule sections: the other two are "The other references, and when each applies", which is the index,
+and "What is deliberately not here", which says formatting belongs to the formatter.
+
+**The decision.** Check 1's corpus stays the ten topic references, unchanged. A **second, separate**
+check counts `house-defaults.md`'s twelve rule sections on its own and reports its own number. The
+two are never summed.
+
+Three reasons, in the order they mattered.
+
+**The denominator does not move, so reports stay comparable.** `docs/audits/2026-09-02-standards.md`
+was written under the current rule and is the only real report this mode has produced. Migrating the
+corpus to twenty-two would have invalidated it, and a mode whose first act is to invalidate its own
+first output has no trend section worth writing. `references/assessment-report.md:11-12` already
+says two runs against the same repository must be comparable without re-reading either tree; that
+sentence binds the rule that produces the number, not just the report that prints it.
+
+**The two numbers answer different questions.** Did the project fold in the topic-reference rules,
+and did it fold in the house defaults. A single figure of eighty-one hides which of the two failed,
+and they fail for different reasons: a topic reference is skipped because nobody judged it
+applicable, a house default is skipped because nobody read the file at all. The 2026-09-02 audit
+found all five applicable topic references skipped whole, which is a finding about applicability
+judgement. A house-defaults number would have been a finding about something else.
+
+**The second check needs its own exclusion rule, stated by name.** `assessment-report.md:65-69`
+excludes trailing checklist headings by naming them, `Testing it`, `What review looks for` and
+`What good looks like`, precisely so that no run subtracts a fixed number and no run judges whether
+a heading "reads like a rule". `house-defaults.md`'s two non-rule sections are not checklists and
+carry neither of those names, so the same mechanism does not reach them: they are excluded by
+meaning. The rule must therefore name them too, as **"The other references, and when each applies"
+and "What is deliberately not here"**, and count every other `##`. Naming them is what keeps the
+denominator reproducible when a thirteenth rule section is added, and what makes adding a
+fourteenth non-rule section a visible edit to this rule rather than a silent change of twelve.
+
+**Not decided here:** where the second check sits in the report's fixed section order, and whether
+its findings count into the header's `coverage` figure or a new one. Both are `assessment-report.md`
+questions and belong with the work that implements this.

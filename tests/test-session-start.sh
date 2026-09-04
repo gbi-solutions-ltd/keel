@@ -122,6 +122,118 @@ else
     chmod 644 "$tmp/f/.keel/profile.json"
 fi
 
+# ---- the loaded plugin version -------------------------------------------------------------
+#
+# The hook prints the version of the plugin copy the session loaded, which is the one fact a session
+# cannot learn any other way: CLAUDE_PLUGIN_ROOT reaches a plugin's own hooks and not `keel` on
+# PATH, and on a developer machine those are routinely different copies a full release apart.
+#
+# Every case below asserts the hook still exits 0 and still carries the router pointer, because the
+# failure being guarded against is a dead hook rather than a missing line. A hook that exits
+# non-zero prints nothing at all, and a session that loses the router looks exactly like one where
+# the plugin is not installed. That is the failure case 10 above records for the profile read.
+version_line_of() {   # version_line_of <plugin-root-or-empty>
+    local pr="$1" out
+    if [ -n "$pr" ]; then out="$( cd "$tmp/d" && CLAUDE_PLUGIN_ROOT="$pr" "$HOOK" 2>/dev/null )"
+    else out="$( cd "$tmp/d" && "$HOOK" 2>/dev/null )"; fi
+    printf '%s' "$out" | python3 -c '
+import json, sys
+try:
+    c = json.load(sys.stdin)["hookSpecificOutput"]["additionalContext"]
+except Exception:
+    print("INVALID-JSON"); sys.exit(0)
+if "pick a skill" not in c:
+    print("NO-ROUTER"); sys.exit(0)
+hits = [l for l in c.split("\n") if l.startswith("keel ")]
+print(hits[0] if hits else "NONE")'
+}
+
+check_version() {   # check_version <name> <plugin-root-or-empty> <expected line or NONE>
+    local name="$1" got
+    got="$(version_line_of "$2")"
+    if [ "$got" = "$3" ]; then ok "$name"
+    else bad "version" "$name: expected [$3], got [$got]"; fi
+}
+
+vroot="$tmp/plug"
+
+# 11. The ordinary case. A plugin root carrying a VERSION puts one line in the context.
+mkdir -p "$vroot/ok" && printf '9.9.9\n' > "$vroot/ok/VERSION"
+check_version "a plugin root's VERSION reaches the session context" "$vroot/ok" "keel 9.9.9"
+
+# 12. CLAUDE_PLUGIN_ROOT unset, which no real install produces and every test invocation does. The
+# BASH_SOURCE fallback has to resolve to this repository, or the four size assertions below are
+# measuring something other than what a session sees.
+check_version "with CLAUDE_PLUGIN_ROOT unset the fallback finds this repository" "" "keel $(cat "$(dirname "$HOOK")/../VERSION")"
+
+# 13. No VERSION at all, which is what a partial or hand-assembled install looks like.
+mkdir -p "$vroot/none"
+check_version "an absent VERSION drops the line and keeps the router" "$vroot/none" NONE
+
+# 14. An unreadable VERSION. Same guard as case 10, and the one that regresses the moment somebody
+# simplifies `[ -r ... ]` away: under `set -e` the read is the last command in an && chain, so a
+# failure takes the whole hook down rather than the line.
+#
+# Skipped as root, which can read a 000 file, so the case would pass while testing nothing.
+mkdir -p "$vroot/unreadable" && printf '1.2.3\n' > "$vroot/unreadable/VERSION"
+if [ "$(id -u)" -eq 0 ]; then
+    printf '  SKIP  an unreadable VERSION drops the line and keeps the router (running as root)\n'
+else
+    chmod 000 "$vroot/unreadable/VERSION"
+    check_version "an unreadable VERSION drops the line and keeps the router" "$vroot/unreadable" NONE
+    chmod 644 "$vroot/unreadable/VERSION"
+fi
+
+# 15. Whitespace, which is checked as its own rule in the hook rather than left to the character
+# set. A newline breaks the one-line contract of the injected context and escape() would ship it
+# rather than reject it. Three shapes, because a set widened later may stop excluding one of them
+# as a side effect: that is exactly what happened to this guard on 2026-09-02.
+mkdir -p "$vroot/multiline" && printf '0.1\nrm -rf /\n' > "$vroot/multiline/VERSION"
+check_version "a multiline VERSION is dropped rather than escaped and shipped" "$vroot/multiline" NONE
+mkdir -p "$vroot/space" && printf '0.17.0 rc1\n' > "$vroot/space/VERSION"
+check_version "a VERSION containing a space is dropped" "$vroot/space" NONE
+mkdir -p "$vroot/tab" && printf '0.17\t0\n' > "$vroot/tab/VERSION"
+check_version "a VERSION containing a tab is dropped" "$vroot/tab" NONE
+
+# 16. A pre-release version. Letters and hyphens are accepted since 2026-09-02: the digits-and-dots
+# set that shipped that morning dropped the line silently for `0.17.0-rc.1`, which is the release
+# where knowing which copy a session loaded matters most and the one nobody would have checked.
+mkdir -p "$vroot/prerelease" && printf '0.17.0-rc.1\n' > "$vroot/prerelease/VERSION"
+check_version "a pre-release VERSION is kept, letters and hyphens included" "$vroot/prerelease" "keel 0.17.0-rc.1"
+
+# A character outside the widened set is still dropped, so widening did not become anything-goes.
+mkdir -p "$vroot/slash" && printf '0.17/0\n' > "$vroot/slash/VERSION"
+check_version "a VERSION containing a slash is still dropped" "$vroot/slash" NONE
+
+# 17. A VERSION of 300 digits. This is the case that is only found by running the guard: it passes
+# any plausible character set and would blow NFR-01 on its own, which is why the length bound is a
+# separate test rather than folded into the class.
+mkdir -p "$vroot/long" && python3 -c "print('9' * 300)" > "$vroot/long/VERSION"
+check_version "a 300 character VERSION is dropped by the length bound" "$vroot/long" NONE
+
+# 18. The cap, from both sides and on both shapes, because twelve has to be what is under test
+# rather than the character set. A twelve character pre-release is accepted and a thirteen character
+# one is not, and the same pair for a plain numeric version. Four cases, one number.
+mkdir -p "$vroot/twelve-pre" && printf '0.17.0-rc.12\n' > "$vroot/twelve-pre/VERSION"
+check_version "a twelve character pre-release VERSION is kept" "$vroot/twelve-pre" "keel 0.17.0-rc.12"
+mkdir -p "$vroot/thirteen-pre" && printf '0.17.0-rc.123\n' > "$vroot/thirteen-pre/VERSION"
+check_version "a thirteen character pre-release VERSION is dropped" "$vroot/thirteen-pre" NONE
+mkdir -p "$vroot/thirteen" && printf '1.2.3.4.5.6.7\n' > "$vroot/thirteen/VERSION"
+check_version "a thirteen character numeric VERSION is dropped" "$vroot/thirteen" NONE
+mkdir -p "$vroot/eleven" && printf '100.100.100\n' > "$vroot/eleven/VERSION"
+check_version "an eleven character numeric VERSION is kept" "$vroot/eleven" "keel 100.100.100"
+
+# 19. And the longest version the cap accepts must still fit NFR-01, which is the whole reason the
+# cap is twelve rather than a round number. Measured on the worst of the four forms rather than on
+# the one this repository selects, and on a twelve character version rather than the eleven above,
+# because twelve is the boundary and eleven would leave the assertion a character of slack.
+long_chars="$( cd "$tmp/b" && CLAUDE_PLUGIN_ROOT="$vroot/twelve-pre" "$HOOK" 2>/dev/null | wc -c | tr -d ' ' )"
+if [ "$long_chars" -le 1285 ]; then
+    ok "the longest version the cap accepts still fits NFR-01 at $long_chars characters"
+else
+    bad "version" "a twelve character version puts the worst form at $long_chars characters, over the 1285 of NFR-01. The cap in hooks/session-start and this ceiling have to move together"
+fi
+
 # The four forms are asserted at their exact measured sizes, not as an upper bound. NFR-01 of
 # docs/prd/plain-language-chat.md caps every combination at 1285 characters and the wordings were
 # chosen against that, so a wording edit has to be a deliberate act with a re-measurement rather
@@ -133,16 +245,37 @@ size_of() {   # size_of <cwd>
 # characters against the 1 the worst form had spare, so four phrases were trimmed in the same edit:
 # "Unsure which fits:" to "Unsure:", "for Oracle APEX" dropped from a line whose two skill names
 # already carry the word, "is down now:" to "is down:", and "when no skill fits" to "when none fits".
-# No skill name was dropped. The four forms fell by 18 characters each and the worst is now 1266,
+# No skill name was dropped. The four forms fell by 18 characters each and the worst was then 1266,
 # 351 tokens, which is 5 tokens inside NFR-01 rather than the 0 the first costing would have left.
-for spec in "b:1266:terse and technical" "g:1265:terse and plain" \
-            "c:1064:verbose and technical" "h:1255:verbose and plain"; do
+#
+# Re-measured 2026-09-02 when the hook began printing the loaded plugin version. Every form grew by
+# 13: two characters for the newline escape() renders as `\n`, five for `keel `, and six for the
+# version string itself. The worst is now 1279, 355 tokens, one inside NFR-01.
+#
+# THESE FOUR NUMBERS DEPEND ON THE LENGTH OF ./VERSION, and that is deliberate. CLAUDE_PLUGIN_ROOT
+# is unset here, so the hook falls back to this repository and prints its real version, six
+# characters today. A bump to a seven character version moves all four by one and fails this block,
+# which is correct: it genuinely spends one of the six characters NFR-01 has left, and the point of
+# asserting exact sizes rather than an upper bound is that spending them is a deliberate act with a
+# re-measurement. Update the numbers, do not pin the version.
+for spec in "b:1279:terse and technical" "g:1278:terse and plain" \
+            "c:1077:verbose and technical" "h:1268:verbose and plain"; do
     dir="${spec%%:*}"; rest="${spec#*:}"; want="${rest%%:*}"; label="${rest#*:}"
     got="$(size_of "$tmp/$dir")"
     if [ "$got" = "$want" ]; then
         ok "$label injects exactly $want characters"
     else
-        bad "size" "$label injects $got characters, expected $want. NFR-01 caps every form at 1285"
+        # Self-explaining on purpose. The likeliest cause of this failing is a VERSION whose length
+        # changed, which is a legitimate release and not a defect, and somebody meeting four red
+        # constants with no explanation deletes the tripwire rather than reading it.
+        bad "size" "$label injects $got characters, expected $want, a difference of $(( got - want )).
+        These four numbers are deliberately coupled to the length of ./VERSION, which this hook
+        prints. A release that changes the version's length by one moves all four by one, and that
+        is not a defect: it spends the headroom NFR-01 has left, which was 6 characters at 1279
+        against the 1285 ceiling. Re-measure all four, update these constants and the four-form
+        table under 'The rule is on by default and it is not free' in
+        docs/05-token-and-memory-design.md, which NFR-05 requires to agree with them. Do not pin the
+        version to keep this green: the coupling is what makes spending those characters deliberate."
     fi
 done
 

@@ -336,7 +336,9 @@ is worse than an honest gap because it reads as coverage.
 
 1. Every story in scope maps to at least one task.
 2. No placeholder phrases survive.
-3. Names used in later tasks match what earlier tasks defined.
+3. Names used in later tasks match what earlier tasks defined. A function called
+   `clearLayers()` in task 3 and `clearFullLayers()` in task 7 is a bug you are shipping into
+   someone's afternoon.
 4. Every **verifying** command comes from `profile.verify`. Investigative commands (`grep`,
    `git log`, `ls`) need no entry, and demanding one makes the check reject correct plans.
 5. Every task ends with a hand-over step that stages named paths and names the commit the
@@ -345,3 +347,14 @@ is worse than an honest gap because it reads as coverage.
 6. No task depends on a file no task creates.
 
 Fix inline. Then report coverage and hand off.
+
+## Common mistakes
+
+| Mistake | Instead |
+|---|---|
+| Steps that describe rather than instruct | Show the code. "Add validation" is not a step |
+| Guessing the test command | Read `profile.verify`. Guessing produces a plan that fails at step 2 |
+| Planning `verify` stories as new work | Its first task is a test for existing behaviour |
+| One giant task | If a reviewer could reject half of it, it is two tasks |
+| Skipping the failing-test step | Watching it fail is what proves the test works |
+| A done condition that describes rather than commands | Name the command and its expected result |

@@ -51,7 +51,7 @@
   },
   "deploy": {
     "target": "gcp-cloud-run",
-    "registry": "europe-west1-docker.pkg.dev/gbi/payouts",
+    "registry": "europe-west1-docker.pkg.dev/example-project/payments-api",
     "envs": [
       "dev",
       "staging",

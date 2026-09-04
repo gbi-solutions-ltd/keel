@@ -44,8 +44,13 @@ you are covered for.
   body.
 - Body within 700 words, which is the target rather than the ceiling: ADR-0001 allows up to 900, and
   anything over 700 requires a passing eval arm at that length recorded in `tests/evals/results.md`.
-  One body has bought it: `coding-standards` at 876 words, on the arm recorded in
-  `tests/evals/results.md` for 2026-09-01. Assume 700 is the limit unless you are willing to run one. Aim at 400 for one linear path, 600
+  **An arm discharges the length it was run at, not the body it was run against**, so a body that
+  grows past the length of its last passing arm owes a new one. A gate arm counts, per ADR-0001's
+  clarification of 2026-09-04. Six bodies carry a passing arm at their current length:
+  `coding-standards` 795 (2026-09-03), `write-docs` 756 (2026-09-02), `context-budget` 723
+  (2026-09-02) and `write-prd` 793 (2026-08-30) on dedicated length arms, and `tdd` 793 and
+  `execute-plan` 884 on the 0.17.0 release gate of 2026-09-01, all in `tests/evals/results.md`.
+  Assume 700 is the limit unless you are willing to run one. Aim at 400 for one linear path, 600
   when it fans out to subagents or carries modes.
 - No `@` links. They force-load at parse time and burn context before it is needed.
 - No literal `docs/keel`. Skills use `<docs_root>` and read `profile.docs_root`; templates use
@@ -71,9 +76,10 @@ you are covered for.
 - `templates/profile.schema.json` cannot change shape without `SCHEMA_VERSION` moving, because
   `doctor` compares the version and not the fields, so a silent schema change is one it stays quiet
   about.
-- GBi is named under `skills/` only in the five reference files decision 2 declares, and never in a
-  `SKILL.md`. `tests/no-internal-leaks.sh` enforces it, so publishing stays a deletion rather than an
-  audit.
+- **Shipped content names no organisation.** Nothing under `skills/`, `templates/` or
+  `output-styles/` carries the house's own name; say "the house defaults" or "a service following
+  the observability standard" instead. `tests/no-internal-leaks.sh` enforces it, so publishing stays
+  a deletion rather than an audit.
 - **Client and partner identifiers are not in this repository.** `tests/no-internal-leaks.sh` loads
   them from `KEEL_DENY_FILE`, defaulting to `~/.config/keel/internal-deny-list.txt`, and prints on
   every run whether it found one. Without it the generic patterns still run: an absent list degrades

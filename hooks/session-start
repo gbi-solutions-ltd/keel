@@ -6,12 +6,34 @@
 # counter, no reading of any file that changes. One volatile byte here costs the cache on every
 # request in every session.
 #
-# THE ONE EXCEPTION, AND ITS BOUND. It reads `conventions.response_style` and
-# `conventions.explain_level` from the project profile. That is a file that changes, which the rule
-# above forbids, so the bound matters: the output has exactly four forms, and it moves between them
-# only when a person deliberately edits a key. That costs one cache miss on the session after the
-# edit, the same as editing CLAUDE.md, rather than one per request. A key read for its value would
-# be volatile; a key read for which of four paragraphs to print is not.
+# THE EXCEPTIONS, AND THE BOUND THEY SHARE. The bound is not how many forms the output can take.
+# It is that every change to it follows a deliberate act, so it costs one cache miss on the session
+# after that act rather than one per request. Widened from a form-count bound on 2026-09-02, because
+# the second exception below has one form per release and the old wording could not admit it.
+# NFR-03 of docs/prd/plain-language-chat.md carries the same rule and was amended the same day.
+#
+# First, it reads `conventions.response_style` and `conventions.explain_level` from the project
+# profile. That is a file that changes, which the rule above forbids, so the bound matters: the
+# output has exactly four forms, and it moves between them only when a person deliberately edits a
+# key. That costs one cache miss on the session after the edit, the same as editing CLAUDE.md. A
+# key read for its value would be volatile; a key read for which of four paragraphs to print is not.
+#
+# Second, it prints the version of the plugin copy this session loaded. That is the one fact a
+# session cannot learn any other way: CLAUDE_PLUGIN_ROOT is set only for hooks a plugin itself
+# defines, so this process can see it and `keel` on PATH cannot, and the two are routinely different
+# copies. A cached copy sat a full release behind for twelve days in August 2026 with nothing able to
+# say so. It changes less often than the profile does, not more: the cache path is versioned
+# (.../cache/gbi/keel/<version>/) so an upgrade writes a new directory rather than editing this one,
+# which makes VERSION write-once for the life of a copy.
+#
+# WHAT IT COSTS, AND WHY THE ARITHMETIC MISLEADS. Thirteen characters for an eleven-character
+# version string, because escape() below renders the newline as a two-character `\n` in the JSON.
+# Anyone counting the literal string gets twelve and concludes there is more room than there is.
+# NFR-01 caps every form at 1,285 characters and the worst was 1,266 before this line, so the room
+# was nineteen characters and six are left. The fail threshold in tests/validate-skills.sh is 1,286
+# and not 1,285, because 1285*10/36 truncates to 356 and 356 is not over 356.
+#
+# Nothing further goes in this output without taking words out first.
 #
 # NO python3 HERE. This runs before every session, so it must not depend on an interpreter being
 # present or pay its startup. The profile is matched with a builtin `case`, which also means the
@@ -100,6 +122,45 @@ if [ "$plain" = yes ]; then
 elif [ "$verbose" = no ]; then
     CONTEXT="$CONTEXT$BREVITY"
 fi
+
+# The loaded plugin copy's version. See the second exception in the header.
+#
+# Guarded assignment, not `ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd ...)}"`. Under `set -e` a failing
+# command substitution inside an assignment takes the whole hook down, and a dead hook costs the
+# session its router pointer, which is the same failure the `-r` test above exists to prevent.
+ROOT="${CLAUDE_PLUGIN_ROOT:-}"
+[ -n "$ROOT" ] || ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)" || ROOT=""
+
+# Three guards, in order, and nothing is printed when any of them rejects. Not the word "unknown":
+# a line that tells the reader nothing still costs the budget in every request of every session,
+# forever.
+#
+# **Whitespace, stated as its own rule rather than left to the character set.** The context is one
+# string injected into every prompt, so a VERSION carrying a newline would break the one-line
+# contract and `escape` would ship it rather than reject it. The set below happens to exclude
+# whitespace too, but a rule that matters this much should not depend on a side effect of a list
+# somebody may widen later. Somebody did: see the next paragraph.
+#
+# **The set allows letters and hyphens, not only digits and dots.** It was digits and dots until
+# 2026-09-02, which silently dropped the line for any pre-release: `0.17.0-rc.1` failed the class
+# and printed nothing, on exactly the release where knowing which copy a session loaded matters
+# most, and nothing would have reported it. Requester decision, 2026-09-02: widen the set, keep the
+# cap. The cap is what protects NFR-01; the set never did.
+#
+# **Twelve characters is what the budget affords**, being the nineteen NFR-01 leaves minus the seven
+# this line spends before the number, two for the escaped newline and five for `keel `. It is the
+# guard that does the real work, and the one found by running this code rather than reading it: a
+# VERSION of 300 digits passes any plausible character set and blows NFR-01 on its own.
+# `0.17.0-rc.1` is eleven and `100.100.100` is eleven, so the ceiling is not near either shape.
+ver=""
+[ -n "$ROOT" ] && [ -r "$ROOT/VERSION" ] && ver="$(<"$ROOT/VERSION")"
+case "$ver" in
+    ''|*[[:space:]]*)      ver="" ;;
+    *[!0-9A-Za-z.-]*)      ver="" ;;
+esac
+[ "${#ver}" -le 12 ] || ver=""
+[ -n "$ver" ] && CONTEXT="$CONTEXT
+keel $ver"
 
 escape() { local s="$1"; s="${s//\\/\\\\}"; s="${s//\"/\\\"}"; s="${s//$'\n'/\\n}"; printf '%s' "$s"; }
 

@@ -145,7 +145,7 @@ runs Claude Code in a terminal, the settings file works as written.
 `keel doctor` warns when the extension is installed and that setting is absent, because the failure
 is invisible: the mode simply is not what the project asked for, and nothing says so.
 
-### Why this is right for GBi specifically
+### Why this is right for this house specifically
 
 You have many repos across several stacks. The failure mode to avoid is the one where
 `tdd` in `payments-api` is six months behind `tdd` in `merchant-portal` and nobody knows

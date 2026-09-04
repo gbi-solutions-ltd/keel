@@ -2,6 +2,11 @@
 # Assemble an eval prompt: the scenario's pressure prompt plus the skills it injects.
 # Prints to stdout. Dispatching and scoring are done by an agent, deliberately.
 #
+# The prompt is only valid dispatched from stage.sh's <dir>/project/. Where a scenario injects a
+# skill with references, the prompt names them at ../skills/<skill>/references/, and only stage.sh
+# puts them there. Printing it here to read is fine; dispatching it from anywhere else points the
+# arm at a path that does not exist.
+#
 # Usage: tests/evals/run.sh <scenario-name>
 
 set -uo pipefail
@@ -27,6 +32,22 @@ if [ -n "$skills" ]; then
         printf '=== SKILL: %s ===\n' "$s"
         cat "skills/$s/SKILL.md"
         printf '\n'
+    done
+    # Where the staged references are, from the arm's working directory. stage.sh puts them at
+    # <staged>/skills/<skill>/references/ and the arm runs in <staged>/project, so this path is a
+    # promise this script makes and stage.sh keeps. Case 26 of tests/test-eval-harness.sh pins both
+    # halves, because a path named here and not staged is worse than no path at all.
+    #
+    # Only for skills that have one. Pointing an arm at a directory that does not exist teaches it
+    # the instruction is unreliable, and the links inside the injected SKILL.md are relative to the
+    # skill directory, so they resolve nowhere from project/ without this line.
+    for s in $skills; do
+        [ -d "skills/$s/references" ] || continue
+        # shellcheck disable=SC2016
+        # The backticks are markdown, wrapping a path for the reader, and there is nothing here for
+        # the shell to expand. Single quotes are what keep the format string literal, which is
+        # exactly what SC2016 warns about and exactly what is wanted.
+        printf 'The reference files %s links are on disk at `../skills/%s/references/`. Read one when the skill tells you to.\n\n' "$s" "$s"
     done
     printf '=== TASK ===\n\n'
 fi

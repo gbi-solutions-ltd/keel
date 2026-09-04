@@ -92,7 +92,7 @@ after a `/clear` and what keeps token use flat as a project grows.
 | `design-architecture` | PRD, stories, snapshot | `<docs_root>/architecture/<slug>.md`, `<docs_root>/decisions/ADR-NNNN-*.md` |
 | `write-plan` | architecture, stories | `<docs_root>/plans/YYYY-MM-DD-<slug>.md` |
 | `execute-plan` | plan | code, commits, checked boxes in the plan |
-| `coding-standards` | the codebase, or an existing `standards.md` | `<docs_root>/standards.md`, or `<docs_root>/audits/YYYY-MM-DD-standards.md` in assess mode |
+| `coding-standards` | the codebase, or an existing `standards.md` | `<docs_root>/standards.md`, or `<docs_root>/audits/YYYY-MM-DD-standards.md` in assess mode, or `<docs_root>/audits/YYYY-MM-DD-standards-audit.md` in audit mode |
 | `security-audit` | diff or whole repo | `<docs_root>/audits/YYYY-MM-DD-security.md` |
 | `incident-response` | the running system, runbooks | `<docs_root>/incidents/YYYY-MM-DD-<slug>.md` |
 | `setup-deployment` | profile, architecture | `.github/workflows/*`, `Dockerfile`, `<docs_root>/runbooks/deploy.md` |

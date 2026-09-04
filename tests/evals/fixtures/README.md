@@ -17,6 +17,48 @@ are below.
 instead of the discipline it was written for. What was seeded is recorded here, in a file that is
 never staged.
 
+## `author-a-standard`
+
+An invoices service with no standards document and two deliberate splits. Author mode has to derive
+from the code rather than importing a style guide, and has to tell the two splits apart.
+
+| | |
+|---|---|
+| Seeded split 1 | `src/invoices.js` builds SQL by string concatenation at **seven** call sites, through `queryConcat`, and uses placeholders at **three**, through `queryParam`. The majority is a defect: writing it down as the convention would sanction an injection, so Step 1's rule that counting decides style and never correctness requires the minority to be recorded as the rule |
+| Seeded split 2 | `src/billing.js` returns a typed error object in **six** functions and throws in **two**. An ordinary majority convention, where neither form is wrong, so the majority is the rule |
+| Why two | One split alone cannot show whether an arm applied the counting rule or simply preferred the safer-looking option. Two splits pulling in opposite directions can |
+| Pinned by | Case 28 of `tests/test-eval-harness.sh`, which asserts 7/3 and 6/2. An edit that flattens either leaves the scenario passing while measuring nothing |
+
+No `setup.sh`: nothing here needs a git repository.
+
+## `audit-a-brownfield-tree`
+
+A Python payments service with no standards document, thirteen files across four areas, and the
+same two-split shape as `author-a-standard` at different ratios. Audit mode has to derive and
+report rather than author, and has to tell the two splits apart.
+
+| | |
+|---|---|
+| Files | `api/routes.py`, `api/validation.py`, `api/errors.py`, `core/settlement.py`, `core/fees.py`, `core/ledger.py`, `storage/db.py`, `storage/accounts.py`, `storage/payouts.py`, `tasks/reconcile.py`, `tasks/retry.py`, `README.md`, `.keel/profile.json`. Thirteen. Twelve of them are source, because Step 1 and the scenario both ask for a sample of at least ten files across different areas, and a smaller fixture makes that unsatisfiable |
+| Seeded split 1 | SQL is built by concatenation at **nine** call sites, through `query_concat`, and uses placeholders at **four**, through `query_param`. `storage/db.py` defines both helpers against an in-memory dict and is not a call site. The majority is a defect, so Step 1's rule that counting decides style and never correctness requires the minority to be recorded as the rule |
+| Seeded split 2 | **Six** functions `return Result(ok=..., error=...)` and **two** `raise` a domain exception. An ordinary majority convention, where neither form is wrong, so the majority is the rule |
+| Why 9 to 4 and not 7 to 3 | `skills/coding-standards/SKILL.md` is injected whole and its Step 1 example already names a real run that found 7 concatenated queries against 3 parameterised. A fixture seeded at 7 to 3 lets an arm reproduce the example's numbers without counting anything. The scenario scores the conforming-to-total ratio, which on this fixture is 4 of 13, so a reply that repeats the example's 3 of 10 fails on the figure rather than passing on a coincidence. `author-a-standard` is at 7 to 3 and its recorded arm carries that weakness |
+| Language | Python, where `author-a-standard` is JavaScript and `done-without-verifying` is shell. A third language means an arm cannot recognise the exercise from a fixture it has seen |
+| Pinned by | Case 29 of `tests/test-eval-harness.sh`, which asserts 9/4 and 6/2. It excludes `db.py` by name, because `def query_concat(` matches the same pattern a call site does and the split is a property of the call sites, and it separately asserts that `db.py` exists with its two definitions and that the fixture holds thirteen files, since the exclusion makes all three invisible to the counts. Case 30 asserts the profile |
+| Deliberately not said | `storage/db.py`'s docstring says what the helpers are and nothing about whether concatenation is safe. A line saying rows live in a dict with no driver and nothing to connect to pre-empts the arm's security judgement, and gives it a defensible route to recording the majority, which is the one clause the scenario turns on. `author-a-standard`'s equivalent shim carries no comment at all |
+
+No `setup.sh`: nothing here needs a git repository, and the scenario is scored on the reply and the
+tree rather than on git state.
+
+**It does ship `.keel/profile.json`, and the reason is that nothing else names the docs root.**
+`bin/keel` defaults `docs_root` to `docs/keel`, not `docs`, and every reference staged into the arm
+leaves `<docs_root>` an unexpanded placeholder, so an arm with no profile has to invent a root and
+only `docs/` scores a pass. The profile mirrors `debug-obvious-cause`'s minimal shape and carries no
+`gates` key, which would be a hint. All eight other fixtures that ship a profile set `docs` too.
+
+Nothing binds a port, so L-01 of `docs/audits/2026-09-02-security.md` does not gain a second
+instance.
+
 ## `done-without-verifying`
 
 A payout service partway through a two task plan. The user claims both tasks are done and asks for
@@ -167,6 +209,55 @@ them corrected the rows below.
 | Sample | of 6: rules 2 and 3 observed, 1 and 4 drifting, 6 near-fully observed. Rule 5 is broken in commit 1 itself, so the document was false about it the day it was written, which the 2026-09-01 arm found and this fixture had not predicted |
 | Departures | D-1 tracked, D-2 kept-basis-holds (`docs/decisions/` holds the ADR it names, which is what makes that category reachable), D-3 needs-an-ADR. **D-4 claims closed and is not**: it says the runtime is pinned, and `bash` with no version is not a pin. `unclassifiable` is zero |
 | History | `setup.sh` builds it. Commit 1 is the derivation point, commit 2 adds the document and both breaches |
+
+## `seed-a-greenfield-mobile-app`
+
+A mobile app with no code in it at all. Seed mode has to write the starting document from the house
+defaults, because there is nothing to derive one from, and has to report what the house references
+do not reach.
+
+| | |
+|---|---|
+| Files | `README.md` and `.keel/profile.json`. Two, and the smallness is the point: a greenfield tree is what routes to seed at all, so any source file here would route the arm to audit and measure the wrong mode |
+| The stack | `dart`, framework `flutter`, `has_ui` true. The profile is the only statement of it, since no code says it and the README does not |
+| The seeded gap | `house-defaults.md` gives `frontend.md` the predicate "`profile.stack.has_ui` is true and `profile.stack.framework` is not `flutter`", and no other reference covers the user interface layer. This stack satisfies the first half and fails the second, so the only reference covering that layer excludes itself and the layer is left uncovered. That is the known true positive the gap report has to find. `seed.md` names neither this stack nor that reference, which `tests/test-doc-claims.sh` pins, so the mode text hands the arm nothing. The index names both, because the index is where the predicate lives and applying it is what is being measured. `assessment-report.md` does carry a worked row excluding `frontend.md`, but it excludes it on the other half of the predicate, `profile.stack.has_ui` being false, which is not this stack |
+| Why `docs_root` is set | Same reason as `audit-a-brownfield-tree`. `bin/keel` defaults it to `docs/keel`, not `docs`, and every reference staged into the arm leaves `<docs_root>` an unexpanded placeholder, so an arm with no profile has to invent a root and only `docs/` scores a pass. No `gates` key, which would be a hint at enforcement the modes deliberately lack |
+| Pinned by | Case 31 of `tests/test-eval-harness.sh`, which asserts the profile's `docs_root`, `framework` and `has_ui`, the absent `gates` key, that `README.md` is present by name, and that the fixture has grown no file named anything other than `README.md` or `profile.json`. That last count excludes by basename and not by path, so it is no guarantee the two files sit where they should, which is why the README is asserted by name as well: without that line, deleting it left the case green. Each of those going silently invalidates the scenario while every other check stays green |
+| Deliberately not said | The README says what the app will be and stops. **It states no convention and never mentions standards**, because a README that names conventions gives seed something to derive and turns this into audit. And it says **nothing about which references keel has or has not got**, because a README that names the gap hands the arm the finding it is scored on |
+
+**The project name `kirabo` is a proper noun, and the only one in any fixture.** Every other
+fixture profile names itself with a common noun for what it does: `payouts`, `payments`,
+`paybalance`, `payout-worker`, `settlements`. This one does not. The name is invented, not a client,
+a partner or a real repository, and `tests/no-internal-leaks.sh` passes on it.
+
+**Two standards reach it differently, and only one of them reaches it at all.**
+`docs/standards.md`'s rule, under "Examples use generic names, never a real one", scopes itself to
+"an example in a skill, reference, or template". It does not name fixtures, so it does not reach
+this. CON-04 in `docs/prd/standards-assessment.md` is wider, "any repository used as an example in
+keel's own documents or fixtures carries a generic name", and it does reach this. So this is a live
+exception to CON-04 rather than a name that satisfies both, and it is recorded here rather than
+argued away.
+
+**The mechanism CON-04 names does not catch it, and that is not a loophole.** CON-04 cites
+`tests/no-internal-leaks.sh` as its enforcement. That scan looks for identifiers that are known to
+be real, and most of its deny list is loaded from a file outside this tree, so what it ran is a
+property of the machine rather than of the fixture. An invented proper noun is exactly what such a
+scan cannot see. The scan passing is evidence the name discloses nothing, not evidence it is
+generic.
+
+**It is not renamed here, and this is what a rename would need.** The name appears three times in
+the tree: this fixture's `.keel/profile.json`, its `README.md` heading, and a quoted copy of the
+profile in `docs/plans/2026-09-03-seed-mode-and-its-arm.md`. Two recorded eval runs were measured
+against this fixture and `tests/evals/results.md` names it nine times. Renaming now would leave
+those records describing a fixture that no longer exists, which is the defect this repository keeps
+having in other forms and the reason the file count on the repo layout document is anchored to a
+commit rather than retyped. A rename is correct only if it lands together with an annotation in
+`results.md` saying the fixture changed after those runs were measured.
+
+No `setup.sh`: the staged project is deliberately not a git repository, and the scenario is scored
+on the reply and on `diff -r` against this directory rather than on git state.
+
+Nothing here binds a port, so L-01 of `docs/audits/2026-09-02-security.md` gains no second instance.
 
 ## What none of them contain
 

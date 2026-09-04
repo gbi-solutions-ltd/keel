@@ -58,9 +58,10 @@ was. That is the whole mechanism, and it is why the replacement is a target the 
 rather than a third documented number.
 
 The relief this document used to assume, moving substance into `references/`, does not work at the
-margin. `coding-standards` carries **12 reference files and 17,816 words** in them and its body is
-still 683. A body's floor is set by its step count and by the sentence each reference costs to
-introduce, not by how much detail it holds.
+margin. `coding-standards` carries **17 reference files and 22,752 words** in them and its body is
+still 795, against 12, 17,816 and 683 when ADR-0001 measured it on 2026-08-16. A body's floor
+is set by its step count and by the sentence each reference costs to introduce, not by how much
+detail it holds.
 
 What survives from the old reasoning is why a fan-out skill is irreducibly larger: a body that
 dispatches subagents carries the per-agent briefs inline, because a brief in a reference file is one
@@ -76,7 +77,14 @@ SessionStart injection.
 unchanged, and 351 for the injection. The descriptions grew by one skill and the injection shrank,
 because adding `design-database` to the router needed 17 characters against the 1 it had spare and
 four phrases were trimmed to pay for it. The net is 50 tokens for a skill, which is what the
-mechanism below is meant to cost. The injection
+mechanism below is meant to cost.
+
+**Re-measured 2026-09-02: 1,945 tokens**, being 1,121 and 469 unchanged and 355 for the injection.
+The injection grew by 4 because the hook now prints the version of the plugin copy the session
+loaded, which is the only way a session can know it: `CLAUDE_PLUGIN_ROOT` reaches a plugin's own
+hooks and not `keel` on `PATH`, and on a developer machine those are routinely different copies. A
+cached 0.16.1 served this repository's sessions for twelve days while it developed 0.17.0, and
+nothing could say so. Four tokens is what that costs, forever, in every request. The injection
 was 300 until the brevity rule was made the default later the same day; see below. For comparison,
 superpowers injects its entire `using-superpowers` skill body at session start, which is around 900
 tokens on its own, and gstack's tier-4 preamble runs into several thousand.
@@ -299,20 +307,37 @@ carries the block also carries however many tokens the model chooses to write ba
 
 **The rule is on by default and it is not free.** `hooks/session-start` selects one paragraph from
 `conventions.response_style` and `conventions.explain_level` together, so there are four forms and
-not two. Measured 2026-08-18:
+not two. Every form also carries the loaded plugin's version since 2026-09-02. Measured 2026-09-02
+against `VERSION` 0.17.0:
 
 | `response_style` | `explain_level` | Injected | Chars | Tokens |
 |---|---|---|---|---|
-| `terse` | `technical` | the brevity paragraph | 1,284 | 356 |
-| `terse` | `plain` | brevity and define-on-first-use | 1,283 | 356 |
-| `verbose` | `technical` | nothing | 1,082 | 300 |
-| `verbose` | `plain` | define-on-first-use | 1,273 | 353 |
+| `terse` | `technical` | the brevity paragraph | 1,279 | 355 |
+| `terse` | `plain` | brevity and define-on-first-use | 1,278 | 355 |
+| `verbose` | `technical` | nothing | 1,077 | 299 |
+| `verbose` | `plain` | define-on-first-use | 1,268 | 352 |
 
-The defaults cost **356** against a 250 target and a 400 ceiling. That is 56 tokens of input in
+**These figures moved twice and the table did not follow the first time**, which is worth recording
+because NFR-05 exists to stop exactly that. It carried the 2026-08-18 measurement (1,284 / 1,283 /
+1,082 / 1,273) until 2026-09-02, through the 2026-08-30 trim that cut every form by 18 characters
+when `design-database` joined the router. The prose above records that trim; this table did not.
+A figure with a date on it is trusted long after the date stops meaning anything.
+
+**The version line costs 13 characters, not 12**, and the arithmetic misleads in a way worth
+naming: the string is `keel 0.17.0`, eleven characters, plus a newline the hook's `escape` renders
+as a two-character `\n` in the JSON. Someone counting the literal gets twelve and concludes there
+is more room than there is. The hook drops any `VERSION` longer than twelve characters for the same
+reason, which is what the nineteen characters NFR-01 left will bear. Twelve is chosen rather than a
+rounder number because it is the largest that fits, and it accommodates a pre-release:
+`0.17.0-rc.12` is twelve and puts the worst form at 1,285 exactly.
+
+The defaults cost **355** against a 250 target and a 400 ceiling. That is 55 tokens of input in
 every request of every session, spent to shorten output in some of them, and the direction of that
 trade has never been measured. It was taken as an explicit instruction on 2026-08-16, not as an
-inference, and it is recorded here rather than buried because the 44 tokens of remaining headroom
-are now the tightest budget in this document.
+inference, and it is recorded here rather than buried because the 45 tokens of remaining headroom
+are now the tightest budget in this document. **Six characters of that headroom are what is left**,
+since NFR-01 caps every form at 1,285 and the worst is 1,279. `tests/validate-skills.sh` fails at
+1,286 rather than 1,285, because 1285 times 10 over 36 truncates to 356 and 356 is not over 356.
 
 `NFR-01` of `docs/prd/plain-language-chat.md` holds every combination at or under 356 for exactly
 that reason, so adding a dial did not spend the headroom. `tests/validate-skills.sh` measures all

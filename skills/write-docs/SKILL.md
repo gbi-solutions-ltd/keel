@@ -81,6 +81,9 @@ rendering traps are in
 State what the reader must know to avoid harm, early. A destructive command, a shared environment,
 a step that cannot be undone.
 
+**Documenting a UI.** Where `profile.stack.has_ui` is true and the `frontend-design` plugin is
+installed, use it for component documentation. Otherwise read the components and say so.
+
 Write the current state. A document says what is true now, never the review history that produced
 it. Durable tradeoffs go to an ADR. When a section is wrong, delete it and write it again from the
 code. Reread against the tells in

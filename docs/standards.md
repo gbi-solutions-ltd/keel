@@ -5,7 +5,7 @@
 | Derived from | All 9 skills, 3 scripts, and 3 templates, at commit `2e698ff` |
 | Date | 2026-08-11 |
 | Enforced by | `tests/run-tests.sh`, which runs `tests/validate-skills.sh`, `tests/no-internal-leaks.sh`, `tests/supply-chain-scan.sh`, and `shellcheck` from the profile |
-| Departures from GBi defaults | Listed in the last section |
+| Departures from House defaults | Listed in the last section |
 
 > Anything a linter can check is not in this file, by design. If you find a formatting rule here,
 > move it into `tests/validate-skills.sh` and delete it from here.
@@ -34,19 +34,24 @@ that length in `tests/evals/results.md`. See `docs/decisions/ADR-0001-skill-body
 
 **Within 30 words of the ceiling the warning says how many are left**, added 2026-08-20. "Over the
 700 target" reads the same at 750 and at 897, and only one of those is a body where the next edit
-fails the suite. **`write-plan` is at 897, three words of headroom**, and `execute-plan` is at 884
+fails the suite. **`write-plan` was at 897, three words of headroom**, and `execute-plan` is at 884
 with sixteen; both were found by trying to edit them rather than by reading anything. The place a
 number like that has to reach someone is the moment they run the suite, which is what the warning
 now does.
 
-**Neither is fixed by moving a section into `references/`, and that was checked before it was left
-alone.** `write-plan`'s eight sections are all instruction at the point of use: the four mechanical
-self-review checks in Step 5 are the ones a planner runs and would skip behind a link, and Step 4's
-placeholder list is consulted while writing. What is genuinely reference already moved, into
-`references/plan-template.md` and `references/plan-review.md`, which is the split done correctly.
-A body sitting near the ceiling because every section belongs in it is not the same defect as one
-that is 200 words of material a reader needs at one step, and the rule above already says which:
-reach for a reference because a reader needs it at one step, not as a way to buy words.
+**`write-plan`'s relocation was rejected on 2026-08-20 and revisited on 2026-09-04.** The earlier
+reading was that all eight sections are instruction at the point of use, so the four mechanical
+self-review checks in Step 5 would be skipped behind a link. What it missed is that those checks
+were never only in the body: `references/plan-template.md` carries a six-item self-review that is a
+superset of them, and `references/plan-review.md` already summarises them and holds the
+measured-failure evidence verbatim. The body was restating a reference it tells the reader to open
+at Step 3, so this was a deduplication rather than a relocation. Body 897 to 673.
+
+**The earlier reasoning was not disproved, and half of it still stands.** Nobody has measured
+whether a planner skips a check behind a link. Step 4's placeholder list stays in the body for
+exactly that reason: unlike the self-review, it exists nowhere else. A section that exists only in
+the body still belongs in it, and reaching for a reference is still about what a reader needs at one
+step, not a way to buy words.
 
 **Why:** the body loads on every invocation, so length has a real per-use cost, and a long enough
 body gets skimmed rather than followed. The previous numbers were 400 and 600 under a hard 700, and
@@ -57,7 +62,7 @@ number under it is not a limit, it is where bodies settle.**
 
 **Example:** `skills/coding-standards/SKILL.md` is the case that shows moving detail out has a
 floor: `coding-standards` carried 12 reference files and 17,816 words against a body of 683 when
-ADR-0001 measured it, and carries 13 and 20,118 against 876 today. Reach for a reference
+ADR-0001 measured it, and carries 17 and 22,752 against 795 today. Reach for a reference
 because a reader needs it at one step, not as a way to buy words.
 
 ## Subagent briefs stay in the body; everything else can move
@@ -264,7 +269,7 @@ change is merged by its own author unreviewed**, which is the property the two-r
 to guarantee. A skill affects every repository with the plugin installed, so it is not a solo
 change even when it is a one-line change.
 
-## Departures from GBi defaults
+## Departures from House defaults
 
 | Default | This project | Why |
 |---|---|---|

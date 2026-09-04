@@ -1,6 +1,6 @@
 # keel
 
-GBi's standard operating procedure for AI-assisted software delivery, packaged as a
+A house standard operating procedure for AI-assisted software delivery, packaged as a
 Claude Code plugin plus a thin per-project bootstrap.
 
 **Status:** installable, 25 skills built, `keel` CLI and session hook working. **Not 1.0.0:**
@@ -286,7 +286,7 @@ the machine.
 The evals in `tests/evals/` are the only thing that tests whether a discipline skill changes
 behaviour under pressure. The static suite checks shape; a skill can pass it and do nothing.
 
-9 scenarios exist. Six are dispatched at a release gate and score a reply.
+12 scenarios exist. Six are dispatched at a release gate and score a reply.
 `commit-outside-a-worktree`, added on 2026-08-20, scores git state instead: its fixture is
 built into a real repository by `tests/evals/stage.sh`, and the arm passes or fails on whether
 `git log` moved. `review-a-live-schema`, added on 2026-08-30 with the `design-database` skill, is
@@ -311,7 +311,8 @@ Read in order. Each doc is self-contained but they build on each other.
 | [`docs/06-repo-layout.md`](docs/06-repo-layout.md) | Exact file tree of the keel repo |
 | [`docs/07-open-decisions.md`](docs/07-open-decisions.md) | Every call taken and why, decisions: 12 of 12 resolved, two with a named part still open |
 | [`docs/standards.md`](docs/standards.md) | This repo's own conventions, the judgement calls only |
-| [`docs/runbooks/going-public.md`](docs/runbooks/going-public.md) | What publishing this repository would require. Two of its steps are decisions, and none of it has been executed |
+| [`docs/runbooks/cutting-a-release.md`](docs/runbooks/cutting-a-release.md) | How a release is cut: the eval gate, the three-place version bump, both tags, and the public export. Executed for 0.17.0 |
+| [`docs/runbooks/going-public.md`](docs/runbooks/going-public.md) | What publishing this repository required, executed 2026-08-17, each step annotated with what actually happened |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to add or change a skill, and why the order matters |
 | [`SOURCES.md`](SOURCES.md) | Attribution, per skill, for the four MIT projects this is built from |
 
@@ -344,4 +345,4 @@ separate from `LICENSE` so that `LICENSE` stays canonical MIT text and licence d
 
 We take the ideas, not the code. gstack is ~1,200 files and carries a browser daemon we
 do not need. superpowers is a general methodology with no opinion on our stack. What we
-build is smaller than both and opinionated about how GBi ships.
+build is smaller than both and opinionated about how this house ships.

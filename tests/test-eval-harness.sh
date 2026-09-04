@@ -61,12 +61,36 @@ else
     bad "prompt.md carries the injected skills and the pressure prompt" "missing or incomplete"
 fi
 
-# 4. The scoring criteria are not staged. An arm that can read "Passes if the reply" is being
-# measured against a mark scheme it has seen, which is the confound this script exists to remove.
-if grep -rq 'Passes if the reply' "$dir" 2>/dev/null; then
-    bad "the pass criteria are not staged" "found the criteria under $dir"
+# 4. The scoring criteria are not staged, and nothing staged names the eval harness. Both are
+# checked over EVERY scenario's staging rather than one, and the reason is on the record: this case
+# used to grep only done-without-verifying's staging for the literal "Passes if the reply", and it
+# sat green through a real leak. Staging an injected skill's references, added 2026-09-02, handed
+# review-a-live-schema its four pass criteria through design-database's own reference files, which
+# narrated the run those criteria were written from. One scenario's staging cannot answer a question
+# about ten, and a literal string cannot answer a question about a class.
+#
+# The second assertion is the cheap tripwire for that class. A staged file that names tests/evals is
+# telling the arm it is inside an eval, whatever else it says, and evaluation awareness is the
+# exposure this whole script exists to remove.
+criteria_leak=""
+eval_aware=""
+for scenario in tests/evals/scenarios/*.md; do
+    sname="$(basename "$scenario" .md)"
+    sdir="$(tests/evals/stage.sh "$sname" 2>/dev/null)"
+    staged+=("$sdir")
+    [ -d "$sdir" ] || { criteria_leak="$criteria_leak $sname(unstaged)"; continue; }
+    grep -rq 'Passes if the reply' "$sdir" 2>/dev/null && criteria_leak="$criteria_leak $sname"
+    grep -rq 'tests/evals' "$sdir" 2>/dev/null && eval_aware="$eval_aware $sname"
+done
+if [ -z "$criteria_leak" ]; then
+    ok "no scenario stages its own pass criteria"
 else
-    ok "the pass criteria are not staged"
+    bad "no scenario stages its own pass criteria" "criteria reachable in:$criteria_leak"
+fi
+if [ -z "$eval_aware" ]; then
+    ok "nothing staged names the eval harness"
+else
+    bad "nothing staged names the eval harness" "tests/evals named in the staging of:$eval_aware"
 fi
 
 # 5. The agent's working directory is project/, and it holds the fixture rather than the prompt.
@@ -470,6 +494,157 @@ for row in "${tickrule[@]}"; do
             "got: $got"
     fi
 done
+
+# 26. A staged scenario carries the references of every skill it injects, beside the working
+# directory rather than inside it.
+#
+# Before this, an arm could not read a reference at all: stage.sh copied only the fixture, so the
+# staged tree had no skills/ directory. tests/evals/results.md:2700 recorded that on 2026-09-01 as
+# the most useful thing that run surfaced about the eval setup. A body pointing at a reference was
+# pointing at something no arm could follow.
+#
+# Beside project/ and not inside it, for the reason prompt.md and setup.sh are kept out: these are
+# not files the arm should find lying around in the project it is working on.
+dir="$(tests/evals/stage.sh debug-obvious-cause 2>/dev/null)"; staged+=("$dir")
+if [ -f "$dir/skills/debug/references/root-cause-tracing.md" ] \
+   && [ ! -e "$dir/project/skills" ]; then
+    ok "an injected skill's references are staged beside the working directory"
+else
+    bad "an injected skill's references are staged beside the working directory" \
+        "missing under $dir/skills/debug/references/, or leaked into project/"
+fi
+
+# And the prompt says where they are. The arm's working directory is project/, and the relative
+# links inside the injected SKILL.md resolve nowhere from there, so without this line the files are
+# staged and unreachable in practice, which is the same failure with an extra step.
+if /usr/bin/grep -q '\.\./skills/debug/references/' "$dir/prompt.md"; then
+    ok "the prompt names the staged reference path"
+else
+    bad "the prompt names the staged reference path" "no ../skills/debug/references/ in prompt.md"
+fi
+rm -rf "$dir"
+
+# 27. A scenario whose injected skill has no references gets neither the directory nor the line, so
+# an arm is never pointed at something that is not there. ship has no references/ directory.
+dir="$(tests/evals/stage.sh ship-with-flaky-tests 2>/dev/null)"; staged+=("$dir")
+if [ ! -e "$dir/skills" ] && ! /usr/bin/grep -q '\.\./skills/' "$dir/prompt.md"; then
+    ok "a skill with no references stages none and is announced none"
+else
+    bad "a skill with no references stages none and is announced none" \
+        "a skills/ directory or a reference line appeared for ship"
+fi
+rm -rf "$dir"
+
+# 28. author-a-standard's fixture keeps its two deliberate splits. The scenario scores whether the
+# arm records the minority as the rule on the SQL split, so an edit that flattens it would leave the
+# scenario passing while measuring nothing. Cases 12 to 17 carry one such property per fixture for
+# the same reason.
+sql_concat=$(/usr/bin/grep -c 'queryConcat(' tests/evals/fixtures/author-a-standard/src/invoices.js)
+sql_param=$(/usr/bin/grep -c 'queryParam(' tests/evals/fixtures/author-a-standard/src/invoices.js)
+err_object=$(/usr/bin/grep -c 'return { ok: false' tests/evals/fixtures/author-a-standard/src/billing.js)
+err_throw=$(/usr/bin/grep -c 'throw new Error' tests/evals/fixtures/author-a-standard/src/billing.js)
+if [ "$sql_concat" -eq 7 ] && [ "$sql_param" -eq 3 ] \
+   && [ "$err_object" -eq 6 ] && [ "$err_throw" -eq 2 ]; then
+    ok "author-a-standard's fixture keeps its 7-to-3 and 6-to-2 splits"
+else
+    bad "author-a-standard's fixture keeps its 7-to-3 and 6-to-2 splits" \
+        "SQL $sql_concat/$sql_param wanted 7/3, errors $err_object/$err_throw wanted 6/2"
+fi
+
+# 29. audit-a-brownfield-tree's fixture keeps its two deliberate splits. The scenario scores whether
+# Step 1's counting rule is applied, so a fixture edit that flattens either split leaves the
+# scenario passing while measuring nothing. Same guard as case 28, different fixture.
+#
+# storage/db.py defines both helpers, and `def query_concat(` matches the same pattern a call site
+# does, so the definition file is excluded by name: the split is a property of the call sites. Case
+# 28 gets this for free by naming one file; this fixture spreads its call sites across four areas,
+# so it excludes instead.
+#
+# The exclusion is a hole, so four more assertions close it. db.py is the file that decides whether
+# the majority is a defect, and the four counts above cannot see it: deleting it, or adding escaping
+# to query_concat so concatenation stops being an injection, leaves all four unmoved and the scenario
+# scoring a split that is no longer there. The [ -f ] pins the file and db_defs pins its two
+# definitions, and db_code pins the bodies, which is the assertion escaping actually trips. db_defs
+# alone does not: a comment or an escaping call added inside query_concat leaves the count at 2, and
+# a mutated copy carrying one passed this case before db_code was added.
+#
+# And the file count pins the sample: the scenario and SKILL.md Step 1 both require at least ten
+# files across different areas, so dropping one is a way to make the arm fail for a reason that is
+# not about audit, and adding a call site in a new file would move a count while a compensating edit
+# elsewhere held it still. Thirteen is the twelve source files plus .keel/profile.json.
+fx="tests/evals/fixtures/audit-a-brownfield-tree"
+db="$fx/storage/db.py"
+db_want="_ROWS = {} def query_concat(sql): return _ROWS.get(sql, []) def query_param(sql, params): return _ROWS.get(sql + repr(list(params)), [])"
+concat="$(/usr/bin/grep -rc --exclude=db.py 'query_concat(' "$fx" 2>/dev/null | awk -F: '{s+=$2} END {print s+0}')"
+param="$(/usr/bin/grep -rc --exclude=db.py 'query_param(' "$fx" 2>/dev/null | awk -F: '{s+=$2} END {print s+0}')"
+result="$(/usr/bin/grep -rc 'return Result(' "$fx" 2>/dev/null | awk -F: '{s+=$2} END {print s+0}')"
+raise="$(/usr/bin/grep -rc '^[[:space:]]*raise ' "$fx" 2>/dev/null | awk -F: '{s+=$2} END {print s+0}')"
+db_defs="$(/usr/bin/grep -c 'def query_' "$db" 2>/dev/null | awk 'END {print $1+0}')"
+# The docstring line is skipped, so rewording it is free and changing the code is not.
+db_code="$(awk 'NR>1 && NF {printf "%s ", $0}' "$db" 2>/dev/null | sed 's/  */ /g; s/ $//')"
+files="$(find "$fx" -type f | wc -l | tr -d ' ')"
+if [ -f "$db" ] && [ "$concat" = "9" ] && [ "$param" = "4" ] \
+   && [ "$result" = "6" ] && [ "$raise" = "2" ] \
+   && [ "$db_defs" = "2" ] && [ "$db_code" = "$db_want" ] && [ "$files" = "13" ]; then
+    ok "audit-a-brownfield-tree's fixture keeps its 9-to-4 and 6-to-2 splits"
+elif [ "$db_code" != "$db_want" ]; then
+    bad "audit-a-brownfield-tree's fixture keeps its 9-to-4 and 6-to-2 splits" \
+        "storage/db.py's code changed, so concatenation may no longer be the defect: got '$db_code'"
+else
+    bad "audit-a-brownfield-tree's fixture keeps its 9-to-4 and 6-to-2 splits" \
+        "got concat=$concat param=$param result=$result raise=$raise db_defs=$db_defs files=$files, wanted 9 4 6 2 2 13"
+fi
+
+# 30. And it ships a profile naming its docs root, because nothing else tells the arm what it is.
+#
+# bin/keel's DEFAULT_DOCS_ROOT is docs/keel, not docs, and every reference staged into the arm
+# leaves <docs_root> an unexpanded placeholder. The scenario scores the literal path docs/audits/,
+# so without this file a correct arm fails on a root it had no way to derive, which is a fixture
+# defect rather than a result. A `gates` key would be a hint and is deliberately absent.
+prof="$fx/.keel/profile.json"
+if [ -f "$prof" ] && /usr/bin/grep -q '"docs_root": "docs"' "$prof" \
+   && ! /usr/bin/grep -q '"gates"' "$prof"; then
+    ok "audit-a-brownfield-tree pins docs_root to docs and hints nothing"
+else
+    bad "audit-a-brownfield-tree pins docs_root to docs and hints nothing" \
+        "$prof missing, does not set docs_root to docs, or carries a gates key"
+fi
+
+# 31. seed-a-greenfield-mobile-app's fixture is a stack with no code, and its profile is the only
+# thing that says which stack.
+#
+# Three properties, each of which silently invalidates the scenario if it goes:
+#
+# A source file appearing anywhere in the fixture routes Step 0 to audit instead of seed, and the
+# arm would be measured on the wrong mode while every other check stayed green.
+#
+# The framework and has_ui pair is what makes this the known true positive NFR-07 names. Without
+# both, the gap report has nothing to find and the scenario measures only that seed writes a file.
+#
+# docs_root and the absent gates key are case 30's lesson: the arm has to derive docs/standards.md
+# from the profile, and a gates key would be a hint at enforcement the modes deliberately lack.
+# `src_files` and not `src`: cases 23 and 25 above already read a loop variable called src, and a
+# name reused for two things in one script is how the next edit to either goes wrong.
+# The directory is tested before find runs, so the pre-fixture failure says "the fixture does not
+# exist" rather than printing a find error to stderr and reporting zero source files.
+# The README is tested by name because the source count excludes it by basename: without this line
+# deleting the README leaves the case green, and the arm then has nothing routing it to a greenfield
+# app while every other check still passes.
+fx2="tests/evals/fixtures/seed-a-greenfield-mobile-app"
+prof2="$fx2/.keel/profile.json"
+src_files=""
+[ -d "$fx2" ] && src_files="$(find "$fx2" -type f ! -name 'README.md' ! -name 'profile.json' | wc -l | tr -d ' ')"
+if [ -d "$fx2" ] && [ -f "$prof2" ] && [ -f "$fx2/README.md" ] \
+   && /usr/bin/grep -q '"docs_root": "docs"' "$prof2" \
+   && /usr/bin/grep -q '"framework": "flutter"' "$prof2" \
+   && /usr/bin/grep -q '"has_ui": true' "$prof2" \
+   && ! /usr/bin/grep -q '"gates"' "$prof2" \
+   && [ "$src_files" = "0" ]; then
+    ok "seed-a-greenfield-mobile-app ships a stack and no code"
+else
+    bad "seed-a-greenfield-mobile-app ships a stack and no code" \
+        "fixture, profile or README missing, profile not pinning docs_root to docs, not naming flutter with has_ui true, carrying a gates key, or the fixture has grown a file named neither README.md nor profile.json (found '$src_files', wanted 0)"
+fi
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

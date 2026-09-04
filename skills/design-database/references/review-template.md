@@ -2,17 +2,17 @@
 
 The sections a schema review or a schema design produces, in this order.
 
-**Why this file is the skill.** A `create-skill` Step 1 baseline on 2026-08-19, recorded in
-`tests/evals/results.md`, reviewed a six table payments schema with no skill at all. It found an
-unseeded 32 bit key about 85 days from exhausting its range, a PCI exposure traced into three
-unbounded text columns, two live double-payment paths, and why float money makes a disputed
-settlement figure irreproducible. It needed no help finding things.
+**Why this file is the skill.** A capable review finds the headline defects unaided: the key a few
+months from exhausting its range, the card data sitting in an unbounded text column, the path that
+can pay twice, the float money column behind a settlement figure nobody can reproduce. Finding
+things is not the problem.
 
-What it never did was sweep. Column types went unexamined, denormalisation went unmentioned though
-it was in the request, no ERD was drawn though the model had been reconstructed to review it, and
-partitioning appeared once in passing. Every one of those is an omission from something the reader
-already produces, and `create-skill` Step 2 says that is fixed by a required field rather than by a
-reminder. Hence sections, not advice.
+Sweeping is. What gets skipped is whatever nothing required, and it is skipped by good reviewers
+under no time pressure at all: the pass over the columns, the normalisation question even when the
+request asked for it, the diagram even when the model was reconstructed to review it, the
+partitioning decision that gets mentioned rather than decided. Each is an omission from something
+the reader already produces, and `create-skill` Step 2 says that is fixed by a required field rather
+than by a reminder. Hence sections, not advice.
 
 ## The rule that makes this work
 
@@ -57,9 +57,9 @@ Foreign keys declared, and relationships that exist in the application but not i
 
 **This is a sweep, not a search.** Go through every table, every column. The finding is the list.
 
-`None found` here is valid only after every table has been looked at, and the baseline that prompted
-this section had walked past a `VARCHAR(20)` date of birth, a `VARCHAR(5)` boolean and an `INT` soft
-delete flag while doing excellent work elsewhere.
+`None found` here is valid only after every table has been looked at. A review doing excellent work
+elsewhere will walk past a date of birth in a character column and a flag held as an integer,
+because nothing made it look.
 
 See [type-selection.md](type-selection.md) for what to look for and what each mismatch costs.
 
@@ -89,8 +89,8 @@ See [indexing-and-partitioning.md](indexing-and-partitioning.md).
 Anything with a ceiling, checked against current values rather than against the schema alone: integer
 key ranges, fixed-width columns, and any enumeration with a bounded encoding.
 
-For each, give the one query that settles it. The baseline's best finding was of exactly this shape,
-and it was reachable only because it combined a type with a row count.
+For each, give the one query that settles it. The strongest findings of this kind are reachable only
+because they combine a type with a row count, which is why the query belongs beside the claim.
 
 ## 8. What to change first
 

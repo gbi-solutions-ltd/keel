@@ -40,10 +40,10 @@ them, and duplicating them would guarantee drift:
 |---|---|---|
 | Logging, telemetry, traces | `references/observability.md` | `setup-deployment` when wiring the exporter, `debug` when reading an error log |
 | Frontend components, theming, browser security | `references/frontend.md` | `review-code`, `security-audit`, `design-architecture` |
-| GBi defaults: writing, secrets, errors, money, data, tests | `references/house-defaults.md` | every skill that writes code |
+| House defaults: writing, secrets, errors, money, data, tests | `references/house-defaults.md` | every skill that writes code |
 | Database-backed testing | `tdd/references/writing-good-tests.md` | `write-plan` when planning a `verify` story |
 
-Two of these carry GBi-specific requirements worth naming here, because they are easy to miss:
+Two of these carry house-specific requirements worth naming here, because they are easy to miss:
 
 **Error logs are written to be pasted into an agent CLI.** An `error` line names the failing
 operation in domain terms, carries the identifiers needed to reproduce as fields, and includes a
@@ -295,9 +295,9 @@ deleted before the real implementation starts.
 contributor or a new service, review feedback about style, or before the first commit in an
 unfamiliar repo.
 **Reads:** the codebase, `.keel/profile.json`, existing lint and format configs.
-**Writes:** `<docs_root>/standards.md`, `<docs_root>/audits/YYYY-MM-DD-standards.md`, and lint or
-format config when missing.
-**Does:** three distinct jobs.
+**Writes:** `<docs_root>/standards.md`, `<docs_root>/audits/YYYY-MM-DD-standards.md`,
+`<docs_root>/audits/YYYY-MM-DD-standards-audit.md`, and lint or format config when missing.
+**Does:** four distinct jobs.
 
 1. **Derive.** Infer the repo's actual conventions from the code rather than imposing a
    generic style guide, then write them down. Naming, file layout, error handling, logging,
@@ -306,11 +306,17 @@ format config when missing.
    being a prompting problem. Anything a regex can check should never be a skill
    instruction. What remains in `standards.md` is only the judgement calls.
 3. **Assess.** Given a `standards.md` that already exists, check it against the tree and write a
-   dated report to `<docs_root>/audits/YYYY-MM-DD-standards.md`. Four checks, always all four, in
-   one order: house-defaults coverage, the follow-up backlog, a judgement sample, the departures
-   ledger. It never edits the document it is checking.
+   dated report to `<docs_root>/audits/YYYY-MM-DD-standards.md`. Five checks, always all five, in
+   one order: house-defaults coverage, the house defaults themselves as check 1b reported straight
+   after check 1, the follow-up backlog, a judgement sample, the departures ledger. It never edits
+   the document it is checking.
+4. **Audit.** Given code and no `standards.md`, derive what the tree already does and write a dated
+   report to `<docs_root>/audits/YYYY-MM-DD-standards-audit.md`. The `-audit` suffix keeps it off
+   assess's path, so the two modes cannot overwrite each other on the same day. The report is a
+   derivation and not an agreed standard, it says so in its own header, and audit writes nothing
+   else.
 
-Also emits the GBi-wide defaults: conventional commits, no secrets in code, structured
+Also emits the house-wide defaults: conventional commits, no secrets in code, structured
 logging, no `any` escape hatches without a comment explaining why.
 
 ### `debug`
@@ -327,8 +333,14 @@ Includes the multi-component evidence-gathering technique, which is the highest-
 for our services: instrument every boundary, run once, and let the evidence say which layer
 broke instead of guessing.
 
-**Plugin call:** when a language server plugin is installed, use its diagnostics and
+**Capability:** when a language server plugin is installed, use its diagnostics and
 find-references rather than grep. It is both faster and correct.
+
+The marker is `Capability` and not `Plugin call` on purpose. A language server ships no skill, no
+command and no MCP server, so there is nothing for a body to name and nothing for
+`tests/validate-skills.sh` to check. `refactor` had the same row in
+`docs/04-plugin-strategy.md`'s wiring map and it was removed there for this reason. Distinguishing
+the two markers is what lets the check parse every `Plugin call` without a special case.
 
 ---
 
@@ -344,7 +356,7 @@ confidence-scored review beats a single inline pass. Falls back to an inline rub
 otherwise: correctness, standards conformance, test coverage and honesty, error handling,
 performance, security, simplicity.
 
-The GBi-specific additions the generic plugin will not know about: does the diff match the
+The house-specific additions the generic plugin will not know about: does the diff match the
 plan, does every changed line trace to the request (Karpathy's surgical-changes test), and
 were any tests written after the code.
 
@@ -371,7 +383,7 @@ real ones gets fixed.
 **Plugin calls:** `security-guidance` for its hook-level coverage on every edit, and the
 built-in `/security-review` command as a cross-check on the diff.
 
-Given GBi is in payments, this skill also carries a payments-specific checklist: idempotency
+Because the house works in payments, this skill also carries a payments-specific checklist: idempotency
 on money-moving endpoints, webhook signature verification, amount and currency handling,
 PII at rest and in logs, and audit trail completeness.
 

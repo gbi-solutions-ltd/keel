@@ -4,7 +4,7 @@ The structure of `<docs_root>/audits/YYYY-MM-DD-standards.md`, written by `codin
 assess mode. Nothing in an assessment modifies what is being assessed, and `standards.md` is never
 edited. The mode makes no network request and runs no command that changes the project. **A probe
 that needed a change in order to run was not run**: it belongs under "Not covered" by its real name
-rather than in the findings. Probe, not check: all four checks run every time, and it is an
+rather than in the findings. Probe, not check: every check runs every time, and it is an
 individual probe inside one of them that gets dropped. Without that clause the sentence before it is
 unenforceable, because a probe can be made to pass and then honestly reported as passing.
 
@@ -22,34 +22,40 @@ section order, the counts and the vocabulary below are fixed rather than suggest
 | Document | `<docs_root>/standards.md`, <N> lines, derived at `<sha>` on YYYY-MM-DD |
 | Commits since derivation | <N>, <M> files changed |
 | Date | YYYY-MM-DD |
-| Findings | coverage <n>, backlog <n>, sample <n>, departures <n> |
+| Findings | coverage <n>, house defaults <n>, backlog <n>, sample <n>, departures <n> |
 | Not covered | Named explicitly. See the last section |
 ```
 
 `Commits since derivation` earns its row because it is the single number that predicts how much of
 the document is stale, and it costs one `git rev-list --count` and one `git diff --stat`.
 
-Each of the four `Findings` counts is defined, so that two reports mean the same thing by them.
+Each of the five `Findings` counts is defined, so that two reports mean the same thing by them.
 **Coverage** is rules in the `Omitted` column, plus each reference skipped whole counted once more.
-**Backlog** is items not `closed`. **Sample** is rules whose verdict is not `observed`.
-**Departures** is rows in `needs an ADR`, `stale reason` or `unclassifiable`, which is what the
-`A finding?` column of check 4's category table marks yes.
+**House defaults** is the `house-defaults.md` sections `standards.md` omits, out of the sections
+check 1b counts. **Backlog** is items not `closed`. **Sample** is rules whose verdict is not
+`observed`. **Departures** is rows in `needs an ADR`, `stale reason` or `unclassifiable`, which is
+what the `A finding?` column of check 4's category table marks yes.
 
 ## Section order, fixed
 
 1. Summary, three sentences and the counts
 2. Check 1, house-defaults coverage
-3. Check 2, the follow-up backlog
-4. Check 3, the judgement sample
-5. Check 4, the departures ledger
-6. Trend, where a previous assessment exists
-7. Not covered, explicit
+3. Check 1b, house-defaults coverage as its own number
+4. Check 2, the follow-up backlog
+5. Check 3, the judgement sample
+6. Check 4, the departures ledger
+7. Trend, where a previous assessment exists
+8. Not covered, explicit
 
 That is the ranked order, highest-yield first, which is not cheapest first: check 1 costs the most
 on a first run, because ten topic references have to be read before a single rule can be disposed
-of. All four checks run every time, so
-report every one even where it found nothing. A check that comes back clean is a result, and a
-reader who cannot see that it ran cannot tell it from a check that was skipped.
+of. Every check runs every time, so report every one even where it found nothing. A check that comes
+back clean is a result, and a reader who cannot see that it ran cannot tell it from a check that was
+skipped.
+
+**Check 1 and check 1b are never added together.** They have different denominators and different
+sources, and a reader who sees one combined coverage figure cannot tell which of the two failed.
+Report both, name both, and let the reader do any arithmetic they want.
 
 ## Check 1, house-defaults coverage
 
@@ -93,6 +99,18 @@ a different verdict and nobody can see why.
 A reference whose every rule is `Omitted` is also **skipped whole**, and is reported as such. It is
 a different finding from a scatter of omissions: an omitted rule may have been considered and
 dropped, a skipped reference was never opened.
+
+## Check 1b, house-defaults coverage as its own number
+
+**The counting unit.** One house rule is one `##` section of
+[house-defaults.md](house-defaults.md), excluding exactly two by name: "The other references, and
+when each applies", which is an index, and "What is deliberately not here", which is a statement of
+scope. Nothing else is excluded from the count. No fixed number is subtracted, and no judgement is
+made about whether a heading reads like a rule. The denominator is 12, measured 2026-09-02.
+
+**What it reports.** For each of those sections, whether `standards.md` folds it in, adapts it,
+departs from it with a reason, or omits it, on the same four dispositions check 1 uses. Report it
+immediately after check 1 and before check 2.
 
 ## Check 2, the follow-up backlog
 
@@ -180,7 +198,7 @@ Every departure lands in exactly one category.
 |---|---|---|
 | `closed` | No longer a departure | no |
 | `tracked` | Temporary, with a tracking reference that exists | no |
-| `kept, basis holds` | Permanent, its ADR exists, and its stated basis re-verifies as still true | no |
+| `kept, basis holds` | Permanent, its ADR exists, and its stated basis re-verifies as still true, or there was no corpus to re-verify it against and the ledger's last column says so | no |
 | `needs an ADR` | Permanent, and the ADR it requires does not exist | yes |
 | `stale reason` | Kept, on a reason the tree no longer supports | yes |
 | `unclassifiable` | Fits none of the above. Name what it carries instead | yes |
@@ -245,7 +263,7 @@ running.
 ```markdown
 ## Not covered
 
-- Checks 1 to 4 only. Nothing outside the four was assessed.
+- Checks 1, 1b, 2, 3 and 4 only. Nothing outside them was assessed.
 - The judgement sample read the first rule of 8 of the document's 20 judgement sections.
   Sections 9 to 20 were not read, and nor were any later rules inside sections 1 to 8.
 - No test was run, and nothing was executed against a running instance. The only commands run

@@ -1,0 +1,6 @@
+{
+  "project": { "name": "kirabo", "kind": "frontend" },
+  "stack": { "language": "dart", "runtime": "dart", "framework": "flutter", "package_manager": "pub", "datastores": [], "has_ui": true },
+  "verify": { "test": null, "lint": null, "build": null },
+  "docs_root": "docs"
+}

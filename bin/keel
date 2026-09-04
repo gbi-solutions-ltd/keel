@@ -499,8 +499,10 @@ Written and read by keel skills. Committed on purpose: this is the project's mem
 | \`audits/\` | \`security-audit\`, \`coding-standards\` |
 | \`incidents/\` | \`incident-response\` |
 
-A dated report in \`audits/\` is named \`YYYY-MM-DD-<kind>.md\`, where \`<kind>\` is the noun of
-the skill that wrote it: \`security\`, \`standards\`. An incident record is named for its slug.
+A dated report in \`audits/\` is named \`YYYY-MM-DD-<kind>.md\`, where \`<kind>\` is the noun of the
+skill that wrote it: \`security\`, \`standards\`. Where a second mode of the same skill writes there
+too, its kind is that noun plus its own mode name, so \`coding-standards\` writes \`standards\` from
+assess and \`standards-audit\` from audit. An incident record is named for its slug.
 
 See \`prompting.md\` for how to phrase a request so the right skill fires.
 D
@@ -1672,18 +1674,67 @@ PY
     # Both the default config directory and CLAUDE_CONFIG_DIR are checked, because they can differ
     # and either may be the one a session actually uses. Reporting "not registered" while it sits
     # in the other directory is worse than saying nothing.
-    local found="" cfg
+    # Registration is a boolean; freshness is not, and nothing here was checking it. The marketplace
+    # clone under <config>/plugins/marketplaces/ only moves when somebody runs
+    # `/plugin marketplace update`, so an install can sit a full release behind while every other
+    # signal reports green: the clone, the installed copy and its gitCommitSha all agree with each
+    # other and all disagree with the marketplace. That happened here for twelve days across
+    # 0.16.1 and 0.17.0. `lastUpdated` is the only local record of when the clone was last known
+    # current, and reading it costs no network call.
+    #
+    # WHAT THIS MEASURES, STATED BECAUSE THE TWO ARE EASY TO CONFUSE: fetch age, not staleness. A
+    # local check cannot tell them apart, and the gap runs both ways. Nine tags landed between
+    # 2026-08-17 and 2026-08-20, so on 2026-08-19 a three day old clone was already several
+    # releases behind and this check would have said nothing. Across the twelve day gap to 0.17.0 a
+    # user correctly on 0.16.1 is warned from 2026-08-27 with nothing to do about it. Seven days is
+    # chosen anyway, because it sits between the two observed cadences: shorter than the longest
+    # gap between releases, so somebody who fetched just before one hears within a week rather than
+    # after the next, and longer than a release burst, so nobody who fetched yesterday is warned
+    # during one. Both branches below say which of the two they are talking about.
+    #
+    # Hardcoded rather than a profile field. A new field bumps SCHEMA_VERSION, and the comment on
+    # that constant says to move it only when a field changes, precisely so a release that changed
+    # nothing else does not warn everybody.
+    local found="" cfg age="" stale_days=7
     for cfg in "${CLAUDE_CONFIG_DIR:-}" "$HOME/.claude"; do
         [ -n "$cfg" ] && [ -f "$cfg/plugins/known_marketplaces.json" ] || continue
-        MP="$cfg/plugins/known_marketplaces.json" python3 -c "
-import json, os, sys
+        age="$(MP="$cfg/plugins/known_marketplaces.json" python3 -c "
+import json, os, sys, datetime
 d = json.load(open(os.environ['MP']))
-sys.exit(0 if any('keel' in json.dumps(v) for v in d.values()) else 1)" 2>/dev/null \
+# The same selection the registration check used, kept identical so the two reports can never mean
+# different entries in the same file.
+hits = [v for v in d.values() if 'keel' in json.dumps(v)]
+if not hits:
+    sys.exit(1)
+ts = hits[0].get('lastUpdated')
+if isinstance(ts, str):
+    try:
+        t = datetime.datetime.fromisoformat(ts.replace('Z', '+00:00'))
+        now = datetime.datetime.now(datetime.timezone.utc)
+        # Clamped at zero. A clock skewed forward yields a negative age, which is not a fresh clone
+        # and must never print as one. It reads as today and the next run corrects it.
+        print(max(0, (now - t).days))
+    except ValueError:
+        pass
+" 2>/dev/null)" \
           && { found="$cfg"; break; }
     done
     if have_python; then
-        [ -n "$found" ] && good "the gbi marketplace is registered ($found)" \
-          || warn "the gbi marketplace is not registered on this machine, so a session here has no keel skills. Run '/plugin marketplace add gbi-solutions-ltd/keel' then '/plugin install keel@gbi'."
+        if [ -z "$found" ]; then
+            warn "the gbi marketplace is not registered on this machine, so a session here has no keel skills. Run '/plugin marketplace add gbi-solutions-ltd/keel' then '/plugin install keel@gbi'."
+        else
+            good "the gbi marketplace is registered ($found)"
+            case "$age" in
+                ''|*[!0-9]*)
+                    warn "cannot tell how fresh the gbi marketplace list is: known_marketplaces.json in $found records no usable lastUpdated. That is unknown, not current. Run '/plugin marketplace update gbi' then '/plugin install keel@gbi' to set it." ;;
+                *)
+                    if [ "$age" -ge "$stale_days" ]; then
+                        warn "the gbi marketplace list was last fetched $age days ago, so a newer keel may have been released since and nothing on this machine would know. Run '/plugin marketplace update gbi' then '/plugin install keel@gbi'."
+                    else
+                        good "the gbi marketplace list was fetched $age day(s) ago, recent enough not to warn. That is fetch age and not currency: a release landing since then is not visible here either."
+                    fi ;;
+            esac
+        fi
     fi
 
     printf '\n'

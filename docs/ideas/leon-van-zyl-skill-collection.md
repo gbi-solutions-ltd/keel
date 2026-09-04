@@ -108,7 +108,7 @@ no warning tier above the ceiling.
 to lose **87 percent** of its body to become a legal keel skill. What survives that cut is not an
 adaptation of the file, it is a different file that happens to share a topic. ADR-0001's own
 context section already establishes that the relief valve, moving substance into `references/`,
-has a floor: `coding-standards` sits at 683 words with 12 references carrying 17,816 words. Moving
+has a floor: `coding-standards` sits at 795 words with 17 references carrying 22,752 words. Moving
 material out does not pull a body below roughly 680, so "put the other 7,200 words in references"
 does not rescue this either; it produces a body that still has to be written from scratch.
 
@@ -373,7 +373,7 @@ final section of [`THIRD-PARTY-LICENSES.md`](../../THIRD-PARTY-LICENSES.md), quo
 > Both gaps are recorded rather than papered over. We are relying on a README statement of MIT,
 > which is a real grant of permission but leaves the copyright holder line undocumented. That is
 > acceptable for a private internal repository. It should be resolved before keel is published or
-> shared outside GBi Solutions Ltd, and it is listed as a prerequisite in
+> shared outside the house, and it is listed as a prerequisite in
 > `docs/07-open-decisions.md` decision 2.
 
 And for each of those two, an explicit action: *"**Action before any public release:** ask the
@@ -581,7 +581,7 @@ Named rather than left silent.
   `pushed_at` is `2026-08-25T14:24:40Z`, six days before this assessment. Whether the local copy is
   that commit was not checked, and there is no vendored commit hash in the tree to check against.
   A licence may have been added since; the API check on 2026-08-31 says not.
-- **Whether the SEO gap is a real gap for GBi.** keel covers no SEO because no engagement has needed
+- **Whether the SEO gap is a real gap for the house.** keel covers no SEO because no engagement has needed
   it. Whether client web applications need discoverability auditing is a question about the book of
   work, not about the code, and it decides whether Rank 1's third item is worth the `write-docs`
   surgery.

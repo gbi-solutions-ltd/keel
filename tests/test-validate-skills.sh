@@ -428,6 +428,46 @@ m_docs_link_in_fence() {
 }
 run "a quoted link inside a fenced block is allowed" 0 m_docs_link_in_fence
 
+# MUST NOT REJECT. A plan quotes an assertion and the assertion carries a link pattern, so the
+# pattern sits in an inline code span. A span renders as code, which means it is not a link, and
+# resolving one is the same too-strict failure as resolving a fenced block. Measured: with the
+# strip the docs loop extracts no target at all from
+# docs/plans/2026-09-02-the-four-mode-router-and-audit.md, and without it one per link-shaped
+# pattern that plan quotes, each to a file it never named as one. The number of them is left
+# unwritten on purpose: it grows every time the plan quotes another pattern, and it already has.
+#
+# Both delimiter lengths are in the one fixture because one clause was not enough. Against a
+# double-backtick span a single-delimiter strip matches the empty run between the two opening
+# backticks and the empty run between the two closing ones, deletes both, and leaves the contents
+# standing as a link. A fixture carrying only the single form passes over the bug that shipped.
+m_docs_link_in_span() {
+    mkdir -p "$1/docs/plans"
+    { printf '# Plan\n\nAssert this: `[the thing](../../elsewhere/one.md)` in the single form,\n'
+      printf 'and ``[the thing](../../elsewhere/two.md)`` in the double form.\n'
+    } > "$1/docs/plans/p.md"
+}
+run "a link quoted inside an inline code span is allowed" 0 m_docs_link_in_span
+
+# MUST REJECT. The link text is a code span and the target is a real relative path outside it. This
+# is the shape at skills/write-prd/references/questionnaire.md:15, whose own target is an anchor
+# that the ^(https?:|#) filter drops with or without the strip, so it proves nothing; this fixture
+# uses that shape against a path instead. The strip removes the text and the target is still
+# extracted and still resolved. That is the one shape the strip provably cannot blind the checker
+# to; it is not a general guarantee, and the two shapes that defeat it, escaped backticks and a
+# span wrapped across two lines, are named in the comment above the docs loop in
+# validate-skills.sh.
+#
+# A SECOND SPAN SITS AFTER THE LINK, and it is load bearing. With only the one span this case
+# tolerates the obvious greedy widening s/BACKTICK.*BACKTICK//g, because that mutant deletes the
+# link text and leaves the target standing, so the case still rejects and passes over the bug. With
+# a span on each side of the link the mutant swallows the link too, nothing is extracted, and the
+# case fails. Verified both ways.
+m_docs_broken_link_span_text() {
+    mkdir -p "$1/docs/plans"
+    printf '# Plan\n\nSee [`the thing`](missing-thing.md) for `detail`.\n' > "$1/docs/plans/p.md"
+}
+run "a broken link whose text is a code span is rejected" 1 m_docs_broken_link_span_text
+
 # MUST NOT REJECT. Skills must write <docs_root>, but a document explaining the default layout has to
 # name it. Measured: this rule fires on five correct documents, including the one that defines the
 # layout, so it does not carry over to documentation.
@@ -599,6 +639,44 @@ m_keys_extra()   { profile_keys_fixture "$1" '| `a` | string | `keel init` | A. 
 | `c` | string | **you** | Not in the schema. |
 '; }
 check_reports "a row the schema does not declare is reported" yes "which the schema does not declare" m_keys_extra
+
+
+# ---- the documented-delegation rule, and the pipeline race that made it lie ------------------
+#
+# On 2026-09-04 CI went red on main with six delegation failures against a tree that had passed the
+# identical check on the pull request minutes earlier, and passes it on a developer machine. The
+# rule read the skill body through `body_of file | grep -q`, under `set -o pipefail`. grep -q exits
+# at the first match; the producer then dies on its next write, and pipefail turns its 141 into a
+# failed pipeline, so a match that was found is reported as a body that never names the plugin.
+# The four skills it accused all had bodies over one stdio block with the match in the first block,
+# and the two it let through had bodies under a block, so the producer had finished before grep
+# left. Timing decided it, which is why the same commit passed and failed.
+#
+# The fixture makes the race certain rather than likely: the mention is on the first line of the
+# body and is followed by more filler than a pipe will hold, so the producer is still blocked on a
+# write when grep matches and leaves. Under the old pipeline this case fails every run.
+delegation_fixture() {   # delegation_fixture <root> <body-mentions-plugin: yes|no>
+    local root="$1" mention="$2"
+    mkdir -p "$root/docs"
+    { printf '# Plugins\n\n'
+      printf '| keel skill | Plugin it calls | What it delegates |\n'
+      printf '|---|---|---|\n'
+      printf '| `example` | `some-plugin` | A thing |\n'
+    } > "$root/docs/04-plugin-strategy.md"
+    { printf -- '---\nname: example\ndescription: Use when a test needs a valid skill to exist.\n---\n\n'
+      [ "$mention" = yes ] && printf 'Delegates to the `some-plugin` plugin when it is installed.\n\n'
+      # Larger than any pipe buffer, so the producer cannot finish before the consumer matches.
+      head -c 200000 < /dev/zero | tr '\0' 'x' | fold -w 100
+    } > "$root/skills/example/SKILL.md"
+}
+
+m_delegation_named()   { delegation_fixture "$1" yes; }
+check_reports "a delegation named early in a long body is not reported" \
+  no "never names it" m_delegation_named
+
+m_delegation_missing() { delegation_fixture "$1" no; }
+check_reports "a delegation the body never names is reported" \
+  yes "never names it" m_delegation_missing
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

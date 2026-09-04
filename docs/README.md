@@ -16,7 +16,9 @@ Written and read by keel skills. Committed on purpose: this is the project's mem
 | `audits/` | `security-audit`, `coding-standards` |
 | `incidents/` | `incident-response` |
 
-A dated report in `audits/` is named `YYYY-MM-DD-<kind>.md`, where `<kind>` is the noun of the
-skill that wrote it: `security`, `standards`. An incident record is named for its slug.
+A dated report in `audits/` is named `YYYY-MM-DD-<kind>.md`, where `<kind>` is the noun of the skill
+that wrote it: `security`, `standards`. Where a second mode of the same skill writes there too, its
+kind is that noun plus its own mode name, so `coding-standards` writes `standards` from assess and
+`standards-audit` from audit. An incident record is named for its slug.
 
 See `prompting.md` for how to phrase a request so the right skill fires.

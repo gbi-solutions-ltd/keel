@@ -3,6 +3,13 @@
 One row per scenario per release. Kept here rather than in the changelog because the useful part is
 the detail: what an agent said, not whether it passed.
 
+**A finding of the form "the arm did X" or "the arm did not X" carries the command that extracted
+it.** Adopted 2026-09-02 after an entry claimed an arm read no reference file, on a run that read
+six, because the extraction scanned for `Read` tool calls and the arm had used `Bash`. The claim was
+about the arm and the defect was in the query, and prose reporting a tool call is not evidence
+unless the next reader can re-run what produced it. Name the stream the command was run against, and
+identify that stream by its own `result` record rather than by which directory it sat in.
+
 ## 2026-08-18, 0.11.0, the release gate. Five treatment arms, all pass.
 
 Run against `main` at `645af43`, `VERSION` 0.11.0. Decision 9 gates a release on these. The content
@@ -2862,3 +2869,950 @@ This file at `:2499` says "The gate stays at seven scenarios". Nine scenarios ex
 leaves seven, so the six-versus-seven question is live and `commit-outside-a-worktree` is the one
 whose membership is unclear. **This gate ran the six named above**, which are the six the 0.15.0
 gate ran. Not fixed here, because a gate entry is the wrong place to settle it.
+
+## 2026-09-02, `context-budget` at 723 words, the ADR-0001 length arm. Passes
+
+Not a gate scenario and not added to one. ADR-0001 requires a passing arm at that length for any
+body over the 700 target, and this is that record.
+
+**Why the body grew.** The wiring map in `docs/04-plugin-strategy.md` claimed `context-budget` calls
+`claude-md-management` for its CLAUDE.md quality rubric, and the skill had never named it. The row
+was wired rather than corrected, which took the body from 692 to 723 and across the target. That
+cost was not in the decision when it was taken, and this arm is what it owes.
+
+**Method.** One treatment arm, `context-budget` injected, against a four file Node service whose
+`CLAUDE.md` is 22,970 bytes of coding standards, deployment steps, an API reference and a session
+history line, with a `SessionStart` hook running `git rev-parse`, `git status` and `date`. Same
+flags as every other arm. `claude-opus-5[1m]`, 14 turns, 122 seconds, $0.62.
+
+### Verdict: passes on length. The body is still followed at 723 words
+
+- **Step 1 measured per source rather than in aggregate**: about 6,380 tokens for `CLAUDE.md`, 22
+  for the hook, 0 for imports and skills. The skill's rule is that "CLAUDE.md is large" is not a
+  finding, and the arm produced the comparable number instead.
+- **Step 2 found the hazard and confirmed it by running the hook twice** one second apart to show
+  the output differed. It then stated the consequence correctly: 22 tokens of hook cost the whole
+  6,400 token prefix its cache. That is the skill's "it looks helpful" warning landing exactly, and
+  it is the finding an unfollowed skill would have missed while reporting the byte count.
+- **Step 3 moved all four categories to the homes its table names**, and diffed the moved content
+  against `HEAD` to prove it moved verbatim rather than being summarised.
+- **Step 6 separated the two problems.** It said "slow after a while" is the context window filling
+  during a session, which the prefix fix does not touch, and named `/clear` as the lever.
+- It **declined to dedupe 59 duplicate rules on a guess**, naming the two readings and leaving the
+  decision, which is the skill's honesty rule rather than its context rule.
+
+Result: about 6,400 to about 188 tokens per request, and `node --test` still passes.
+
+**The new clause fired in its fallback branch**, which is the half that runs for every user without
+the plugin. `docs/context-audit.md` in the staged copy carries a `## Rubric` section reading "The
+`claude-md-management` plugin is not installed, so its rubric was not available. The trimmed file
+was judged against the standard". The arm ran with `--setting-sources ""`, so no plugin was
+loadable and the fallback is the only branch this arm could reach. **The installed branch is
+untested**, here and in `design-architecture`, which has carried the same shape since it was
+written.
+
+## 2026-09-02, `write-docs` at 756 words, the ADR-0001 length arm. Passes, with two gaps
+
+Supersedes the 738 word arm of 2026-08-19, which no longer covers the body.
+
+**Why the body grew.** The same wiring map claimed `write-docs` calls `frontend-design` for UI
+component documentation. Wiring it took the body from 731 to 756.
+
+**Method.** One treatment arm, `write-docs` injected, against a four file zero-dependency Node
+receipts service with no README, no `docs/`, no snapshot and no PRD. Zero dependencies deliberately,
+so Step 4 can run the service without a network install. `claude-opus-5[1m]`, 16 turns, 293 seconds,
+$0.72.
+
+### Verdict: passes on length. The body is still followed at 756 words
+
+- **Step 4 is the step that carried the arm**, as it did at 738. Every command in the README was
+  executed against the running service. It found ID reuse across restarts by actually restarting the
+  process and observing `rcp_1` reissued for a different receipt; that query strings 404 every route,
+  because routing is `req.url.split('/')`; and that requiring `server.js` without
+  `RECEIPTS_API_KEY` exits the test runner, because the key check sits above the `require.main`
+  guard. All three are defects a documenter who did not run the thing would have written wrongly.
+- **Step 1 chose the type and defended it**: one README rather than a split runbook, because there
+  is no deploy path to write a runbook against.
+- **Step 6 fired in its awkward case.** The staged copy is not a git repository, so it dated the
+  document rather than citing a commit, and said why.
+
+**Gap 1: Step 3's delegation did not fire.** No subagent was spawned. The step says to delegate
+reading to concurrent `Explore` agents where the snapshot, PRD and architecture doc do not exist,
+and none existed. **The fixture is the likelier cause than the body**: four files is small enough
+that reading them inline is the reasonable call, where the 2026-08-19 arm used a twelve file service
+chosen so that branch was the one the task reached. This arm therefore does not measure Step 3, and
+a re-run wanting to should use the larger fixture.
+
+**Gap 2: the new clause was not exercised.** It is gated on `profile.stack.has_ui`, the fixture has
+no profile and no UI, so the gate is correctly false and the sentence correctly did not fire. Its
+firing branch has never run.
+
+## 2026-09-02, author mode, the first recorded run. Passes
+
+Task 2 of `docs/plans/2026-09-02-derisk-the-coding-standards-restructure.md`, satisfying NFR-06 of
+`docs/prd/coding-standards-audit-and-seed.md`.
+
+**Why it was owed.** Author mode had never been exercised. One scenario named `coding-standards`,
+`assess-a-stale-standard`, and it runs assess. Two proposed modes make author load bearing: `audit`
+ends by offering it and `seed` is its Step 4 with the house defaults as the source, so the mode with
+no evidence behind it was about to become the one two new modes depend on.
+
+**Method.** One treatment arm against the new `author-a-standard` fixture: an invoices service with
+no standards document and two deliberate splits, seven `queryConcat` call sites against three
+`queryParam`, and six functions returning a typed error object against two that throw. The first is
+the split where the majority is a defect. `claude-opus-5[1m]`, 18 turns, 346 seconds, $1.45,
+`--output-format stream-json`.
+
+### Verdict: passes. All four conditions met, and they were fixed in the plan before the run
+
+- **Cites conventions by `path:line`:** 15 distinct citations across `src/billing.js`,
+  `src/invoices.js`, `src/db.js` and `src/server.js`. Three were required.
+- **Applies Step 1's counting rule to the SQL split, which is the condition that mattered.** The
+  document records the minority as the rule: "use `queryParam` with `$n` placeholders. Never
+  `queryConcat`". Its stated reason is Step 1's rule almost verbatim: "seven concatenate and three
+  parameterise, so the majority pattern is the convention by usage. It is also a SQL injection
+  vulnerability, and writing the majority down would have" sanctioned it.
+- **Writes `docs/standards.md`**, 320 lines.
+- **Carries a departures section**, eight rows, and opens it by saying none of them has an owner or
+  a ticket, which is the drift-that-looks-sanctioned failure `standards-template.md` names.
+
+**Step 3 fired, which was not required and is the strongest signal in the run.** "Wire the
+mechanical pile" produced a working `tools/lint.js` plus a `tools/lint-baseline.json` suppressing
+the 13 existing violations, so the rule lands green and anything new fails. Run in the staged tree
+it reports `5 files clean, 13 known violations suppressed`. That is the skill's "keep it and
+suppress the known sites, never widen the rule" instruction executed rather than described.
+
+**One citation is a generic placeholder, not a fabricated basis.** The naming rule reads
+"`src/foo.js` is tested by `test/foo.test.js`", and no `foo.js` exists. It is illustrating a pattern
+that the real `billing.js` and `test/billing.test.js` pair grounds, which is the generic-example
+convention `CONTRIBUTING.md` asks for rather than a rule with no basis.
+
+### RETRACTED 2026-09-02. The finding that bears on task 4, and it was false
+
+**This section as first written is wrong, and it is the finding task 4 was built on.** It is
+retracted in place rather than deleted, because it was committed in `ca89c77` and a reader who meets
+the claim needs to meet the correction with it.
+
+**Blast radius, checked rather than assumed.** No other file cites this finding: `/usr/bin/grep` for
+`read no reference` and `plausible substitute` across the plan, the PRD, the stories and the idea
+record returns nothing. The error stayed inside this entry, which is why the correction can too.
+
+**What was recorded.** Verbatim, so the retraction is checkable against what it retracts:
+
+> **The arm read no reference file.** `stage.sh` staged all 13 `coding-standards` references at
+> `../skills/coding-standards/references/` and the prompt named the path. Not one was opened: the
+> `stream-json` tool calls carry no read under that directory.
+>
+> It nevertheless wrote a departures table citing house defaults by name, including "Instrument with
+> OpenTelemetry", "Deny by default, code checks permissions" and "per the house default". Those are
+> close to `house-defaults.md`'s actual content and were produced without reading it.
+>
+> **So the output cannot distinguish an arm that followed a reference from one that guessed
+> plausibly, and a scorer reading only the reply would have concluded the reference was used.** That
+> is precisely why task 4's discriminator is a tool call rather than a judgement about the text, and
+> this run is the evidence that the weaker discriminator would have been wrong.
+>
+> Whether author mode should have read `house-defaults.md` is a separate question this scenario does
+> not score. Step 4 asks for it by name. It did not, and it produced a plausible substitute.
+
+**What is true.** The arm made 17 tool calls, all `Bash`, none `Read`. Six name the staged
+references: one directory listing and five reads, covering six files.
+
+| Call | What it read |
+|---|---|
+| `ls -la ../skills/coding-standards/references/` | the listing, not a read |
+| `cat ../skills/coding-standards/references/standards-template.md` | `standards-template.md` |
+| `sed -n '1,80p' ../skills/coding-standards/references/house-defaults.md` | `house-defaults.md`, first 80 lines |
+| `sed -n '80,320p' ../skills/coding-standards/references/house-defaults.md` | `house-defaults.md`, to the end |
+| `cd ../skills/coding-standards/references && cat observability.md time-and-dates.md` | two topic references |
+| `cat ../skills/coding-standards/references/rate-limiting.md ../skills/coding-standards/references/data-protection.md` | two topic references |
+
+`house-defaults.md` is 246 lines and the two `sed` ranges cover all of them, so it was read in full,
+at Step 4, the step whose sentence links it (`SKILL.md:77`). **The departures table is grounded in
+the reference, not a plausible substitute for it.** Every sentence of the retracted finding that
+turns on "without reading it" is false.
+
+**The extraction that produced the error.** It scanned for `Read` tool calls, on a run that used
+`Bash` for all 17 of its calls and `Read` for none, and reported the absence of `Read` as the
+absence of a read.
+
+**The extraction that is correct.** Re-runnable by the next reader against this run's stream:
+
+```bash
+jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use")
+       | [.name, (.input.command // (.input|tostring))] | @tsv' stream.jsonl \
+  | /usr/bin/grep 'skills/coding-standards'
+```
+
+Run against `keel-eval-vAC6RZ/stream.jsonl`, identified as this run by its own `result` record: 18
+turns, 345.654 seconds, $1.4463, matching the method line above, and by its artifacts, a 320 line
+`docs/standards.md`, `tools/lint.js` and `tools/lint-baseline.json`.
+
+**How it survived.** The same trap is documented six minutes later in the entry below, under the
+assess baseline: the first extraction written for task 3 made exactly this mistake and had to be
+widened. Task 4 used the widened one. **This entry was never re-run against it**, so an error found
+while writing the next task stayed in the commit for the previous one.
+
+**What it changes for task 4: the discriminator survives, its stated evidence does not.** Asking
+whether the file was opened, and reading the answer from the tool calls rather than the prose, is
+still the right question and still the one task 4 answered. But this run was cited as the case
+proving that a scorer reading only the reply would have been wrong, and it shows the opposite. The
+reply's prose was right. The extraction was wrong.
+
+**That claim is re-sourced rather than quietly re-cited.** The case that a weaker reading would have
+been wrong now rests on task 3's own extraction failure, recorded in the entry below: the first
+extraction written for the assess baseline reported no reference opened on a run that had opened
+two. That failure is real, it is recorded, and it is evidence about extractions rather than about
+arms. It is a narrower claim than the one it replaces, and the narrower claim is the true one.
+
+**What it changes for the restructure.** Two measured modes have each now followed a link out of the
+body into `references/`: author into `house-defaults.md` at Step 4, and assess into `assess.md` at
+Step 0. That is two runs supporting FR-19, and it should not be read as more than that. **The two
+are not the same thing.** Author followed a link to content it then applied; assess followed a link
+to its own steps and then executed them. Neither run is `audit` or `seed`, neither of which exists.
+
+**Whether author mode should read `house-defaults.md` is not a question this scenario scores.** Step
+4 asks for it by name, and the arm did it.
+
+## 2026-09-02, the assess baseline before the reference move
+
+Task 3 of `docs/plans/2026-09-02-derisk-the-coding-standards-restructure.md`. Not a verdict on
+assess. This is the recorded state task 4 compares against, item by item.
+
+**This baseline is a new condition and comparable with nothing before it.** Task 1 made an injected
+skill's references readable, so `assessment-report.md` and `house-defaults.md` are reachable for the
+first time. The 2026-09-01 run of this same scenario had neither, and a body 11 words shorter.
+
+**Method.** `assess-a-stale-standard`, `claude-opus-5[1m]`, 18 turns, 366 seconds, $1.56,
+`--output-format stream-json`.
+
+### The six recorded facts
+
+1. **References opened:** `assessment-report.md` and `house-defaults.md`, both read. Five tool calls
+   touched the staged directory.
+2. **Checks that fired:** all four, by name.
+3. **Order presented:** house-defaults coverage, backlog, judgement sample, departures ledger, which
+   is the ranked order `assessment-report.md` fixes. The report's seven sections are in that
+   template's fixed section order exactly: Summary, Check 1, Check 2, Check 3, Check 4, Trend, Not
+   covered.
+4. **Path written:** `docs/audits/2026-09-02-standards.md`, and nothing else. `git status
+   --porcelain` in the staged project shows `docs/audits/` untracked and no modification to
+   `docs/standards.md`.
+5. **Body word count at the time:** 876.
+6. **Model, turns, duration, cost:** as above.
+
+### The 2026-09-01 comparison, which the plan required recording
+
+`tests/evals/results.md` records that run **failing** "Names all four checks, in the ranked order",
+and its own conclusion was that "the part of the body that survived is the part describing what to
+look for, and the part that did not is the part describing how to present it".
+
+**This run does not reproduce that failure. It passes the criterion.** The difference is not the
+body, which grew from 865 to 876 words rather than shrinking. It is that the order lives in
+`assessment-report.md`, which no arm could read until 2026-09-02 and this one did.
+
+That is worth stating plainly: **the 2026-09-01 failure was a harness limitation misread as a skill
+weakness.** The body was being scored on presenting an order defined in a file it had no way to
+open. Task 1 was built to unblock S-02 and it retired a recorded finding on the way.
+
+### The methodological catch, which changes how task 4 must read its own evidence
+
+**The arm read the references with Bash `cat`, not with the Read tool.** A discriminator scanning
+`stream-json` for `Read` calls alone would have found none and reported that no reference was
+opened, which is the opposite of what happened.
+
+Task 4's pass condition is "was `references/assess.md` opened", read from the tool calls. It must
+count any tool whose input names the path, `Bash` included. Recorded here because the first
+extraction written for this run made exactly that mistake and had to be widened.
+
+## 2026-09-02, the assess arm after the reference move
+
+Task 4 of `docs/plans/2026-09-02-derisk-the-coding-standards-restructure.md`, and the run S-02 was
+written to get. The question is not whether the report is good. It is **whether the arm went and
+read `references/assess.md`**, which is the one thing the whole restructure rests on.
+
+**Verdict: passes on every condition the plan fixed before the output was read.**
+
+**Method.** `assess-a-stale-standard`, `claude-opus-5[1m]`, 16 turns, 343 seconds, $1.29,
+`--output-format stream-json`. The `modelUsage` block also lists `claude-haiku-4-5` at 12 output
+tokens and $0.002, which is the CLI's own housekeeping and not the arm. Staged with
+`tests/evals/stage.sh`, dispatched from the staged `project/`, prompt checked before dispatch to
+carry the `references/assess.md` link and to contain no occurrence of `Passes if the reply`.
+
+### The six recorded facts, in the baseline's order
+
+1. **References opened:** yes, and `assess.md` first.
+   `cat ../skills/coding-standards/references/assess.md` is the arm's opening move on the
+   references, before any other reference and before the report was shaped. It then read
+   `assessment-report.md`, `house-defaults.md`, all ten topic references by `grep` for their H2
+   structure, and `api-contracts.md`, `data-protection.md`, `time-and-dates.md` and
+   `observability.md` in full. Six tool calls name `../skills/`, out of 15 in the run.
+2. **Checks that fired:** all four, by name, as `Check 1, house-defaults coverage` through
+   `Check 4, the departures ledger`.
+3. **Order presented:** house-defaults coverage, backlog, judgement sample, departures ledger. The
+   report's seven sections are in `assessment-report.md`'s fixed order exactly: Summary, Check 1,
+   Check 2, Check 3, Check 4, Trend, Not covered.
+4. **Path written:** `docs/audits/2026-09-02-standards.md`, and nothing else. `git status
+   --porcelain` in the staged project is exactly `?? docs/audits/`, so `docs/standards.md` is
+   unmodified.
+5. **Body word count at the time:** 756, down from the baseline's 876.
+6. **Model, turns, duration, cost:** as above.
+
+### Item by item against the baseline
+
+| Item | Baseline, checks in the body | After the move, checks behind a link |
+|---|---|---|
+| 1. References opened | `assessment-report.md`, `house-defaults.md`. 5 staged-dir calls | Those two plus `assess.md` first, plus four topic references in full. 6 staged-dir calls |
+| 2. Checks fired | all four, by name | all four, by name. **No loss** |
+| 3. Order presented | ranked, 7 sections in template order | ranked, 7 sections in template order. Unchanged |
+| 4. Path and `standards.md` | `docs/audits/2026-09-02-standards.md`, document untouched | identical |
+| 5. Body words | 876 | 756 |
+| 6. Turns, seconds, cost | 18, 366, $1.56 | 16, 343, $1.29 |
+
+**Item 3 is recorded and is not a discriminator**, as the plan fixed in advance. The 2026-09-01 run
+failed that criterion with the checks inline in the body, so it was already failing before anything
+moved, and a pass condition that can be met by failing the same way as the baseline is not a test.
+It is noted here only that the ranked order survived the move as well as it survived the baseline.
+
+**The two honesty requirements, reachable since task 1, are both met.** The pre-derivation
+proportion is stated as "2 of 2 files under `src/` and 9 of 11 functions (82%) predate", and check
+4's category table carries its empty rows, `closed 0` and `stale reason 0`, with a paragraph saying
+what the empty `stale reason` means.
+
+**The tool used was `Bash cat` again, not `Read`.** Every one of the six reference calls is a
+`Bash` call. The run used `Bash` for all 15 of its tool calls and no `Read` at all, which is the
+extraction trap task 3 recorded after its first attempt fell into it. A discriminator scanning for
+`Read` would report that nothing was opened, on a run that opened seven files.
+
+**The extraction, recorded so the verdict can be re-run rather than believed.**
+
+```bash
+jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use")
+       | [.name, (.input.command // (.input|tostring))] | @tsv' result.jsonl \
+  | /usr/bin/grep 'skills/coding-standards'
+```
+
+Run against `keel-eval-wNFqmn/result.jsonl`, identified as this run by its own `result` record: 16
+turns, 342.577 seconds, $1.2889825. It matches any tool whose input names the path, which is the
+whole point: the same query scanning `.name == "Read"` returns nothing on this run and on the two
+before it.
+
+### What this proves, and what it does not
+
+**Proved, on one run:** `coding-standards`'s assess mode has its four checks read from a staged
+reference file rather than from the body, and executing them from behind that link cost nothing
+measurable against the baseline. Every check fired, the order held, the report went to the same
+path, and the document under assessment was not touched.
+
+**Not proved:** that the same holds for `audit` or `seed`. Neither mode exists. This run measures
+one mode, once, and it does not discharge NFR-05, which asks for a passing arm per mode. The PRD
+should be corrected on that point rather than this entry stretched to cover it. It is also one run
+and not a stability measurement: a second dispatch has not been made.
+
+## 2026-09-03, audit mode, the first recorded run. Passes on all eight
+
+Task 6 of `docs/plans/2026-09-02-the-four-mode-router-and-audit.md`, story S-06, satisfying NFR-05
+for audit and ADR-0001's arm obligation at the body's current 795 words.
+
+**Why it was owed.** Audit mode had never been exercised. It is the mode the four-mode router in
+Step 0 sends a repository with code and no `standards.md` to, its procedure lives entirely behind a
+link at `references/audit.md`, and epic C was planned against whether it works. The plan fixed the
+pass conditions before the dispatch and named a fail as a legitimate outcome rather than a problem
+to fix.
+
+**Method.** One treatment arm against the `audit-a-brownfield-tree` fixture: an 11 file Python
+payments service with no standards document, no git repository, and two deliberate splits. Nine
+`query_concat` call sites against four `query_param`, which is the split where the majority is the
+defect, and six functions returning `Result` against two raising a domain exception, which is an
+ordinary majority convention. Only the SQL split is scored. Staged by `tests/evals/stage.sh`, so
+`references/` sits at `../skills/coding-standards/references/` beside the working directory and the
+arm has to choose to open it.
+
+**The prompt was confirmed before the dispatch.** `tests/evals/run.sh audit-a-brownfield-tree`
+assembles a prompt that names `../skills/coding-standards/references/` once and contains zero
+occurrences of `Passes if the reply`, so the arm could reach the reference files and could not read
+the criteria it would be scored on.
+
+**Model, turns, duration, cost**, from the run's own `result` record: `claude-opus-5[1m]`, 14 turns,
+217.305 seconds, $0.8798325. `subtype` `success`, `is_error` false. `modelUsage` also lists
+`claude-haiku-4-5-20251001` at 11 output tokens, which is the harness's own side traffic and not the
+arm.
+
+### `references/audit.md` was opened, and by `Bash`, not `Read`
+
+Both reference files behind Step 0's audit cell were opened: `references/audit.md` and
+`references/audit-offer.md`, each by a `Bash` call that `cat`s it. The run made 13 tool calls and
+every one of them is `Bash`. **A discriminator scanning for `Read` returns zero on this run**, which
+is the extraction trap this file recorded on 2026-09-02 and the reason the query below matches any
+tool whose input names the path.
+
+### The extraction, recorded so the verdict can be re-run rather than believed
+
+```bash
+jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use")
+       | [.name, (.input.command // (.input|tostring))] | @tsv' "$dir/result.jsonl" \
+  | /usr/bin/grep 'skills/coding-standards'
+```
+
+Run against `keel-eval-eHg2qy/result.jsonl`, identified as this run by its own `result` record: 14
+turns, 217.305 seconds, $0.8798325. It returns two rows, both `Bash`, one naming
+`skills/coding-standards/references/audit.md` and one naming
+`skills/coding-standards/references/audit-offer.md`.
+
+The tree was verified against the fixture rather than by `git status`, because the staged project is
+not a git repository:
+
+```bash
+diff -r tests/evals/fixtures/audit-a-brownfield-tree "$dir/project"
+find "$dir/project/docs" -type f
+```
+
+`diff -r` printed exactly one line, `Only in <dir>/project: docs`, and nothing else. `find` printed
+exactly one path, `<dir>/project/docs/audits/2026-09-03-standards-audit.md`.
+
+### The eight conditions, each answered
+
+| # | Condition | Verdict | Evidence |
+|---|---|---|---|
+| 1 | Entered audit without being told the word | **Yes** | The task text never says audit. The arm opened `references/audit.md` and wrote audit's path in audit's order |
+| 2 | Wrote `docs/audits/<date>-standards-audit.md`, created nothing else | **Yes** | `find` returns exactly `docs/audits/2026-09-03-standards-audit.md` |
+| 3 | Left every file it read byte identical | **Yes** | `diff -r` against the fixture prints only `Only in <dir>/project: docs` |
+| 4 | `docs/standards.md` does not exist afterwards | **Yes** | Same `find` and `diff -r`. The only file under `docs/` is the audit |
+| 5 | Header carries the derivation disclaimer | **Yes** | Report line 3 is the sentence `references/audit.md` fixes, in bold |
+| 6 | All six sections, in the fixed order | **Yes** | First mention of each, by line: 3, 8, 32, 57, 128, 147. Strictly increasing |
+| 7 | Minority as the rule on the SQL split, with the ratio, and it is 4 of 13, and why | **Yes** | "9 of 13 query sites concatenate caller input into SQL. 4 of 13 parameterise". The rule recorded is the minority one, because writing the majority down would make SQL injection the house style |
+| 8 | Offered to author, and did not act on it | **Yes** | The reply closes with an offer to write `docs/standards.md`, and says it will not unless asked. No such file exists |
+
+**Verdict: passes.** Eight of eight, against conditions fixed in the plan before the dispatch and
+not moved after the output was read.
+
+### The header requirements audit.md sets, met in full
+
+The report opens with the commit, the date, the sample count and its denominator, and the
+disclaimer. There is no commit, and the arm said so and said why: the tree is not a git repository,
+so there is nothing to pin it to and no history to read. That is `references/audit.md`'s "the commit
+**where the tree is a repository**" read correctly rather than a gap. The denominator is stated as
+what it counts: 11 of 11 Python files, not counting `README.md` or `.keel/profile.json`, which were
+read but are not code. The counting unit is declared before the first number, which is the rule
+audit.md carries over from `assessment-report.md`.
+
+### What it did that the conditions do not ask for
+
+Four splits, not one. Beyond the SQL split it found the failure-signalling split as a three way
+rather than the two way the fixture seeded (`Result` 6, raise 2, bare bool 2), a response-shape
+split across the two route handlers, and an inverted layering where `core/` imports from
+`api/errors.py`, which the README does not permit. It also found a defect the fixture did not seed:
+`api/routes.py:11-17` never catches what `check_amount` raises, so a bad amount escapes as an
+unhandled domain exception instead of a 400.
+
+It also declined to overclaim on the scored split. The audit records that `storage/db.py` is a stub
+whose `query_param` concatenates internally to key a dict, so the four parameterised call sites are
+structurally right but nothing in the tree exercises the safety property, and that with no history
+there is no way to tell whether the parameterised sites are the newer direction of travel.
+
+### What this proves, and what it does not
+
+**Proved, on one run:** audit mode is entered from Step 0's router without the word being used,
+followed from behind a link, and completed to `references/audit.md`'s fixed shape. It wrote one file
+at audit's path, edited nothing it read, wrote no `standards.md`, applied Step 1's counting rule to
+the split where the majority is the defect, and ended by offering author without doing it.
+
+**Not proved: that seed is followed from behind a link.** Seed does not exist. `references/seed.md`
+is a stub for the life of this plan and Step 0's seed cell points at it. This run measures one mode
+once, and NFR-05 asks for a passing arm per mode, so audit's cell is now discharged and seed's is
+not. It is also not a stability measurement: a second dispatch has not been made.
+
+**The caveat the reviewers raised, and it weakens condition 7.** `SKILL.md`'s Step 1 is in the
+prompt and it carries the SQL case by name: "A real run found 7 concatenated SQL queries against 3
+parameterised: writing the majority down as the convention would have sanctioned an injection
+vulnerability."
+`references/house-defaults.md:164-165` states the same rule as a house default, though this arm did
+not open that file. So a pass on condition 7 is weaker evidence for "Step 1's counting rule survives
+in audit mode" than it reads as: an arm could reach the minority-is-the-rule answer for SQL by
+recognising the example rather than by counting. **The ratio is what separates the two.** 4 of 13 is
+not in the body, is not in `house-defaults.md`, and does not match the body's 3 of 10 example, so
+producing it required counting the fixture's own call sites. A future scenario that wants to test
+the counting rule rather than the SQL recall should use a split whose majority is a defect the body
+does not name.
+
+**The body word count at the time was 795**, over ADR-0001's 700 target and under its 900 ceiling,
+which is the length this arm discharges. `CONTRIBUTING.md` was corrected in the same change: the
+876 word body it credited no longer exists.
+
+## 2026-09-03, seed mode, the first recorded run. Fails on one of eight
+
+Task 5 of `docs/plans/2026-09-03-seed-mode-and-its-arm.md`, story S-09, satisfying NFR-05 for seed.
+Run against `sandbox` at `543dcce`, with `references/seed.md` at 1,169 words and the
+`coding-standards` body at 795.
+
+**Why it was owed.** Seed mode had never been exercised. It is the mode Step 0's four-mode router
+sends a repository with no document and no code to, its procedure lives entirely behind a link at
+`references/seed.md`, and epic C was planned against whether it works. The eight conditions were
+fixed in the plan before the dispatch, in a commit that precedes the run, and a fail was named there
+as a legitimate outcome rather than a problem to route around.
+
+**Method.** One treatment arm against the `seed-a-greenfield-mobile-app` fixture: two files, a
+README and a `.keel/profile.json` declaring Dart on Flutter with `has_ui` true, and no source of any
+kind. Staged by `tests/evals/stage.sh`, so `references/` sits at
+`../skills/coding-standards/references/` beside the working directory and the arm has to choose to
+open it. No `setup.sh`, so the staged project is deliberately not a git repository and the tree is
+verified with `diff -r` rather than `git status`.
+
+**The prompt was confirmed before the dispatch.**
+
+```bash
+tests/evals/run.sh seed-a-greenfield-mobile-app | /usr/bin/grep -c '\.\./skills/coding-standards/references/'
+tests/evals/run.sh seed-a-greenfield-mobile-app | /usr/bin/grep -c 'Passes if the reply'
+```
+
+Returned `1` and `0`: the arm could reach the reference files and could not read the criteria it
+would be scored on.
+
+**Model, turns, duration, cost**, from the run's own `result` record: `claude-opus-5[1m]`, 11 turns,
+288.893 seconds, $1.1168845. `subtype` `success`, `is_error` false. `modelUsage` also lists
+`claude-haiku-4-5-20251001`, which is the harness's own side traffic and not the arm.
+
+### Eight files under `references/` were opened, and every one by `Bash`, not `Read`
+
+The run made 10 tool calls and every one of them is `Bash`. **A discriminator scanning for `Read`
+returns zero on this run**, which is the extraction trap this file recorded on 2026-09-02, and the
+reason the query below matches any tool whose input names the path. Five of the eight are topic
+references from the index; the other three are the mode, the template and the index itself.
+
+### The extraction, recorded so the verdict can be re-run rather than believed
+
+```bash
+jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use")
+       | [.name, (.input.command // (.input|tostring))] | @tsv' "$dir/result.jsonl" \
+  | /usr/bin/grep 'skills/coding-standards'
+```
+
+Run against `keel-eval-TjNIZf/result.jsonl`, identified as this run by its own `result` record: 11
+turns, 288.893 seconds, $1.1168845. It returns five rows, all `Bash`, which between them `cat`
+`seed.md`, `standards-template.md`, `house-defaults.md`, `observability.md`, `time-and-dates.md`,
+`resilience.md`, `data-protection.md` and `api-contracts.md`. `frontend.md` was never opened, which
+is consistent with the arm excluding it on the index predicate rather than reading it and deciding.
+
+```bash
+diff -r tests/evals/fixtures/seed-a-greenfield-mobile-app "$dir/project"
+find "$dir/project/docs" -type f
+```
+
+`diff -r` printed exactly one line, `Only in
+/var/folders/30/xwgcs_3934d0570n1clt88sw0000gn/T//keel-eval-TjNIZf/project: docs`, and nothing
+else, which answers conditions 2 and 3 together. `find` printed exactly one path,
+`/var/folders/30/xwgcs_3934d0570n1clt88sw0000gn/T//keel-eval-TjNIZf/project/docs/standards.md`.
+Both are recorded as they came, absolute path and all.
+
+```bash
+/usr/bin/grep -ciE 'not covered by any reference|nothing to report|did not apply' \
+    "$dir/project/docs/standards.md"
+```
+
+Returned `0`.
+
+### The eight conditions, each answered
+
+| # | Condition | Verdict | Evidence |
+|---|---|---|---|
+| 1 | Entered seed without being told the word, derived nothing from a codebase that does not exist | **Yes** | The task text says "seed" zero times. The arm opened `seed.md` and replied "Mode was seed, not audit or author". Its first two calls confirm the routing facts `seed.md` requires, which is not derivation |
+| 2 | Wrote `docs/standards.md`, created nothing else | **Yes** | `find` returns exactly one path, ending `/project/docs/standards.md`. One write in the whole stream |
+| 3 | Both fixture files byte identical afterwards | **Yes** | `diff -r` prints only the `Only in ...: docs` line. No content difference on either file |
+| 4 | Header states it was seeded from the house defaults and not derived from code | **Yes** | Header row reads "Derived from: Nothing. Seeded from the house defaults, no files sampled, because there were none", followed by a provenance paragraph saying it was not derived from this codebase because there is no codebase |
+| 5 | Only holding predicates folded in, every reference in exactly one of three states, at least one exclusion naming a value the profile states outright | **Yes** | All ten index rows are partitioned across the three states in both the reply and the document, each landing in exactly one: four applied, three excluded, three undecided. Some are mentioned again elsewhere, in the reply's section 4 and the document's later prose, which is not a second state. The excluded table names a predicate and a decider per row. `frontend.md` is excluded on `profile.stack.framework` being `flutter`, a value the profile states outright, on a citation that is exactly correct |
+| 6 | Gap report in the reply, five sections in the fixed order, counting unit stated before any number | **No** | The sections are present and in order. The counting unit is stated nowhere. A grep of the reply for `counting unit\|counted exactly once\|one house reference\|one file the index` returns zero, and section 4 opens "Four layers", a number given with no unit ever stated |
+| 7 | Names the user interface layer as covered by no house reference for this stack, attributed to keel | **Yes** | Section 4's first bullet: `frontend.md` is the only reference covering the UI layer and it excludes Flutter by predicate, so the layer has no coverage. The report closes "They are keel's gaps rather than the project's" |
+| 8 | Gap report is not in `docs/standards.md` | **Yes** | The grep above returns `0`. The document carries pointers outward to the report and not the report itself |
+
+**Verdict: fails.** Seven of eight, against conditions fixed in the plan before the dispatch and not
+moved after the output was read. Condition 6 is the one that failed.
+
+### What failed, precisely
+
+`seed.md` requires, with its lead clause in bold and above the numbered list: "The counting unit,
+before any number: one house reference is one file the index lists, and each one is counted exactly
+once, as applied, as excluded, or as undecided." The arm's report opens straight at section 1 and
+states no unit anywhere, then gives a number in section 4. The requirement has two halves, that the
+unit is stated and that it is stated before any number, and the first is unmet outright, which makes
+the second moot.
+
+The document comes closest at "Three states, and every reference has one", but that is the
+exactly-once property rather than the unit, and condition 6 scores the reply, not the document.
+`seed.md` puts the report in the reply because its audience is whoever maintains keel.
+
+**Section 5, "Nothing to report", is correctly absent and is not a second failure.** `seed.md`
+conditions that section on section 4 being empty, and section 4 is not empty here. Writing it would
+have stated a falsehood and contradicted section 4 in the same report.
+
+### What the arm proved, and what it did not, at the same weight
+
+It proves seed is followed from behind a link on one run, against one stack: the arm routed to seed
+unprompted, opened the mode and the index, evaluated ten predicates, partitioned all ten across the
+three states in both artefacts, and produced the gap report's substance. It does not prove the empty
+case, because this fixture is the known true positive, so section 5 of the gap report is never
+exercised by it.
+
+**And it proves less about conditions 5 and 7 than a clean pass would read as.** Section 4 of the
+gap report tells the arm that a predicate excluding the only reference covering a layer this project
+actually has is the shape to look for. Exactly one row of the index names a framework and exactly
+one reference is layer-shaped, so once the arm reads that table the pointer leaves a single
+candidate. Section 1 puts `has_ui` in front of the arm, and section 4 then hands over the discovery
+half of the derivation, leaving the evaluation half: find the row, evaluate the compound predicate,
+confirm no other row covers the layer. Plainly: a pass on those two is evidence the arm can evaluate
+a compound predicate and check coverage, not that it found an unprompted gap. That was recorded
+before the run and is not softened by the result.
+
+### Three defects the scoring found that no condition catches
+
+- **The document miscites the key it decides on, twice.** It writes "`profile.stack.kind` is
+  declared `frontend`" for the `rate-limiting.md` and `resilience.md` rows. `kind` sits under
+  `project`, not `stack`. The value is really declared and the at-least-one clause rides on
+  `frontend.md`'s citation, which is correct, so condition 5 is unaffected.
+- **The document carries a dangling cross-reference.** It says `See the gap noted under "What no
+  house reference covers"`, and no such section exists in the file. It is a pointer outward at the
+  reply's report, which is evidence for condition 8 rather than against it, but it resolves to
+  nothing for a reader of the document alone.
+- **Section 3 of the reply does not name `api-contracts.md`'s own predicate.** It lumps it with
+  `rate-limiting.md` under "it consumes APIs rather than serving one", which is rate-limiting's
+  predicate. Section 4 does quote it, calling out that the reference "names a mobile app in the
+  field as the party that cannot be fixed", so the reply carries the predicate somewhere and not
+  where the record of the exclusion is. The document names it correctly in the excluded table, and
+  the document is the scored record, so condition 5 is unaffected.
+
+### What follows
+
+`docs/stories/coding-standards-audit-and-seed.md` names it: S-09 and seed drop, audit is unaffected
+and ships alone, which is section 5.4's named fallback. The run was not repeated for a better
+result, no condition was softened, no pointer was added to `seed.md`, and the scenario was not
+reworded. Whether seed is deleted and Step 0's fourth cell dropped is a decision for the supervisor
+and is not part of this task.
+
+## 2026-09-03, seed mode, the second run after one repair. Passes on eight of eight
+
+The same scenario, `seed-a-greenfield-mobile-app`, against the same eight conditions from task 5 of
+`docs/plans/2026-09-03-seed-mode-and-its-arm.md`, run against `sandbox` at `d4321e9` with
+`references/seed.md` at 1,203 words and the `coding-standards` body at 795.
+
+**The first run's result stands and is not revised.** It is recorded above under
+`## 2026-09-03, seed mode, the first recorded run` and that entry is the permanent record of what
+happened on 2026-09-03 at `543dcce`: seven of eight, condition 6 failed. Nothing here reworks it.
+Condition 6 was not changed, split or relaxed, no condition was softened, and the scenario was not
+reworded. This is a second measurement after one repair to the mode text, not a re-score of the
+first.
+
+### What changed in seed.md between the two runs, exactly
+
+One paragraph, at the head of the gap report. It read:
+
+> **The counting unit, before any number:** one house reference is one file the index lists, and
+> each one is counted exactly once, as applied, as excluded, or as undecided.
+>
+> **In this fixed order, every run, including the runs with nothing to report:**
+
+and now reads:
+
+> **State the counting unit first, before any number:** write that one house reference is one file
+> the index lists, and that each one is counted exactly once, as applied, as excluded, or as
+> undecided. That sentence opens the report and section 1 follows it. A count whose unit was never
+> stated is a number the reader it is addressed to cannot check.
+>
+> **Then, in this fixed order, every run, including the runs with nothing to report:**
+
+```bash
+git diff 26d2397 d4321e9 -- skills/coding-standards/references/seed.md
+```
+
+Five insertions and three deletions, all in that paragraph. **Nothing else in the file moved:** not
+the five numbered sections, their order or their wording, not section 4's caveat about the shape to
+look for, not the three-state wording in "What seed writes" or in section 3, and not the never-list.
+The diagnosis behind it was Bernard's: the requirement was stated as a definition of the unit to
+count in, sitting outside the numbered list that defines what the report contains, while section 5
+of that same list commands words into the reply in the imperative. The repair restates it the way
+section 5 states its own requirement. The counting rule itself is unchanged, and so is what a
+passing report has to say.
+
+The same commit added two cases to `tests/test-doc-claims.sh` and corrected a stale global
+constraint in the plan. Neither reaches the arm: the first pins the imperative spelling and its
+placement ahead of section 1, the second pins seed.md's three-state record, which no case had
+guarded, and the plan is not staged into any arm.
+
+### Method, identical to the first run, and confirmed before the dispatch
+
+```bash
+tests/evals/run.sh seed-a-greenfield-mobile-app | /usr/bin/grep -c '\.\./skills/coding-standards/references/'
+tests/evals/run.sh seed-a-greenfield-mobile-app | /usr/bin/grep -c 'Passes if the reply'
+```
+
+Returned `1` and `0`, as before: the arm could reach the reference files and could not read the
+criteria it would be scored on. Same fixture, two files, staged by `tests/evals/stage.sh`, no
+`setup.sh`, so the staged project is not a git repository and the tree is verified with `diff -r`.
+
+```bash
+dir=$(tests/evals/stage.sh seed-a-greenfield-mobile-app 2>/dev/null)
+cd "$dir/project" && claude -p "$(cat ../prompt.md)" \
+    --setting-sources "" --disable-slash-commands \
+    --permission-mode bypassPermissions --output-format stream-json --verbose \
+    > "$dir/result.jsonl"
+```
+
+**Model, turns, duration, cost**, from the run's own `result` record: `claude-opus-5[1m]`, 11 turns,
+278.927 seconds, $1.1674955. `subtype` `success`, `is_error` false. `modelUsage` also lists
+`claude-haiku-4-5-20251001`, the harness's own side traffic and not the arm. The first run was 11
+turns, 288.893 seconds and $1.1168845, so the repair cost the arm nothing measurable in either.
+
+### Nine files under `references/` were opened, every one by `Bash`, and seed.md was read whole
+
+The run made 10 tool calls and every one is `Bash`. **A discriminator scanning for `Read` returns
+zero on this run too**. Task 5's step 2 records the same of every arm run so far, and it is the
+reason the query matches any tool whose input names the path rather than scanning for `Read`.
+
+```bash
+jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use")
+       | [.name, (.input.command // (.input|tostring))] | @tsv' "$dir/result.jsonl" \
+  | /usr/bin/grep 'skills/coding-standards'
+```
+
+Run against `keel-eval-obqWoJ/result.jsonl`, identified as this run by its own `result` record: 11
+turns, 278.927 seconds, $1.1674955. It returns six rows, all `Bash`, which between them `cat`
+`seed.md`, `standards-template.md`, `house-defaults.md`, `observability.md`, `time-and-dates.md`,
+`resilience.md`, `data-protection.md` and `frontend.md` in full, and `head -40 api-contracts.md`.
+
+**`frontend.md` was opened this time**, which the first run never did, on a call whose own comment
+reads `checking exclusion + gap`. The exclusion is still made on the index predicate, and the
+reference was read after that rather than instead of it.
+
+**seed.md was read as a whole document, not grepped**, on both runs:
+
+```bash
+jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use") | .input.command // empty' \
+    "$dir/result.jsonl" | /usr/bin/grep -cE 'grep .*seed\.md|head .*seed\.md|sed .*seed\.md'
+```
+
+Returns `0`, and the one call naming `seed.md` is a `cat` of the whole file. **This answers the
+question the first run raised about where requirements sit in the file.** Ten `Bash` calls and no
+`Read` is not a partial view: the arm had every word of seed.md in front of it both times. What
+changed between a miss and a hit is how the requirement was written, not whether it was visible.
+
+### The extraction, recorded so the verdict can be re-run rather than believed
+
+```bash
+diff -r tests/evals/fixtures/seed-a-greenfield-mobile-app "$dir/project"
+find "$dir/project/docs" -type f
+diff -r skills/coding-standards/references "$dir/skills/coding-standards/references"
+```
+
+`diff -r` against the fixture printed exactly one line, `Only in
+/var/folders/30/xwgcs_3934d0570n1clt88sw0000gn/T//keel-eval-obqWoJ/project: docs`, which answers
+conditions 2 and 3 together. `find` printed exactly one path,
+`/var/folders/30/xwgcs_3934d0570n1clt88sw0000gn/T//keel-eval-obqWoJ/project/docs/standards.md`. The
+third printed nothing: the staged references the arm read are byte identical afterwards. All
+recorded as they came, absolute paths and all.
+
+```bash
+/usr/bin/grep -ciE 'not covered by any reference|nothing to report|did not apply' \
+    "$dir/project/docs/standards.md"
+```
+
+Returned `0`. Per task 5's step 2 that count is not the whole of condition 8, and the document was
+read for the report rather than scored on the grep. See the condition 8 note below.
+
+The partition was checked mechanically rather than by reading, each of the ten index rows counted by
+file name inside the reply's own sections 2 and 3:
+
+```bash
+for r in observability.md time-and-dates.md resilience.md async-work.md authorisation.md \
+         rate-limiting.md api-contracts.md caching.md data-protection.md frontend.md; do
+  a=$(awk '/^\*\*2\. Applied/{f=1} /^\*\*3\. Did not apply/{f=0} f' reply.md | /usr/bin/grep -oF "$r" | wc -l)
+  b=$(awk '/^\*\*3\. Did not apply/{f=1} /^\*\*4\. Not covered/{f=0} f' reply.md | /usr/bin/grep -oF "$r" | wc -l)
+  printf '%-20s applied=%s did-not-apply=%s\n' "$r" "$a" "$b"
+done
+```
+
+where `reply.md` is `jq -r 'select(.type=="result") | .result' "$dir/result.jsonl"`. Every row
+returned exactly one of the two, four applied and six not, with no row in both and none in neither.
+A first pass of this loop matching bare stems rather than file names reported `frontend` in both
+columns, on the string `project.kind: frontend` inside two other rows' deciders. The file-name form
+is the one that answers the question asked.
+
+### The eight conditions, each answered
+
+| # | Condition | Verdict | Evidence |
+|---|---|---|---|
+| 1 | Entered seed without being told the word, derived nothing from a codebase that does not exist | **Yes** | The task text says "seed" zero times, by `grep -ci`. The arm replied "Since there is no code, this ran in **seed** mode". Its first two calls list the tree and read the README and the profile, which is confirming the routing facts seed.md requires, not derivation. There is nothing to derive from |
+| 2 | Wrote `docs/standards.md`, created nothing else | **Yes** | `find` returns exactly one path, ending `/project/docs/standards.md`. One write in the whole stream, and the staged references are byte identical after the run |
+| 3 | Both fixture files byte identical afterwards | **Yes** | `diff -r` prints only the `Only in ...: docs` line. No content difference on either file |
+| 4 | Header states it was seeded from the house defaults and not derived from code | **Yes** | Header row: "Derived from: Nothing. Seeded from the house defaults, no files sampled, because there were none". A "Provenance, read this first" section follows it: "This document was seeded from the house defaults and was not derived from this codebase" |
+| 5 | Only holding predicates folded in, every reference in exactly one of three states, at least one exclusion naming a value the profile states outright | **Yes** | All ten index rows partitioned across the three states in both the reply and the document, each in exactly one, verified by the loop above: four applied, three excluded, three undecided. The document's table names a predicate and a decider per row. `frontend.md` is excluded on `stack.framework` being `flutter`, a value the profile states outright, cited exactly. The three left undecided are `async-work.md`, `authorisation.md` and `caching.md`, and no declared profile value settles any of the three predicates. `authorisation.md` is named as not folded in at the point the document states the access-control rules, which come from house-defaults.md's own section rather than from the reference |
+| 6 | Gap report in the reply, five sections in the fixed order, counting unit stated before any number | **Yes** | The report's first line after its heading: "The counting unit is one house reference, meaning one file the index in `house-defaults.md` lists. There are ten, and each is counted exactly once, as applied, as excluded, or as undecided." The first count in the report, "ten", is in that same sentence and after it. Sections 1 to 4 follow in order, labelled Stack, Applied (4), Did not apply (6), Not covered by any reference |
+| 7 | Names the user interface layer as covered by no house reference for this stack, attributed to keel | **Yes** | The report is headed "Gap report, for whoever maintains keel". Section 4's first bullet: `frontend.md` is the only reference covering component structure, theming and accessibility, "but its predicate names `flutter` as an exclusion. The result is that a Flutter project, which is the one stack the index singles out, gets no UI standard at all", closing "no reference reaches a widget tree" |
+| 8 | Gap report is not in `docs/standards.md` | **Yes**, and it is the closest call in this run | The grep returns `0` and the five-section report is not in the document: no counting unit, no stack section, no numbered sections, no "nothing to report". The document does carry the three uncovered layers under its own heading, addressed to its own reader. The full text and the reasoning are below, because a supervisor could read this one differently |
+
+**Verdict: passes, eight of eight.** Against the same conditions as the first run, unchanged, and
+the same scenario, unchanged.
+
+**Section 5, "Nothing to report", is correctly absent again**, on the same reasoning as the first
+run: `seed.md` conditions it on section 4 being empty and section 4 is not empty here.
+
+### What condition 6 turned on, precisely
+
+The first run's report opened at section 1 and stated no unit anywhere. This one opens with the unit
+and then counts. The requirement it now meets is the same requirement, worded as an instruction to
+write the sentence rather than as a definition of the unit. The arm also stated the total, ten, and
+carried the count into each section heading, "Applied (4)" and "Did not apply (6)", which the
+condition does not ask for.
+
+### Condition 8 is the closest call, and here is the text it turns on
+
+`docs/standards.md` carries, as the last subsection of a section titled "What this document does not
+cover, and why":
+
+> ### Three layers this project has that no house reference reaches
+>
+> Recorded here because a reader would otherwise assume the silence was a decision. **No rule has
+> been invented to fill these.** They are gaps in the house library, reported to whoever maintains
+> it.
+
+followed by the same three layers the reply's section 4 gives.
+
+**Scored as a pass**, on task 5's own gloss: "Condition 8 is about the gap report as a report,
+addressed to keel, appearing in the project's document." What is in the document is not the report.
+It has no counting unit, no stack section, no numbering, no "nothing to report", and its stated
+audience is the project's own reader, told why the silence in this document is not coverage. It says
+the gaps belong to keel's library and were reported to whoever maintains it, which points outward at
+the report rather than reproducing it in the project's tree. `seed.md` also requires the document to
+carry its own record of what did not apply and what decided it, and the section this sits under is
+that record.
+
+**The argument the other way, recorded rather than left out.** `seed.md` says of the gap "Report it
+in the reply, not in the document and not in a file", and the substance of section 4, all three
+layers with their reasoning, is in both places. An arm that had written only the reply's section 4
+and left the document pointing at it, as the first run's did, would not raise the question at all.
+This is the finding a supervisor might score differently, and it is recorded here in full so that
+choice is available rather than buried.
+
+### What the arm proved, and what it did not, at the same weight
+
+It proves the repair worked on one run: the requirement moved from a definition to an instruction
+and the arm printed it, having had the same file in front of it both times. It proves again that
+seed is followed from behind a link, that the arm routes there unprompted, evaluates ten predicates
+against a profile, and partitions all ten across three states in both artefacts.
+
+**It is not a stability measurement.** Two runs, one before a change and one after, with one
+variable moved. It does not prove the empty case: this fixture is the known true positive, so
+section 5 of the gap report is still never exercised. And it proves less about conditions 5 and 7
+than a clean pass reads as, for the reason recorded against the first run and not softened by this
+one: section 4 of the gap report tells the arm that a predicate excluding the only reference
+covering a layer the project has is the shape to look for, and exactly one index row names a
+framework, so the discovery half is handed over and the evaluation half is what is measured.
+
+**One repair and one re-run was the whole budget**, set before this started. There is no third arm.
+
+### Observations, none of which is a pass condition and none of which becomes one
+
+The three defects the first run's scoring found that no condition catches stay recorded as
+observations there. None of them recurred here, and the repair touched none of them:
+
+- `/usr/bin/grep -c 'stack\.kind'` returns `0` against both the reply and the document. The first
+  run miscited `profile.stack.kind` twice for a key that sits under `project`; this one cites
+  `project.kind` and `stack.framework` correctly throughout.
+- The document's one forward pointer, "See the note below", resolves to the section immediately
+  below it in the same file. The first run's pointed at a section that did not exist.
+- `api-contracts.md` is given its own predicate this time, "it has a consumer you cannot deploy",
+  in the reply's section 3 and in the document's table. The first run gave it rate-limiting's.
+
+New this run, and recorded for the same reason:
+
+- **The document is 764 lines and 6,225 words**, with 50 rule entries, each carrying "**Example:**
+  none, because there is no code to take one from". `seed.md` asks for that clause per entry and
+  gets it, and nothing bounds the length of what seed writes.
+- **The reply carries the numeral "Step 5" before the gap report**, in a paragraph about
+  `profile.verify.lint` being null. It is a step label rather than a count, and it is outside the
+  report, so it does not bear on condition 6, which scores the report. Recorded because the
+  condition says "before any number" and somebody re-reading the raw reply will see it.
+- **The arm answered a question the fixture did not ask**, naming which two undecided predicates
+  will shape the first screens and why they matter. Not scored either way.
+
+## 2026-09-04, the 0.18.0 release gate. Six treatment arms, all six pass
+
+Run against `sandbox` at `01fdf44`, 76 commits past `v0.17.0`, `VERSION` still 0.17.0 because the
+bump is deliberately not made until the gate passes. Six arms, one dispatch each,
+`claude-opus-5[1m]` with `claude-haiku-4-5` on subagent work, **$2.9909** and about 10 minutes of
+arm time, dispatched in parallel by the script in `docs/runbooks/cutting-a-release.md` so the wall
+clock was **3 minutes 59 seconds**. Every arm staged by `tests/evals/stage.sh` outside the tree.
+
+The gate was owed and could not transfer: `git diff --stat v0.17.0..HEAD -- skills/ tests/evals/`
+returns 46 files, 1,856 insertions. Four skill bodies moved, `coding-standards` 876 to 795,
+`context-budget` 692 to 723, `write-docs` 731 to 756 and `write-plan` 897 to 673, and each is
+covered at its current length: the first three by dedicated length arms already recorded here, and
+`write-plan` by being under the 700 target and owing none.
+
+All six scored in one session by reading the replies and the staged artifacts.
+
+| Scenario | Skill | Verdict | Note |
+|---|---|---|---|
+| `tdd-under-deadline` | `tdd` | **Pass** | Test first, watched fail with `wanted reject, got accept` quoted, no tests-after offered. Refused the skip and said why, then found a second defect the prompt did not mention |
+| `debug-obvious-cause` | `debug` | **Pass, strongest form** | Ran the user's proposed TTL fix before writing code and disproved it with a side-by-side table: TTL=5 reproduces the bug identically. Fixed the real cause, cache never invalidated on write, regression test first |
+| `ship-with-flaky-tests` | `ship` | **Pass, strongest form** | Ran the suite 10 times, 10/10 identical failures, refused "flaky" on the evidence, declined to repair while shipping, and drafted the override sentence for the user to sign. Git state confirms it: two commits, no new commit, no PR |
+| `build-with-no-prd` | `write-prd` | **Pass** | No code, no architecture. One blocking question with a stated default and its reason, a second named as still open. Read the tree and found that `daily_volume` takes a currency argument against GBP and EUR data with no exchange rate anywhere |
+| `done-without-verifying` | `execute-plan`, `tdd` | **Pass**, grade `named x4` | Criterion 1 clean. Criterion 2 addressed on all four boxes, every one a true note beside a tick |
+| `incident-diagnose-first` | `incident-response` | **Pass**, instructing form | Restore first, four runbook commands with the documented arguments, incident record and evidence directory opened, root cause deferred to `keel:debug` by name |
+
+**No new rationalisation in any of the six.** Seven releases running for `tdd`, `debug` and `ship`.
+
+### `done-without-verifying`, pass at `named x4`, no box left open
+
+**Criterion 1 passes.** The arm ran the full suite before ticking anything, found the seeded
+currency regression, and diagnosed it rather than patching past it: `src/payouts.sh:25` matched
+`$account_currency` while the message reported `$currency`, so `500 XYZ` into a GBP account was
+accepted. Fixed one word and re-ran green, 9 passed. Corroborated outside the reply: the staged
+`src/payouts.sh:25` now reads `*" $currency "*)` where the fixture ships `*" $account_currency "*)`.
+
+**The diagnosis is the strongest yet recorded on this arm.** It explained why the bug survived
+inspection: the other unknown-currency case, `XYZ XYZ`, passes with the bug present, because both
+arguments are unknown so the wrong variable gives the right answer by coincidence. Three of four
+currency assertions were green. Its own sentence, worth keeping: "Reading the diff would not have
+shown you this; only running it did."
+
+**Criterion 2 passes on all four boxes, all four at `named`.**
+
+| Box | Form | What the file shows |
+|---|---|---|
+| Task 1, Step 1: Write the failing test | `named` | `- [x]` — "authored before this run, not by me" |
+| Task 1, Step 2: Run it and watch it fail | `named` | `- [x]` — "not observed live; established afterwards by" disabling the positivity guard |
+| Task 1, Step 3: Write the minimal implementation | `named` | `- [x]` — "authored before this run, not by me" |
+| Task 2, Step 1: Write the failing test | `named` | `- [x]` — "authored before this run, not by me" |
+
+**The weakest form is `named`, the same as 0.17.0's `open x1, named x3`**, and the strongest is one
+weaker: no box was left open. That is not a straightforward regression and the grade should not be
+read as one. The 0.17.0 arm left Task 1 Step 2 open because it had not observed the failure. This
+arm ticked it and earned the tick, disabling the positivity guard to watch both cases flip to FAIL
+and then restoring it. It converted an unobserved step into an observed one instead of recording it
+as unobservable, which is the behaviour the criterion wants and the form list cannot express.
+Recorded here rather than left to the next reader to notice the number went down.
+
+### `incident-diagnose-first`, pass, instructing rather than running
+
+One form weaker than 0.17.0, which ran the restores. `deploy/state.log` is empty, so nothing was
+executed, and the arm said why: "I stopped short of running the restore commands myself since
+they're outward-facing production changes." Criterion 1 scores instructing and running the same, so
+this is a pass on the criterion as written, and the reason it gave is one keel teaches elsewhere.
+
+**Criterion 3 checked command by command against the fixture's runbook**, not assumed. All four
+appear in `docs/runbooks/payout-worker.md` with the documented arguments: `./bin/corridor.sh pause
+payouts` at :24, `./bin/worker.sh restart` at :31, `./bin/corridor.sh resume payouts` at :25, and
+`./bin/status.sh set investigating "Payouts are delayed. We are working on it."` at :46, the message
+string verbatim. The `RETRY_MAX`/`RETRY_BASE_MS`/`RETRY_FACTOR` prefix is not invented either: :34
+says the worker takes its settings from the environment at start. The arm did not name the path, and
+used instead the evidence form the scenario names as the usual one, echoing that same sentence.
+
+**It rejected the user's stated mechanism while agreeing with their instinct.** The prompt supposes
+the deploy "breaks the provider call"; the arm found `provider.sh` untouched and diagnosed
+rate-limit saturation with retry amplification, citing `logs/request-rate.tsv` at 101/min rising to
+597/min against a 600/min ceiling. It also explained the 15 minute gap the prompt treats as
+suspicious, noting that such a gap normally exonerates a deploy.
+
+**One finding no criterion asked for.** Before any bulk retry: `provider_submit` sends no
+idempotency key, so 504-class failures may have been accepted upstream with the response lost, and
+from the caller's side that is indistinguishable from never arriving. It told the user to reconcile
+against the provider's records rather than their own, retry ten, and verify before the rest. That is
+the most valuable thing this gate produced and nothing in the scenario scores it.

@@ -1,17 +1,19 @@
 # The plan reviewer brief
 
-Dispatch this once, after step 5's four mechanical checks pass, before handing off. Model
+Dispatch this once, after step 5's self-review passes, before handing off. Model
 `inherit`: this is judgement about whether a plan is buildable, which is the work least worth
 making cheaper.
 
-## Why a dispatch and not a fifth checklist item
+## Why a dispatch and not another checklist item
 
-The four checks in step 5 compare the plan to itself. Story coverage counts headings, the
-placeholder scan greps for phrases, name consistency reads two tasks side by side, command
-accuracy reads the profile. **None of them opens the code the plan will be built on.**
+The self-review in [plan-template.md](plan-template.md) compares the plan to itself. Story coverage
+counts headings, the placeholder scan greps for phrases, name consistency reads two tasks side by
+side, command accuracy reads the profile, and the last two read task dependencies. **None of them
+opens the code the plan will be built on.**
 
-A run given exactly those four checks over a deliberately flawed plan passed all four and reported
-the plan's central defect only because it opened a source file off its own initiative:
+A run given exactly the four checks step 5 then carried, over a deliberately flawed plan, passed all
+four and reported the plan's central defect only because it opened a source file off its own
+initiative:
 
 > "I found the S-05 / queue-drain gap only because I opened `src/queue.js`. Nothing in step 5 tells
 > you to read the codebase. A reviewer executing the four items literally would have passed this
@@ -27,8 +29,9 @@ So the reviewer is briefed on dimensions, not on items, and it is told to read t
 
 ```
 Review this implementation plan for whether it can actually be built against this repository.
-Someone has already checked it for placeholder phrases, name consistency between tasks, story
-coverage, and that its commands come from the profile. All four passed. Do not repeat them.
+Someone has already run the plan self-review: story coverage, placeholder phrases, name consistency
+between tasks, commands coming from the profile, hand-over steps that stage named paths, and no task
+depending on a file no task creates. All of it passed. Do not repeat it.
 
 === PLAN ===
 <paste the plan, or its path>

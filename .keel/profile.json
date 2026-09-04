@@ -4,7 +4,7 @@
   "project": {
     "name": "keel",
     "kind": "plugin",
-    "description": "GBi standard operating procedure for AI-assisted delivery"
+    "description": "House standard operating procedure for AI-assisted delivery"
   },
   "stack": {
     "language": "bash",

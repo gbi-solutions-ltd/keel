@@ -56,6 +56,9 @@ values is the most costly pattern available, and it looks helpful.
 What stays: the behavioural rules, the verify commands, and where to find everything else. That is
 roughly 450 tokens, not 10,000.
 
+**Judging what is left.** If the `claude-md-management` plugin is installed, use its rubric on the
+trimmed file. Otherwise judge it against the table above and say the rubric was not available.
+
 ## Step 4: Check the skills
 
 Per skill: body word count against the 700 ceiling, description length, and any `@` link, which

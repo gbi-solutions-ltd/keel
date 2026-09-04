@@ -3,10 +3,9 @@
 Section 5 of the review. The forms, stated as questions a reviewer answers per table, and the test
 that separates deliberate denormalisation from duplication nobody decided on.
 
-**Why this is a required section.** Normalisation was in the request that prompted this skill, and
-the baseline never mentioned it. The fixture carried `transactions.merchant_name` and
-`transactions.customer_email`, both duplicating columns that already existed on their parents, and
-the review went past them. Not because they are subtle, but because nothing asked.
+**Why this is a required section.** Normalisation is asked for and then not done. A child table
+carrying a copy of a column that already exists on its parent is not subtle, and reviews go past it
+anyway, because nothing made them answer the question table by table. This section is what asks.
 
 ## The questions, per table
 

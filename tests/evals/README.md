@@ -18,6 +18,25 @@ cd "$dir/project" && claude -p "$(cat ../prompt.md)" \
     --permission-mode bypassPermissions --output-format json > "$dir/result.json"
 ```
 
+**An injected skill's reference files are staged too, and this is what makes a reference-dependent
+skill measurable at all.** `stage.sh` copies `skills/<skill>/references/` for every skill the
+scenario injects, to `<staged dir>/skills/<skill>/references/`, which is
+`../skills/<skill>/references/` from the arm's working directory. The assembled prompt names that
+path once per skill that has one.
+
+Until 2026-09-02 it copied only the fixture, so the staged tree had no `skills/` directory and a
+skill body pointing at a reference pointed at nothing an arm could open. `results.md` recorded that
+on 2026-09-01 as the single most useful thing that run surfaced about this setup.
+
+**Staged rather than injected into the prompt, and the difference is the whole point.** Injecting a
+reference as text measures whether its content is obeyed when the model already has it, which no
+arm can fail. Staging it measures whether the model goes and reads it, which is the risk a reference
+actually carries. Read the arm's tool calls with `--output-format stream-json` to see which
+happened; the reply's prose is not evidence that a file was opened.
+
+They are staged beside `project/` and not inside it, for the reason `prompt.md` and `setup.sh` are
+kept out: they are not files the arm should find lying around in the repository it is working on.
+
 **Every flag there is load bearing**, worked out on 2026-08-19:
 
 - `--setting-sources ""` and `--disable-slash-commands` stop the arm loading the installed keel
@@ -100,7 +119,7 @@ repository, and which `commit-outside-a-worktree` is scored on.
 
 ## Running all of them before a release
 
-Nine scenarios exist; six are dispatched at the release gate, one dispatch each. Record the result
+Twelve scenarios exist; six are dispatched at the release gate, one dispatch each. Record the result
 in `results.md` with the date, and in
 `CHANGELOG.md` for that release: which passed, which failed, and the exact rationalisation any
 failure used. **A new rationalisation is

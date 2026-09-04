@@ -14,12 +14,22 @@
 # shellcheck disable=SC2015
 set -uo pipefail
 
+# NOTHING IN THIS FILE PIPES INTO `grep -q`. Use a here-string, which is a redirect and not a
+# pipeline, so the status is grep's alone. `producer | grep -q needle` under `set -o pipefail` is a
+# race: grep exits at the first match, the producer dies on its next write, and pipefail turns its
+# 141 into a failed pipeline. On 2026-09-04 that turned four found matches into "SKILL.md never
+# names it" on main, against a tree that had passed the same check on the pull request minutes
+# before. The bodies it accused were over one stdio block with the match in the first block; the
+# ones it passed were under a block, so the producer had already finished. Timing decided it.
+
 # Per ADR-0001. The ceiling was 700 with 400 and 600 documented as targets, and because the ceiling
 # was the only number enforced, bodies migrated to it: 15 of 24 skills landed within 20 words of it
 # and none met 400. The remedy the standard named, moving substance into references/, is exhausted,
 # which coding-standards demonstrated at 12 reference files and 17,816 reference words with a body
-# still at 683, measured 2026-08-16. It is 13, 20,118 and 876 today. So the ceiling moves and the target below it is enforced as a warning, because a
-# ceiling with nothing under it is simply where bodies settle.
+# still at 683, measured 2026-08-16. It is 17, 22,752 and 795 today, and tests/test-doc-claims.sh
+# asserts that rather than leaving it to the next reader to notice. So the ceiling moves and the
+# target below it is enforced as a warning, because a ceiling with nothing under it is simply where
+# bodies settle.
 CEILING_WORDS=900
 TARGET_WORDS=700
 # How close to the ceiling a body has to be before the warning says how close. Wide enough that a
@@ -95,8 +105,8 @@ for skill in skills/*/SKILL.md; do
     body=$(body_of "$skill")
 
     # Frontmatter must carry name and description.
-    printf '%s' "$fm" | grep -q '^name:' || report "$name: frontmatter has no name"
-    if ! printf '%s' "$fm" | grep -q '^description:'; then
+    grep -q '^name:' <<<"$fm" || report "$name: frontmatter has no name"
+    if ! grep -q '^description:' <<<"$fm"; then
         report "$name: frontmatter has no description"
     else
         desc=$(printf '%s' "$fm" | sed -n 's/^description:[[:space:]]*//p')
@@ -129,7 +139,7 @@ for skill in skills/*/SKILL.md; do
     fi
 
     # @ links force-load at parse time and burn context before it is needed.
-    if printf '%s' "$body" | grep -qE '(^|[[:space:]])@[A-Za-z0-9_./-]+'; then
+    if grep -qE '(^|[[:space:]])@[A-Za-z0-9_./-]+' <<<"$body"; then
         report "$name: contains an @ link. Use a relative markdown link instead"
     fi
 
@@ -147,11 +157,18 @@ for skill in skills/*/SKILL.md; do
     # An anchor is part of the link and not part of the path, so it is stripped before resolving:
     # `references/x.md#a-heading` is a correct link to a file that exists, and rejecting it would
     # make the check stricter than correct output, which teaches people to ignore checks.
+    # An inline code span is stripped first, for the same reason, and the same strip runs in all
+    # three link loops. That makes the three agree about spans and no more: only the docs loop
+    # strips fenced blocks, so a fence still means one thing here and another there. The comment
+    # above the docs loop says why, and names the two shapes the span strip does not handle.
+    # shellcheck disable=SC2016  # the backticks are the pattern; in double quotes they would be a
+    # command substitution, so single quotes are required and SC2016 fires on them either way
     while IFS= read -r target; do
         target="${target%%#*}"
         [ -n "$target" ] || continue
         [ -e "$dir/$target" ] || report "$name: broken link to $target"
-    done < <(grep -o '](\([^)]*\))' "$skill" | sed 's/](\(.*\))/\1/' | grep -Ev '^(https?:|#)')
+    done < <(sed 's/``[^`]*``//g; s/`[^`]*`//g' "$skill" \
+        | grep -o '](\([^)]*\))' | sed 's/](\(.*\))/\1/' | grep -Ev '^(https?:|#)')
 done
 
 desc_tokens=$(( desc_chars * 10 / 36 ))
@@ -177,11 +194,13 @@ while IFS= read -r f; do
     # nothing checked, in the one file whose whole job is routing a reader to the right file. A
     # broken link there sends the model to a topic it then silently skips.
     fdir=$(dirname "$f")
+    # shellcheck disable=SC2016  # the backticks are the pattern, not a command substitution
     while IFS= read -r target; do
         target="${target%%#*}"
         [ -n "$target" ] || continue
         [ -e "$fdir/$target" ] || report "$f: broken link to $target"
-    done < <(grep -o '](\([^)]*\))' "$f" | sed 's/](\(.*\))/\1/' | grep -Ev '^(https?:|#)')
+    done < <(sed 's/``[^`]*``//g; s/`[^`]*`//g' "$f" \
+        | grep -o '](\([^)]*\))' | sed 's/](\(.*\))/\1/' | grep -Ev '^(https?:|#)')
 done < <(find skills templates output-styles -name '*.md' 2>/dev/null)
 
 # Documentation obeys the writing rules too. Everything above covers shipped content only, so every
@@ -198,6 +217,58 @@ done < <(find skills templates output-styles -name '*.md' 2>/dev/null)
 #     docs/plans/2026-08-17-release-readiness.md nine times: a plan legitimately quotes links
 #     destined for other files, and two of the nine are `sed` patterns that are not links at all. A
 #     check that rejects a correct plan is the failure CONTRIBUTING.md calls unrecoverable.
+#
+#     Inline code spans are stripped for exactly the same reason, and the strip is repeated in the
+#     two skill link loops above. That makes the three agree about spans and about nothing else:
+#     only this loop strips fenced blocks, so the three still disagree about what a fence means,
+#     and deliberately, because only documentation quotes markdown destined for another file. A
+#     span renders as code, so it is not a link, and resolving one is the same too-strict failure
+#     as resolving a fenced block. The pattern that forced it: task 3 of
+#     docs/plans/2026-09-02-the-four-mode-router-and-audit.md instructs an implementer to add the
+#     assertion `grep -q '](audit-offer.md)'`, and the docs loop extracted audit-offer.md from that
+#     span, resolved it against docs/plans/, and reported a broken link to a file the plan had
+#     never named as one.
+#
+#     TWO DELIMITER LENGTHS, LONGEST FIRST. The plan writes that pattern both ways, once in single
+#     backticks and once in double, and a single-delimiter strip is not enough: against a ``...``
+#     span it deletes the empty run between the two opening backticks and the empty run between the
+#     two closing ones, and leaves the contents standing as a link. That is the false positive
+#     surviving the fix written to remove it, so the double-backtick clause runs first. Which run
+#     lengths survive was measured across n = 1 to 8 rather than reasoned about: runs of one, two,
+#     three, five, six and seven are handled, and runs of four and eight are not. The survivors are
+#     the multiples of four, because the double clause consumes them in pairs and leaves nothing
+#     over for the single clause. The only four-backtick runs in this repository are fence markers,
+#     each alone on its line, and the awk above removes them before the strip sees them. The
+#     failure mode if a four-run ever wrapped a link is the too-strict one this comment is about, a
+#     false broken link, not a missed real one.
+#
+#     Measured before it was added: across every file this loop scans it changes exactly one file's
+#     extracted targets, and across every SKILL.md and every file under skills, templates and
+#     output-styles it changes nothing. No number of false positives is written down here, because
+#     it moves every time that plan quotes another link-shaped pattern and it has already moved
+#     once. The property is what holds: with the strip this loop extracts no target at all from
+#     docs/plans/2026-09-02-the-four-mode-router-and-audit.md, and without it one per quoted
+#     pattern.
+#
+#     WHAT IT PROVABLY CATCHES. A link whose text is backticked and whose target is not: the strip
+#     removes the text, and the target is still extracted and still resolved.
+#     tests/test-validate-skills.sh holds a case in each direction, so a later widening of the
+#     strip that swallowed a real link would fail rather than pass quietly. That is one shape, and
+#     it does not generalise to "cannot blind the check to a real link", which two shapes disprove.
+#
+#     GAP ONE: escaped backticks, which are delimiters to this strip and are not delimiters to
+#     CommonMark. A link written between \` and \` renders as a live link with literal backticks
+#     around it, and the strip deletes it, so its target is never resolved and a broken one is
+#     never reported. Nothing in this repository writes that shape.
+#
+#     GAP TWO, and the worse of the two because the shape is everywhere: a code span wrapped across
+#     two lines. sed is line-oriented, so a span that opens on one line and closes on the next
+#     leaves an odd backtick on each of them, and the odd one pairs with the next span's opener and
+#     deletes everything between, a real link included. Hard wrapping at 100 columns splits spans
+#     routinely, and over twenty documents here already carry at least one span split that way.
+#     Both gaps were reproduced, not reasoned about. Neither mis-resolves anything on the tree as
+#     it stands, and closing either needs a parser rather than a sed, which is why they are
+#     recorded here instead.
 #   - The docs/keel path rule: NOT applied. It fires on five correct documents, among them
 #     docs/05-token-and-memory-design.md, which is the document that defines the layout and has to
 #     name it. A skill must write <docs_root>; prose about the default is prose.
@@ -207,11 +278,13 @@ while IFS= read -r f; do
     LC_ALL=C grep -q "$(printf '\xe2\x80\x93')" "$f" && report "$f: contains an en dash"
 
     ddir=$(dirname "$f")
+    # shellcheck disable=SC2016  # the backticks are the pattern, not a command substitution
     while IFS= read -r target; do
         target="${target%%#*}"
         [ -n "$target" ] || continue
         [ -e "$ddir/$target" ] || report "$f: broken link to $target"
     done < <(awk '/^ *```/{fence=!fence; next} !fence' "$f" \
+        | sed 's/``[^`]*``//g; s/`[^`]*`//g' \
         | grep -o '](\([^)]*\))' | sed 's/](\(.*\))/\1/' | grep -Ev '^(https?:|#)')
 done < <({ find docs -name '*.md' 2>/dev/null
            find . -maxdepth 1 -name '*.md' 2>/dev/null | sed 's|^\./||'; })
@@ -317,6 +390,79 @@ if [ -f skills/keel/SKILL.md ]; then
     done < <(grep -oE '\| `[a-z-]+` \|$' skills/keel/SKILL.md | tr -d '| `')
 fi
 
+# Every documented delegation must be one the skill actually makes.
+#
+# Three separate audits found this class and each fixed only the instances in front of it. The
+# wiring map in docs/04-plugin-strategy.md was false in six of its ten rows on 2026-09-02, four of
+# them since the table was written, and the column header says "Plugin it calls" in the present
+# tense. docs/02-skill-catalog.md carried the same false claim about context-budget. A documented
+# delegation nobody made is worse than an undocumented one: a reader plans around it.
+#
+# TWO SOURCES, TWO SHAPES, because the documents differ and converting one to suit a checker is the
+# tail wagging the dog. In docs/04 it is the table under the `| keel skill |` header. In docs/02 it
+# is prose introduced by a bold `**Plugin call` lead, which is consistent across every instance.
+#
+# THIS COMMITS docs/04 TO A PARSEABLE TABLE. The header row is the anchor and the first two columns
+# are load bearing: skill in one, plugin in the other, each in backticks. Reformatting that table
+# breaks this check rather than silently disabling it, because a table this cannot parse yields no
+# pairs, and the count assertion below is what makes that loud.
+#
+# BODY ONLY, NOT references/, decided deliberately. A reference file mention is satisfiable without
+# the skill delegating at all: the body is what the model reads on every invocation, and a pointer
+# buried in a reference the run never loads is exactly the gap being guarded. All six true rows name the
+# plugin in the body today, so the stricter rule costs nothing now and is the one worth having.
+#
+# A COMMAND IS NOT A PLUGIN. Backticked tokens starting with `/` are skipped: `/security-review` is
+# built in and `/code-review` is provided by a plugin already named on the same row, so requiring
+# them would check the same fact twice under a name that can change.
+if [ -f docs/04-plugin-strategy.md ] || [ -f docs/02-skill-catalog.md ]; then
+    delegation_pairs=0
+    while IFS="$(printf '\t')" read -r src skill plugin; do
+        [ -n "$skill" ] && [ -n "$plugin" ] || continue
+        delegation_pairs=$(( delegation_pairs + 1 ))
+        if [ ! -f "skills/$skill/SKILL.md" ]; then
+            report "$src claims $skill delegates to $plugin, and skills/$skill/SKILL.md does not exist"
+        elif ! grep -q -- "$plugin" <<<"$(body_of "skills/$skill/SKILL.md")"; then
+            report "$src says \`$skill\` calls \`$plugin\`, and skills/$skill/SKILL.md never names it. Wire the skill, or take the row out. A reference file does not count: the body is what the model reads on every invocation."
+        fi
+    done <<EOF
+$(
+    [ -f docs/04-plugin-strategy.md ] && awk '
+        /^\| keel skill \|/ { t=1; next }
+        t && /^\|---/ { next }
+        t && !/^\|/ { t=0; next }
+        t {
+            n = split($0, cell, "|")
+            if (n < 3) next
+            s = cell[2]; p = cell[3]
+            if (match(s, /`[^`]+`/) == 0) next
+            skill = substr(s, RSTART + 1, RLENGTH - 2)
+            while (match(p, /`[^`]+`/)) {
+                tok = substr(p, RSTART + 1, RLENGTH - 2)
+                if (substr(tok, 1, 1) != "/") print "docs/04-plugin-strategy.md\t" skill "\t" tok
+                p = substr(p, RSTART + RLENGTH)
+            }
+        }' docs/04-plugin-strategy.md
+    [ -f docs/02-skill-catalog.md ] && awk '
+        /^### `/ { if (match($0, /`[^`]+`/)) skill = substr($0, RSTART + 1, RLENGTH - 2) }
+        /^\*\*Plugin call/ {
+            line = $0
+            while (match(line, /`[^`]+`/)) {
+                tok = substr(line, RSTART + 1, RLENGTH - 2)
+                if (substr(tok, 1, 1) != "/") print "docs/02-skill-catalog.md\t" skill "\t" tok
+                line = substr(line, RSTART + RLENGTH)
+            }
+        }' docs/02-skill-catalog.md
+)
+EOF
+
+    # A parse that silently yields nothing passes every assertion above, which is the failure mode of
+    # every checker built on a format somebody may reformat. This is the floor that tells the two
+    # apart. Ten pairs on 2026-09-02, six in the table and four in the prose.
+    [ "$delegation_pairs" -ge 8 ] || \
+      report "the delegation check found only $delegation_pairs documented delegations, against 10 on 2026-09-02. Either the wiring map in docs/04-plugin-strategy.md or the \`**Plugin call\` leads in docs/02-skill-catalog.md have been reformatted past what this parses, and a check that reads nothing passes everything."
+fi
+
 # The SessionStart injection is the only routing map a session gets without loading anything, and it
 # sits in the prefix of every request. A skill missing from it is a skill the model will not think of
 # unless the user names it. Three had gone missing before this check existed, including
@@ -360,6 +506,14 @@ if [ -f hooks/session-start ]; then
             # floor rejects a valid hook. Zero output is the one length that always means failure.
             if [ "$hook_chars" -eq 0 ]; then
                 report "hooks/session-start produced no output for response_style=$rs explain_level=$el. It failed to run, and a size check with no floor would have counted that as comfortably within budget."
+            elif [ "$hook_chars" -gt 1285 ]; then
+                # Characters, and checked before the token bounds below, because NFR-01 is written
+                # in characters and this is the number a person can count. The token estimate is
+                # derived from it and rounds in a way that surprises: 1285*10/36 truncates to 356,
+                # which is not over 356, so the token bound alone first fails at 1286. Stating the
+                # limit twice in two units is deliberate, and the character one fails first so the
+                # message names the unit the requirement uses.
+                report "hooks/session-start injects $hook_chars characters for response_style=$rs explain_level=$el, over the 1285 of NFR-01 in docs/prd/plain-language-chat.md. Take words out, or re-measure and move the requirement deliberately."
             elif [ "$hook_tokens" -gt 400 ]; then
                 report "hooks/session-start injects about $hook_tokens tokens for response_style=$rs explain_level=$el, over the 400 ceiling. It is in every request of every session."
             elif [ "$hook_tokens" -gt 356 ]; then
@@ -386,7 +540,7 @@ snapshot_tpl=skills/repo-snapshot/references/section-templates.md
 if [ -f "$snapshot_tpl" ]; then
     section10="$(awk '/^## 10\./{f=1} f&&/^## 11\./{f=0} f' "$snapshot_tpl")"
     for needed in 'security-audit --full' 'coding-standards' 'did not check'; do
-        printf '%s' "$section10" | grep -qF -- "$needed" \
+        grep -qF -- "$needed" <<<"$section10" \
           || report "$snapshot_tpl section 10 does not require '$needed'. A snapshot that names neither what it skipped nor who does it reads as a clean bill of health."
     done
 fi
@@ -395,7 +549,7 @@ fi
 # anything, while the message still claimed to be about step 6.
 if [ -f skills/repo-snapshot/SKILL.md ]; then
     step6="$(awk '/^## Step 6/{f=1} f&&/^## [A-Z]/&&!/^## Step 6/{f=0} f' skills/repo-snapshot/SKILL.md)"
-    printf '%s' "$step6" | grep -qF -- 'did not check' \
+    grep -qF -- 'did not check' <<<"$step6" \
       || report "skills/repo-snapshot/SKILL.md step 6 does not require the snapshot to say what it did not check."
 fi
 
@@ -431,7 +585,7 @@ if [ -f "$tool_tbl" ] && [ -f lib/detect-stack.sh ]; then
     done
 
     snapshot_s10="$(awk '/^## 10\./{f=1} f&&/^## 11\./{f=0} f' skills/repo-snapshot/references/section-templates.md 2>/dev/null)"
-    printf '%s' "$snapshot_s10" | grep -qF -- 'tool-choices.md' \
+    grep -qF -- 'tool-choices.md' <<<"$snapshot_s10" \
       || report "skills/repo-snapshot/references/section-templates.md section 10 does not cite tool-choices.md, so a gap gets a skill but no tool."
 fi
 

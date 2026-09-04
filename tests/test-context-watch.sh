@@ -243,9 +243,15 @@ printf '{"docs_root":"docs/keel"}\n' > "$work/.keel/profile.json"
 # the hook at all: rc 127 and an env error, which never reaches the python3 check being tested.
 mkdir -p "$work/empty"
 bash_bin="$(command -v bash)"
-out="$(printf '{"hook_event_name":"UserPromptSubmit","transcript_path":"%s","cwd":"%s","session_id":"s-np","tool_name":"Bash"}' "$work/e2e.jsonl" "$work" | PATH="$work/empty" "$bash_bin" "$HOOK" 2>/dev/null)"; rc=$?
+
+# stderr is kept rather than discarded, and reported on failure. This case failed once on a CI
+# runner with rc=1 and no output, and nothing in hooks/context-watch can return 1: every path out
+# of it is an explicit exit 0. The message that would have said why went to /dev/null, so one
+# failure produced no evidence and the next run passed. The assertion is unchanged: stdout must be
+# empty, which is what silence means here, and stderr is diagnostic only.
+out="$(printf '{"hook_event_name":"UserPromptSubmit","transcript_path":"%s","cwd":"%s","session_id":"s-np","tool_name":"Bash"}' "$work/e2e.jsonl" "$work" | PATH="$work/empty" "$bash_bin" "$HOOK" 2>"$work/no-python.err")"; rc=$?
 [ "$rc" -eq 0 ] && [ -z "$out" ] && ok "the watchdog is silent and exits 0 when python3 is absent" \
-  || bad "no python" "rc=$rc out=$out"
+  || bad "no python" "rc=$rc out=$out err=$(head -3 "$work/no-python.err")"
 
 # A subagent's context is discarded when it returns. Counting it would report the main thread as
 # full because a subagent read twenty files, which inverts the reason for delegating at all.

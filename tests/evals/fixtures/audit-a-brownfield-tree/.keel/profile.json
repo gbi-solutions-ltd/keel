@@ -1,0 +1,6 @@
+{
+  "project": { "name": "payments", "kind": "service" },
+  "stack": { "language": "python", "runtime": "python3", "package_manager": "none", "datastores": [] },
+  "verify": { "test": null, "lint": null, "build": null },
+  "docs_root": "docs"
+}

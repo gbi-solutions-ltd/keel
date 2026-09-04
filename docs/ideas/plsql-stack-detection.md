@@ -21,7 +21,7 @@ is the false positive any detector has to survive.
 
 Anyone running `keel init` on an Oracle PL/SQL repository gets a profile that says the project has
 no language, no datastore and no test command, so every skill that reads the profile has nothing to
-work from and asks the user instead. There are two such repositories in GBi work right now.
+work from and asks the user instead. There are two such repositories in house work right now.
 
 **Evidence.** Run on 2026-08-18 against the Oracle repository, a git-tracked
 Oracle codebase of 191 `.sql` files with a working utPLSQL v3 suite at `tests/run_all_tests.sql` and
@@ -108,7 +108,7 @@ where the honest answer to lint and typecheck is "none". (Corrected 2026-08-18: 
 | Filename convention is not a reliable marker | `.pks` / `.pkb` / `.spc.sql` / `.bdy.sql` are too rare to key on | the Oracle repository has exactly one `.spc.sql` and one `.bdy.sql` out of 191 files. A machine-wide search for `.pks`, `.pkb`, `.prc`, `.fnc` found none at all | **Yes, and it rules out the obvious marker** |
 | utPLSQL is the test framework worth naming | An Oracle project that tests at all uses it | 16 mentions across the Oracle repository's `tests/`. One instance, and it is the only real option | Partly |
 | `verify.test` must stay null | No test command can run without a connection | Follows from the doctrine at `lib/detect-stack.sh:290-292`. Nobody has tried to write one | **No, worth one attempt before accepting it** |
-| Two repositories justify a fourteenth language | The cost lands once and the benefit repeats | Unknown. GBi's Oracle exposure is not written down anywhere | **No** |
+| Two repositories justify a fourteenth language | The cost lands once and the benefit repeats | Unknown. The house's Oracle exposure is not written down anywhere | **No** |
 
 ## What the system says
 

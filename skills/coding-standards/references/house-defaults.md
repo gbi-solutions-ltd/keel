@@ -2,7 +2,11 @@
 
 Conventions that apply across this organisation's repositories unless a project records a
 deliberate departure.
-A project that departs says so in its own `standards.md`, with a reason.
+
+**Adopters inherit it unchanged.** There is no overlay, no per-project defaults file and no profile
+key that switches a default off. A project that disagrees with a default says so in its own
+`standards.md`, in the departures ledger, with a reason. That is the only mechanism, and it is
+deliberate: a departure a reader can see beats a default that was quietly never adopted.
 
 ## The other references, and when each applies
 

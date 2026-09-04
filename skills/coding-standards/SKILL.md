@@ -13,29 +13,17 @@ Write down what this codebase already does, then move everything mechanical into
 **Core principle:** a convention a linter can check should never be a document anybody reads. Ink
 is for judgement calls only.
 
-## Step 0: Author or assess
+## Step 0: Choose the mode
 
-**Author** where no `<docs_root>/standards.md` exists, the default, and steps 1 to 5 follow.
-**Assess** where one exists and nobody knows whether the code still follows it, and step 0a replaces
-them. Choose from the request's words, before reading anything. Asked to assess with no document,
-say so and offer to author. Asked to author over one, name it and ask first. Ambiguous with a
-document present, ask once.
+Two facts choose it, before anything is read: whether `<docs_root>/standards.md` exists, and whether
+there is code. No document and code is **audit**, [references/audit.md](references/audit.md). No
+document and no code is **seed**, [references/seed.md](references/seed.md). A document, either way,
+is **assess**, [references/assess.md](references/assess.md), naming any check a missing corpus
+stopped. **Author** is steps 1 to 5, and is what audit offers at its end.
 
-## Step 0a: Assess
-
-Write `<docs_root>/audits/YYYY-MM-DD-standards.md`, following
-[references/assessment-report.md](references/assessment-report.md). Change nothing else, run nothing
-that alters the project, never edit `standards.md`. **The report is one numbered section per check,
-in this order:**
-
-1. **House-defaults coverage.** `standards.md` against all ten references the index lists,
-   applicable or not, each row saying what decided it. Those predicates are prose, not profile
-   fields. No code read.
-2. **The backlog.** Follow-ups and inconsistencies against HEAD, not the document's own status text.
-3. **A judgement sample.** Up to eight rules, all of them where fewer exist, source read for those
-   only, every imprecise match opened.
-4. **The departures ledger.** Each departure into one of six categories, three of which are
-   findings. Re-verify every kept departure's basis.
+The request's words win where they conflict. Where a precondition is wrong, say so: asked to assess
+with no document, offer seed or audit by which fact holds; asked to seed or author over one, name it
+and ask first. Ambiguous with a document present, ask once.
 
 ## Step 1: Derive, do not impose
 

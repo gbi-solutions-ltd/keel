@@ -13,6 +13,10 @@
 #   <dir>/prompt.md   the assembled prompt, kept out of the working directory so it is not one of
 #                     the files the arm finds lying around in the project it is working on
 #   <dir>/project/    the arm's working directory: a scenario's fixture, or empty
+#   <dir>/skills/<skill>/references/
+#                     the references of every skill the scenario injects, beside the working
+#                     directory rather than inside it, so `../skills/<skill>/references/` resolves
+#                     from project/ and the arm has to choose to read one
 #
 # Usage: tests/evals/stage.sh <scenario-name>
 #        dir=$(tests/evals/stage.sh done-without-verifying)
@@ -41,6 +45,28 @@ fixture="tests/evals/fixtures/$name"
 if [ -d "$fixture" ]; then
     cp -R "$fixture/." "$dir/project/" || { rm -rf "$dir"; exit 1; }
 fi
+
+# The references of every skill this scenario injects, staged beside project/ rather than inside it.
+#
+# An arm's working directory is project/, and until 2026-09-02 the staged tree held nothing else, so
+# a skill body pointing at references/ pointed at nothing an arm could open. tests/evals/results.md
+# recorded that on 2026-09-01 as the single most useful thing that run surfaced about the eval setup.
+#
+# Staged rather than injected into the prompt on purpose: injected text measures whether a reference
+# is obeyed when the model already has it, and the question worth asking is whether it goes and reads
+# it. Only the second can fail, so only the second is a test.
+#
+# Beside project/ for the same reason prompt.md and setup.sh are kept out of it. A skills/ directory
+# inside the project is a file the arm would find lying around in the repository it is working on,
+# and it would end up in the first commit of any scenario scored on git state.
+# Assigned first and then split, which is run.sh:18-26's idiom for the same line and avoids
+# SC2013: the splitting is wanted, because `Inject: execute-plan tdd` names two skills.
+inject_skills=$(sed -n 's/^Inject: *//p' "$f")
+for s in $inject_skills; do
+    [ -d "skills/$s/references" ] || continue
+    mkdir -p "$dir/skills/$s" || { rm -rf "$dir"; exit 1; }
+    cp -R "skills/$s/references" "$dir/skills/$s/" || { rm -rf "$dir"; exit 1; }
+done
 
 # A fixture that needs more than files carries a setup.sh, run here with the staged project/ as its
 # working directory. Three scenarios need it: a fixture cannot ship a .git directory, because a

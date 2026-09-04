@@ -27,9 +27,9 @@ fact. Bodies migrate to whatever the validator permits.
 
 The lever the standard offers for relief is moving substance into `references/`. That lever is
 exhausted, and `coding-standards` proves it: **12 reference files carrying 17,816 words, and a body
-still at 683**, as measured on 2026-08-16. That skill has since gained a second mode and stands at
-13 references, 20,118 reference words, and a body of 876. The conclusion below is unchanged by that:
-moving substance out still did not pull the body under 680, and the growth came from a new mode
+still at 683**, as measured on 2026-08-16. That skill now routes four modes and stands at
+17 references, 22,752 reference words, and a body of 795. The conclusion below is unchanged by that:
+moving substance out still did not pull the body under 680, and the growth came from new modes
 rather than from failing to offload. A body's floor is set by its number of steps and by the link-plus-when-to-read
 sentence each reference costs, not by how much detail it holds. Moving more out does not pull a body
 below roughly 680, so the fifteen skills at the ceiling cannot be relieved by the remedy the
@@ -52,6 +52,16 @@ targets, so a body crossing it is visible in every validator run rather than sil
 skill body over 700 words requires a passing eval arm at that length, recorded in
 `tests/evals/results.md`, so the room is taken against observed behaviour rather than against an
 assertion.
+
+*Clarified 2026-09-04, by Bernard.* "A passing eval arm at that length" means any arm recorded in
+`tests/evals/results.md` that passed against the body unmodified, whether it was dispatched as a
+release-gate arm or as a dedicated length arm. The narrower reading, that only an arm scored on
+length counts, is set out as Reading B in
+[bodies-over-the-target-with-no-arm.md](../ideas/bodies-over-the-target-with-no-arm.md), and it
+lost: what this sentence buys is room taken against observed behaviour, and an arm that followed
+the body at that length observed it whatever it was dispatched to measure. Unchanged by this, an
+arm still discharges the length it ran at and not the body it ran against, so a body that has since
+grown past that length owes a new one.
 
 ## Alternatives considered
 

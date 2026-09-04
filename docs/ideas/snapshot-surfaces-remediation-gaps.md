@@ -22,7 +22,7 @@ distinction, because it is why the recommendation below is small.
 ## What was asked for
 
 > Could part of the snapshot's work also be that the repo is checked for coding standards (even if
-> the GBi defaults are considered) as well as a security audit to assess current position? These
+> the house defaults are considered) as well as a security audit to assess current position? These
 > could both be reported in the report. One of the critical purposes of the snapshot is to surface
 > gaps that need remediation. In fact after remediation, the user could run the snapshot again as a
 > way to ascertain being in a better position.
@@ -45,7 +45,7 @@ without cutting the snapshot: the body is **698 words against a 700 ceiling**.
 |---|---|---|
 | Do nothing | Nothing | Section 10 names a skill per recommendation, so a good snapshot already ends by pointing at `security-audit`. But nothing makes it, and a snapshot that quietly omits the pointer reads as a clean bill of health |
 | Do it manually | Run the three skills in sequence and read three documents | This is what the design intends, and it works. The gap is that nobody is told to, not that they cannot |
-| Buy it | A SAST or posture tool, a few hundred a month | Covers the security half only, misses authorisation and business logic entirely, per `security-audit`'s own Common mistakes row, and knows nothing about GBi's conventions |
+| Buy it | A SAST or posture tool, a few hundred a month | Covers the security half only, misses authorisation and business logic entirely, per `security-audit`'s own Common mistakes row, and knows nothing about the house conventions |
 | Build something smaller | An hour or two, in two skills | This is the recommendation |
 
 Variants of building it:
@@ -65,7 +65,7 @@ Variants of building it:
 | A reader of a snapshot does not already know to run `security-audit` | The handoff is being missed in practice | Look at whether any real snapshot run was followed by an audit | **No. No instance either way was named** |
 | Re-running the snapshot would show improvement legibly | The document has stable comparable measures | Section 9's rubric is measured/estimated/unmeasured per metric, and section 9 explicitly forbids an overall score | Partly, and it cuts against the idea: the metrics are comparable, the summary judgement is deliberately absent |
 | The two audits are cheap enough to run inside a snapshot | A `--full` audit is minutes, not hours | `security-audit --full` runs seven phases and delegates one subagent per phase | **No, and it is likely false.** A full audit is the most expensive skill in the set |
-| Standards conformance is checkable against something written | The repo has standards, or GBi defaults apply | `skills/coding-standards/references/house-defaults.md` exists | Yes |
+| Standards conformance is checkable against something written | The repo has standards, or house defaults apply | `skills/coding-standards/references/house-defaults.md` exists | Yes |
 
 ## What the system says
 

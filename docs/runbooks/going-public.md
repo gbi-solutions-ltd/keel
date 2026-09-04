@@ -87,7 +87,7 @@ What to do, per that decision:
 **The `GBI_ALLOWED` rule beside it does not move.** It names five paths, discloses nothing, and is
 the thing that keeps step 3 a deletion rather than an audit.
 
-## 3. Deal with the five GBi reference files
+## 3. Deal with the five house-specific reference files
 
 **DONE, and it went further than this section proposed.** All five are generic once the name comes out
 of their prose, so `GBI_ALLOWED` is gone and the rule is now that shipped content names no
@@ -102,7 +102,7 @@ found **one** item needing redaction rather than none: `pipeline-patterns.md` at
 payment platform with 3.6% coverage", and a sector plus an exact figure identifies an engagement to
 anyone who has read that audit.
 
-Decision 2 confined GBi-specific content to five files so that publishing would be a deletion. Since
+Decision 2 confined house-specific content to five files so that publishing would be a deletion. Since
 2026-08-17 that is enforced by `tests/no-internal-leaks.sh`, so the list is trustworthy:
 
 - `skills/coding-standards/references/gbi-defaults.md`
@@ -119,7 +119,7 @@ Per file:
 
 | File | What it actually contains | Do |
 |---|---|---|
-| `gbi-defaults.md` | House conventions, most of which any team would adopt | Rename to `house-defaults.md`, remove the two GBi sentences, update the link in `skills/coding-standards/SKILL.md` |
+| `gbi-defaults.md` | House conventions, most of which any team would adopt | Rename to `house-defaults.md`, remove the two sentences naming the organisation, update the link in `skills/coding-standards/SKILL.md` |
 | `observability.md` | Generic, plus SigNoz named as the default backend | Keep. Replace the named default with "whatever `profile.observability.backend` says" |
 | `authorisation.md` | Separation-of-duties rules written for a payments business | Keep. The rules are good for anyone handling money; only the framing sentence names us |
 | `payments-checklist.md` | Domain checklist. Read it line by line | Keep, after a read for any trap traceable to one client's incident |
@@ -136,7 +136,7 @@ All five touchpoints below were already correct and none was edited.
 What this section missed: `.claude-plugin/` is shipped content that no rule scopes to and nothing had
 read. `marketplace.json` advertised "GBi internal AI engineering tooling" on a repository about to
 stop being internal, and `plugin.json` declared `"license": "SEE LICENSE IN LICENSE"` after the MIT
-change. Both fixed. That directory stays outside the GBi rule on purpose, because `owner.name`
+change. Both fixed. That directory stays outside the organisation-name rule on purpose, because `owner.name`
 legitimately names the marketplace owner.
 
 `gbi-solutions-ltd/keel` is load-bearing in five places, and two of them break silently:
@@ -161,9 +161,9 @@ and should go, along with the credential-helper explanation it exists to give.
 `docs/standards.md`, `decisions/`, `ideas/`, `plans/`, `runbooks/` and `IMPLEMENTATION-PLAN.md`.
 
 Two facts made that safe, and both were measured rather than argued. `HEAD` carried no client
-identifier outside the deny list and its test. And exactly **one** file under `docs/` named a GBi
+identifier outside the deny list and its test. And exactly **one** file under `docs/` named a house
 service, `2026-08-15-existing-service-pilot.md`, which is withheld. Note also that the audits name
-**GBi's own** services rather than a third party's, so that exposure was GBi's to accept.
+**the house's own** services rather than a third party's, so that exposure was ours to accept.
 
 Accepted knowingly: the published tree names Bernard Tebandeke and Edrine Kamya as reviewers, with 17
 further references to "Bernard". Put to the author explicitly and authorised twice.
@@ -207,8 +207,8 @@ done | sort -u | head -50
 ```
 
 Expect hits. Every client identifier this repository ever removed is still in its history, and
-several were removed by the sweeps decision 2 records. The eight GBi neutralisations of 2026-08-17
-are in there too.
+several were removed by the sweeps decision 2 records. The eight organisation-name neutralisations of
+2026-08-17 are in there too.
 
 If there are hits, publishing the existing history is not an option, and there are two ways out:
 
@@ -253,6 +253,11 @@ tests/no-internal-leaks.sh            # clean, and printing that it ran in fallb
 Then change visibility.
 
 ## 7a. Publishing an update, after the first release
+
+**For a release, use [`cutting-a-release.md`](cutting-a-release.md) instead.** It carries this
+section's export and sync steps plus the eval gate, the version bump, the tags and the release
+itself, as one procedure, executed for 0.17.0. What follows stays here as the route for a change
+that is not a release.
 
 Written on 2026-08-19, the first time the public repository took a change that was not a release.
 The public tree is separate and has no history in common with this one, so an update is a fresh

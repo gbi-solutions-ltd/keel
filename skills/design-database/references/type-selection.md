@@ -3,10 +3,10 @@
 Section 4 of the review is a sweep: every table, every column. This file is what to look for and,
 for each, what the wrong type actually costs. The cost is the part that gets a fix scheduled.
 
-**Why the sweep needs a file at all.** The baseline that prompted this skill did excellent work on
-the schema's headline defects and never came back for the types. It walked past a `VARCHAR(20)` date
-of birth, a `VARCHAR(5)` boolean and an `INT` soft-delete flag. None of those is hard to spot. They
-were missed because nothing required a pass over the columns, which is why section 4 requires one.
+**Why the sweep needs a file at all.** A review can do excellent work on a schema's headline
+defects and never come back for the types. A date of birth in a character column, a boolean held as
+a short string, a flag stored as an integer: none of these is hard to spot, and all of them survive
+a review that never passes over the columns. Section 4 requires that pass for exactly that reason.
 
 ## Money
 
@@ -69,8 +69,8 @@ together with a row count.
 
 A 32 bit signed key stops at 2,147,483,647. At 1.5 billion rows and growing, that is months away,
 and sooner than the row count suggests because every rolled-back insert burns a value that is never
-reused. The baseline found exactly this, unprompted, and it is the shape section 7 exists to make
-repeatable rather than lucky.
+reused. A good reviewer finds this unprompted, and section 7 exists to make it repeatable rather
+than lucky.
 
 For every integer key: the type's ceiling, the current maximum value, and the growth rate. Where the
 gap is small, give the stopgap and its condition as well as the real fix, because widening a key on

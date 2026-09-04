@@ -2591,12 +2591,101 @@ case "$out" in *"marketplace is registered"*) ok "doctor finds the marketplace i
 # And in the default directory, which is where it lands when CLAUDE_CONFIG_DIR is unset. Both are
 # checked because they can differ, and saying "not registered" while it sits in the other one is
 # worse than saying nothing. Found on a machine where exactly that was true.
+#
+# Neither fixture above carries lastUpdated, so both also exercise the unknown-age branch below for
+# free. That is why they still pass unchanged: an absent timestamp adds a warning and warnings do
+# not fail doctor.
 mkdir -p "$d/home/.claude/plugins"
 printf '{"keel":{"source":{"source":"github","repo":"gbi-solutions-ltd/keel"}}}\n' \
   > "$d/home/.claude/plugins/known_marketplaces.json"
 out="$( cd "$d" && CLAUDE_CONFIG_DIR="$d/empty-config" HOME="$d/home" "$KEEL" doctor 2>&1 )"
 case "$out" in *"marketplace is registered"*) ok "doctor falls back to the default config directory" ;;
   *) bad "marketplace" "doctor missed a marketplace in the default directory" ;; esac
+
+# ---- marketplace clone freshness -------------------------------------------
+# Registration is a boolean and freshness is not. The clone only moves on `/plugin marketplace
+# update`, so an install can sit a full release behind while the clone, the installed copy and its
+# gitCommitSha all agree with each other and all disagree with the marketplace. lastUpdated is the
+# only local record of when that was last known current.
+#
+# Every timestamp here is generated relative to now. A hardcoded date makes the suite start failing
+# on a day nobody chose.
+# Two argument, and deliberately so. A single argument taking either a day count or a literal JSON
+# value cannot tell 12345 the number of days from 12345 the numeric lastUpdated, and the first
+# version of this helper silently generated a timestamp 12345 days old for the case that was meant
+# to prove a non-string is rejected. The test passed the wrong thing and reported it as a product
+# failure. An explicit mode is one word longer and cannot do that.
+mp_at() {   # mp_at days <n> | mp_at raw <literal-json-value> | mp_at absent
+    local ts
+    case "$1" in
+        days)
+            ts="$(python3 -c "
+import datetime, sys
+print((datetime.datetime.now(datetime.timezone.utc)
+       - datetime.timedelta(days=int(sys.argv[1]), hours=1)).strftime('%Y-%m-%dT%H:%M:%S.000Z'))" "$2")"
+            printf '{"gbi":{"source":{"source":"github","repo":"gbi-solutions-ltd/keel"},"lastUpdated":"%s"}}\n' "$ts" ;;
+        absent) printf '{"gbi":{"source":{"source":"github","repo":"gbi-solutions-ltd/keel"}}}\n' ;;
+        raw)    printf '{"gbi":{"source":{"source":"github","repo":"gbi-solutions-ltd/keel"},"lastUpdated":%s}}\n' "$2" ;;
+    esac > "$d/cfg/plugins/known_marketplaces.json"
+}
+mp_doctor() { ( cd "$d" && CLAUDE_CONFIG_DIR="$d/cfg" HOME="$d/empty-home" "$KEEL" doctor 2>&1 ); }
+
+# Well past the threshold. The number is echoed back so the reader can act on it.
+mp_at days 30; out="$(mp_doctor)"
+case "$out" in *"was last fetched 30 days ago"*) ok "doctor names the age of a stale marketplace clone" ;;
+  *) bad "marketplace" "doctor said nothing about a 30 day old marketplace clone" ;; esac
+
+# A stale clone is advisory, never a failure, for the same reason an absent marketplace is: a CI
+# runner is a legitimate state and doctor has to stay usable in a pipeline.
+mp_at days 30
+if ( cd "$d" && CLAUDE_CONFIG_DIR="$d/cfg" HOME="$d/empty-home" "$KEEL" doctor >/dev/null 2>&1 ); then
+  ok "a stale marketplace clone does not fail doctor"
+else bad "marketplace" "doctor failed because the marketplace clone was stale"; fi
+
+# The boundary, both sides. Seven is inclusive and six is not, which is what makes the threshold a
+# tested number rather than a comment. An hour is subtracted in mp_at so a whole-day count cannot
+# land on the boundary by rounding.
+mp_at days 7; out="$(mp_doctor)"
+case "$out" in *"was last fetched 7 days ago"*) ok "seven days is inside the stale threshold" ;;
+  *) bad "marketplace" "a seven day old clone did not warn; the threshold is meant to be inclusive" ;; esac
+
+mp_at days 6; out="$(mp_doctor)"
+case "$out" in
+  *"was last fetched"*) bad "marketplace" "a six day old clone warned; the threshold is meant to exclude it" ;;
+  *"was fetched 6 day(s) ago"*) ok "six days is inside the fresh threshold and says so" ;;
+  *) bad "marketplace" "doctor said nothing at all about a six day old clone" ;;
+esac
+
+# The fresh branch must not read as "you are current". This check measures fetch age, and a local
+# check cannot tell fetch age from staleness: a three day old clone was several releases behind
+# during the burst of nine tags between 2026-08-17 and 2026-08-20.
+mp_at days 1; out="$(mp_doctor)"
+case "$out" in *"fetch age and not currency"*) ok "the fresh branch says what it is not measuring" ;;
+  *) bad "marketplace" "the fresh branch reads as a currency guarantee" ;; esac
+
+# Absence reads as unknown, never as fine. This is the case the whole check turns on: a silent pass
+# here is indistinguishable from a check that never ran.
+for spec in "absent||no lastUpdated at all" "raw|12345|a numeric lastUpdated" "raw|\"not-a-date\"|an unparseable lastUpdated"; do
+    mode="${spec%%|*}"; rest="${spec#*|}"; val="${rest%%|*}"; label="${rest#*|}"
+    mp_at "$mode" "$val"; out="$(mp_doctor)"
+    case "$out" in
+      *"That is unknown, not current"*)
+        case "$out" in
+          *"was fetched"*) bad "marketplace" "$label reported an age as well as unknown" ;;
+          *) ok "$label reads as unknown rather than current" ;;
+        esac ;;
+      *) bad "marketplace" "$label did not report the age as unknown" ;;
+    esac
+done
+
+# A clock skewed forward yields a negative age. It must clamp to today rather than printing a
+# negative, which would read as fresher than fresh.
+mp_at days -5; out="$(mp_doctor)"
+case "$out" in
+  *"was fetched 0 day(s) ago"*) ok "a future lastUpdated clamps to zero rather than going negative" ;;
+  *"-"[0-9]*" day"*) bad "marketplace" "a future lastUpdated printed a negative age" ;;
+  *) bad "marketplace" "a future lastUpdated did not clamp to zero" ;;
+esac
 
 case "$out" in *" gh "*) bad "marketplace" "doctor still tells people they need gh" ;;
   *) ok "doctor no longer claims gh is required" ;; esac

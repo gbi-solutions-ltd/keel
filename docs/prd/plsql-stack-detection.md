@@ -166,7 +166,7 @@ in flight touches `lib/detect-stack.sh`.
 | A3 | ~~`.sql` plus `.plsql` dominance is a sound proxy~~ **Superseded 2026-08-18 by the content signal.** Dominance plus an Oracle-exclusive token is the proxy. | A PostgreSQL migrations repository contains `VARCHAR2`, `DBMS_` or `PACKAGE BODY` | **Yes, by construction.** None of the three has a PostgreSQL equivalent |
 | A4 | Ten files is the right floor. | A real Oracle repository has fewer | **No.** The number was chosen, not measured. Both known instances have 191 and 1,129 |
 | A5 | utPLSQL is the framework worth naming in `tool-choices.md`. | An Oracle project that tests uses something else | **Partly.** 16 mentions in the Oracle repository's tests, and it is the only real option |
-| A6 | Two repositories justify a fourteenth language. | The cost lands once and the benefit does not repeat | **No.** GBi's Oracle exposure is not written down anywhere |
+| A6 | Two repositories justify a fourteenth language. | The cost lands once and the benefit does not repeat | **No.** The house's Oracle exposure is not written down anywhere |
 | A7 | An Oracle repository contains at least one of `VARCHAR2`, `DBMS_` or `PACKAGE BODY`. | An Oracle codebase of pure table DDL uses none of them | **No, and it is the cost of `FR-12`.** Such a repository would now be missed where the filename marker alone would have caught it. Neither known instance was checked for these tokens, because neither is reachable from here |
 
 ## 13. Open questions

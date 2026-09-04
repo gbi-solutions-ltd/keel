@@ -1,21 +1,32 @@
 # Repo Layout
 
-The `keel` repo as it actually is, at 0.16.1. 293 tracked files.
+The `keel` repo as it actually is, at 0.17.0. 330 tracked files at `54f1dfd`.
 
 **This document was a plan until 0.5.0, and it had drifted.** It described the tree "as it should
 exist when Phase 6 is done" and listed files that were never created: `lib/write-profile.sh`,
 `lib/doctor-checks.sh`, `templates/settings.template.json`, `templates/docs-keel-skeleton/`,
 `tests/test-init.sh`, `tests/test-doctor.sh`, per-stack `tests/fixtures/`, and two references under
 names the skills never used. A layout that lists files nobody wrote is worse than none: it sends a
-reader hunting for helpers that do not exist. Regenerated from `git ls-files` on 2026-09-01, which
-is the only way it stays true: the 2026-08 version was hand-maintained and had silently lost a whole
-skill, a hook, nine test files and this repository's entire self-hosted docs root.
+reader hunting for helpers that do not exist. Regenerated from `git ls-files` on 2026-09-01, and
+hand-corrected since, because that output left out four top-level entries with `bin/` among them.
+
+**The top level is asserted and the interior is curated.** `tests/test-doc-claims.sh` fails if
+`git ls-files` produces a top-level entry the tree below does not show, so the part of this document
+that is a checkable claim about structure is checked. Everything under those entries is a human
+choice and stays one: `tests/fixtures/` and `tests/evals/` collapse to a line each with a comment
+saying what is inside, `skills/` is expanded in full because the skill set is what a reader came
+for, and a generator would flatten both. The assertion guards the level hand maintenance lost once:
+the 2026-08 version was hand-maintained and had silently dropped a whole skill, a hook, nine test
+files and this repository's entire self-hosted docs root.
 
 ```
 keel/
 ├── .claude-plugin/
 │   ├── marketplace.json                # the repo is its own marketplace
 │   └── plugin.json                     # plugin manifest. Its version keys the install cache
+│
+├── bin/
+│   └── keel                            # the CLI. Every `keel` subcommand lives in this one file
 │
 ├── skills/                             # 25 skills, flat namespace
 │   ├── apex-export/
@@ -28,8 +39,11 @@ keel/
 │   ├── coding-standards/
 │   │   ├── SKILL.md
 │   │   ├── references/api-contracts.md
+│   │   ├── references/assess.md
 │   │   ├── references/assessment-report.md
 │   │   ├── references/async-work.md
+│   │   ├── references/audit-offer.md
+│   │   ├── references/audit.md
 │   │   ├── references/authorisation.md
 │   │   ├── references/caching.md
 │   │   ├── references/data-protection.md
@@ -38,6 +52,7 @@ keel/
 │   │   ├── references/observability.md
 │   │   ├── references/rate-limiting.md
 │   │   ├── references/resilience.md
+│   │   ├── references/seed.md
 │   │   ├── references/standards-template.md
 │   │   └── references/time-and-dates.md
 │   ├── context-budget/
@@ -170,7 +185,10 @@ keel/
 │   ├── test-validate-skills.sh
 │   ├── validate-skills.sh
 │   ├── fixtures/                       # per-stack detection fixtures, and an APEX capture
-│   └── evals/                          # 9 scenarios, 9 fixtures, results.md
+│   └── evals/                          # 12 scenarios, 12 fixtures, results.md
+│
+├── .github/
+│   └── workflows/ci.yml                # the pipeline. Its lint comes from .keel/profile.json
 │
 ├── docs/                               # keel's own docs_root, written by keel's own skills
 │   ├── 01-architecture.md
@@ -191,6 +209,13 @@ keel/
 │   ├── prd/
 │   ├── runbooks/
 │   └── stories/
+│
+├── .keel/                              # keel's own install of itself, not the tree below
+│   └── profile.json
+│
+├── .claude/                            # the other half, written by `keel init` as in any project
+│   ├── keel-nudge
+│   └── settings.json
 │
 ├── .gitignore
 ├── AGENTS.md
@@ -233,7 +258,7 @@ The layout was checked against the `skill-creator` plugin in Anthropic's officia
 which is a known-working plugin with the same shape: `.claude-plugin/plugin.json` plus
 `skills/<name>/SKILL.md`.
 
-Self-hosting the marketplace in the same repo means one URL to remember. If GBi later has more
+Self-hosting the marketplace in the same repo means one URL to remember. If the house later has more
 than one plugin, list them all in this one `marketplace.json` rather than adding a second
 marketplace, since one name maps to one marketplace per user.
 

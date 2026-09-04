@@ -63,7 +63,7 @@ The pattern, used identically in every skill that has a plugin dependency:
 ## Plugin: code-review
 
 If the `code-review` plugin is installed, invoke `/code-review` and use its findings as
-the correctness pass, then add the GBi-specific checks below. If it is not installed,
+the correctness pass, then add the house-specific checks below. If it is not installed,
 tell the user:
 
 > The `code-review` plugin gives a multi-agent review with confidence scoring, which
@@ -83,6 +83,11 @@ Three properties this gives us:
 
 ## Wiring map
 
+Every row here names a plugin the skill's own body names, and
+`tests/validate-skills.sh` fails when one does not. The table is therefore a claim about the tree
+rather than an intention, which it was not until 2026-09-02: six of its ten rows were false, four of
+them since the table was written.
+
 | keel skill | Plugin it calls | What it delegates |
 |-----------------|-----------------|-------------------|
 | `review-code` | `code-review` | The correctness pass |
@@ -90,11 +95,36 @@ Three properties this gives us:
 | `create-skill` | `skill-creator` | Eval harness, variance benchmarking, packaging |
 | `context-budget` | `claude-md-management` | CLAUDE.md quality rubric |
 | `design-architecture` | `context7` | Current library versions and API surface |
-| `coding-standards` | `context7` | Current lint and framework conventions |
-| `debug` | stack LSP | Diagnostics, go-to-definition, find-references instead of grep |
-| `refactor` | stack LSP | Safe renames, reference completeness |
 | `write-docs` | `frontend-design` | UI component documentation, where a UI exists |
-| `execute-plan` | `playwright` | Browser verification of UI tasks |
+
+**Four rows were removed on 2026-09-02 rather than wired**, and the reasons differ enough to be
+worth keeping.
+
+`coding-standards` to `context7`, for "current lint and framework conventions", contradicted the
+skill it was attached to. Step 1 is "Derive, do not impose. The conventions that matter are the ones
+already in use, not the ones you would choose", and the first row of its Common mistakes table is
+"Importing a generic style guide, instead: derive from the code". Calling a documentation service
+for current conventions is importing a generic style guide with a citation attached. That the body
+had 24 words of headroom was the weaker objection and not the reason.
+
+`execute-plan` to `playwright`, for browser verification, is unpayable rather than wrong: the body
+is 884 words against ADR-0001's 900 ceiling and the shortest honest conditional is about 20. This is
+also the skill where a wrong instruction is most expensive, so it is not a place to shave a sentence
+from elsewhere.
+
+## Capabilities, which are not delegations
+
+`debug` and `refactor` carried rows naming a "stack LSP" for diagnostics, go-to-definition and safe
+renames. A language server is not a plugin a skill can call. `typescript-lsp`'s own README describes
+a server installed with `npm install -g typescript-language-server`, and the plugin ships no skill,
+no command and no MCP server: there is nothing named for a body to invoke, and no fallback sentence
+to write, because the capability either changes what the runtime can do or it does not.
+
+So it is stated where it belongs, in `docs/02-skill-catalog.md` under `debug`, in the conditional
+form that survives contact with the truth: "when a language server plugin is installed, use its
+diagnostics and find-references rather than grep". That is guidance about tool choice, not a
+delegation, and it is deliberately outside the table the validator parses, because a checker that
+has to special-case a row is a checker with a hole in it.
 
 ## `.claude/settings.json` that `keel init` writes
 
@@ -138,7 +168,7 @@ superpowers' `using-superpowers` skill instructs the model to invoke superpowers
 before any response, which will fight our router.
 
 **Recommendation: uninstall superpowers once keel Phase 3 lands.** We keep the parts
-that are good, we drop the parts that do not fit GBi, and we stop paying for two bootstraps.
+that are good, we drop the parts that do not fit the house, and we stop paying for two bootstraps.
 Until then, keep it, since it is currently doing useful work.
 
 Credit where due: superpowers is MIT licensed and our adapted skills should say so in a
@@ -180,7 +210,7 @@ the loser is not ours to do.
 
 Skimmed from the same marketplace, only the ones that would actually earn their place:
 
-| Plugin | Why it might matter to GBi |
+| Plugin | Why it might matter to the house |
 |--------|---------------------------|
 | `pr-review-toolkit` | Broader than `code-review`, worth comparing in the pilot |
 | `code-simplifier` | Directly serves the Simplicity First principle |

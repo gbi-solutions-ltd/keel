@@ -7,6 +7,153 @@ versions as each skill is tested against real repositories.
 
 Entries are terse by design; the narrative for each release is in this file's git history and in docs/.
 
+## 0.18.0 - 2026-09-04
+
+- Release gate 2026-09-04 against `01fdf44`: **six treatment arms, all six pass**, $2.9909, 3m59s
+  wall clock. `tdd-under-deadline`, `build-with-no-prd` and `done-without-verifying` pass;
+  `debug-obvious-cause` and `ship-with-flaky-tests` pass in their strongest recorded form;
+  `incident-diagnose-first` passes instructing rather than running. No arm failed and no new
+  rationalisation appeared, seven releases running for `tdd`, `debug` and `ship`. Full scoring in
+  `tests/evals/results.md`.
+- **A release-gate eval arm discharges an ADR-0001 length obligation**, ruled 2026-09-04. An arm
+  recorded in `tests/evals/results.md` discharges the length it was run at, whether it was
+  dispatched as a dedicated length arm or as part of a release gate. `CONTRIBUTING.md`'s covered
+  list goes from four bodies to six: `tdd` 793 and `execute-plan` 884 join it on the 0.17.0 gate of
+  2026-09-01, both bodies byte identical to what that gate ran against. The rejected reading, that
+  only a dedicated arm counts, is named in the ADR rather than left implicit.
+- **`write-plan`'s body went from 897 words to 673, and `docs/standards.md` was overruled to allow
+  it.** At 897 it sat three words from ADR-0001's 900 ceiling, so any added sentence failed the
+  suite, and it owed an eval arm that no scenario could run because nothing injects it. Step 5's
+  four mechanical self-review checks and the Common mistakes table moved into
+  `references/plan-template.md`. `docs/standards.md` had rejected exactly that move on 2026-08-20,
+  on the grounds that a planner would skip the checks behind a link; it now records why that was
+  revisited and that the reasoning was never disproved. The checks were never only in the body: the
+  template already carried a six-item self-review that is a superset of them. Step 4's placeholder
+  list stayed, because unlike the self-review it exists nowhere else. `write-plan` no longer appears
+  in the validator's length warnings, which drop from seven to six.
+- **The wiring map in `docs/04-plugin-strategy.md` was false in six of its ten rows, and the two
+  skills that could be wired now are.** The column header reads "Plugin it calls", present tense.
+  `context-budget` names `claude-md-management` in Step 3 and `write-docs` names `frontend-design`
+  in Step 5, both in the conditional form `design-architecture` already used, which degrades to a
+  working skill when the plugin is absent. Costs measured: `context-budget` 692 to 723 words,
+  `write-docs` 731 to 756. **`context-budget` crosses ADR-0001's 700 target as a result**, so it
+  carries a new eval-arm obligation, and `write-docs`'s existing arm at 738 no longer covers it.
+  That cost was not in the decision when it was taken and is recorded here rather than absorbed.
+- **Four rows removed rather than wired, for three different reasons.** `coding-standards` to
+  `context7` for "current lint and framework conventions" contradicted the skill it was attached
+  to: Step 1 is "Derive, do not impose" and the first Common mistakes row is "Importing a generic
+  style guide". That the body had 24 words spare was the weaker objection. `execute-plan` to
+  `playwright` is unpayable at 884 words against a 900 ceiling with a 20-word minimum, in the skill
+  where a wrong instruction is most expensive. `debug` and `refactor` to a "stack LSP" were never
+  delegations: `typescript-lsp`'s own README describes a server installed with `npm install -g
+  typescript-language-server`, and the plugin ships no skill, no command and no MCP server, so there
+  is nothing for a body to name. That guidance stays in `docs/02-skill-catalog.md` under `debug`,
+  where it already had the honest conditional wording, and its marker changed from `**Plugin call:**`
+  to `**Capability:**` so the checker below needs no special case.
+- **`tests/validate-skills.sh` fails when a documented delegation is not one the skill makes.**
+  Three separate audits found this class and each fixed only what was in front of it. It parses the
+  table in `docs/04-plugin-strategy.md` and the `**Plugin call` prose leads in
+  `docs/02-skill-catalog.md`, two shapes because the documents differ and reformatting one to suit a
+  checker is the tail wagging the dog. **Body only, not `references/`**: a reference mention is
+  satisfiable without the skill delegating, which is the gap being guarded, and all six true rows
+  name the plugin in the body today so the stricter rule costs nothing. Tokens starting with `/` are
+  skipped, since a command is provided by a plugin already named on the same row. It commits
+  `docs/04` to a parseable table, said in the comment, and a floor assertion fails when the parse
+  yields fewer than 8 pairs against the 10 present, because a checker that reads nothing passes
+  everything. Both branches proved by breaking them.
+- **That check accused four skills that did name their plugin, and the pipeline it read them through
+  was why.** `body_of file | grep -q needle` under `set -o pipefail` is a race: grep exits at the
+  first match, the producer dies on its next write, and pipefail turns its 141 into a failed
+  pipeline, so a match that was found reads as a body that never names it. CI went red on `main`
+  against a tree that had passed the identical check on the pull request minutes before. The four
+  bodies it accused were over one 4096-byte stdio block with the match in the first block; the two
+  it passed were under a block, so the producer had already finished. Every `grep -q` in
+  `tests/validate-skills.sh` now reads a here-string, which is a redirect and not a pipeline, so the
+  status is grep's alone. Two tests cover the rule that had none: one puts the mention on the first
+  line of a body larger than any pipe will hold, which fails every run under the old pipeline, and
+  one proves the rule still fires when the body really is silent. **The same shape survives in about
+  seventy places across the other test files**, as `printf '%s' "$var" | grep -q`, and is a latent
+  flake wherever the variable exceeds a block; left alone here rather than swept during a release.
+- **A link into a path the public export excludes is broken for everyone outside this repository.**
+  `docs/ideas/repo-layout-omits-its-own-executable.md` linked `.claude/settings.json`, which
+  `tests/export-public.sh` excludes, so the link resolved on every internal run and the exported
+  tree failed its own validator. Named rather than linked now, with the reason in the document so it
+  is not repaired back. **Only the export's suite catches this class**, which is the step in
+  `docs/runbooks/cutting-a-release.md` that exists for it, and it catches it at release time rather
+  than at commit time.
+- **`hooks/session-start` prints the version of the plugin copy the session loaded.** That is the
+  one fact a session could not learn: `CLAUDE_PLUGIN_ROOT` reaches a plugin's own hooks and not
+  `keel` on `PATH`, and the two are routinely different copies. A cached 0.16.1 served this
+  repository's sessions for twelve days while it developed 0.17.0, with 19 skill files differing,
+  `coding-standards` missing its assess mode and `design-database` absent, and nothing could say so.
+  `keel doctor` compared only `profile.schema_version` against `SCHEMA_VERSION`, which is bumped
+  only when a profile field changes and is therefore silent on any number of skill changes, by
+  design. Costs 13 characters, being the 11 character string plus the two character `\n` that
+  `escape` renders, against the 19 NFR-01 had spare; 6 are left. A `VERSION` carrying whitespace,
+  carrying a character outside `0-9 A-Z a-z . -`, or longer than 12 characters prints nothing rather
+  than being escaped and shipped. Each guard earns its place: whitespace is checked separately
+  rather than left to the character set, because a set widened later stops excluding it as a side
+  effect; the 12 character cap is what actually protects NFR-01, since a 300 character `VERSION`
+  passes any plausible set, and that case was found by running the guard rather than reading it.
+  **The set allows letters and hyphens after review**: it was digits and dots for one morning, which
+  silently dropped the line for any pre-release such as `0.17.0-rc.1`, on exactly the release where
+  knowing which copy a session loaded matters most and the one nobody would have checked.
+  `0.17.0-rc.1` is 11 characters and `0.17.0-rc.12` is 12, so the cap accommodates the shape.
+- **NFR-03 of `docs/prd/plain-language-chat.md` widened from a form-count bound to a
+  change-frequency bound**, requester decision 2026-09-02. It required the output to change "only
+  when a person edits the profile", which held for `response_style` and its four enumerated forms
+  and could not admit a value with one form per release. It now requires that every change follow a
+  deliberate act, costing one cache miss on the session after it rather than one per request, which
+  covers both. The original wording is kept in the Evidence cell rather than overwritten.
+- **`docs/05-token-and-memory-design.md`'s four-form table re-measured**, per NFR-05: 1,279 / 1,278
+  / 1,077 / 1,268 characters against `VERSION` 0.17.0. It had carried the 2026-08-18 figures
+  throughout, including across the 2026-08-30 trim that cut every form by 18 characters, so it was
+  already wrong before this change. NFR-05's own pointer had drifted onto a passage about the
+  handoff file and now cites the heading instead of a line number.
+- **`keel doctor` warns when the marketplace clone has not been fetched for 7 days.** The clone
+  under `<config>/plugins/marketplaces/` moves only on `/plugin marketplace update`, so it, the
+  installed copy and its `gitCommitSha` can all agree with each other and all disagree with the
+  marketplace, which is what happened here. `lastUpdated` in `known_marketplaces.json` is the only
+  local record of when the clone was last known current and reading it costs no network call.
+  **It measures fetch age, not staleness, and a local check cannot tell them apart.** Nine tags
+  landed between 2026-08-17 and 2026-08-20, so a three day old clone was already several releases
+  behind and this would have said nothing; across the twelve day gap to 0.17.0 a user correctly on
+  0.16.1 is warned from 2026-08-27 with nothing to do about it. Seven is kept because it sits
+  between the two cadences, and both branches say which of the two they are talking about, the
+  quiet one included. An absent, non-string or unparseable `lastUpdated` reports unknown rather
+  than staying silent, because a silent pass there is indistinguishable from a check that never ran.
+- **`tests/test-context-watch.sh`'s no-python case keeps stderr instead of discarding it.** The case
+  runs `hooks/context-watch` with `PATH` emptied and asserts silence and exit 0. It failed once on a
+  CI runner with `rc=1 out=` and nothing else, on a commit that changed only Markdown, and passed on
+  the next run. Nothing in the hook can return 1: every path out of it is an explicit `exit 0`, the
+  `command -v python3` guard included, so the message that would have explained it existed and went
+  to `/dev/null`. Stderr now goes to a file in the work directory and the first three lines are
+  reported in the failure, matching what `tests/test-profile-keys.sh` already does. **The assertion
+  is unchanged** and stderr is diagnostic only: stdout must still be empty, which is what silence
+  means here. Proved by forcing the hook to exit 1 with a message and watching the case report
+  `rc=1 out= err=...`, which is the CI signature with the reason attached.
+
+  The underlying failure is still unexplained. This does not fix it; it makes the next occurrence
+  say why.
+
+- **`docs/runbooks/cutting-a-release.md`, the release procedure as one document.** It existed as
+  four sources that had to be reassembled every time: `going-public.md` section 7a, the export
+  script's header, the previous release commit and the public repository's own history. Two
+  consecutive releases spent real time reconstructing it, and the second reconstruction is what
+  wrote this. Every command in it was executed on the 0.17.0 release and the outputs quoted are
+  that run's; the symptoms rows carried from earlier runs are marked as such rather than presented
+  as tested.
+
+  **Three traps it exists to state.** `tests/no-internal-leaks.sh` takes no directory argument, so
+  the pre-publish sweep run from this repository's root prints exactly the same `OK` having swept
+  the wrong tree; the same scanner degrades to two generic patterns when the deny list is absent
+  from the machine and still prints `OK`, so the mode line has to be read and not just the verdict;
+  and `tests/test-cache-install.sh` goes red between the version edit and its commit, which is
+  normal exactly once and is not a licence to ignore a second red file.
+
+  `README.md`'s row for `going-public.md` said none of it had been executed, five releases after it
+  was. Corrected in the same table.
+
 ## 0.17.0 - 2026-09-01
 
 - **`coding-standards` gains an assess mode.** Given an existing `<docs_root>/standards.md` it runs

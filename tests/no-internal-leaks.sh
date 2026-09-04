@@ -180,6 +180,37 @@ if [ -s "$GBI_CANDIDATES" ]; then
     done < <(tr '\n' '\0' < "$GBI_CANDIDATES" | xargs -0 grep -nHE -- '\bGBi' 2>/dev/null)
 fi
 
+# Example values in the shipped templates, which the two rules above cannot reach.
+#
+# WHY NEITHER EXISTING RULE CATCHES THIS CLASS. `templates/keel-profile.example.json` carried
+# `europe-west1-docker.pkg.dev/gbi/payouts` as its registry: the organisation's name in a path
+# segment, plus a project that does not exist. The DENY patterns are about clients and developer
+# paths, and this is neither. The `\bGBi` rule is case-sensitive on purpose, for the reason at the
+# top of this file, and lower-case `gbi` here is not a typo of the branded form: it is what a real
+# Google Artifact Registry path looks like. Making that rule case-insensitive would be worse than
+# the leak, because two lines above the offending value the same file carries
+# `https://raw.githubusercontent.com/gbi-solutions-ltd/keel/...`, which is the real public
+# repository and correct. A rule that fails on correct content is the too-strict failure
+# CONTRIBUTING.md calls unrecoverable.
+#
+# So the rule is narrow by construction: in the shipped JSON templates, `gbi` in any case may
+# appear only on a line declaring the schema. Everything else in those files is an example value,
+# and CONTRIBUTING.md says examples use obviously generic names. Two files, one exemption, no
+# judgement about what a path means.
+for f in templates/keel-profile.example.json templates/profile.schema.json; do
+    [ -f "$f" ] || continue
+    while IFS= read -r hit; do
+        [ -n "$hit" ] || continue
+        line="${hit%%:*}"; text="${hit#*:}"
+        # shellcheck disable=SC2016
+        # `$schema` and `$id` are JSON keys being matched literally, not shell expansions. Single
+        # quotes are what makes them literal, which is exactly what SC2016 is written to warn about
+        # and exactly what is wanted here.
+        case "$text" in *'"$schema"'*|*'"$id"'*) continue ;; esac
+        report "$f: example value names the organisation -> $line: $(printf '%s' "$text" | cut -c1-70). Use a generic name: payments-api, example-project"
+    done < <(LC_ALL=C grep -niE 'gbi' "$f" 2>/dev/null)
+done
+
 if [ "$errors" -eq 0 ]; then
     printf 'OK    no project-specific identifiers\n'
     exit 0
