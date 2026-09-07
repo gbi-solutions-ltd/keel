@@ -57,7 +57,13 @@ DEFAULT_DOCS_ROOT="docs/keel"
 # Asked once, at startup. The answer cannot change while this process runs, and the lookup was
 # forked about twenty times a run for a constant. The function stays so no call site changes.
 HAVE_PYTHON=0
-command -v python3 >/dev/null 2>&1 && HAVE_PYTHON=1
+# PRESENCE IS NOT RUNNABILITY. `command -v` sufficed until Windows: there,
+# python3 is commonly a Microsoft Store App Execution Alias -- a shim that sits
+# on PATH, IS FOUND BY `command -v`, prints "Python was not found..." and exits
+# 49 without running anything. Every call site below then inherits HAVE_PYTHON=1
+# and fails in a way attributed to whatever it was reading. Ask the interpreter
+# to run rather than asking the shell to find it.
+python3 -c 'pass' >/dev/null 2>&1 && HAVE_PYTHON=1
 have_python() { [ "$HAVE_PYTHON" -eq 1 ]; }
 
 # What bounds a verify command in doctor, when the machine has anything to bound it with. macOS
@@ -1327,8 +1333,18 @@ cmd_doctor() {
 
     [ -f .keel/profile.json ] || { fail "no .keel/profile.json. Run 'keel init'."; return 1; }
     if have_python; then
-        python3 -c "import json;json.load(open('.keel/profile.json'))" 2>/dev/null \
-          && good "profile parses" || { fail "profile is not valid JSON"; return 1; }
+        # Do not fold two outcomes into one message. `2>/dev/null` here reported
+        # a non-running interpreter as "your JSON is broken" -- a confident wrong
+        # cause on a file that was fine -- and doctor then returned 1, so no later
+        # check ran at all. One is an environment problem, the other a real defect.
+        _pyout="$(python3 -c "import json;json.load(open('.keel/profile.json'))" 2>&1)"; _pyrc=$?
+        if [ "$_pyrc" -eq 0 ]; then
+            good "profile parses"
+        elif printf %s "$_pyout" | grep -qiE "was not found|not recognized|cannot find|No such file"; then
+            fail "python3 did not run, so the profile was NOT checked: $_pyout"; return 1
+        else
+            fail "profile is not valid JSON: $_pyout"; return 1
+        fi
     else
         warn "python3 absent: cannot validate the profile or read its fields"
     fi
