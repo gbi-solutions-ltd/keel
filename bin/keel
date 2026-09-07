@@ -91,7 +91,7 @@ json_load() {  # json_load <file>
     # No apostrophe anywhere below. bash 3.2 does not treat a quoted heredoc body as literal when
     # the heredoc is inside a $( ), so one ' opens a quote that swallows the rest of this file and
     # the parse error is reported hundreds of lines away. shellcheck does not see it.
-    JSON_CACHE="$(python3 - "$1" <<'PY' 2>/dev/null
+    JSON_CACHE="$(python3 - "$1" <<'PY' 2>/dev/null | tr -d '\r'
 import json, sys
 
 def render(v):
@@ -172,7 +172,7 @@ settings_report_load() {
     # and bash 3.2 does not treat a quoted heredoc body as literal there, so one of them swallows
     # the rest of this file and reports the parse error hundreds of lines away. shellcheck does not
     # see it. json_load one file up carries the same warning for the same reason.
-    SETTINGS_REPORT="$(KEEL_HERE="$HERE" python3 - <<'PY' 2>/dev/null
+    SETTINGS_REPORT="$(KEEL_HERE="$HERE" python3 - <<'PY' 2>/dev/null | tr -d '\r'
 import json, os, glob
 # Every scope Claude Code merges, in its order. Project scope
 # alone was harmless while the fallback list was three plugins nobody enables per project. Once init
@@ -1400,7 +1400,7 @@ d=json.load(open('.keel/profile.json')).get('artifacts',{})
 for k,v in d.items():
     if k.startswith('_') or not v: continue
     print(f'{k}={v}')
-" 2>/dev/null)
+" 2>/dev/null | tr -d '\r')
     fi
 
     # The other half of the map: a key that is null while its default is sitting there. The profile
