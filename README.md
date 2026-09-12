@@ -13,9 +13,17 @@ that needs two pilots and a verified install from a second machine.
 /plugin install keel@gbi
 ```
 
-That is the whole install. The skills, the session hook and the `keel` CLI all arrive with the
-plugin: a plugin's `bin/` directory is added to the PATH that Claude Code's Bash tool uses, so
-after restarting the session `keel version` in a Claude Code shell prints the VERSION file.
+That is the whole install **on Claude Code**. The skills, the session hook and the `keel` CLI all
+arrive with the plugin: a plugin's `bin/` directory is added to the PATH that Claude Code's Bash
+tool uses, so after restarting the session `keel version` in a Claude Code shell prints the VERSION
+file.
+
+**Codex CLI is supported too, and it is not the same install or the same guarantee.** keel is Tier
+A on Claude Code and Tier B on Codex: the skills, `AGENTS.md` and the CLI are the same, and the set
+of gates that actually fire is smaller. `docs/harness-support.md` is generated from the capability
+manifest and is the only place that answers which, so it is the page to read before relying on a
+gate. Codex also requires a step Claude Code does not: it runs no hook until you have trusted the
+plugin's hooks, and it says nothing when it skips one.
 
 The marketplace is cloned over HTTPS, so nothing needs configuring and `gh` is not required. The
 repository was private until 2026-08-17 and the install worked the same way then, through the
@@ -85,8 +93,9 @@ the default and is what `keel init` writes. This changes replies only. Artifacts
 whatever it says, and it composes with `response_style`, so all four combinations are valid.
 
 The plugin also ships an output style, **keel terse**, selectable in `/config` under **Output
-style**. That one is machine-wide rather than per-project, so it is the option for non-keel
-repositories. It is not required here and nothing sets it for you.
+style**. That is a Claude Code feature and has no Codex counterpart, so on Codex the profile's
+`response_style` is the whole of it. It is machine-wide rather than per-project, so it is the option
+for non-keel repositories. It is not required here and nothing sets it for you.
 
 ## Upgrading
 
@@ -120,6 +129,9 @@ survive. It adds what is missing and leaves the rest alone.
 Every key `.keel/profile.json` may contain, what it does, and whether keel writes it or you do,
 is listed in [docs/profile-keys.md](docs/profile-keys.md).
 
+Each key says what reads it: a file and line where something does, "a person" where the answer is a
+human, and "nothing yet" with a link to the record that decided so.
+
 `.keel/profile.json` records `keel_version`, so comparing it with `keel version` tells you
 whether a project has been re-initialised since the last upgrade.
 
@@ -140,10 +152,17 @@ VS Code user settings, once per machine:
 
 The CLI, and JetBrains, need neither. `keel doctor` warns when this applies to you.
 
-Bypassing prompts is bounded here because the guardrails do not depend on them: `keel init` writes
-`deny` rules for secrets and `ask` rules for destructive commands and for network egress into the
-committed `.claude/settings.json`, and both kinds still apply under `bypassPermissions`. `allow`
-rules do not, which is why the protection is written the way it is.
+Bypassing prompts is bounded **on Claude Code** because the guardrails do not depend on them:
+`keel init` writes `deny` rules for secrets and `ask` rules for destructive commands and for network
+egress into the committed `.claude/settings.json`, and both kinds still apply under
+`bypassPermissions`. `allow` rules do not, which is why the protection is written the way it is.
+
+**That bound is a Claude Code guarantee and does not carry to Codex.** Codex has path rules and its
+own execution policy, and it has no equivalent of an `ask` a hook can force, so the part of this
+protection that depends on putting a command to a human is absent there rather than weakened.
+`docs/harness-support.md` says exactly what each harness gets, and `keel doctor` now reports it for
+the harness in front of you: which one it is running under, the gates that harness gets here, and a
+warning where this bound is one of the things it does not.
 
 **Bounded is not safe.** The rules cover the file tools and the common command shapes; they do not
 cover a secret read by a script that opens the file itself, anything outside the repository, or
@@ -172,11 +191,11 @@ writing it and hoping.
 | [`skills/write-user-stories`](skills/write-user-stories/SKILL.md) | Built | The same service, consuming its PRD. 19 stories, coverage proved both ways |
 | [`skills/design-architecture`](skills/design-architecture/SKILL.md) | Built, `adr` mode tested | The same service. Its 4 `decide` stories produced 4 ADRs. `new` and `existing` design modes unexercised |
 | [`skills/write-plan`](skills/write-plan/SKILL.md) | Built | The same service. A 6-task plan from one story and one ADR, using the profile's verify commands |
-| [`skills/tdd`](skills/tdd/SKILL.md) | Built | Used for real to build this repo's own skill validator, red then green |
+| [`skills/tdd`](skills/tdd/SKILL.md) | Built | Used for real to build this repo's own skill validator, red then green. Since 2026-09-07 the cycle's unit is one behavioural unit under [ADR-0006](docs/decisions/ADR-0006-the-tdd-cycle-unit-is-a-behavioural-unit.md), accepted the same day: every case that goes red for one named missing production change is written and watched to fail together, and the whole suite runs once at the unit boundary instead of on every GREEN, measured here at 313 seconds against 2 for a single test. Mutation ships with it, as a technique here and a gate in `review-code`'s rubric. A `tdd-under-deadline` eval arm at the body's current length was dispatched on 2026-09-07 and passed, so ADR-0001's length obligation is discharged; the scoring is in [`tests/evals/results.md`](tests/evals/results.md) |
 | [`skills/debug`](skills/debug/SKILL.md) | Built | An undiagnosed worker leak in a NestJS suite. Two hypotheses refuted, no fix guessed |
 | [`skills/execute-plan`](skills/execute-plan/SKILL.md) | Built | Its refusal gate, against a real plan blocked by an unaccepted ADR. Correctly refused. Then baselined and re-run for delegation: the mode table read as a free choice and inline won, three leaf tasks with disjoint files could not be overlapped because every `Done when:` gated on the whole suite, and no rule stopped a coordinator writing code. All four re-run scenarios pass, including a declared batch that had to be refused |
 | [`skills/coding-standards`](skills/coding-standards/SKILL.md) | Built | This repo. Produced `docs/standards.md` and found a broken lint command in its own profile. Carries 10 topic references: observability, time, resilience, async work, authorisation, rate limiting, API contracts, caching, data protection, frontend |
-| [`skills/review-code`](skills/review-code/SKILL.md) | Built | This repo's own last commit. All four project-specific passes ran; suite verified rather than assumed |
+| [`skills/review-code`](skills/review-code/SKILL.md) | Built | This repo's own last commit. All four project-specific passes then defined ran; suite verified rather than assumed. A fifth pass, the mutation gate added 2026-09-07, is unexercised |
 | [`skills/security-audit`](skills/security-audit/SKILL.md) | Built | Phase order re-found every known issue in the Spring Boot service, including 6 keystores inside the built jar |
 | [`skills/refactor`](skills/refactor/SKILL.md) | Built | Its precondition, against a real target with no tests. Correctly stopped and routed to `tdd` |
 | [`skills/optimize-performance`](skills/optimize-performance/SKILL.md) | Built | Its precondition, against a service with no target and no baseline. Correctly refused |
@@ -286,7 +305,7 @@ the machine.
 The evals in `tests/evals/` are the only thing that tests whether a discipline skill changes
 behaviour under pressure. The static suite checks shape; a skill can pass it and do nothing.
 
-12 scenarios exist. Six are dispatched at a release gate and score a reply.
+13 scenarios exist. Six are dispatched at a release gate and score a reply.
 `commit-outside-a-worktree`, added on 2026-08-20, scores git state instead: its fixture is
 built into a real repository by `tests/evals/stage.sh`, and the arm passes or fails on whether
 `git log` moved. `review-a-live-schema`, added on 2026-08-30 with the `design-database` skill, is
@@ -329,7 +348,7 @@ Templates that ship into every installed project:
 | Source | What we take |
 |--------|--------------|
 | `andrej-karpathy-skills` | The four behavioural principles, and the discipline of keeping the always-loaded layer tiny |
-| `superpowers` | Skill mechanics: TDD iron law, four-phase debugging, plan structure, TDD-for-skills, session-start hook pattern |
+| `superpowers` | Skill mechanics: TDD iron law, four-phase debugging, plan structure, TDD-for-skills, the session start hook pattern |
 | `cursor-starter` | Prompt content: PRD, user stories, architecture, stack choice, CI/CD, security audit, repo snapshot, review, refactor, performance |
 | `gstack` | Distribution model (no vendored files, team mode), skill routing, preamble tiering for token control |
 

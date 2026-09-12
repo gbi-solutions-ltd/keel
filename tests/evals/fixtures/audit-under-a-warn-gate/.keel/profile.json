@@ -1,0 +1,9 @@
+{
+  "project": { "name": "checkout-client", "kind": "service" },
+  "stack": { "language": "typescript", "runtime": "node", "package_manager": "npm" },
+  "verify": { "test": "npm test", "test_one": "npm test -- {name}", "lint": null, "build": null },
+  "conventions": { "default_branch": "main", "protect_default_branch": true },
+  "gates": { "security_audit": "warn" },
+  "hard_block_paths": ["src/billing/**"],
+  "docs_root": "docs"
+}

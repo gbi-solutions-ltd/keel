@@ -223,7 +223,7 @@ check that failed, a check that could not run because something upstream was bro
 nobody attempted.
 
 **Gap 4: nothing audits what a repository claims against what it does.**
-`skills/write-docs/SKILL.md:33` warns that prose restating the code goes stale silently, `:87-90`
+`skills/write-docs/SKILL.md` warns that "restating what the code" goes stale silently, `:87-90`
 requires a document to record the commit it describes so staleness is judgeable, and
 `skills/review-code/SKILL.md:83` gates a behaviour change on its documentation. All three prevent
 *new* drift. None detects drift that already exists. This repository has already paid for that gap:
@@ -246,7 +246,7 @@ Every number below was measured on this tree at `e60dcee` on branch `sandbox`, w
 
 **Budget 1: `setup-deployment` has 17 words of body headroom.**
 Its body is **683 words**. The warning threshold is 700 (`TARGET_WORDS=700`,
-`tests/validate-skills.sh:24`) and the ceiling is 900 (`CEILING_WORDS=900`, `:23`).
+`tests/validate-skills.sh`) and the ceiling is 900 (`CEILING_WORDS=900`, `:23`).
 `grep -n "setup-deployment" tests/evals/results.md` returns **nothing**, so it holds no eval arm,
 and ADR-0001 requires "a passing eval arm at that length" for any body over 700. Running that arm is
 not in scope here, so **the body must land at 700 words or fewer**. That is 17 words for everything
@@ -254,7 +254,7 @@ task 1 adds. Task 1's addition is measured at 12, leaving 5.
 
 **Budget 2: `write-docs` must be word-neutral.**
 Its body is **738 words**, over the target, and it holds a passing arm at exactly that length:
-`tests/evals/results.md:599`, "`write-docs` at 738 words, the ADR-0001 length arm". Growing past 738
+`tests/evals/results.md`, "`write-docs` at 738 words, the ADR-0001 length arm". Growing past 738
 requires a new arm at the new length. So **task 2's body edit must remove at least as many words as
 it adds**, and its `Done when:` states the before and after counts. Task 2's measured net is minus 7,
 landing at 731.
@@ -374,9 +374,9 @@ justification, not from anywhere else.
    - *Justification class: general engineering knowledge.* A process that fails partway through is
      exactly the process that cannot remember what it made, so the record has to be written before
      the step that might fail, not after the run that might not finish.
-   - *Justification class: keel practice.* `skills/setup-deployment/SKILL.md:88-91` already requires
-     a closing report naming what gates, what does not, and whether rollback was tested. A ledger is
-     the same instinct applied to resources rather than to checks.
+   - *Justification class: keel practice.* `skills/setup-deployment/SKILL.md`, at "Step 8: Report",
+     already requires a closing report naming what gates, what does not, and whether rollback was
+     tested. A ledger is the same instinct applied to resources rather than to checks.
    - The cost column is not optional: a free tier is a limit that becomes an incident later, and a
      resource with no stated cost is one nobody will decommission.
 
@@ -429,7 +429,7 @@ justification, not from anywhere else.
      `skills/repo-snapshot/references/section-templates.md:169` already runs a three-value evidence
      vocabulary, `measured`, `estimated`, `unmeasured`, "and the word" is required on every value.
      This is the same device for a different question.
-   - *Justification class: keel practice.* `skills/security-audit/SKILL.md:66-67`: "Say plainly what
+   - *Justification class: keel practice.* `skills/security-audit/SKILL.md`: "Say plainly what
      you did not cover. An audit that implies completeness it does not have is worse than a narrow
      one." `not attempted` is that rule given a name so it cannot be omitted by silence.
 
@@ -437,7 +437,7 @@ justification, not from anywhere else.
    this is compared rather than assumed; the system answers on the address people will actually use;
    a schema migration that the release depended on has evidence it ran; and a check must not mutate
    the system it is checking.
-   - *Justification class: keel practice.* `skills/setup-deployment/SKILL.md:59-61`: "Then build it
+   - *Justification class: keel practice.* `skills/setup-deployment/SKILL.md`: "Then build it
      and look inside... What a Dockerfile appears to copy and what lands in the image are different
      questions." Same principle at the other end of the pipeline: what the pipeline says it deployed
      and what is answering requests are different questions.
@@ -484,8 +484,8 @@ diagnosing the other's link failures.
 
 **Done when:** `tests/run-tests.sh` prints `All test files passed`, and
 `awk 'f;/^---$/{c++; if(c==2) f=1}' skills/write-docs/SKILL.md | wc -w` prints **731**, which is
-**at or below the 738 the existing eval arm covers** (`tests/evals/results.md:599`), so no new arm
-is owed. Record both numbers on handover: before 738, after 731.
+**at or below the 738 the existing eval arm covers** (`tests/evals/results.md`, "`write-docs` at
+738 words"), so no new arm is owed. Record both numbers on handover: before 738, after 731.
 
 - [x] **Step 1: Write the failing test**
 
@@ -538,7 +538,8 @@ code. Reread against the tells in
 **This is deduplication, not word golf, and that distinction is load bearing.** ADR-0001's
 Consequences names "a word-golf exercise where a genuine improvement must be paid for by deleting a
 different one" as the pathology it exists to stop, and
-`tests/evals/results.md:610-613` records a `write-docs` edit being reverted for exactly that reason.
+`tests/evals/results.md` records a `write-docs` edit being reverted for exactly that reason, at
+"The first attempt paid for it by deleting a duplicative `Common mistakes` row to stay under 700."
 The two clauses removed here are not deleted, they are already in the reference the same paragraph
 links: `skills/write-docs/references/current-state-prose.md:22` carries "stated as properties of the
 option rather than", and `:10` carries "Amending the sentences that carried the wrong claim keeps
@@ -601,10 +602,10 @@ Net: plus 12, minus 19, so 738 becomes **731**.
    - **`## What is out of scope`, as its own subsection.** Ranking advice, keyword strategy, content
      suggestions, backlinks and "consider adding" are not findings. A project deliberately kept out
      of search, and consistently kept out, is a decision and passes.
-   - *Justification class: keel practice.* `skills/review-code/SKILL.md:56-58` already separates
-     "Consider", a genuine preference to be said once, from what blocks, and
-     `skills/security-audit/SKILL.md:66-67` requires an audit to state its limits. A file that
-     wandered into ranking advice would be claiming a competence keel does not have.
+   - *Justification class: keel practice.* `skills/review-code/SKILL.md` already separates
+     "Consider", a genuine preference to be said once, from what blocks, and "Say plainly what
+     you did not cover" in `skills/security-audit/SKILL.md` requires an audit to state its limits.
+     A file that wandered into ranking advice would be claiming a competence keel does not have.
 
 6. **`## Reporting`.** Ranked by who is affected and how badly, capped, and closing with a named
    list of what could not be checked and why. The audit is read-only: it reports, and fixing is a
@@ -612,7 +613,7 @@ Net: plus 12, minus 19, so 738 becomes **731**.
    - *Justification class: keel practice.* `skills/review-code/SKILL.md:63-64` caps at "around ten
      findings. More than that means the change is too large to review, and that is itself the
      finding", and `:82` sets the read-only rule: "Rewriting it yourself in the review | Say what is
-     wrong. The author fixes it." `skills/security-audit/SKILL.md:66-67` sets the closing statement.
+     wrong. The author fixes it." "Say plainly" in `skills/security-audit/SKILL.md` sets the close.
 
 **What this file must not contain.** No framework, no file-naming convention from one stack, and no
 claim about which crawlers read which file. The first two would make it useless on twelve of the
@@ -769,11 +770,12 @@ migration, and no request to a write endpoint to find out what it does. A check 
 to the system in order to pass was not run, and it belongs in this section under its real name
 rather than in the findings. On a client system, running a write to see what happens is a change to
 somebody's data made without asking.
-- *Justification class: keel practice.* `skills/security-audit/SKILL.md:66-67`: "Say plainly what
+- *Justification class: keel practice.* `skills/security-audit/SKILL.md`: "Say plainly what
   you did not cover. An audit that implies completeness it does not have is worse than a narrow one."
   This rule is what makes that sentence enforceable: without it, a check can be made to pass and
   then honestly reported as passing.
-- *Justification class: this repository's history.* `CONTRIBUTING.md:145-146` records it happening
+- *Justification class: this repository's history.* `CONTRIBUTING.md`, under Testing against a
+  real repository, records it happening
   here: "During development a probe of mine ran `git init` in a project as a side effect of a
   read-only check, which it had no business doing." The reference is written from that, and the
   section may cite it.
@@ -801,7 +803,8 @@ coverage check returned when you ran it, and whether it matched what this task r
 
 ### Task 4: The catalog and the README say what the skills now do
 
-**Story:** none. Standing rule, `CONTRIBUTING.md:125`: "Documentation lands in the same commit.
+**Story:** none. Standing rule, `CONTRIBUTING.md` under Commits and
+review: "Documentation lands in the same commit.
 `README.md`, `CHANGELOG.md`, and the plan."
 **Files:**
 - Modify: `docs/02-skill-catalog.md`
@@ -897,7 +900,7 @@ a changelog that implies evidence this work does not have:
 - **That it is keel's own work with no third-party source**, so `SOURCES.md` and
   `THIRD-PARTY-LICENSES.md` are unchanged and deliberately so.
 
-**Do not touch `VERSION`.** Established from `CONTRIBUTING.md:132-137`: releases are monthly, tagged
+**Do not touch `VERSION`.** Established from the Releases section of `CONTRIBUTING.md`: releases are monthly, tagged
 and gated by the behavioural evals, and nothing in that section or anywhere else in `CONTRIBUTING.md`
 ties a change to a version bump. The existing `## Unreleased` block already holds the
 `design-database` work with `VERSION` unmoved, which is the precedent. **No version bump is required

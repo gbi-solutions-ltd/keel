@@ -55,7 +55,7 @@ only its own section must still obey them.
 
 **Depends on:** task 2
 
-**Done when:** `./gradlew test --tests '*SecurityPropertiesTest'` passes and the full suite is green.
+**Done when:** `./gradlew test --tests '*SecurityPropertiesTest'` passes.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -82,9 +82,13 @@ private List<String> apiKeys;
 - [ ] **Step 4: Run it and watch it pass**
 
 Run: `./gradlew test --tests '*SecurityPropertiesTest'`
-Expected: PASS. Then run the full suite; nothing else may break.
+Expected: PASS. The suite runs at the unit boundary, not per step.
 
-- [ ] **Step 5: Hand over**
+- [ ] **Step 5: Run the suite at the unit boundary, then hand over**
+
+Run: `./gradlew test`
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+This is the one suite run the task schedules.
 
 ```bash
 git add src/main/java/com/example/config/SecurityProperties.java \
@@ -231,6 +235,11 @@ Rules:
 - Where a task genuinely has no command, the line says so in the same place, the way the no-test
   tasks below do: `**Done when:** there is no command. This is a human check against the staging
   environment.` An honest gap reads as a gap. An invented command reads as coverage.
+- It is **scoped to the task's own test, never the full suite**, in every plan and not only in a
+  concurrent batch. The suite runs once at the unit boundary, which for a sequential task is its
+  hand-over step and for a batched one is the `Batch gate:` line at the join. A whole-suite `Done
+  when:` puts the suite back inside the cycle it was moved out of, and in a batch it also cannot
+  pass, for the reason under "Tasks that run concurrently" above.
 - It appears once per task, above the steps, so a fresh agent dispatched only that section still
   receives it.
 
@@ -242,7 +251,7 @@ Each step is one action, two to five minutes:
 - Run it and watch it fail
 - Write the minimal code
 - Run it and watch it pass
-- Hand over: stage the named paths, do not commit
+- Run the suite at the unit boundary, then hand over: stage the named paths, do not commit
 
 Steps 2 and 4 are not ceremony. A test you did not watch fail may be asserting nothing, and a
 plan that omits the failure check produces suites that are green because they test nothing.

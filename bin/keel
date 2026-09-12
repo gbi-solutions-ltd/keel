@@ -34,11 +34,39 @@ HERE="$(cd "$(dirname "$SELF")/.." && pwd)"
 # expects", which is the only version of that question worth warning about. Bump it only when a
 # field is added, removed, renamed or moved. 0.7.0 and 0.7.1 changed none, and a warning that fires
 # on releases like those is one nobody reads by the time it matters.
-SCHEMA_VERSION=2
+SCHEMA_VERSION=4
+
+# The keys a schema version removed, the version that removed each, and what to do instead. Read by
+# cmd_doctor, which is the only thing that can tell a person their profile still carries one.
+#
+# A register rather than a walk of the schema, because every object in
+# templates/profile.schema.json is additionalProperties: true on purpose: a project may carry keys
+# of its own, and a rule reporting anything the schema does not declare would warn at people for
+# using a documented affordance, and could name no remedy for the keys that do matter.
+#
+# Append a line here in the same commit that removes a key from the schema. Nothing detects a
+# removal you did not record. The fingerprint in tests/validate-skills.sh is a hash of the field
+# set, so it proves the set changed and cannot say which way; that validator checks only the other
+# direction, that no key named here is still declared in the schema.
+retired_keys() {
+    cat <<'RETIRED'
+gates.tdd|4|skills/tdd/SKILL.md asks for the cycle unconditionally and always did, so removing the key changes nothing.
+gates.review|4|skills/ship/SKILL.md runs its review step every time, so a project that set required already had it and one that set off never had the effect it expected.
+gates.docs_updated|4|skills/ship/SKILL.md runs its docs step every time, on the same terms as gates.review.
+gates.observability|4|nothing was asking, so removing the key changes nothing.
+conventions.working_branch|4|record the branch in CONTRIBUTING.md or in notes, where a person will read it.
+observability.log_shipping|4|set observability.backend to none for stdout only, which is the distinction the table in skills/coding-standards/references/observability.md keys on.
+RETIRED
+}
+
+# Set by `keel init --harness <list>`. Empty means "work it out", which is what harness_set_for_repo
+# does from the existing profile and then from the tracked tree.
+HARNESS_FLAG=""
 
 # Fail loudly on a broken install. Without this the sources below print to stderr and execution
 # continues into undefined functions, which reads as a bug in the project being configured.
-for _need in lib/detect-stack.sh lib/merge-claude-md.sh lib/apex-export.sh VERSION; do
+for _need in lib/detect-stack.sh lib/merge-claude-md.sh lib/apex-export.sh \
+             lib/harness/resolve.sh lib/harness/claude.sh VERSION; do
     [ -e "$HERE/$_need" ] || {
         printf 'keel: incomplete install: %s not found under %s\n' "$_need" "$HERE" >&2
         exit 1
@@ -51,6 +79,172 @@ done
 . "$HERE/lib/merge-claude-md.sh"
 # shellcheck source=lib/apex-export.sh
 . "$HERE/lib/apex-export.sh"
+
+# The harness layer. resolve.sh answers which gates are active where, from lib/harness/capabilities;
+# each lib/harness/<id>.sh implements the same seven-function contract for one harness.
+#
+# Claude Code's is sourced here so the contract is always defined, and because it is the harness
+# this CLI itself runs under. It is NOT the selection mechanism: every harness file defines the same
+# function names, so sourcing two leaves only the second reachable. harness_each below is what
+# actually runs a contract function once per harness, sourcing each one immediately before calling
+# it. A repository serving both harnesses is the case that a "source them all and call once" design
+# passes for one and silently skips for the other.
+# shellcheck source=lib/harness/resolve.sh
+. "$HERE/lib/harness/resolve.sh"
+# shellcheck source=lib/harness/claude.sh
+. "$HERE/lib/harness/claude.sh"
+
+# Run one contract function once per harness this repository serves.
+#
+# The source has to happen INSIDE the loop, immediately before the call, for the reason above. That
+# makes the loaded harness whichever ran last, so nothing outside a harness_each call may assume
+# which one is loaded; go through harness_each instead, even for a single value.
+# Validate before recording. Unchecked, `--harness bogus` wrote a harness nothing implements into
+# the profile, and `--harness --team` ate the next flag: the profile recorded a harness called
+# "--team", --team never ran, nothing was staged, and init said "configured" as though it had. Both
+# found in review. harness_known is the authority and already existed, unused here.
+harness_flag_set() {
+    local want="${1:-}" h known
+    known="$(harness_ids | tr '\n' ' ')"
+    case "$want" in
+        ""|-*) die "--harness needs a comma separated list of harness ids, not '$want'. Known: $known" ;;
+    esac
+    for h in ${want//,/ }; do
+        harness_known "$h" || die "unknown harness '$h'. Known: $known"
+        [ -f "$HERE/lib/harness/$h.sh" ] || die "harness '$h' is in the capability manifest and lib/harness/$h.sh does not exist, so keel cannot configure a repository for it."
+    done
+    HARNESS_FLAG="$want"
+}
+
+# Every harness the capability manifest knows, one per line. Read from the manifest rather than
+# listed here, so a harness added there cannot be missing from an error message that names them.
+harness_ids() {
+    awk -F'|' '$1=="provides" {print $2}' "$(harness_capabilities_path)" | awk '!seen[$0]++'
+}
+
+# Every gate the capability manifest knows, one per line. Read from the manifest for the same
+# reason harness_ids is: a fifth gate added under hooks/ with a requires row would otherwise be
+# missing from what doctor reports, and a report that quietly omits a gate is the failure this
+# whole design exists to prevent. tests/test-harness-claims.sh already fails the build when the
+# requires rows and the files under hooks/ disagree, so either is the same list.
+harness_gates() {
+    awk -F'|' '$1=="requires" {print $2}' "$(harness_capabilities_path)" | awk '!seen[$0]++'
+}
+
+# Which harness is running this process.
+#
+# CLAUDE_PLUGIN_ROOT is NOT a discriminator: Codex sets it deliberately for compatibility, at
+# codex-rs/hooks/src/engine/discovery.rs:266-269, and only for plugin hooks at that. Checked rather
+# than assumed, because hooks/hooks.json interpolates that variable.
+#
+# CODEX_VERSION is injected into every shell command Codex's exec tool runs
+# (codex-rs/core/src/exec_env.rs:40-49). A hook reads turn_id from its stdin payload instead; that
+# path lives in the hooks, not here.
+harness_running() {
+    [ -n "${CODEX_VERSION:-}" ] && { printf 'codex\n'; return 0; }
+    [ -n "${CLAUDECODE:-}" ] && { printf 'claude\n'; return 0; }
+    printf 'unknown\n'
+}
+
+# Whether the hooks keel ships will actually RUN for this harness on this machine. Prints
+# `trusted`, `untrusted` or `unknown`.
+#
+# THIS IS NOT THE QUESTION THE CAPABILITY MANIFEST ANSWERS, and open question 6 of the architecture
+# is the gap between the two. The manifest says what a harness CAN do. Doctor has to say what THIS
+# installation does. Codex runs no hook until its source is trusted and says nothing when it skips
+# one, measured 2026-09-06 on codex-cli 0.153.4, so `harness_active_gates codex` is a true statement
+# about Codex and a false one about a user whose hooks are untrusted. Reporting the manifest's
+# answer there would be keel agreeing with itself.
+#
+# The same probe found the 25 skills load without trust and the hooks do not, so an untrusted
+# install does not look broken, it looks like most of keel working. That is why the doctor line this
+# feeds says which half a person is looking at.
+#
+# WHAT IS READ. The key is `hooks.state."<id>"`, carried as a literal `hooks.state."` prefix in the
+# 0.153.4 binary beside the `enabled` and `trusted_hash` fields, in the user's config. Installing
+# the real keel plugin wrote `[plugins."keel@gbi"] enabled = true` and no trust entry of any kind,
+# and running a session added none, so the absence of `trusted_hash` beside an installed keel is
+# itself the signal.
+#
+# ONLY KEEL'S OWN TABLES COUNT, and this is the correction that matters. The first version of this
+# function tracked the three flags across every `[hooks.state.*]` and `[plugins.*]` table in the
+# file, which on any config holding a second plugin answered about the wrong one. Both directions
+# were wrong and one of them fails OPEN: an unrelated plugin the user had trusted made keel read as
+# trusted, and doctor printed three gates active on an installation where none of them would ever
+# run. The id is `<plugin name>@<marketplace>`, so the tables are matched on a quoted id of `keel`
+# or `keel@anything` and nothing else contributes.
+#
+# UNKNOWN IS NOT A FAILURE STATE AND MUST NOT READ AS ONE. The manifest fails closed on missing
+# evidence because a wrong `provides` row is unsafe. A doctor line that cries wolf on every machine
+# gets ignored, which costs more than it saves, so an absent or unreadable config says so rather
+# than reporting a gate dark.
+#
+# It lives in this file rather than in lib/harness/codex.sh because cmd_doctor asks it for a named
+# harness id, including one the repository does not serve, and harness_each only walks the set the
+# repository does serve.
+harness_hooks_trusted() {   # harness_hooks_trusted <harness>
+    case "${1:-}" in
+        # Claude Code has no trust step. A hook in settings.json runs, so there is nothing to read
+        # and nothing to withhold.
+        claude) printf 'trusted\n'; return 0 ;;
+        codex)  ;;
+        *) printf 'unknown\n'; return 0 ;;
+    esac
+    # `${HOME:-}` and not `$HOME`: this file runs under `set -u`, and an unset HOME (a container, a
+    # cron shell) would abort doctor on an unbound variable instead of reporting. Both unset leaves
+    # an unreadable path, which is the `unknown` this function already has an answer for.
+    local cfg="${CODEX_HOME:-${HOME:-}/.codex}/config.toml"
+    [ -r "$cfg" ] || { printf 'unknown\n'; return 0; }
+    # The section is tracked rather than grepped, because `enabled` and `trusted_hash` are ordinary
+    # field names and the answer depends on which table they sit in. A hash that is blank or empty
+    # is absent evidence and grants nothing, the same rule ADR-0003 puts on a provides row.
+    awk -F= '
+        /^[[:space:]]*\[/ {
+            state  = ($0 ~ /^[[:space:]]*\[hooks\.state\."keel(@[^"]*)?"\][[:space:]]*$/)
+            plugin = ($0 ~ /^[[:space:]]*\[plugins\."keel(@[^"]*)?"\][[:space:]]*$/)
+            next
+        }
+        state {
+            if ($1 ~ /^[[:space:]]*trusted_hash[[:space:]]*$/ && $2 ~ /[^[:space:]"]/) hash = 1
+            if ($1 ~ /^[[:space:]]*enabled[[:space:]]*$/ && $2 ~ /false/) off = 1
+        }
+        plugin {
+            if ($1 ~ /^[[:space:]]*enabled[[:space:]]*$/ && $2 ~ /false/) off = 1
+            installed = 1
+        }
+        END {
+            if (hash && !off) print "trusted"
+            else if (hash || installed) print "untrusted"
+            else print "unknown"
+        }
+    ' "$cfg"
+}
+
+# Asked once per process. harness_set_for_repo starts an interpreter to parse the profile's
+# `harnesses` array, and harness_each is called a dozen times in one init: for the context file, the
+# config paths, the permission rules, the writers and each doctor phase. Unprimed that is a dozen
+# python starts for a constant, and tests/test-keel.sh counts interpreter starts precisely because
+# this file has been bitten by that before. Primed in the parent shell, so the $( ) subshells below
+# inherit it full. Same shape and same reason as json_load and settings_report_load.
+HARNESS_SET=""
+harness_set_load() {
+    HARNESS_SET="$(harness_set_for_repo "$HARNESS_FLAG")"
+}
+
+harness_each() {   # harness_each <contract function> [args...]
+    local h
+    [ -n "$HARNESS_SET" ] || harness_set_load
+    for h in $HARNESS_SET; do
+        [ -f "$HERE/lib/harness/$h.sh" ] || continue
+        # shellcheck source=/dev/null
+        . "$HERE/lib/harness/$h.sh"
+        "$@"
+    done
+    # Leave Claude Code's contract loaded, so a caller that forgets the rule above gets the
+    # behaviour keel has always had rather than whichever harness happened to sort last.
+    # shellcheck source=lib/harness/claude.sh
+    . "$HERE/lib/harness/claude.sh"
+}
 
 DEFAULT_DOCS_ROOT="docs/keel"
 
@@ -156,125 +350,6 @@ else:            print(d)
 PY
 }
 
-# Both reports below read the same settings files, so they are one interpreter start and one parse
-# rather than two of each. Filled on the first lookup and never again in this process.
-#
-# Doctor reads it through two process substitutions, and neither can fill it for the other, so
-# cmd_doctor primes it in its own shell first. Same shape as pkg_scripts_load, same reason.
-SETTINGS_REPORT=""
-SETTINGS_REPORT_LOADED=""
-
-settings_report_load() {
-    [ -n "$SETTINGS_REPORT_LOADED" ] && return 0
-    have_python || return 0
-    SETTINGS_REPORT_LOADED=1
-    # No apostrophe anywhere below, and this is now load-bearing: the heredoc sits inside a $( ),
-    # and bash 3.2 does not treat a quoted heredoc body as literal there, so one of them swallows
-    # the rest of this file and reports the parse error hundreds of lines away. shellcheck does not
-    # see it. json_load one file up carries the same warning for the same reason.
-    SETTINGS_REPORT="$(KEEL_HERE="$HERE" python3 - <<'PY' 2>/dev/null
-import json, os, glob
-# Every scope Claude Code merges, in its order. Project scope
-# alone was harmless while the fallback list was three plugins nobody enables per project. Once init
-# wrote keel@gbi into plugins.recommended it was not: keel is normally enabled at user scope, so
-# every project reported it missing, next to the doctor line saying the marketplace is registered,
-# and the /plugin install it suggested wrote to the scope this never looked at.
-#
-# Names are compared whole here. The duplicate check below strips the marketplace suffix because it
-# is matching skill names across plugins; the recommended list carries qualified names and so must
-# this.
-dirs = [d for d in (os.environ.get("CLAUDE_CONFIG_DIR"), os.path.expanduser("~/.claude")) if d]
-# Later files win, which is the order Claude Code merges them in.
-merged = {}
-for p in [os.path.join(d, "settings.json") for d in dirs] + [".claude/settings.json", ".claude/settings.local.json"]:
-    try:
-        merged.update(json.load(open(p)).get("enabledPlugins", {}))
-    except Exception:
-        pass
-enabled_full = {k for k, v in merged.items() if v}
-try:
-    rec = json.load(open(".keel/profile.json")).get("plugins", {}).get("recommended")
-except Exception:
-    rec = None
-if not rec:
-    rec = ["security-guidance@claude-plugins-official",
-           "code-review@claude-plugins-official",
-           "skill-creator@claude-plugins-official"]
-for r in rec:
-    if r not in enabled_full:
-        print("missing:" + r)
-
-# Each reason is a sentence a reader can act on. A label ("conflicts") tells nobody what to do.
-KNOWN = {
-    "feature-dev": "it ships its own explorer, architect and reviewer agents behind a /feature-dev command, covering the same ground as repo-snapshot, design-architecture, write-plan, execute-plan and review-code, and it writes to none of the artifact chain",
-    "superpowers": "its using-superpowers skill tells the model to invoke a superpowers skill before any response, which competes directly with the keel router, and it injects its whole methodology at session start",
-    "gstack": "it carries its own planning and review workflow plus a session preamble running to several thousand tokens",
-}
-
-enabled = {k.split("@")[0] for k in enabled_full}
-
-# What each installed plugin ships, from the cache: <cfg>/plugins/cache/<market>/<plugin>/<version>/skills/<skill>/SKILL.md
-shipped = {}
-for d in dirs:
-    for path in glob.glob(os.path.join(d, "plugins", "cache", "*", "*", "*", "skills", "*", "SKILL.md")):
-        parts = path.split(os.sep)
-        shipped.setdefault(parts[-5], set()).add(parts[-2])
-
-# Ours comes from the working tree, not from the cache. The cached copy is whatever version was last
-# installed, which is routinely older than the CLI and would under-report a brand new collision.
-ours = {os.path.basename(os.path.dirname(p))
-        for p in glob.glob(os.path.join(os.environ["KEEL_HERE"], "skills", "*", "SKILL.md"))}
-
-for name in sorted(enabled):
-    if name in KNOWN:
-        print("conflict:%s|%s" % (name, KNOWN[name]))
-    if name == "keel":
-        continue
-    for s in sorted(shipped.get(name, set()) & ours):
-        print("dup:%s|%s" % (s, name))
-PY
-)"
-    return 0
-}
-
-# Prints "missing:<plugin>" per recommended plugin that is not enabled. Silent when there is nothing
-# to say. Conflicts are the other two shapes, which see more than this file does.
-plugin_report() {
-    settings_report_load
-    [ -n "$SETTINGS_REPORT" ] || return 0
-    local line
-    # The redirect is on the loop, not a pipe, so this runs in the current shell and spawns nothing.
-    while IFS= read -r line; do
-        case "$line" in missing:*) printf '%s\n' "$line" ;; esac
-    done <<< "$SETTINGS_REPORT"
-    return 0
-}
-
-# Where keel ends and another plugin begins.
-#
-# Two kinds of collision, and the second is the one no hardcoded list can catch:
-#
-#   conflict:<plugin>|<why>   a plugin known to ship a competing end-to-end methodology
-#   dup:<skill>|<plugin>      any enabled plugin shipping a skill name keel also ships
-#
-# The duplicate check reads the installed plugin cache rather than a registry, so a plugin nobody
-# anticipated surfaces the moment it ships its own `tdd` or `review-code`. Two skills under one name
-# is not an error in Claude Code, which is what makes it worth reporting: the model picks one, and
-# neither the session nor the transcript records which.
-#
-# It reports and stops there. Disabling somebody's plugin from a tool they ran to configure a
-# repository would be a larger decision than this command is entitled to make, and the conflicting
-# plugin may be the deliberate choice.
-boundary_report() {
-    settings_report_load
-    [ -n "$SETTINGS_REPORT" ] || return 0
-    local line
-    while IFS= read -r line; do
-        case "$line" in conflict:*|dup:*) printf '%s\n' "$line" ;; esac
-    done <<< "$SETTINGS_REPORT"
-    return 0
-}
-
 docs_root() {
     local r=""
     [ -f .keel/profile.json ] && r="$(json_get .keel/profile.json docs_root || true)"
@@ -329,8 +404,8 @@ default_branch() {
 merge_profile() {
     local fresh="$1" existing="$2"
     have_python || { mv "$fresh" "$existing"; return 0; }
-    python3 - "$fresh" "$existing" <<'PY'
-import json, sys
+    KEEL_HARNESS_EXPLICIT="$HARNESS_FLAG" python3 - "$fresh" "$existing" <<'PY'
+import json, os, sys
 fresh = json.load(open(sys.argv[1]))
 old = json.load(open(sys.argv[2]))
 def merge(new, cur):
@@ -350,6 +425,13 @@ merged["keel_version"] = fresh["keel_version"]
 # reading schema_version, so an old value surviving a re-init would make the refresh invisible to
 # the one check that exists to notice it.
 merged["schema_version"] = fresh["schema_version"]
+# `harnesses` is a human value and the merge above is right to keep it: re-running init must not
+# re-infer the set from the tree and quietly drop a harness somebody added by hand. But an explicit
+# --harness IS the human speaking, and it lost to the value it was trying to replace, silently, on
+# every repository that already had a profile. The only ways to change the set were --force, which
+# discards every human value in the file, and hand-editing. Found in review.
+if os.environ.get("KEEL_HARNESS_EXPLICIT") and "harnesses" in fresh:
+    merged["harnesses"] = fresh["harnesses"]
 json.dump(merged, open(sys.argv[2], "w"), indent=2)
 open(sys.argv[2], "a").write("\n")
 PY
@@ -380,6 +462,48 @@ json_or_null() {
     if [ -n "$1" ]; then printf '"%s"' "$1"; else printf 'null'; fi
 }
 
+# Which harnesses this repository serves. A set, not a switch: a team with some developers on Claude
+# Code and some on Codex works on one repository, and a switch makes that repository's config a
+# running argument between the two of them. ADR-0004.
+#
+# Tracked files only. An untracked .codex/ is one developer's local state and must not change what
+# the repository claims for everybody.
+#
+# AGENTS.md is deliberately NOT a signal. keel has dual written it since long before Codex was
+# supported and Cursor, Copilot CLI and Gemini CLI read it too, so treating it as evidence would
+# mark the whole installed base as Codex-serving in one upgrade.
+harness_set_for_repo() {
+    local explicit="${1:-}"
+    if [ -n "$explicit" ]; then printf '%s\n' "${explicit//,/$'\n'}"; return 0; fi
+    if [ -f .keel/profile.json ]; then
+        # Read through json_get, which answers from the flattened cache json_load already filled,
+        # so this costs no interpreter start of its own. tests/test-keel.sh counts them, and a
+        # second python3 for a value the process has already parsed is the thing it counts.
+        #
+        # The cache flattens with Python str(), so a list comes back as ['claude', 'codex'],
+        # single-quoted and on one line. Unpicking that repr is only safe because every id in it is
+        # validated on the way in by harness_flag_set, so the alphabet is [A-Za-z0-9_-]; anything
+        # else is dropped here rather than half-parsed into a harness name nothing implements.
+        local existing="" raw h
+        raw="$(json_get .keel/profile.json harnesses 2>/dev/null || true)"
+        case "$raw" in
+            \[*\])
+                for h in $(printf '%s' "$raw" | tr -d "[]'\"" | tr ',' ' '); do
+                    case "$h" in
+                        *[!A-Za-z0-9_-]*|"") continue ;;
+                    esac
+                    existing="$existing$h
+"
+                done ;;
+        esac
+        [ -n "$existing" ] && { printf '%s' "$existing"; return 0; }
+    fi
+    local out="claude"
+    git ls-files --error-unmatch .codex/config.toml >/dev/null 2>&1 && out="$out
+codex"
+    printf '%s\n' "$out"
+}
+
 write_profile() {
     local root="$1" lang rt fw pm kind ui
     # Detect the languages here, in this shell, before anything asks. Every line below reads them
@@ -400,6 +524,7 @@ write_profile() {
       printf '{\n'
       printf '  "keel_version": "%s",\n' "$kver"
       printf '  "schema_version": %s,\n' "$SCHEMA_VERSION"
+      printf '  "harnesses": [%s],\n' "$(json_str_array "$(harness_set_for_repo "$HARNESS_FLAG")")"
       printf '  "project": { "name": "%s", "kind": "%s", "description": "" },\n' "$name" "$kind"
       printf '  "stack": { "language": "%s", "runtime": "%s", "framework": "%s", "package_manager": %s, "also": [%s], "datastores": [%s], "has_ui": %s },\n' \
         "$lang" "$rt" "$fw" "$pm_json" "$(json_str_array "$(detect_also)")" \
@@ -427,8 +552,8 @@ write_profile() {
       # window is a floor: observation raises it in flight. It was a ceiling until 2026-08-18, and
       # writing this key before that change would have hard-stopped every 1M session at 170,000
       # tokens permanently.
-      printf '  "gates": { "tdd": "required", "coding_standards": "warn", "review": "required", "security_audit": "required", "observability": "required", "docs_updated": "warn", "commit_guard": "off", "done_verified": "warn", "context_window": 200000 },\n'
-      printf '  "observability": { "backend": "signoz", "otlp_endpoint_var": "OTEL_EXPORTER_OTLP_ENDPOINT", "log_shipping": "otlp" },\n'
+      printf '  "gates": { "coding_standards": "warn", "security_audit": "required", "commit_guard": "off", "done_verified": "warn", "context_window": 200000 },\n'
+      printf '  "observability": { "backend": "signoz", "otlp_endpoint_var": "OTEL_EXPORTER_OTLP_ENDPOINT" },\n'
       # response_style and explain_level are written explicitly rather than left absent and
       # defaulted. Terse and technical are what a project gets without asking, so the keys that
       # change them have to be visible in the file the reader already opens, not things they must
@@ -441,7 +566,7 @@ write_profile() {
       # fallen back to a fixed three when it was absent, which is why a language server was never
       # named on a repository that already had a .claude/settings.json: nothing enabled it and
       # nothing reported it missing.
-      printf '  "plugins": { "recommended": [%s] },\n' "$(json_str_array "$(expected_plugins)")"
+      printf '  "plugins": { "recommended": [%s] },\n' "$(json_str_array "$(harness_each harness_recommend_plugins)")"
       printf '  "artifacts": {\n'
       printf '    "_note": "Set any of these to a path when the artifact already exists elsewhere. Skills read the mapped path instead of the default under docs_root, so a repo with its own naming convention is not duplicated.",\n'
       printf '    "snapshot": null, "prd": null, "stories": null, "architecture": null, "decisions": null, "plans": null\n'
@@ -512,126 +637,6 @@ D
       > "$root/decisions/ADR-0000-template.md"
 }
 
-# Committed into the project, not shipped in the plugin. With skills living in the plugin rather
-# than the repo, this is the only thing that tells a session without the plugin that a standard
-# exists.
-#
-# It states the condition rather than testing it. A hook registered in a project's settings.json
-# receives nothing that names a loaded plugin: CLAUDE_PLUGIN_ROOT is set only for hooks a plugin
-# itself defines, and a project hook's environment carries CLAUDE_PROJECT_DIR and no plugin field at
-# all. The reader knows its own skill list, so the message asks it to look there.
-write_nudge() {
-    mkdir -p .claude
-    cat > .claude/keel-nudge <<'NUDGE'
-#!/usr/bin/env bash
-# SessionStart hook, committed to this repository by `keel init`.
-#
-# A project hook cannot see which plugins a session loaded, so this states the condition and leaves
-# the check to the reader. It prints in every session and sits in that session's context, which is
-# why it is short.
-set -eu
-
-read -r -d '' MSG <<'TXT' || true
-If you have no skills named `keel:*`, the keel plugin is not loaded in this session and the rest of
-this note applies. If you do have them, ignore it.
-
-This project expects the plugin. Without it its gates on tests, security, and review do not apply,
-and .keel/profile.json is what is left: read it before running any test, lint, or build command
-rather than assuming the stack's usual one.
-
-Install it:
-  /plugin marketplace add gbi-solutions-ltd/keel
-  /plugin install keel@gbi
-
-Continuing without it is fine for a small change.
-TXT
-
-escape() { local s="$1"; s="${s//\\/\\\\}"; s="${s//\"/\\\"}"; s="${s//$'\n'/\\n}"; printf '%s' "$s"; }
-printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$(escape "$MSG")"
-NUDGE
-    chmod +x .claude/keel-nudge
-}
-
-# The guardrails. Both lists are checked in and shared by the team, which is why neither contains
-# a permission mode: see write_local_settings for why that stays per-developer.
-#
-# `deny` and `ask` are the only instruments that still work once a session is in bypassPermissions
-# mode. Verified against a live session rather than taken from the documentation: a denied Read
-# and an asked Bash command both held while an ordinary write went through unprompted. Allow rules
-# have no effect in that mode, so protection expressed as an allowlist is not protection at all.
-#
-# deny is for what is never legitimate for an agent to do in a repository. Reading a secret is on
-# that list because the secret then lives in the transcript, and because settings files in the
-# wild already contain pasted production passwords.
-#
-# THE READ RULES DO NOT COVER BASH, and that is worth knowing rather than discovering. A `Read` deny
-# matches the Read tool only, so `cat .env` reaches the same bytes through a different door. Found
-# when a subagent working under these exact rules reported .env contents it had obtained via Bash.
-#
-# The Bash entries below close the common shapes. They are defence in depth and not a boundary: a
-# command string cannot be matched exhaustively, and `sh -c`, `xargs`, `env`, a python one-liner or a
-# here-doc all get past them. Treat a secret in the working tree as reachable by any agent that can
-# run commands, and keep the real secrets out of the tree.
-keel_deny_rules() {
-    cat <<'R'
-Read(./.env)
-Read(./.env.*)
-Read(./secrets/**)
-Read(./**/*.pem)
-Read(./**/id_rsa*)
-Bash(cat *.env*)
-Bash(cat *secrets/*)
-Bash(cat *id_rsa*)
-Bash(head *.env*)
-Bash(tail *.env*)
-Bash(less *.env*)
-Bash(more *.env*)
-Bash(strings *.env*)
-R
-}
-
-# ask is for what is destructive but sometimes right. It restores the prompt for exactly those
-# commands and leaves everything else flowing, which is the whole point of pairing it with bypass
-# mode. Rebasing a feature branch and force-pushing it is normal work; doing it without a human
-# reading the command first is not.
-#
-# Deliberately not here: a recursive delete rooted at the filesystem root or at the home directory,
-# which Claude Code already circuit-breaks in every mode. A rule that duplicates a built-in check
-# reads as protection while adding none.
-#
-# The last three are the egress rules, and they guard a different thing from the rest of the list.
-# Everything above destroys something the user can see is gone. These send something out, and the
-# loss is silent: whatever a session can read, it can post. Decision 12 in docs/07-open-decisions.md
-# recorded that gap when it accepted the bypassPermissions default, and this closes it. The vendor's
-# own hardening guidance names denying these commands as the way to do it; ask rather than deny,
-# because fetching a page is ordinary work and a prompt is enough to make it a decision.
-#
-# THESE ARE NOT AN EGRESS BOUNDARY, for the same reason the Bash entries in the deny list are not a
-# read boundary. Not covered, and not an exhaustive list of what is not covered: a remote shell or
-# file copy over ssh, a git push to a remote nobody looked at, a python or node one-liner opening a
-# socket, and any of those reached through sh -c or xargs. A machine that must not talk to the
-# internet needs a sandbox or a firewall, not a rule list.
-keel_ask_rules() {
-    cat <<'R'
-Bash(git push --force*)
-Bash(git push -f *)
-Bash(git reset --hard*)
-Bash(git clean *)
-Bash(git branch -D *)
-Bash(terraform apply*)
-Bash(terraform destroy*)
-Bash(kubectl delete *)
-Bash(docker system prune*)
-Bash(npm publish*)
-R
-    # The egress three are emitted rather than written into the heredoc above, because a heredoc
-    # line cannot carry a scanner suppression: its text is the rule, so a trailing comment would
-    # land inside the rule string. supply-chain-scan reads this file as an executable and its
-    # net-in-script rule cannot tell a command named in a permission rule from one being run, which
-    # is the same false positive the two test files already suppress.
-    printf 'Bash(%s *)\n' curl wget nc  # supply-chain-scan: allow these name the commands to prompt for, nothing here runs them
-}
-
 # Emit a JSON array of the rules from one of the two lists above, indented to sit inside
 # "permissions". Kept in one place so the writer, the merge, and doctor cannot disagree.
 json_rule_array() {
@@ -643,121 +648,6 @@ json_rule_array() {
         printf '\n      "%s"' "$r"
     done
     printf '\n    ]'
-}
-
-# No extraKnownMarketplaces here, deliberately. A marketplace source says where this reader gets
-# keel from, which is a fact about their machine and not about the project, so a committed file
-# asserting one is wrong for everyone whose answer differs: a reader outside the GitHub org cannot
-# reach a private repo, and at project scope the declaration shadows whatever the reader chose at
-# user level. Every @claude-plugins-official plugin below is enabled without one and resolves fine.
-# Doctor names the install command when the marketplace is absent, and so does the nudge.
-#
-# That paragraph is about write_settings, two functions below. expected_plugins comes first because
-# both writers read it.
-
-# The plugin set this project expects, one name per line, marketplace-qualified.
-#
-# Both writers read this: write_settings enables them in .claude/settings.json on a fresh repository,
-# and write_profile records them in plugins.recommended so doctor can report what is missing. They
-# were two lists for one turn of this change and immediately disagreed: the profile carried only the
-# language servers, so doctor stopped naming the five official plugins it had always named, and an
-# existing assertion caught it. One definition, read twice.
-expected_plugins() {
-    printf 'keel@gbi\n'
-    for p in security-guidance code-review skill-creator claude-md-management context7 $(detect_plugins); do
-        printf '%s@claude-plugins-official\n' "$p"
-    done
-}
-
-write_settings() {
-    mkdir -p .claude
-    if [ -f .claude/settings.json ]; then
-        merge_permissions_into_settings
-        return 0
-    fi
-    {
-      printf '{\n  "enabledPlugins": {'
-      local first_plugin=1 ep
-      while IFS= read -r ep; do
-          [ -n "$ep" ] || continue
-          [ $first_plugin -eq 1 ] && first_plugin=0 || printf ','
-          printf '\n    "%s": true' "$ep"
-      done <<EOF_PLUGINS
-$(expected_plugins)
-EOF_PLUGINS
-      printf '\n  },\n'
-      printf '  "permissions": {\n    "deny": '
-      keel_deny_rules | json_rule_array
-      printf ',\n    "ask": '
-      keel_ask_rules | json_rule_array
-      printf '\n  },\n'
-      printf '  "hooks": {\n    "SessionStart": [\n      {\n        "matcher": "startup|clear",\n'
-      printf '        "hooks": [ { "type": "command", "command": "./.claude/keel-nudge", "shell": "bash" } ]\n'
-      printf '      }\n    ]\n  }\n}\n'
-    } > .claude/settings.json
-}
-
-# An existing settings.json is the common case on a mature repo, and it is exactly the case that
-# most needs the guardrails. Add only what is missing: rules the project already lists are left
-# alone, and nothing else in the file is touched.
-merge_permissions_into_settings() {
-    have_python || { err "python3 absent: could not add permission guardrails to the existing .claude/settings.json. Add them by hand, or delete the file and re-run."; return 0; }
-    local deny ask
-    deny="$(keel_deny_rules)"; ask="$(keel_ask_rules)"
-    DENY="$deny" ASK="$ask" python3 - <<'PY'
-import json, os
-p = ".claude/settings.json"
-try:
-    d = json.load(open(p))
-except Exception as e:
-    raise SystemExit(f"keel: {p} is not valid JSON ({e}); leaving it alone")
-perms = d.setdefault("permissions", {})
-added = 0
-for key, env in (("deny", "DENY"), ("ask", "ASK")):
-    have = perms.setdefault(key, [])
-    for rule in os.environ[env].splitlines():
-        if rule and rule not in have:
-            have.append(rule); added += 1
-if added:
-    json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
-    print(f"  added {added} permission guardrail(s) to .claude/settings.json")
-PY
-}
-
-# The permission mode is per-developer and stays out of version control, deliberately.
-#
-# A committed file that sets bypassPermissions turns off every prompt for anyone who clones the
-# repository, before they have read a line of it. The split stops that: the shared file carries the
-# guardrails, the local file carries the mode, and the mode never reaches anyone else's machine.
-#
-# Be accurate about what it does not do. keel picks this default and the engineer overrides it, so
-# this is keel's call for the machine it is run on, announced in init's summary, not a choice each
-# engineer makes unprompted. Recorded as decision 12 in docs/07-open-decisions.md with the residual
-# it accepts. Claude Code merges both files and the deny and ask rules still apply under the mode,
-# verified twice and cited there, which is what makes the split cost nothing.
-write_local_settings() {
-    mkdir -p .claude
-    local f=.claude/settings.local.json
-    if [ ! -f "$f" ]; then
-        printf '{\n  "permissions": {\n    "defaultMode": "bypassPermissions"\n  }\n}\n' > "$f"
-        return 0
-    fi
-    # Never clobber this file. It accumulates a developer's own allow rules over months of work,
-    # and losing them is worse than not setting the mode.
-    have_python || { err "python3 absent: left $f alone. Set permissions.defaultMode by hand if you want bypass mode."; return 0; }
-    python3 - <<'PY'
-import json
-p = ".claude/settings.local.json"
-try:
-    d = json.load(open(p))
-except Exception as e:
-    raise SystemExit(f"keel: {p} is not valid JSON ({e}); leaving it alone")
-perms = d.setdefault("permissions", {})
-if "defaultMode" not in perms:
-    perms["defaultMode"] = "bypassPermissions"
-    json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
-    print("  set permissions.defaultMode in .claude/settings.local.json")
-PY
 }
 
 # Whether the repository's own rules ignore a path, with the developer's global excludes taken out
@@ -807,7 +697,9 @@ $(git -c core.quotePath=false ls-tree -r --name-only HEAD 2>/dev/null)
     # the physical path, so under /var every prefix test failed and the check silently found
     # nothing. doctor already runs from the project root everywhere else.
     top="$(pwd)"
-    for f in README.md CLAUDE.md AGENTS.md "$root"/*.md; do
+    # harness_each, not a bare call: the rule at the top of this file is that nothing outside one
+    # may assume which harness is loaded, and a bare call here scanned whichever was sourced last.
+    for f in README.md $(harness_each harness_context_file) AGENTS.md "$root"/*.md; do
         [ -f "$f" ] || continue
         dir="${f%/*}"; [ "$dir" = "$f" ] && dir='.'
         while IFS= read -r target; do
@@ -869,7 +761,10 @@ ignore_local_state() {
     # neither of keel's. Found on the existing-service pilot, where it silently un-ignored the
     # settings.local.json rule the repository already had.
     [ -s .gitignore ] && [ -n "$(tail -c 1 .gitignore)" ] && printf '\n' >> .gitignore
-    for line in ".claude/settings.local.json" ".keel/handoff.md"; do
+    # The harness's own uncommitted config, plus the handoff. Read from the contract rather than
+    # named here, so a repository serving a second harness ignores that harness's local file too
+    # without this function learning what it is called.
+    for line in $(harness_each harness_config_paths | sed -n 's/^local|//p') ".keel/handoff.md" ".keel/handoff.seen"; do
         if [ -f .gitignore ] && grep -qxF "$line" .gitignore; then continue; fi
         printf '%s\n' "$line" >> .gitignore
     done
@@ -890,7 +785,7 @@ stage_for_team() {
     # hold a space and this file uses no arrays; `$1` is already read into `root` above.
     local p
     set --
-    for p in .keel CLAUDE.md AGENTS.md .claude "$root" .gitignore; do
+    for p in .keel $(harness_each harness_context_file) AGENTS.md $(harness_each harness_config_dirs) "$root" .gitignore; do
         [ -e "$p" ] && set -- "$@" "$p"
     done
     if [ "$#" -gt 0 ] && git add -- "$@" >/dev/null 2>&1; then
@@ -906,12 +801,25 @@ cmd_init() {
     # written against it keep working when prompts are added.
     local team=0
     FORCE=0
-    for a in "$@"; do case "$a" in -y|--yes) ;; --team) team=1 ;; --force) FORCE=1 ;; esac; done
+    HARNESS_FLAG=""
+    # --harness takes its value in the NEXT argument, so the loop cannot be a plain `for a in "$@"`
+    # any more: that form has no way to consume two. `shift`-based parsing keeps every existing flag
+    # behaving exactly as it did and is the smallest change that can read a value at all.
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -y|--yes) ;;
+            --team) team=1 ;;
+            --force) FORCE=1 ;;
+            --harness) shift; harness_flag_set "${1:-}" ;;
+            --harness=*) harness_flag_set "${1#--harness=}" ;;
+        esac
+        shift
+    done
 
     local root; root="$(docs_root)"
     check_docs_ignored "$root" || exit 1
 
-    for f in CLAUDE.md AGENTS.md; do
+    for f in $(harness_each harness_context_file) AGENTS.md; do
         check_markers "$f"; local rc=$?
         [ $rc -eq 2 ] && die "$f has duplicate keel markers. Remove the extra block by hand; keel will not guess which to keep."
         [ $rc -eq 3 ] && die "$f has an unbalanced keel marker. Fix it by hand."
@@ -922,25 +830,43 @@ cmd_init() {
     # so the reads below and the ones inside render_block inherit it full. Each of those is a $( ),
     # which cannot fill it for anybody else. Not redundant.
     json_load .keel/profile.json || true
+    harness_set_load
     local block; block="$(mktemp)"
     render_block "$block" "$root"
-    merge_block CLAUDE.md "$block"
+    for _ctx in $(harness_each harness_context_file); do merge_block "$_ctx" "$block"; done
     merge_block AGENTS.md "$block"
     rm -f "$block"
     scaffold_docs "$root"
-    write_nudge
-    write_settings
-    write_local_settings
+    harness_each harness_write_config "$root"
+    harness_each harness_write_local_config "$root"
     ignore_local_state
 
     say "keel: configured $(basename "$PWD")"
     [ "$FORCE" -eq 1 ] && say "  (--force: detected values overwrote the existing profile)"
     say "  profile   .keel/profile.json"
-    say "  block     CLAUDE.md, AGENTS.md"
+    # Each line is skipped when the harness set has nothing to put in it, rather than printed with
+    # an empty value. A codex-only repository has no context file of its own and no local config, so
+    # unguarded these read "block      AGENTS.md" with a doubled space and "mode      :
+    # bypassPermissions, not committed" with no path in front of the colon.
+    say "  block     $(harness_each harness_context_file | sed 's/$/,/' | tr '\n' ' ')AGENTS.md"
     say "  docs      $root/"
-    say "  plugins   .claude/settings.json"
-    say "  guards    .claude/settings.json permissions: $(keel_deny_rules | grep -c .) deny, $(keel_ask_rules | grep -c .) ask"
-    say "  mode      .claude/settings.local.json: bypassPermissions, not committed"
+    say "  plugins   $(harness_each harness_config_paths | sed -n 's/^committed|//p' | paste -sd' ' -)"
+    say "  guards    $(harness_each harness_config_paths | sed -n 's/^committed|//p' | head -1) permissions: $(harness_each harness_permission_rules | grep -c "^deny|") deny, $(harness_each harness_permission_rules | grep -c "^ask|") ask"
+    local _local_cfg; _local_cfg="$(harness_each harness_config_paths | sed -n 's/^local|//p')"
+    [ -n "$_local_cfg" ] && say "  mode      $_local_cfg: bypassPermissions, not committed"
+    # Anything a harness needs the person to do that keel cannot do for it. Open question 6 of
+    # docs/architecture/tiered-multi-harness-support.md is the case this exists for: Codex runs no
+    # hook until its source is trusted and says nothing when it skips one, so an install that says
+    # nothing leaves every gate silently dark and looking installed. Printed here rather than left
+    # to doctor because this is the moment the person is configuring the repository.
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        case "$line" in
+          fail\|*|warn\|*) say "  action    ${line#*|}" ;;
+          *)               say "  note      ${line#*|}" ;;
+        esac
+    done < <(harness_each harness_doctor_findings install)
+
     local kind; kind="$(json_get .keel/profile.json project.kind || true)"
     local t; t="$(json_get .keel/profile.json verify.test || true)"
     # Not before there is code. doctor treats kind 'docs' as pre-implementation and says verify
@@ -1270,13 +1196,12 @@ cmd_new() {
 
     local block; block="$(mktemp)"
     render_block "$block" "$root"
-    merge_block CLAUDE.md "$block"
+    for _ctx in $(harness_each harness_context_file); do merge_block "$_ctx" "$block"; done
     merge_block AGENTS.md "$block"
     rm -f "$block"
     scaffold_docs "$root"
-    write_nudge
-    write_settings
-    write_local_settings
+    harness_each harness_write_config "$root"
+    harness_each harness_write_local_config "$root"
     ignore_local_state
     write_ci "$stack"
 
@@ -1325,6 +1250,22 @@ cmd_doctor() {
     warn() { printf 'WARN  %s\n' "$1"; warnings=$((warnings+1)); return 0; }
     good() { printf 'ok    %s\n' "$1"; return 0; }
 
+    # One harness section, printed here so this file keeps the ordering and the counters and the
+    # harness file keeps the knowledge. The loop runs in this shell, not the subshell, so fail and
+    # warn increment what they are meant to increment. Splitting on the first pipe alone, because a
+    # message may contain one and a level never does.
+    harness_section() {   # harness_section <phase>
+        local line
+        while IFS= read -r line; do
+            [ -n "$line" ] || continue
+            case "$line" in
+              fail\|*) fail "${line#fail|}" ;;
+              warn\|*) warn "${line#warn|}" ;;
+              ok\|*)   good "${line#ok|}" ;;
+            esac
+        done < <(harness_each harness_doctor_findings "$1")
+    }
+
     [ -f .keel/profile.json ] || { fail "no .keel/profile.json. Run 'keel init'."; return 1; }
     if have_python; then
         python3 -c "import json;json.load(open('.keel/profile.json'))" 2>/dev/null \
@@ -1333,6 +1274,52 @@ cmd_doctor() {
         warn "python3 absent: cannot validate the profile or read its fields"
     fi
     json_load .keel/profile.json || true
+    harness_set_load
+
+    # The harness section. ADR-0004: a guarantee is a property of (repository, harness), so this
+    # answers for the harness in front of the person and names what the others do not get.
+    #
+    # It is printed before everything below it because it says which of the answers below apply.
+    local running trust active harnesses h g
+    running="$(harness_running)"
+    if [ "$running" = unknown ]; then
+        warn "cannot determine which harness is running, so this reports on every harness this repository serves"
+        harnesses="$HARNESS_SET"
+    else
+        good "running under $running"
+        harnesses="$running"
+    fi
+    for h in $harnesses; do
+        # Trailing space stripped: the list sits mid-sentence in the two warnings below, and
+        # `tr` leaves one before the full stop.
+        active="$(harness_active_gates "$h" | tr '\n' ' ')"; active="${active% }"
+        trust="$(harness_hooks_trusted "$h")"
+        case "$trust" in
+          # No "gates active" line beside either of these. Two lines, one calling the gates live and
+          # one calling them dark, is worse than either alone.
+          untrusted)
+            warn "$h will run none of keel's hooks here until you have trusted them, so these gates are dark: ${active:-none}. The skills load without that trust and the hooks do not, so keel looks installed and is not. That trust lives in your own $h configuration and keel cannot grant it." ;;
+          unknown)
+            warn "$h gates the manifest grants: ${active:-none}. keel cannot tell from your $h configuration whether the hooks behind them will run on this machine, so treat none of them as proven here." ;;
+          *)
+            good "$h gates active: ${active:-none}" ;;
+        esac
+        for g in $(harness_gates); do
+            harness_gate_active "$h" "$g" || warn "$h does not get $g"
+        done
+    done
+    # A repository declaring hard_block_paths and serving a harness with no ask is protected for
+    # some of the people working in it and not others.
+    if grep -q '"hard_block_paths"' .keel/profile.json 2>/dev/null; then
+        for h in $HARNESS_SET; do
+            harness_provides "$h" pretooluse_ask \
+              || warn "this repository declares hard_block_paths, which is not enforced for its $h users"
+        done
+    fi
+    # A harness installed here that the repository does not list. A machine fact, so it belongs in
+    # doctor and never in init, which writes a committed team fact.
+    command -v codex >/dev/null 2>&1 && ! printf '%s\n' "$HARNESS_SET" | grep -qx codex \
+      && warn "codex is installed on this machine but this repository does not list it in harnesses"
 
     local root; root="$(docs_root)"
     check_docs_ignored "$root" && good "docs root '$root' is not gitignored" || problems=$((problems+1))
@@ -1347,7 +1334,7 @@ cmd_doctor() {
     done < <(referenced_docs_findings "$root")
     [ "$refs" -eq 0 ] && good "every referenced document is in HEAD" || true
 
-    for f in CLAUDE.md AGENTS.md; do
+    for f in $(harness_each harness_context_file) AGENTS.md; do
         check_markers "$f"; local rc=$?
         case $rc in
           0) [ -f "$f" ] && good "$f markers intact" || warn "$f is absent" ;;
@@ -1360,24 +1347,7 @@ cmd_doctor() {
     # It sits in the prefix of every request in this repository forever, so a line added here is not
     # paid once, it is paid per request per engineer. Target 450 tokens, ceiling 700.
     #
-    # Estimated at chars/3.6 rather than counted. The count-tokens endpoint needs an API key, and a
-    # budget check that only works where a key happens to be configured is a budget check that is
-    # absent exactly where nobody is watching. The estimate is within a few percent, which is all a
-    # ceiling this coarse requires.
-    if [ -f CLAUDE.md ]; then
-        local blk_chars blk_tokens
-        # awk counts it rather than printing it for `wc -c` to count: same number, one process
-        # instead of three. The +1 per line is the newline the old pipeline's print emitted.
-        blk_chars=$(awk '/keel:start/,/keel:end/{c+=length($0)+1} END{print c+0}' CLAUDE.md)
-        blk_tokens=$(( blk_chars * 10 / 36 ))
-        if [ "$blk_tokens" -gt 700 ]; then
-            fail "the CLAUDE.md keel block is about $blk_tokens tokens, over the 700 ceiling. It is in the prefix of every request here. Move detail into the docs root, which loads on demand."
-        elif [ "$blk_tokens" -gt 450 ]; then
-            warn "the CLAUDE.md keel block is about $blk_tokens tokens, over the 450 target though under the 700 ceiling."
-        else
-            good "CLAUDE.md keel block is about $blk_tokens tokens, within budget"
-        fi
-    fi
+    harness_section context-block
 
     # Every verify command must actually run. This is the check that catches a profile naming a
     # path that does not exist, which otherwise surfaces as a pipeline failure blamed on CI.
@@ -1460,6 +1430,34 @@ for k,v in d.items():
                 fail "verify.$k timed out after ${VERIFY_TIMEOUT}s: $c. Either it hangs, or it needs longer than doctor is willing to wait; run it by hand to tell the two apart."
             else fail "verify.$k does not run (${el}s): $c"; fi
         done
+
+        # Declared and never run, which is the honest treatment for these two. e2e needs a running
+        # system by its own description and security reaches the network, so running either here
+        # would make doctor cost what a deployment costs. Both were written into every profile by
+        # write_profile and read by nothing, so a user opened their profile, saw a real command in
+        # a real field, and had no way to learn that nothing would ever run it.
+        #
+        # A second loop rather than two more keys on the one above, because that one runs what it
+        # reads and these two never run: folding them in means a `case` that jumps 2 of 6 keys past
+        # twenty lines of timeout and exit-code handling, which is harder to read than the repeated
+        # json_get line is to tolerate.
+        for k in e2e security; do
+            local dc; dc="$(json_get .keel/profile.json "verify.$k" || true)"
+            # null is `ok` and not a warning. Neither key has a detector worth the name: security
+            # has no branch in detect_verify at all, and e2e has one only for a node `test:e2e`
+            # script, so init writes null into effectively every profile. A warning here would
+            # fire on every project keel has ever made, would be clearable by no keel command, and
+            # is the required value on Dart per that stack's own FR-14. The message says what to do
+            # instead.
+            #
+            # "does not detect", present tense, and a claim about this project rather than about
+            # what keel can do. security has no detector to have tried; e2e's fires only on a node
+            # `test:e2e` script. The past tense would assert a search happened, which is false for
+            # security and not knowable from here for e2e.
+            if [ -z "$dc" ]; then good "verify.$k is null: keel does not detect one, so set it if this project has one"
+            else good "verify.$k is set (declared, not run): $dc"
+            fi
+        done
     fi
 
     # stack.has_ui is written once, by init, and a project grows a user interface after that.
@@ -1473,24 +1471,16 @@ for k,v in d.items():
         warn "stack.has_ui is false, but this project looks like it has a user interface. Skills that branch on it are reading the wrong answer. Correct it with: keel profile set stack.has_ui true"
     fi
 
-    # Fill the settings cache here, in this shell. Both readers below sit in a `< <( )`, which is a
-    # subshell: it inherits this variable already full, but anything it loads itself dies with it.
-    # Without this line the two would each start their own interpreter. It is not redundant.
-    settings_report_load
+    # Give the harness a chance to fill any cache its readers share, here, in this shell. Claude
+    # Code's readers sit in a `< <( )`, which is a subshell: it inherits a variable already full,
+    # but anything it loads itself dies with it, so without this each would start its own
+    # interpreter. Called through the contract rather than by name: `settings_report_load` exists
+    # on one harness only, and cmd_doctor calling it directly is the break this task's own note
+    # says the sixth contract function exists to prevent.
+    harness_set_load
+    harness_each harness_doctor_findings prime >/dev/null
 
-    # Plugin set. Advisory in both directions: a missing plugin degrades a skill rather than
-    # breaking it, and feature-dev being present may be a deliberate choice. Specified in docs/04
-    # and found unwritten by a sweep of the plan against the repository.
-    if [ -f .claude/settings.json ] && have_python; then
-        while IFS= read -r line; do
-            [ -n "$line" ] || continue
-            case "$line" in
-              missing:keel@*)
-                          warn "keel itself is not enabled here: ${line#missing:}. Install it with '/plugin install ${line#missing:}'. Without it no keel skill loads at all, which is not a degraded mode." ;;
-              missing:*)  warn "recommended plugin not enabled: ${line#missing:}. Install it with '/plugin install ${line#missing:}'. The skill that uses it degrades to an inline fallback." ;;
-            esac
-        done < <(plugin_report)
-    fi
+    harness_section plugins
 
     # The context watchdog is deliberately silent when it cannot run, so that a session is never
     # interrupted by the thing meant to protect it. Silence with nothing reporting it would be
@@ -1543,35 +1533,26 @@ for k,v in d.items():
             elif [ "$cwnum" = 1 ] && [ -n "$cwmax" ] && [ "$cw" -gt "$cwmax" ]; then
                 warn "gates.context_window is $cw, above the largest context window that exists. The watchdog is using $cwmax. Correct the value, or a session will never be warned."
             elif [ "$cwnum" = 1 ] && [ -n "$cwdef" ] && [ "$cw" -lt "$cwdef" ]; then
-                warn "gates.context_window is $cw, below the $cwdef default, so the watchdog is using $cwdef. The key is a floor and only ever raises the window. Set KEEL_CONTEXT_WINDOW to force a smaller one."
+                if [ "$running" = codex ]; then
+                    warn "gates.context_window is $cw and the watchdog is ignoring it. The key is a floor and only ever raises the window, and on codex the window starts from the model_context_window the session's own rollout states. Set KEEL_CONTEXT_WINDOW to force a smaller one."
+                else
+                    warn "gates.context_window is $cw, below the $cwdef default, so the watchdog is using $cwdef. The key is a floor and only ever raises the window. Set KEEL_CONTEXT_WINDOW to force a smaller one."
+                fi
             elif [ "$cwnum" = 1 ]; then
                 good "context watchdog available (window $cw from gates.context_window, raised automatically if a session is observed exceeding it)."
             elif [ -n "$cw" ] && [ "$cw" != "None" ]; then
                 warn "gates.context_window is '$cw', which is not a usable number, so the watchdog is ignoring it and assuming 200000. Set a positive integer."
             else
-                good "context watchdog available (window assumed 200000, raised once a session is observed exceeding it). A profile written by a newer keel carries gates.context_window; set it here to start from a larger value."
+                if [ "$running" = codex ]; then
+                    good "context watchdog available (on codex the window is read from the session itself, which states model_context_window; the conservative default applies only to a session that states none). gates.context_window is a floor and raises that starting point."
+                else
+                    good "context watchdog available (window assumed 200000, raised once a session is observed exceeding it). A profile written by a newer keel carries gates.context_window; set it here to start from a larger value."
+                fi
             fi
         fi
     fi
 
-    # Boundaries. Advisory by design: a competing plugin may be a deliberate choice, and nothing here
-    # disables one on somebody's behalf. What it does is make the collision visible, because the
-    # failure mode is silent. Two plugins answering to one skill name produce a session that picks
-    # one arbitrarily and never says so, which reads as the skill behaving inconsistently.
-    if have_python; then
-        local t
-        while IFS= read -r line; do
-            [ -n "$line" ] || continue
-            case "$line" in
-              conflict:*)
-                t="${line#conflict:}"
-                warn "${t%%|*} is enabled alongside keel: ${t#*|}. Running both means two answers to 'which methodology applies'. Disable one for this project, or accept it deliberately. See docs/04." ;;
-              dup:*)
-                t="${line#dup:}"
-                warn "both keel and ${t#*|} ship a skill named '${t%%|*}'. Claude Code does not error on this: it picks one and does not record which, so the skill will look inconsistent rather than broken. Disable one plugin for this project." ;;
-            esac
-        done < <(boundary_report)
-    fi
+    harness_section boundaries
 
     # Staleness. Per-project files do not update themselves when the plugin does, so a project can
     # sit on the conventions of an older keel indefinitely while every session loads the new
@@ -1603,41 +1584,35 @@ for k,v in d.items():
         else
             warn "this project's profile is at schema version ${sv:-none}; keel ${iv:-unknown} expects $SCHEMA_VERSION. Re-run 'keel init' to pick up the new fields. It merges, so your own values survive."
         fi
-    fi
 
-    # Permission guardrails. These are what make a bypassPermissions default defensible, so their
-    # absence is a real finding rather than an advisory: deny and ask are the only rules that still
-    # apply once prompts are off.
-    if [ -f .claude/settings.json ] && have_python; then
-        local missing_rules
-        missing_rules="$(DENY="$(keel_deny_rules)" ASK="$(keel_ask_rules)" python3 - <<'PY' 2>/dev/null
-import json, os
-try:
-    perms = json.load(open(".claude/settings.json")).get("permissions", {})
-except Exception:
-    raise SystemExit(0)
-missing = [r for key, env in (("deny", "DENY"), ("ask", "ASK"))
-           for r in os.environ[env].splitlines()
-           if r and r not in perms.get(key, [])]
-print(len(missing))
-PY
-)"
-        if [ "${missing_rules:-0}" -eq 0 ] 2>/dev/null; then
-            good "permission guardrails present in .claude/settings.json"
-        else
-            fail "$missing_rules permission guardrail(s) missing from .claude/settings.json. Re-run 'keel init' to add them. They are the only protection that survives bypassPermissions mode."
+        # A retirement is invisible to the person holding a profile that has one, and until this
+        # rule the prescribed remedy hid it. Doctor keys off schema_version and init merges, so
+        # `keel init` on a schema 3 profile returned schema_version 4 with all six retired keys
+        # still in the file, after which the branch above reported the profile current and nothing
+        # ever mentioned them again. Every other staleness message keel has is written for a schema
+        # change that adds fields, because until 4 every one of them did.
+        #
+        # A warning and never a failure: the key does nothing, so nothing is broken, and the fix is
+        # a hand edit no keel command performs.
+        if json_load .keel/profile.json; then
+            local rpath rver rwhat
+            while IFS='|' read -r rpath rver rwhat; do
+                [ -n "$rpath" ] || continue
+                # The cache is one path=value line per leaf, so the = is what makes this a whole
+                # key rather than the prefix of a longer one.
+                case "$JSON_CACHE" in
+                    "$rpath="*|*"
+$rpath="*) warn ".keel/profile.json sets $rpath, retired in schema $rver. $rwhat" ;;
+                esac
+            done <<RETIRED_SEEN
+$(retired_keys)
+RETIRED_SEEN
         fi
     fi
 
-    # The local file must stay out of git: it sets a permission mode, and committing it turns off
-    # prompts for everyone who clones rather than for the one person who chose it.
-    if [ -f .claude/settings.local.json ] && git rev-parse --git-dir >/dev/null 2>&1; then
-        if repo_ignores .claude/settings.local.json; then
-            good ".claude/settings.local.json is git-ignored"
-        else
-            fail ".claude/settings.local.json is not git-ignored. It carries a permission mode; committing it imposes that mode on everyone who clones. Add it to .gitignore."
-        fi
-    fi
+    harness_section permissions
+
+    harness_section local-state
 
     # The handoff must stay out of git too. It is session state, stale the moment work resumes, and
     # it reaches a commit on its own through 'git add -A'. check-ignore reports a tracked path as not
@@ -1650,18 +1625,7 @@ PY
         fi
     fi
 
-    # Advisory, and the answer to "I set defaultMode and nothing happened". A session the VS Code
-    # extension starts resolves its own starting mode and ignores defaultMode from every settings
-    # file. Two extension settings are needed instead, and neither lives in this repository.
-    if [ -f .claude/settings.local.json ] && ls -d "$HOME"/.vscode/extensions/anthropic.claude-code-* >/dev/null 2>&1; then
-        local vs="$HOME/Library/Application Support/Code/User/settings.json"
-        [ -f "$vs" ] || vs=""
-        if [ -n "$vs" ] && grep -q '"claudeCode.initialPermissionMode"' "$vs" 2>/dev/null; then
-            good "the VS Code extension has its own initial permission mode set"
-        else
-            warn "the Claude Code VS Code extension is installed. Sessions it starts ignore permissions.defaultMode from settings files, so this project's mode applies only to CLI sessions. To match it in the extension, set claudeCode.allowDangerouslySkipPermissions and claudeCode.initialPermissionMode in VS Code user settings."
-        fi
-    fi
+    harness_section editor
 
     # Whether this machine has the plugin's marketplace registered, which is the real precondition
     # for the skills existing at all. Advisory, never a failure: the profile and its gates are
@@ -1695,47 +1659,7 @@ PY
     # Hardcoded rather than a profile field. A new field bumps SCHEMA_VERSION, and the comment on
     # that constant says to move it only when a field changes, precisely so a release that changed
     # nothing else does not warn everybody.
-    local found="" cfg age="" stale_days=7
-    for cfg in "${CLAUDE_CONFIG_DIR:-}" "$HOME/.claude"; do
-        [ -n "$cfg" ] && [ -f "$cfg/plugins/known_marketplaces.json" ] || continue
-        age="$(MP="$cfg/plugins/known_marketplaces.json" python3 -c "
-import json, os, sys, datetime
-d = json.load(open(os.environ['MP']))
-# The same selection the registration check used, kept identical so the two reports can never mean
-# different entries in the same file.
-hits = [v for v in d.values() if 'keel' in json.dumps(v)]
-if not hits:
-    sys.exit(1)
-ts = hits[0].get('lastUpdated')
-if isinstance(ts, str):
-    try:
-        t = datetime.datetime.fromisoformat(ts.replace('Z', '+00:00'))
-        now = datetime.datetime.now(datetime.timezone.utc)
-        # Clamped at zero. A clock skewed forward yields a negative age, which is not a fresh clone
-        # and must never print as one. It reads as today and the next run corrects it.
-        print(max(0, (now - t).days))
-    except ValueError:
-        pass
-" 2>/dev/null)" \
-          && { found="$cfg"; break; }
-    done
-    if have_python; then
-        if [ -z "$found" ]; then
-            warn "the gbi marketplace is not registered on this machine, so a session here has no keel skills. Run '/plugin marketplace add gbi-solutions-ltd/keel' then '/plugin install keel@gbi'."
-        else
-            good "the gbi marketplace is registered ($found)"
-            case "$age" in
-                ''|*[!0-9]*)
-                    warn "cannot tell how fresh the gbi marketplace list is: known_marketplaces.json in $found records no usable lastUpdated. That is unknown, not current. Run '/plugin marketplace update gbi' then '/plugin install keel@gbi' to set it." ;;
-                *)
-                    if [ "$age" -ge "$stale_days" ]; then
-                        warn "the gbi marketplace list was last fetched $age days ago, so a newer keel may have been released since and nothing on this machine would know. Run '/plugin marketplace update gbi' then '/plugin install keel@gbi'."
-                    else
-                        good "the gbi marketplace list was fetched $age day(s) ago, recent enough not to warn. That is fetch age and not currency: a release landing since then is not visible here either."
-                    fi ;;
-            esac
-        fi
-    fi
+    harness_section marketplace
 
     printf '\n'
     # Warnings are counted into the summary because they scroll off. Writing the 0.6.1 release notes

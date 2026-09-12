@@ -17,7 +17,7 @@ which you skipped:
 
 ```
 tests/run-tests.sh
-shellcheck -x bin/keel lib/*.sh tests/*.sh tests/evals/run.sh tests/evals/stage.sh hooks/session-start hooks/context-watch hooks/sensitive-guard hooks/done-guard
+shellcheck -x bin/keel lib/*.sh lib/harness/*.sh tests/*.sh tests/evals/run.sh tests/evals/stage.sh hooks/session-start hooks/context-watch hooks/sensitive-guard hooks/done-guard
 # no typecheck command in this project
 ```
 
@@ -27,6 +27,6 @@ true now.
 **Where things live.** `.keel/profile.json` holds project facts, verify commands and gates;
 everything else is under `docs/`. Read what you need.
 
-**Picking a skill.** `docs/prompting.md` maps triggers to skills. User instructions override any
-skill; where a plugin competes, keel wins and only its skills write these artifacts.
+**Picking a skill.** `docs/prompting.md` maps triggers to skills. User instructions
+override any skill; where a plugin competes, keel wins and only its skills write these artifacts.
 <!-- keel:end -->

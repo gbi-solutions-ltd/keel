@@ -43,7 +43,8 @@ Ordered by where breaches actually come from, which is not where code review loo
    [references/payments-checklist.md](references/payments-checklist.md). This is where the real
    risk is, and generic tooling does not cover it.
 
-Delegate phases to parallel subagents on a `--full` run, one per phase, model `sonnet`, and say
+Delegate phases to parallel subagents on a `--full` run, one per phase,
+delegation profile `keel-fanout`, and say
 which model in one line. The reading stays out of the main context, and step 3 verifies every
 finding before it is written, so nothing ships on the cheaper model's judgement alone.
 
@@ -71,12 +72,15 @@ worse than a narrow one.
 
 ## Step 5: Plugin and gate
 
-`security-guidance` covers edits and the end of a turn with its own hooks, so it catches what runs
-between audits. Recommend it if absent. The built-in `/security-review` is a useful cross-check on
-a diff.
+**Claude Code only.** `security-guidance` covers edits and the end of a turn with its own hooks, so
+it catches what runs between audits; recommend it if absent, and the built-in `/security-review` is
+a useful cross-check on a diff. Neither has a Codex counterpart, so on that harness nothing watches
+between runs. Say so.
 
-Then report to `ship`. A finding above the project's threshold blocks the ship gate; on a
-`hard_block_paths` match it is not overridable in conversation.
+Then report to `ship`, which runs unconditionally and refuses on anything red whatever this key
+says. `gates.security_audit` instead sets this report's own verdict: `required` says findings block
+shipping, `warn` leaves them to the user, `off` skips the audit. A `hard_block_paths` match is never
+overridable in conversation, whatever the gate says.
 
 ## Common mistakes
 

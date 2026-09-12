@@ -94,7 +94,7 @@ Copied in full. A task executed by a fresh agent that reads only its own section
   and `standards.md` is never edited by one. A new check inherits that rule.
 - **No task here creates or deletes a file under `tests/evals/scenarios/`**, and none needs to.
 - **A finding of the form "the arm did X" carries the command that extracted it**, per
-  `tests/evals/results.md:6`. No task here runs an arm, so no task here should be recording one.
+  `tests/evals/results.md`. No task here runs an arm, so no task here should be recording one.
 
 ## Concurrency
 

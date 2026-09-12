@@ -346,19 +346,51 @@ m_plan_template_marker() {
 }
 run "a plan template carrying the marker passes" 0 m_plan_template_marker
 
-# A brief dispatched to a model alias that does not exist is dispatched to nothing, and the failure
-# is silent. Both cases matter: the rule has to accept the aliases that work as much as it rejects
-# the ones that do not, or the first correct pin gets reverted.
-m_model_alias_unknown() {
+# A dispatch that names no model at all inherits whatever the driver is paying for, silently, and
+# the output looks like output either way. That is why the rule exists. What it accepts changed on
+# 2026-09-06: ADR-0005 removed the vendor vocabulary rather than adding to it, because sonnet, opus,
+# haiku and fable are Anthropic model names and mean nothing on a second harness. A body names a
+# delegation profile now, and each harness resolves that to its own model.
+#
+# THE SECOND CASE USED TO ASSERT THAT `model `sonnet`` PASSES. That was the old rule written down as
+# a test, and a rule change that leaves its own fixture behind is a rule the next person reverts
+# while believing the suite. Both directions are still pinned, in both vocabularies.
+m_model_alias_vendor() {
+    printf '\nDispatch these agents with model `sonnet`.\n' >> "$1/skills/example/SKILL.md"
+}
+run "a vendor model alias is rejected" 1 m_model_alias_vendor
+
+m_model_alias_invented() {
     printf '\nDispatch these agents with model `sonnet-4-turbo`.\n' >> "$1/skills/example/SKILL.md"
 }
-run "an unknown model alias is rejected" 1 m_model_alias_unknown
+run "an invented model alias is rejected too" 1 m_model_alias_invented
 
-m_model_alias_known() {
-    printf '\nDispatch these agents with model `sonnet`, and say so in one line.\n' \
+# `inherit` survives the removal, and it is not the neutral replacement for the four: it says the
+# driver's model, which is the deliberate pin on judgement work and the opposite of what a fan-out
+# wants.
+m_model_inherit() {
+    printf '\nDispatch these agents with model `inherit`, and say so in one line.\n' \
       >> "$1/skills/example/SKILL.md"
 }
-run "a known model alias passes" 0 m_model_alias_known
+run "model inherit still passes" 0 m_model_inherit
+
+m_delegation_profile() {
+    printf '\nDispatch these agents, delegation profile `keel-fanout`, and say so in one line.\n' \
+      >> "$1/skills/example/SKILL.md"
+}
+run "a delegation profile satisfies the dispatch rule" 0 m_delegation_profile
+
+# The alias rule and the dispatch rule are separate, and until this case existed only one of them
+# was actually pinned: every fixture that carried a vendor alias also failed the dispatch rule, so
+# putting `sonnet` back on the accepted list left the suite green. This body satisfies the dispatch
+# rule and still names an alias, which only the alias rule can catch.
+m_alias_beside_profile() {
+    printf '\nDispatch these agents, delegation profile `keel-fanout`, and say so in one line.\n' \
+      >> "$1/skills/example/SKILL.md"
+    printf '\nA later paragraph naming model `sonnet` is still a vendor alias.\n' \
+      >> "$1/skills/example/SKILL.md"
+}
+run "a vendor alias is rejected even beside a valid profile" 1 m_alias_beside_profile
 
 # A language keel detects with no row in the tool table is a gap the snapshot will improvise on,
 # differently each time. The table is only trustworthy while it covers what detection produces.
@@ -540,9 +572,160 @@ JSON
 }
 run_out "a schema version with no recorded fingerprint is rejected" 1 m_schema_unknown_version "records no fingerprint" yes
 
+# The phrase form for a marker. The ten unread: markers cite their own row in a table of 22
+# contiguous rows, so an insertion above them retargets a citation onto a neighbouring key's row and
+# nothing goes red. A line number into bin/keel is worse: 47 lines landed in it in one commit on the
+# branch that added these cases, moving 32 citations that had been correct. A phrase is what the
+# grammar was missing.
+m_readby_phrase_ok() {
+    mkdir -p "$1/templates" "$1/bin"
+    # "reads key a" is here for the leaf check below, not the phrase check this fixture exists for:
+    # the marker's phrase is still exactly SCHEMA_VERSION=1, on the same line.
+    printf 'reads key a via SCHEMA_VERSION=1\n' > "$1/bin/keel"
+    cat > "$1/templates/profile.schema.json" <<'JSON'
+{ "properties": { "a": { "description": "d", "x-keel-read-by": "code:bin/keel#SCHEMA_VERSION=1" } } }
+JSON
+}
+run_out "a marker citing a phrase that is in the file is accepted" 1 m_readby_phrase_ok "x-keel-read-by" no
+
+m_readby_phrase_gone() {
+    mkdir -p "$1/templates" "$1/bin"
+    printf 'SCHEMA_VERSION=1\n' > "$1/bin/keel"
+    cat > "$1/templates/profile.schema.json" <<'JSON'
+{ "properties": { "a": { "description": "d", "x-keel-read-by": "code:bin/keel#SCHEMA_VERSION=9" } } }
+JSON
+}
+run_out "a marker citing a phrase that is not in the file is rejected" 1 m_readby_phrase_gone "x-keel-read-by" yes
+
+# A phrase carrying a pipe would break the markdown table docs/profile-keys.md renders it into, and
+# the generator has no way to say which marker did it.
+m_readby_phrase_pipe() {
+    mkdir -p "$1/templates" "$1/bin"
+    printf 'SCHEMA_VERSION=1\n' > "$1/bin/keel"
+    cat > "$1/templates/profile.schema.json" <<'JSON'
+{ "properties": { "a": { "description": "d", "x-keel-read-by": "code:bin/keel#SCHEMA|VERSION" } } }
+JSON
+}
+run_out "a marker phrase containing a pipe is rejected" 1 m_readby_phrase_pipe "x-keel-read-by" yes
+
+# The fifth value. A key nothing is written to read, that a model was measured reading anyway.
+# gates.coding_standards is the first user: tests/evals/results.md records an arm reading it out of
+# the profile and setting severity by it with nothing telling it to, while the marker said unread:.
+# Its citation names the record that measured it, so the claim is checkable rather than remembered.
+m_readby_observed() {
+    mkdir -p "$1/templates" "$1/bin" "$1/tests/evals"
+    printf 'SCHEMA_VERSION=1\n' > "$1/bin/keel"
+    printf '# Results\n\nAn arm read the key and acted on it anyway.\n' > "$1/tests/evals/results.md"
+    cat > "$1/templates/profile.schema.json" <<'JSON'
+{ "properties": { "a": { "description": "d", "x-keel-read-by": "observed:tests/evals/results.md#read the key and acted on it anyway" } } }
+JSON
+}
+run_out "an observed: marker citing the record that measured it is accepted" 1 m_readby_observed "x-keel-read-by" no
+
+# observed: names a record, so it names a document. A path into code would be code:.
+m_readby_observed_code() {
+    mkdir -p "$1/templates" "$1/bin"
+    printf 'SCHEMA_VERSION=1\n' > "$1/bin/keel"
+    cat > "$1/templates/profile.schema.json" <<'JSON'
+{ "properties": { "a": { "description": "d", "x-keel-read-by": "observed:bin/keel#SCHEMA_VERSION=1" } } }
+JSON
+}
+run_out "an observed: marker naming a file that is not a record is rejected" 1 m_readby_observed_code "x-keel-read-by" yes
+
 # The check is guarded on the file existing, like every other repository-only check in the
 # validator, because the fixture roots these tests run in have no templates/profile.schema.json.
 run_out "no profile schema present means the fingerprint check stays quiet" 0 noop "fingerprint" no
+
+# A key bin/keel says schema 4 retired, still declared in the schema. The register in bin/keel is
+# what doctor reads to tell a person their profile carries a dead key, and a register naming a key
+# that is still live tells them to remove one that still works. Nothing else can catch it: the
+# fingerprint above is a hash of the field set, so it sees that the set changed and never which way.
+m_retired_key_still_declared() {
+    mkdir -p "$1/templates" "$1/bin"
+    cat > "$1/bin/keel" <<'KEEL'
+SCHEMA_VERSION=1
+retired_keys() {
+    cat <<RETIRED
+gates.tdd|4|it does nothing now.
+RETIRED
+}
+KEEL
+    cat > "$1/templates/profile.schema.json" <<'JSON'
+{ "properties": { "gates": { "properties": { "tdd": { "type": "string" } } } } }
+JSON
+}
+run_out "a key listed as retired that the schema still declares is rejected" 1 \
+    m_retired_key_still_declared "retired" yes
+
+# And the register stays quiet when it agrees with the schema, or every commit reports it.
+m_retired_key_absent() {
+    mkdir -p "$1/templates" "$1/bin"
+    cat > "$1/bin/keel" <<'KEEL'
+SCHEMA_VERSION=1
+retired_keys() {
+    cat <<RETIRED
+gates.tdd|4|it does nothing now.
+RETIRED
+}
+KEEL
+    cat > "$1/templates/profile.schema.json" <<'JSON'
+{ "properties": { "gates": { "properties": { "coding_standards": { "type": "string" } } } } }
+JSON
+}
+run_out "a register that agrees with the schema says nothing" 1 \
+    m_retired_key_absent "retired" no
+
+# Every key the example template sets is declared in the schema, or a project that copies the
+# example sets a key that does nothing. conventions.branch_prefix was exactly this, pre-existing
+# and undetected: in the example, in neither schema revision, read by nothing.
+m_example_key_undeclared() {
+    mkdir -p "$1/templates"
+    cat > "$1/templates/profile.schema.json" <<'JSON'
+{ "properties": { "conventions": { "type": "object", "additionalProperties": true,
+  "properties": { "default_branch": { "type": "string" } } } } }
+JSON
+    cat > "$1/templates/keel-profile.example.json" <<'JSON'
+{ "conventions": { "default_branch": "main", "branch_prefix": "feat/" } }
+JSON
+}
+run_out "an example key the schema does not declare is rejected" 1 \
+    m_example_key_undeclared "does not declare" yes
+
+# And the check stays quiet on an example that only sets declared keys, including the two
+# legitimate escapes: _note under an object that allows one, and a key under a field the schema
+# itself declares as an open map (verify_notes).
+m_example_keys_all_declared() {
+    mkdir -p "$1/templates"
+    cat > "$1/templates/profile.schema.json" <<'JSON'
+{ "properties": {
+    "conventions": { "type": "object", "additionalProperties": true,
+      "properties": { "default_branch": { "type": "string" } } },
+    "verify_notes": { "type": "object", "additionalProperties": { "type": "string" } },
+    "observability": { "type": "object", "additionalProperties": true,
+      "properties": { "backend": { "type": "string" } } }
+  } }
+JSON
+    cat > "$1/templates/keel-profile.example.json" <<'JSON'
+{ "$schema": "irrelevant",
+  "conventions": { "default_branch": "main" },
+  "verify_notes": { "test_one": "why it is what it is" },
+  "observability": { "backend": "signoz", "_note": "backend is one of ..." } }
+JSON
+}
+run_out "an example whose keys are all declared, or _note, or under an open map, says nothing" 1 \
+    m_example_keys_all_declared "does not declare" no
+
+# The floor: an example that parses to nothing checked would otherwise pass silently, the same
+# failure mode the reader rule above guards against with its own "read no keys at all" line.
+m_example_empty() {
+    mkdir -p "$1/templates"
+    cat > "$1/templates/profile.schema.json" <<'JSON'
+{ "properties": { "keel_version": { "type": "string" } } }
+JSON
+    printf '{}\n' > "$1/templates/keel-profile.example.json"
+}
+run_out "an empty example template reports rather than passing silently" 1 \
+    m_example_empty "checking nothing" yes
 
 # The size check ran the hook once, from the repository root, so it measured whichever form the
 # local profile selects and nothing else. A paragraph that fits terse and technical while breaking
@@ -591,10 +774,10 @@ run_out "a hook that produces nothing is reported, not counted as small" 1 \
 profile_keys_fixture() {
     local root="$1" page_rows="$2"
     mkdir -p "$root/docs" "$root/templates"
-    printf '{"properties":{"a":{"type":"string","description":"A."},"b":{"type":"string","description":"B."}}}\n' \
+    printf '{"properties":{"a":{"type":"string","description":"A.","x-keel-read-by":"human"},"b":{"type":"string","description":"B.","x-keel-read-by":"human"}}}\n' \
       > "$root/templates/profile.schema.json"
     { printf '# Profile keys\n\ngenerate-profile-keys.sh\n\n'
-      printf '| Key | Type | Set by | Description |\n|---|---|---|---|\n'
+      printf '| Key | Type | Set by | Read by | Description |\n|---|---|---|---|---|\n'
       printf '%s' "$page_rows"
     } > "$root/docs/profile-keys.md"
 }
@@ -620,25 +803,297 @@ check_reports() {   # check_reports <name> <yes|no> <needle> <mutate-fn>
     fi
 }
 
-m_keys_ok()      { profile_keys_fixture "$1" '| `a` | string | `keel init` | A. |
-| `b` | string | **you** | B. |
+m_keys_ok()      { profile_keys_fixture "$1" '| `a` | string | `keel init` | a person | A. |
+| `b` | string | **you** | a person | B. |
 '; }
 check_reports "a reference matching the schema is not reported" no "profile-keys.md disagrees" m_keys_ok
 
-m_keys_missing() { profile_keys_fixture "$1" '| `a` | string | `keel init` | A. |
+m_keys_missing() { profile_keys_fixture "$1" '| `a` | string | `keel init` | a person | A. |
 '; }
 check_reports "a key absent from the reference is reported" yes "no row for b" m_keys_missing
 
-m_keys_stale()   { profile_keys_fixture "$1" '| `a` | string | `keel init` | Something else entirely. |
-| `b` | string | **you** | B. |
+m_keys_stale()   { profile_keys_fixture "$1" '| `a` | string | `keel init` | a person | Something else entirely. |
+| `b` | string | **you** | a person | B. |
 '; }
 check_reports "a stale description is reported" yes "a stale description for a" m_keys_stale
 
-m_keys_extra()   { profile_keys_fixture "$1" '| `a` | string | `keel init` | A. |
-| `b` | string | **you** | B. |
-| `c` | string | **you** | Not in the schema. |
+m_keys_extra()   { profile_keys_fixture "$1" '| `a` | string | `keel init` | a person | A. |
+| `b` | string | **you** | a person | B. |
+| `c` | string | **you** | a person | Not in the schema. |
 '; }
 check_reports "a row the schema does not declare is reported" yes "which the schema does not declare" m_keys_extra
+
+
+# ---- every declared profile key says what reads it ------------------------
+#
+# 22 of 61 keys were read by nothing on 2026-09-07 and CHANGELOG.md recorded seven. This rule is
+# what stops that recurring. Asserted on the message and not the exit code, for the reason stated
+# above profile_keys_fixture: a fixture that declares a schema trips the fingerprint rule too.
+readby_fixture() {   # readby_fixture <root> <json-value-for-x-keel-read-by> <read-by-cell>
+    local root="$1" entry="$2" cell="$3"
+    mkdir -p "$root/templates" "$root/docs" "$root/bin"
+    printf 'a real line a citation can point at\n' > "$root/bin/reader"
+    printf '{"properties":{"a":{"type":"string","description":"A.","x-keel-read-by":%s}}}\n' "$entry" \
+      > "$root/templates/profile.schema.json"
+    { printf '# Profile keys\n\ngenerate-profile-keys.sh\n\n'
+      printf '| Key | Type | Set by | Read by | Description |\n|---|---|---|---|---|\n'
+      printf '| `a` | string | **you** | %s | A. |\n' "$cell"
+    } > "$root/docs/profile-keys.md"
+}
+
+m_readby_code()   { readby_fixture "$1" '"code:bin/reader:1"' '`bin/reader:1`'; }
+check_reports "a key naming a reader that exists is not reported" no \
+  "x-keel-read-by" m_readby_code
+
+m_readby_human()  { readby_fixture "$1" '"human"' 'a person'; }
+check_reports "a key declared human-read is not reported" no \
+  "x-keel-read-by" m_readby_human
+
+# THE MUST-NOT-REJECT CASE FOR generic:, and it needs its own fixture rather than reusing
+# readby_fixture.
+#
+# Six of the 55 real keys, all six artifacts.*, ride on a genuine parent-map read: cmd_doctor's
+# `d=json.load(...).get('artifacts',{})` iterates a Python dict, so the loop variable is `k`, and
+# no line anywhere near the citation contains the individual key's own name,
+# `stories` or `snapshot` or any of the other five. code:'s leaf check below would reject every one
+# of them and be right to: the citation is real but the individual key genuinely cannot be pointed
+# at. generic: is the escape built for exactly this, and it is the only marker form the leaf check
+# does not run against.
+#
+# THIS IS NOT THE SAME SHAPE as verify.lint, verify.typecheck, verify.build, verify.e2e,
+# verify.security and verify.format, which also ride on a shared loop. Those loops
+# (`for k in test lint typecheck build`, `for k in e2e security`, `for k in format lint typecheck`)
+# enumerate literal barewords, so the leaf sits one line above the citation and code:'s ordinary
+# leaf-in-window check passes them without help; converting them to generic: too would hide a real
+# drift the same way the case below is built to reject. Only a read through actual dynamic data,
+# where the key name is nowhere in the source, needs generic:.
+#
+# A fixture reusing readby_fixture cannot show this: its schema is flat, so there is no parent, and
+# bin/reader contains neither a leaf name nor a parent name to withhold. This one is nested and its
+# reader line names the parent only, so it is what the leaf check would wrongly reject as code: and
+# is what generic: exists to carry instead. It is also the only case in this file that exercises the
+# recursive branch of the walk, which builds the dotted path artifacts.stories from two levels.
+m_readby_parent() {
+    local root="$1"
+    mkdir -p "$root/templates" "$root/docs" "$root/bin"
+    printf 'for k in prof["artifacts"]:\n' > "$root/bin/reader"
+    printf '%s\n' '{"properties":{"artifacts":{"type":"object","properties":{"stories":{"type":"string","description":"S.","x-keel-read-by":"generic:bin/reader:1"}}}}}' \
+      > "$root/templates/profile.schema.json"
+    { printf '# Profile keys\n\ngenerate-profile-keys.sh\n\n'
+      printf '| Key | Type | Set by | Read by | Description |\n|---|---|---|---|---|\n'
+      printf '| `artifacts.stories` | string | **you** | `bin/reader:1` | S. |\n'
+    } > "$root/docs/profile-keys.md"
+}
+check_reports "a key covered only by a parent-map read, declared generic:, is not reported" no \
+  "x-keel-read-by" m_readby_parent
+
+# generic: still gets the base resolution checks, only not the leaf check: a markdown file is
+# rejected the same way code: rejects one, because generic: also names executing code, not prose.
+m_readby_generic_md() {
+    local root="$1"
+    mkdir -p "$root/templates" "$root/docs" "$root/bin"
+    printf 'irrelevant\n' > "$root/bin/reader.md"
+    printf '%s\n' '{"properties":{"a":{"type":"string","description":"A.","x-keel-read-by":"generic:bin/reader.md:1"}}}' \
+      > "$root/templates/profile.schema.json"
+    { printf '# Profile keys\n\ngenerate-profile-keys.sh\n\n'
+      printf '| Key | Type | Set by | Read by | Description |\n|---|---|---|---|---|\n'
+    } > "$root/docs/profile-keys.md"
+}
+check_reports "generic: naming a markdown file is reported" yes \
+  "not generic:" m_readby_generic_md
+
+# generic: naming a file that does not exist fails the same floor code: does.
+m_readby_generic_gone() {
+    local root="$1"
+    mkdir -p "$root/templates" "$root/docs"
+    printf '%s\n' '{"properties":{"a":{"type":"string","description":"A.","x-keel-read-by":"generic:bin/nosuchreader:1"}}}' \
+      > "$root/templates/profile.schema.json"
+    { printf '# Profile keys\n\ngenerate-profile-keys.sh\n\n'
+      printf '| Key | Type | Set by | Read by | Description |\n|---|---|---|---|---|\n'
+    } > "$root/docs/profile-keys.md"
+}
+check_reports "generic: naming a file that does not exist is reported" yes \
+  "that file does not exist" m_readby_generic_gone
+
+# ---- code: markers must name their key, in a small window, or declare generic: instead ----
+#
+# project.kind's real marker was found citing a phrase with no relation to any reader of the key,
+# and the rule that checks citations resolve had no way to see it: the phrase resolved, so the rule
+# was satisfied, and nobody but a person reading both sides caught the mismatch. This is the check
+# that would have caught it on its own, without demanding every parent-map read carry a lie instead:
+# the key's own leaf name must appear on the cited line or within the three lines above it.
+#
+# Three above and not zero, because a jq read three lines above the marker's own line is a
+# legitimate reader and must not fail; the fixture below pins that directly. Leaf and not the full
+# dotted path, because a single-purpose read of a nested key almost never repeats the parent segment
+# (hooks/session-start:111 reads "response_style", not "conventions.response_style"), and demanding
+# the parent too would reject every real single-purpose citation in this tree bar none.
+m_readby_code_leaf_present() {
+    local root="$1"
+    mkdir -p "$root/templates" "$root/docs" "$root/bin"
+    printf 'v = prof.get("widgets")\n' > "$root/bin/reader"
+    printf '%s\n' '{"properties":{"widgets":{"type":"string","description":"W.","x-keel-read-by":"code:bin/reader:1"}}}' \
+      > "$root/templates/profile.schema.json"
+    { printf '# Profile keys\n\ngenerate-profile-keys.sh\n\n'
+      printf '| Key | Type | Set by | Read by | Description |\n|---|---|---|---|---|\n'
+    } > "$root/docs/profile-keys.md"
+}
+check_reports "a code: marker whose cited line names the key is not reported" no \
+  "the three above it" m_readby_code_leaf_present
+
+# THE MUST-NOT-BREAK CASE, named directly in the task that asked for this rule.
+m_readby_code_leaf_three_above() {
+    local root="$1"
+    mkdir -p "$root/templates" "$root/docs" "$root/bin"
+    printf 'widgets are read a few lines up from here\nfiller line two\nfiller line three\nv = jq(prof)\n' \
+      > "$root/bin/reader"
+    printf '%s\n' '{"properties":{"widgets":{"type":"string","description":"W.","x-keel-read-by":"code:bin/reader:4"}}}' \
+      > "$root/templates/profile.schema.json"
+    { printf '# Profile keys\n\ngenerate-profile-keys.sh\n\n'
+      printf '| Key | Type | Set by | Read by | Description |\n|---|---|---|---|---|\n'
+    } > "$root/docs/profile-keys.md"
+}
+check_reports "a code: marker whose leaf sits three lines above the citation is not reported" no \
+  "the three above it" m_readby_code_leaf_three_above
+
+# One line further out than the case above, to prove the window has an edge and is not accidentally
+# unbounded.
+m_readby_code_leaf_four_above() {
+    local root="$1"
+    mkdir -p "$root/templates" "$root/docs" "$root/bin"
+    printf 'widgets are read here\nfiller line two\nfiller line three\nfiller line four\nv = jq(prof)\n' \
+      > "$root/bin/reader"
+    printf '%s\n' '{"properties":{"widgets":{"type":"string","description":"W.","x-keel-read-by":"code:bin/reader:5"}}}' \
+      > "$root/templates/profile.schema.json"
+    { printf '# Profile keys\n\ngenerate-profile-keys.sh\n\n'
+      printf '| Key | Type | Set by | Read by | Description |\n|---|---|---|---|---|\n'
+    } > "$root/docs/profile-keys.md"
+}
+check_reports "a code: marker whose leaf sits four lines above the citation is reported" yes \
+  "the three above it" m_readby_code_leaf_four_above
+
+# THE DEFECT THIS RULE EXISTS FOR. project.kind's real marker was exactly this shape: a phrase that
+# resolves to a real line in bin/keel, naming neither project.kind nor kind, unrelated to any of its
+# readers. A citation that resolves and still names nothing this key owns is not a legitimate
+# parent-map read, which is what generic: is for and this fixture is not declaring; it is a wrong
+# citation, and this is the shape that should be rejected rather than waved through.
+m_readby_code_no_leaf() {
+    local root="$1"
+    mkdir -p "$root/templates" "$root/docs" "$root/bin"
+    printf 'echo service\n' > "$root/bin/reader"
+    printf '%s\n' '{"properties":{"widgets":{"type":"string","description":"W.","x-keel-read-by":"code:bin/reader:1"}}}' \
+      > "$root/templates/profile.schema.json"
+    { printf '# Profile keys\n\ngenerate-profile-keys.sh\n\n'
+      printf '| Key | Type | Set by | Read by | Description |\n|---|---|---|---|---|\n'
+    } > "$root/docs/profile-keys.md"
+}
+check_reports "a code: marker whose citation names nothing of the key is reported" yes \
+  "the three above it" m_readby_code_no_leaf
+
+# A phrase repeating in its target file is legal by design (the comment above the phrase branch
+# says so, and tests/validate-citations.sh gives the same ruling): rejecting a phrase that occurs
+# twice is stricter than correct output. The leaf check has to honour that too, not just the
+# existence check. This fixture's phrase resolves at line 1, with no leaf nearby, and again at
+# line 5, where the leaf sits on the cited line itself; a leaf check anchored only to the first
+# occurrence would reject a real citation for a reason that is really about a different, unrelated
+# line sharing its text.
+m_readby_code_leaf_second_occurrence() {
+    local root="$1"
+    mkdir -p "$root/templates" "$root/docs" "$root/bin"
+    printf 'irrelevant marker text\nfiller line two\nfiller line three\nfiller line four\nirrelevant marker text naming widgets\n' \
+      > "$root/bin/reader"
+    printf '%s\n' '{"properties":{"widgets":{"type":"string","description":"W.","x-keel-read-by":"code:bin/reader#irrelevant marker text"}}}' \
+      > "$root/templates/profile.schema.json"
+    { printf '# Profile keys\n\ngenerate-profile-keys.sh\n\n'
+      printf '| Key | Type | Set by | Read by | Description |\n|---|---|---|---|---|\n'
+    } > "$root/docs/profile-keys.md"
+}
+check_reports "a code: marker whose phrase repeats, with the leaf near the second, is not reported" no \
+  "the three above it" m_readby_code_leaf_second_occurrence
+
+m_readby_absent() {
+    local root="$1"
+    mkdir -p "$root/templates" "$root/docs"
+    printf '{"properties":{"a":{"type":"string","description":"A."}}}\n' \
+      > "$root/templates/profile.schema.json"
+    { printf '# Profile keys\n\ngenerate-profile-keys.sh\n\n'
+      printf '| Key | Type | Set by | Read by | Description |\n|---|---|---|---|---|\n'
+      printf '| `a` | string | **you** | _undeclared_ | A. |\n'
+    } > "$root/docs/profile-keys.md"
+}
+check_reports "a key that declares no reader is reported" yes \
+  "a declares no x-keel-read-by" m_readby_absent
+
+m_readby_stale()  { readby_fixture "$1" '"code:bin/reader:99"' '`bin/reader:99`'; }
+check_reports "a key naming a line its reader does not have is reported" yes \
+  "that file has 1 lines" m_readby_stale
+
+m_readby_gone()   { readby_fixture "$1" '"code:bin/nosuchreader:1"' '`bin/nosuchreader:1`'; }
+check_reports "a key naming a file that does not exist is reported" yes \
+  "that file does not exist" m_readby_gone
+
+m_readby_bad_type() { readby_fixture "$1" '7' 'a person'; }
+check_reports "a marker that is not a string or a list is reported" yes \
+  "not a string or a list of strings" m_readby_bad_type
+
+# THE RC BACKSTOP KEEPS A CASE, and it can no longer be a marker. Before the type guard, 7 and true
+# reached the backstop by crashing the entry loop, and this suite pinned it there. The guard now
+# catches every marker shape ahead of the loop, which is the point of it, so a marker case pins the
+# guard and nothing pins the backstop. That is the half-asserted clause this task exists to remove.
+# A property whose value is not an object crashes the schema walk itself, before any marker is
+# looked at, so it is what a genuine last resort now looks like: the rule stopped, and the operator
+# is told it stopped rather than being told nothing.
+m_readby_walk_crashes() {
+    local root="$1"
+    mkdir -p "$root/templates" "$root/docs"
+    printf '%s\n' '{"properties":{"a":"not an object"}}' > "$root/templates/profile.schema.json"
+    { printf '# Profile keys\n\ngenerate-profile-keys.sh\n\n'
+      printf '| Key | Type | Set by | Read by | Description |\n|---|---|---|---|---|\n'
+    } > "$root/docs/profile-keys.md"
+}
+check_reports "a schema that stops the rule mid-run is reported, not read as quiet" yes \
+  "could not run to completion" m_readby_walk_crashes
+
+# THE TYPED CASE, and it is not a duplicate of the one above. 7 and true crash the entry loop and
+# land on the rc backstop; 0 and false do not, they are falsy, so `if not entries` reported them as
+# "has an empty x-keel-read-by", which is the wrong diagnosis for the wrong-type fault. The two
+# cases together hold the guard and the backstop apart: this one must name the type, and the one
+# above must still reach the rc capture.
+m_readby_zero_marker() { readby_fixture "$1" '0' 'a person'; }
+check_reports "a marker of 0 is reported as the wrong type, not as empty" yes \
+  "not a string or a list of strings" m_readby_zero_marker
+
+m_readby_zero()  { readby_fixture "$1" '"code:bin/reader:0"' '`bin/reader:0`'; }
+check_reports "a marker citing line zero is reported" yes \
+  "line numbers start at 1" m_readby_zero
+
+m_readby_advisory_code() { readby_fixture "$1" '"code:bin/reader.md:1"' '`bin/reader.md:1`'; }
+check_reports "code: naming a markdown file is reported" yes \
+  "Prose nothing asserts is advisory" m_readby_advisory_code
+
+# BOTH DIRECTIONS OF THE FILE-TYPE CLAUSE ARE PINNED, and this is the half that was missing. With
+# only the code:-naming-markdown case above, deleting the advisory: half of the clause in
+# tests/validate-skills.sh left this whole suite green, so the clause was half unasserted: exactly
+# the "an assertion that cannot distinguish quiet from broken is not an assertion" failure the
+# comments in that rule condemn, thirty lines away from where it happened.
+m_readby_advisory_nonmd() { readby_fixture "$1" '"advisory:bin/reader:1"' '`bin/reader:1`'; }
+check_reports "advisory: naming a file that is not markdown is reported" yes \
+  "which is not a markdown file" m_readby_advisory_nonmd
+
+# THE FLOOR. A schema with no properties yields no keys, so the rule checks nothing and would pass
+# everything. Copied from the tool-table floor at `tests/validate-skills.sh#rule rather than break it. Found in review, before it happened.`, pinned at
+# tests/test-validate-skills.sh:425, and deliberately NOT from the delegation floor at
+# `tests/validate-skills.sh#Ten pairs on 2026-09-02`, which is pinned in neither direction.
+m_readby_no_keys() {
+    local root="$1"
+    mkdir -p "$root/templates" "$root/docs"
+    printf '{"definitions":{"a":{"type":"string"}}}\n' > "$root/templates/profile.schema.json"
+    { printf '# Profile keys\n\ngenerate-profile-keys.sh\n\n'
+      printf '| Key | Type | Set by | Read by | Description |\n|---|---|---|---|---|\n'
+    } > "$root/docs/profile-keys.md"
+}
+check_reports "a reader rule that extracts no keys is reported" yes \
+  "read no keys at all" m_readby_no_keys
 
 
 # ---- the documented-delegation rule, and the pipeline race that made it lie ------------------
@@ -655,15 +1110,28 @@ check_reports "a row the schema does not declare is reported" yes "which the sch
 # The fixture makes the race certain rather than likely: the mention is on the first line of the
 # body and is followed by more filler than a pipe will hold, so the producer is still blocked on a
 # write when grep matches and leaves. Under the old pipeline this case fails every run.
+#
+# SEVEN FILLER ROWS, ALWAYS NAMED. This fixture builds one delegation pair, which is one short of
+# the floor tests/validate-skills.sh#Ten pairs on 2026-09-02 sets at 8: every run of the two cases
+# below tripped that floor and printed its message, which neither case looks for or asserts against.
+# The filler rows always name a plugin the skill body always names, regardless of the `mention`
+# argument, so they clear the floor without engaging the row-level assertion the two cases exist to
+# test.
 delegation_fixture() {   # delegation_fixture <root> <body-mentions-plugin: yes|no>
-    local root="$1" mention="$2"
+    local root="$1" mention="$2" i
     mkdir -p "$root/docs"
     { printf '# Plugins\n\n'
       printf '| keel skill | Plugin it calls | What it delegates |\n'
       printf '|---|---|---|\n'
       printf '| `example` | `some-plugin` | A thing |\n'
+      for i in 1 2 3 4 5 6 7; do
+          printf '| `example` | `filler-plugin-%s` | Filler |\n' "$i"
+      done
     } > "$root/docs/04-plugin-strategy.md"
     { printf -- '---\nname: example\ndescription: Use when a test needs a valid skill to exist.\n---\n\n'
+      for i in 1 2 3 4 5 6 7; do
+          printf 'Delegates to `filler-plugin-%s` when it is installed.\n' "$i"
+      done
       [ "$mention" = yes ] && printf 'Delegates to the `some-plugin` plugin when it is installed.\n\n'
       # Larger than any pipe buffer, so the producer cannot finish before the consumer matches.
       head -c 200000 < /dev/zero | tr '\0' 'x' | fold -w 100
@@ -677,6 +1145,39 @@ check_reports "a delegation named early in a long body is not reported" \
 m_delegation_missing() { delegation_fixture "$1" no; }
 check_reports "a delegation the body never names is reported" \
   yes "never names it" m_delegation_missing
+
+# THE FLOOR ITSELF, pinned in neither direction until now. A table reformatted past what the awk
+# above parses yields zero pairs, which every assertion in the block above passes vacuously, exactly
+# the failure mode tests/validate-skills.sh#Ten pairs on 2026-09-02 exists to catch. Copied from the
+# reader-rule floor at m_readby_no_keys, tests/test-validate-skills.sh#THE FLOOR.
+m_delegation_table_unparseable() {
+    mkdir -p "$1/docs"
+    printf '# Plugins\n\nThis table has been reformatted and no longer has the header row the parser looks for.\n' \
+      > "$1/docs/04-plugin-strategy.md"
+}
+check_reports "a delegation table reformatted past parsing trips the floor" yes \
+  "documented delegations, against 10" m_delegation_table_unparseable
+
+# And the floor stays quiet at 8 documented pairs, or it is not a floor at 8, it is one at whatever
+# count the fixtures happen to carry.
+m_delegation_healthy() {
+    local root="$1" i
+    mkdir -p "$root/docs"
+    { printf '# Plugins\n\n'
+      printf '| keel skill | Plugin it calls | What it delegates |\n'
+      printf '|---|---|---|\n'
+      for i in 1 2 3 4 5 6 7 8; do
+          printf '| `example` | `healthy-plugin-%s` | A thing |\n' "$i"
+      done
+    } > "$root/docs/04-plugin-strategy.md"
+    { printf -- '---\nname: example\ndescription: Use when a test needs a valid skill to exist.\n---\n\n'
+      for i in 1 2 3 4 5 6 7 8; do
+          printf 'Delegates to `healthy-plugin-%s` when it is installed.\n' "$i"
+      done
+    } > "$root/skills/example/SKILL.md"
+}
+check_reports "a delegation table with 8 documented pairs does not trip the floor" no \
+  "documented delegations, against 10" m_delegation_healthy
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

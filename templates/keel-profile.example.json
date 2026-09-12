@@ -32,18 +32,13 @@
     "security": "npm audit --audit-level=high"
   },
   "gates": {
-    "tdd": "required",
     "coding_standards": "required",
-    "review": "required",
     "security_audit": "required",
-    "docs_updated": "warn",
-    "observability": "required",
     "commit_guard": "off",
     "done_verified": "warn"
   },
   "conventions": {
     "commit_style": "conventional",
-    "branch_prefix": "feat/",
     "default_branch": "main",
     "response_style": "terse",
     "explain_level": "technical",
@@ -84,7 +79,6 @@
   "observability": {
     "backend": "signoz",
     "otlp_endpoint_var": "OTEL_EXPORTER_OTLP_ENDPOINT",
-    "log_shipping": "otlp",
     "_note": "backend is one of signoz (default), grafana, datadog, none. Instrument with OpenTelemetry regardless; the vendor sits behind the exporter."
   },
   "artifacts": {

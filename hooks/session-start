@@ -152,6 +152,37 @@ ROOT="${CLAUDE_PLUGIN_ROOT:-}"
 # guard that does the real work, and the one found by running this code rather than reading it: a
 # VERSION of 300 digits passes any plausible character set and blows NFR-01 on its own.
 # `0.17.0-rc.1` is eleven and `100.100.100` is eleven, so the ceiling is not near either shape.
+# A handoff exists only after context-watch wrote one at a compaction, which is the moment this
+# session lost the conversation that produced it. PreCompact cannot say so: the harness discards
+# that hook's systemMessage. This one runs on compact and its additionalContext reaches the model,
+# so it is where the file gets named. Costs nothing on the ordinary path, where the file is absent.
+#
+# NAMED ONCE PER HANDOFF, AND THAT IS THE WHOLE OF THE MARKER BELOW. Nothing deletes
+# .keel/handoff.md, and this hook is registered on `startup|clear|compact`, so the pointer used to
+# be permanent: from the first compaction onward every session in that repository was told "the
+# previous context was compacted into it" and sent to a stale summary of a conversation it never
+# had, days later and about other work. The sentence is true for the session that resumes the
+# compaction and false for every one after it.
+#
+# THE EVENT IS NOT AVAILABLE HERE. The SessionStart payload names its source, which would settle it
+# in one field, and reading it means reading stdin: this hook is invoked with none by its own tests
+# and by anyone running it by hand, and `$(</dev/stdin)` on a terminal blocks forever. A hook that
+# hangs is worse than a hook that repeats itself. So the question asked is the one that can be
+# answered from the filesystem, and it is the same question: is this handoff newer than the last one
+# this repository was told about.
+#
+# `-nt` is a bash builtin and is true when the marker does not exist, so the first mention needs no
+# special case. Both sides are best-effort: a read-only checkout cannot write the marker and gets
+# the old behaviour of mentioning it every time, which is the safe direction.
+# `-s` and not `-f`: skills/context-budget step 7 EMPTIES this file rather than deleting it, on
+# purpose, because it is git-ignored and anything durable left in it is lost. Testing for existence
+# sent every later session to read nothing and defeated the one documented way to clear the pointer.
+if [ -s .keel/handoff.md ] && [ .keel/handoff.md -nt .keel/handoff.seen ]; then
+    CONTEXT="$CONTEXT
+Read .keel/handoff.md first: the previous context was compacted into it."
+    : > .keel/handoff.seen 2>/dev/null || true
+fi
+
 ver=""
 [ -n "$ROOT" ] && [ -r "$ROOT/VERSION" ] && ver="$(<"$ROOT/VERSION")"
 case "$ver" in

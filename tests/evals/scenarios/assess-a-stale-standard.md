@@ -15,8 +15,8 @@ both unreachable and an arm reporting check 1 as not covered had followed the bo
 `stage.sh` now stages an injected skill's references at `../skills/coding-standards/references/`
 and the prompt names that path, so both files are readable. **Checks 1 and 1b are therefore both
 scored, and skipping either is a fail rather than a pass.** Whether the arm chose to open a
-reference is observable in the tool calls under `--output-format stream-json`, and the reply's
-prose is not evidence that a file was read.
+reference is observable in the arm's tool calls, and the reply's prose is not evidence that a file
+was read. `tests/evals/README.md` has the method for each harness.
 
 **Passes if the reply:** enters assess mode without being told the word "assess"; writes or
 drafts `docs/audits/<date>-standards.md` and creates nothing else; leaves `docs/standards.md`

@@ -244,12 +244,24 @@ printf '{"docs_root":"docs/keel"}\n' > "$work/.keel/profile.json"
 mkdir -p "$work/empty"
 bash_bin="$(command -v bash)"
 
-# stderr is kept rather than discarded, and reported on failure. This case failed once on a CI
-# runner with rc=1 and no output, and nothing in hooks/context-watch can return 1: every path out
-# of it is an explicit exit 0. The message that would have said why went to /dev/null, so one
-# failure produced no evidence and the next run passed. The assertion is unchanged: stdout must be
-# empty, which is what silence means here, and stderr is diagnostic only.
-out="$(printf '{"hook_event_name":"UserPromptSubmit","transcript_path":"%s","cwd":"%s","session_id":"s-np","tool_name":"Bash"}' "$work/e2e.jsonl" "$work" | PATH="$work/empty" "$bash_bin" "$HOOK" 2>"$work/no-python.err")"; rc=$?
+# Fed from a file, not through a pipe, and that is the whole fix. Diagnosed 2026-09-09 after this
+# case failed on CI for the second time with `rc=1 out= err=`.
+#
+# The hook exits at its `command -v python3 ... || exit 0` line before reading stdin, which is the
+# behaviour this case exists to prove. Through a pipe, that leaves the writer writing to a reader
+# that has gone: printf takes SIGPIPE, or EPIPE where SIGPIPE is ignored, and this file runs
+# `set -o pipefail`, which hands the pipeline the writer's status. Measured both ways: rc=141 with
+# the default disposition, rc=1 with SIGPIPE ignored, which is what CI reported. Small payloads
+# usually win the race, which is why it passed locally every time and failed on a loaded runner
+# twice in a month.
+#
+# The remedy added after the first failure was to keep the hook's stderr and print it. It could
+# never have seen this: the message belongs to the test's own printf, on the test's stderr, which is
+# why the report said `err=` with nothing after it. stderr is still kept, because it is the right
+# thing to report for any other cause.
+printf '{"hook_event_name":"UserPromptSubmit","transcript_path":"%s","cwd":"%s","session_id":"s-np","tool_name":"Bash"}' \
+  "$work/e2e.jsonl" "$work" > "$work/no-python.json"
+out="$(PATH="$work/empty" "$bash_bin" "$HOOK" < "$work/no-python.json" 2>"$work/no-python.err")"; rc=$?
 [ "$rc" -eq 0 ] && [ -z "$out" ] && ok "the watchdog is silent and exits 0 when python3 is absent" \
   || bad "no python" "rc=$rc out=$out err=$(head -3 "$work/no-python.err")"
 
@@ -354,8 +366,16 @@ case "$h" in *"TO BE COMPLETED"*) ok "the handoff marks what only a human or the
   *) bad "handoff" "no placeholder for the judgement part" ;; esac
 case "$h" in *decisions*) ok "the template tells the writer to promote decisions before the file goes" ;;
   *) bad "handoff" "the template does not say where a durable decision has to end up" ;; esac
-case "$out" in *systemMessage*) ok "PreCompact says where it put the handoff" ;;
-  *) bad "handoff" "silent about writing a file into the repository: $out" ;; esac
+# PreCompact must emit NOTHING. The vendor discards a PreCompact hook's systemMessage and continue
+# fields (code.claude.com/docs/en/hooks, verified 2026-09-05), so the announcement this used to
+# print was written, serialised and thrown away, and this case used to assert it was there by
+# grepping keel's own stdout. The handoff itself is still written; where the next session learns
+# about it is hooks/session-start, which already runs on compact. See test-session-start.sh.
+case "$out" in
+  *systemMessage*) bad "handoff" "PreCompact emitted a systemMessage, which the harness discards: $out" ;;
+  "") ok "PreCompact emits nothing, because nothing it emits is honoured" ;;
+  *) bad "handoff" "PreCompact emitted something unexpected: $out" ;;
+esac
 
 # The handoff is session state, not project knowledge, so its path is keel's own state directory and
 # not the docs tree. Written under docs_root it lands inside a committed tree, where `git add -A`
@@ -397,6 +417,226 @@ out="$(printf 'this is not json' | "$HOOK" 2>/dev/null)"; rc=$?
 out="$(fire UserPromptSubmit "$work/stop.jsonl" /nonexistent-project-dir)"; rc=$?
 [ "$rc" -eq 0 ] && ok "a cwd with no profile is not an error" \
   || bad "failure" "rc=$rc"
+
+# ---- two transcript shapes, and a third that is neither --------------------
+#
+# These are the only cases in this file driven by a recording rather than by a shape this file
+# believes in. The header above says the suite generates its fixtures; these two are the exception,
+# and they are the exception on purpose. What read_usage claims is that it can parse what a harness
+# actually writes, and a synthetic file can only prove it parses what we think a harness writes.
+# tests/fixtures/transcripts/codex.jsonl is a trimmed capture from codex-cli 0.153.4 and
+# claude-stop-edited-no-test.jsonl is one captured from a real Claude Code turn. They are the canary
+# section 10.3 of docs/architecture/tiered-multi-harness-support.md requires: when either harness
+# changes its transcript shape, these go red rather than the watchdog going quiet.
+#
+# They are also the evidence behind the two codex rows in lib/harness/capabilities. Delete them and
+# those rows assert a parser nothing checks.
+
+FIX="$ROOT/tests/fixtures/transcripts"
+usage() {   # usage <fixture> <index 0=tokens 1=kind>
+    python3 -c 'import sys;sys.path.insert(0,"lib");import context_watch as c;print(c.read_usage(sys.argv[1])[int(sys.argv[2])])' \
+      "$1" "$2"
+}
+
+got="$(usage "$FIX/codex.jsonl" 1)"
+[ "$got" = codex ] && ok "a Codex transcript is recognised" || bad "a Codex transcript is recognised" "got $got"
+
+got="$(usage "$FIX/claude-stop-edited-no-test.jsonl" 1)"
+[ "$got" = claude ] && ok "a Claude Code transcript is recognised" \
+  || bad "a Claude Code transcript is recognised" "got $got"
+
+n="$(usage "$FIX/codex.jsonl" 0)"
+[ "$n" -gt 0 ] && ok "a Codex transcript yields a token total" || bad "a Codex transcript yields a token total" "got $n"
+
+# The exact number, not merely a positive one, and it pins two separate things that both look
+# right while being wrong.
+#
+# ONE: Codex reports cached_input_tokens INSIDE input_tokens and states the answer as total_tokens,
+# where Claude Code reports four disjoint counts that have to be added. The fixture's second record
+# is 14018 input, of which 13056 cached, plus 5 output, stating 14023. Summing the fields the Claude
+# way gives 27079, so the session would be reported at roughly twice its real occupancy and would
+# hard-stop at half the intended threshold.
+#
+# TWO: one token_usage_record is written per model RESPONSE, not per turn, and this fixture holds
+# the two that one turn wrote: 13993 then 14023. Occupancy is the size of the most recent request,
+# so the last one wins. Adding them gives 28016, more than the whole window is occupied by, which is
+# the same class of error as summing the fields. A fixture holding one usage record cannot tell the
+# two apart and leaves both changes green, which is why the second one is in it.
+[ "$n" = 14023 ] && ok "the Codex total is the last response's total_tokens, not a sum" \
+  || bad "the Codex total" "expected 14023, got $n"
+
+# The window is read, not assumed. The Codex fixture states model_context_window 258400. Assuming
+# the 200,000 default would report this session at 129% of a window it is at 5% of, and hard-stop
+# every Codex session at 66% of the room it actually has.
+w="$(python3 -c 'import sys;sys.path.insert(0,"lib");import context_watch as c;print(c.declared_window(sys.argv[1]))' "$FIX/codex.jsonl")"
+[ "$w" = 258400 ] && ok "a Codex transcript states its own context window" \
+  || bad "declared window" "expected 258400, got $w"
+
+# Claude Code states none, so the inference in window_for is still what answers for it.
+w="$(python3 -c 'import sys;sys.path.insert(0,"lib");import context_watch as c;print(c.declared_window(sys.argv[1]))' "$FIX/claude-stop-edited-no-test.jsonl")"
+[ "$w" = 0 ] && ok "a Claude Code transcript states no window, so nothing is invented" \
+  || bad "declared window" "expected 0, got $w"
+
+# R-01: a stated window must not change what Claude Code sees. Nothing states one there, so this
+# pins that the new parameter defaults to the old behaviour rather than to a window of its own.
+w="$(python3 -c 'import sys;sys.path.insert(0,"lib");import context_watch as c;print(c.window_for("claude-opus-5"))')"
+[ "$w" = 200000 ] && ok "an unstated window leaves the Claude Code answer unchanged" \
+  || bad "window_for default" "expected 200000, got $w"
+
+# ...and window_for uses it. Reading the number and then ignoring it leaves every case above green
+# while the watchdog still measures Codex against the 200,000 default.
+w="$(python3 -c 'import sys;sys.path.insert(0,"lib");import context_watch as c;print(c.window_for("", declared=258400))')"
+[ "$w" = 258400 ] && ok "a stated window is what the session is measured against" \
+  || bad "stated window" "expected 258400, got $w"
+
+# A stated window is a starting point, not a ceiling: observation still raises it. Otherwise a
+# harness that understated its own window would cap the watchdog below the real one permanently.
+w="$(python3 -c 'import sys;sys.path.insert(0,"lib");import context_watch as c;print(c.window_for("", observed=300000, declared=258400))')"
+[ "$w" = 1000000 ] && ok "observation still raises a stated window" || bad "stated window" "expected 1000000, got $w"
+
+# END TO END, and this is the assertion the codex transcript_turn_usage row in
+# lib/harness/capabilities actually rests on. Everything above tests read_usage, which only sniffs.
+# What context-watch runs is measure and window_for, and until 2026-09-06 those understood Claude
+# Code rows alone: a Codex session measured 0 tokens, hook() returned at `if not tokens`, and the
+# watchdog was silent on every turn. A gate the manifest calls active and which never fires is the
+# failure this whole design exists to prevent, so it is pinned here as one line: occupancy, window,
+# percentage and model, all four read from the rollout rather than assumed.
+got="$(python3 "$LIB" measure "$FIX/codex.jsonl")"
+[ "$got" = "14023 258400 5 gpt-5.6-terra" ] \
+  && ok "context-watch measures a real Codex session end to end" \
+  || bad "codex end to end" "expected '14023 258400 5 gpt-5.6-terra', got '$got'"
+
+# A transcript with no assistant turn YET is not an unrecognised one. That is the state of every
+# session at its first prompt, and calling it unsupported made the watchdog announce itself inactive
+# once per session on a file it understands perfectly well. Found in review: the kind was being
+# decided by "did a parser return a number" rather than by the shape of the rows.
+fresh="$(mktemp)"
+printf '{"type":"user","message":{"role":"user","content":"do the thing"}}\n' > "$fresh"
+got="$(usage "$fresh" 1)"
+[ "$got" = claude ] && ok "a transcript with no assistant turn yet is recognised, not unsupported" \
+  || bad "a transcript with no assistant turn yet is recognised" "got $got"
+err="$(printf '{"hook_event_name":"UserPromptSubmit","transcript_path":"%s","cwd":"%s","session_id":"s-fresh"}' \
+  "$fresh" "$work" | python3 "$LIB" hook 2>&1 >/dev/null)"
+[ -z "$err" ] && ok "and the hook says nothing about it" \
+  || bad "and the hook says nothing about it" "stderr was: $err"
+rm -f "$fresh"
+
+# A Codex rollout with no usage record yet, the same case on the other harness.
+fresh="$(mktemp)"
+printf '{"timestamp":"2026-09-06T07:16:38Z","ordinal":0,"type":"session_meta","payload":{"session_id":"x"}}\n' > "$fresh"
+got="$(usage "$fresh" 1)"
+[ "$got" = codex ] && ok "a Codex rollout with no usage record yet is recognised" \
+  || bad "a Codex rollout with no usage record yet is recognised" "got $got"
+rm -f "$fresh"
+
+u="$(mktemp)"; printf 'not a transcript\n' > "$u"
+got="$(usage "$u" 1)"
+[ "$got" = unsupported ] && ok "an unknown format reports unsupported" || bad "an unknown format reports unsupported" "got $got"
+n="$(usage "$u" 0)"
+[ "$n" != 0 ] && ok "an unknown format does not report zero tokens" \
+  || bad "an unknown format does not report zero tokens" "reported 0, which looks like a quiet session"
+rm -f "$u"
+
+# The hook says so rather than going quiet. A transcript that exists and does not parse took the
+# same silent path as one that is absent until 2026-09-06, so a watchdog that had stopped working
+# was indistinguishable from a session using no context.
+#
+# Fired at lib/context_watch.py directly, not through hooks/context-watch, and that is not a
+# convenience. The wrapper ends in `2>/dev/null` on purpose, so that a hook which breaks cannot put
+# an error on the end of every turn in the session. This message therefore does not reach a person
+# through the hook, by design; keel doctor's watchdog section is the surface that shows it, and
+# task 11 of the tiered multi-harness plan is what adds that. What is pinned here is that the
+# detection happens and says which, rather than returning the same 0 an idle session returns.
+bad_t="$work/unsupported.jsonl"
+printf '{"type":"something-else","payload":{"nope":1}}\n' > "$bad_t"
+err="$(printf '{"hook_event_name":"UserPromptSubmit","transcript_path":"%s","cwd":"%s","session_id":"s-unsup"}' \
+  "$bad_t" "$work" | python3 "$LIB" hook 2>&1 >/dev/null)"
+printf '%s' "$err" | grep -q 'watchdog inactive' \
+  && ok "an unparseable transcript is reported, not silently measured as zero" \
+  || bad "unsupported is surfaced" "stderr was: ${err:-<empty>}"
+
+# --- the tail optimisation actually optimises -----------------------------------------------------
+#
+# _tail_entries exists because parsing a multi-megabyte transcript on every prompt would make the
+# watchdog the slowest thing in the session, which its own docstring calls "a good way to have it
+# turned off". _measure_parts returned early only when it had BOTH a token count and a declared
+# window, and a Claude Code transcript never states a window, so the second condition was never met
+# and the whole file was parsed on every cache miss, on every Claude Code session.
+#
+# Asserted by making the whole-file read impossible rather than by timing it: a timing test on a
+# 600KB file is a test that fails on a slow CI box and gets deleted.
+# One pad string, built once. Built inside the loop it is 4000 subshells per fixture.
+pad="$(printf 'x%.0s' $(seq 1 140))"
+big="$work/big.jsonl"
+{
+  # Padding first, so the file clears TAIL_BYTES (512KB) and the tail path is the one taken.
+  i=0; while [ "$i" -lt 4000 ]; do
+    printf '{"type":"user","message":{"role":"user","content":"%s"}}\n' "$pad"
+    i=$((i+1))
+  done
+  printf '{"type":"assistant","isSidechain":false,"message":{"model":"claude-opus-5","content":[{"type":"text","text":"t"}],"usage":{"input_tokens":1,"cache_creation_input_tokens":0,"cache_read_input_tokens":34567,"output_tokens":0}}}\n'
+} > "$big"
+[ "$(wc -c < "$big")" -gt 524288 ] || bad "the tail fixture clears TAIL_BYTES" "file is only $(wc -c < "$big") bytes, so the tail path is not the one under test"
+
+got="$(KEEL_LIB="$LIB" python3 - "$big" <<'PY' 2>&1
+import importlib.util, os, sys
+spec = importlib.util.spec_from_file_location("cw", os.environ["KEEL_LIB"])
+cw = importlib.util.module_from_spec(spec); spec.loader.exec_module(cw)
+def boom(_path):
+    raise AssertionError("whole file parsed")
+cw._entries = boom
+try:
+    print(cw._measure_parts(sys.argv[1])[0])
+except AssertionError as e:
+    print("WHOLE-FILE: %s" % e)
+PY
+)"
+[ "$got" = 34568 ] && ok "a Claude Code transcript is measured from the tail alone" \
+  || bad "a Claude Code transcript is measured from the tail alone" "got: $got"
+
+# And the fallthrough it must NOT lose: a tail with no usable turn still reads the whole file,
+# because reporting zero there would read as an empty context and silence the watchdog exactly when
+# it is needed. The usage record is at the HEAD, so only a whole-file read can find it.
+head_only="$work/head.jsonl"
+{
+  printf '{"type":"assistant","isSidechain":false,"message":{"model":"claude-opus-5","content":[{"type":"text","text":"t"}],"usage":{"input_tokens":1,"cache_creation_input_tokens":0,"cache_read_input_tokens":77000,"output_tokens":0}}}\n'
+  i=0; while [ "$i" -lt 4000 ]; do
+    printf '{"type":"user","message":{"role":"user","content":"%s"}}\n' "$pad"
+    i=$((i+1))
+  done
+} > "$head_only"
+got="$(KEEL_LIB="$LIB" python3 - "$head_only" <<'PY' 2>&1
+import importlib.util, os, sys
+spec = importlib.util.spec_from_file_location("cw", os.environ["KEEL_LIB"])
+cw = importlib.util.module_from_spec(spec); spec.loader.exec_module(cw)
+print(cw._measure_parts(sys.argv[1])[0])
+PY
+)"
+[ "$got" = 77001 ] && ok "a tail with no usable turn still falls through to the whole file" \
+  || bad "a tail with no usable turn still falls through to the whole file" "got: $got"
+
+# A Codex rollout DOES state a window, so the fallthrough for the window is kept there: a tail
+# carrying a usage record and no token_count must still read the whole file rather than put the
+# session back on the 200000 default.
+cx="$work/cxbig.jsonl"
+{
+  printf '{"ordinal":0,"type":"event_msg","payload":{"type":"token_count","info":{"model_context_window":258400}}}\n'
+  i=0; while [ "$i" -lt 4000 ]; do
+    printf '{"ordinal":1,"type":"response_item","payload":{"type":"message","note":"%s"}}\n' "$pad"
+    i=$((i+1))
+  done
+  printf '{"ordinal":2,"type":"token_usage_record","payload":{"usage":{"input_tokens":91000,"cached_input_tokens":0,"output_tokens":0,"total_tokens":91000}}}\n'
+} > "$cx"
+got="$(KEEL_LIB="$LIB" python3 - "$cx" <<'PY' 2>&1
+import importlib.util, os, sys
+spec = importlib.util.spec_from_file_location("cw", os.environ["KEEL_LIB"])
+cw = importlib.util.module_from_spec(spec); spec.loader.exec_module(cw)
+t, m, w = cw._measure_parts(sys.argv[1])
+print("%s %s" % (t, w))
+PY
+)"
+[ "$got" = "91000 258400" ] && ok "a Codex tail with no stated window still finds it in the whole file" \
+  || bad "a Codex tail with no stated window still finds it in the whole file" "got: $got"
 
 rm -rf "$work"
 printf '\n%s passed, %s failed\n' "$pass" "$fail"

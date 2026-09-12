@@ -25,7 +25,7 @@ if ! git -C "$ROOT" archive HEAD | tar -x -C "$tmp"; then
     exit 1
 fi
 
-# The whole point: HERE resolves, lib/ and VERSION are found, and the guard at bin/keel:35 stays
+# The whole point: HERE resolves, lib/ and VERSION are found, and the guard at `bin/keel#field is added, removed, renamed or moved` stays
 # quiet. A copy missing any sourced file prints "incomplete install" and exits 1.
 out="$("$tmp/bin/keel" version 2>&1)"
 if [ "$out" = "$(cat "$ROOT/VERSION")" ]; then

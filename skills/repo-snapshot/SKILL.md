@@ -46,7 +46,7 @@ re-deriving what someone already wrote.
 **Delegate even though it costs more.** Files read inline sit in context all session; a subagent's are
 discarded.
 
-Dispatch these `Explore` agents concurrently **in one message**, model `sonnet`:
+Dispatch these subagents concurrently **in one message**, delegation profile `keel-fanout`:
 
 | Agent | Brief |
 |---|---|

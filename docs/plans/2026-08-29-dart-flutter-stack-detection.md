@@ -1579,7 +1579,7 @@ testing". `has_ui` is a different predicate. `apex` satisfies both, because APEX
 browser-rendered; Flutter is the first UI to reach that line that is not a browser at all. **This
 fixes the code to match the documented rule rather than inventing a new one.**
 
-**`frontend-design` stays.** `docs/04-plugin-strategy.md:17` scopes it to "Only where there is a UI",
+**`frontend-design` stays.** `docs/04-plugin-strategy.md` scopes it to "Only where there is a UI",
 with no browser qualifier, and Flutter is a UI toolkit. Only the browser-specific recommendation is
 wrong.
 

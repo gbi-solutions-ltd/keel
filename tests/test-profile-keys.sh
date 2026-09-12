@@ -46,11 +46,29 @@ print(' '.join(sorted(set(declared(d)) - rows)))
 [ -z "$missing" ] && ok "every declared key has a row" \
   || bad "coverage" "no row for: $missing"
 
+# The fifth marker value has to reach the page in words. A reader who meets a fifth phrasing with
+# no explanation reads it as a synonym for one of the four, and the whole point of observed: is that
+# it is not: nothing is written to read the key, and a model was measured reading it anyway.
+grep -q 'a model, unprompted' "$work/a.md" \
+  && ok "the generated page renders an observed: marker" \
+  || bad "observed:" "no row says a model reads a key unprompted, so the fifth value is invisible"
+
 # artifacts._note is written by keel init and not declared by the schema. It is a note to the
 # reader rather than a key anyone sets, and declaring it would cost a SCHEMA_VERSION bump.
 grep -qF 'artifacts._note' "$work/a.md" \
   && bad "omission" "artifacts._note appears; the schema does not declare it and FR-12 omits it" \
   || ok "a key the schema does not declare is omitted"
+
+# The column is the whole point of the change: an empty cell is a page that renders the question
+# and answers none of it. _undeclared_ is what read_by prints for a key with no marker, and
+# validate-skills.sh fails on that separately; here it must never reach the page at all.
+# shellcheck disable=SC2016  # the backticks are the pattern, not a command substitution
+blank="$(grep -cE '^\| `[^`]+` \| [^|]* \| [^|]* \|  *\|' "$work/a.md" || true)"
+[ "$blank" = "0" ] && ok "every row carries a Read by value" \
+  || bad "every row carries a Read by value" "$blank row(s) have an empty Read by cell"
+grep -q '_undeclared_' "$work/a.md" \
+  && bad "no row renders as undeclared" "$(grep -n '_undeclared_' "$work/a.md" | head -3)" \
+  || ok "no row renders as undeclared"
 
 # Determinism is what makes the drift rule in validate-skills usable. A generator that varies
 # produces a rule that fails at random, and a rule that fails at random gets disabled.

@@ -233,7 +233,7 @@ case "$out2" in *"schema version none"*) ok "doctor treats an absent schema_vers
 
 Run: `tests/test-keel.sh`
 Expected: FAIL on `an old keel_version alone does not raise the re-run warning`, because the current
-comparison at `bin/keel:1207` warns on exactly that.
+comparison, `[ "$pv" != "$iv" ]` in doctor, warns on exactly that.
 
 - [x] **Step 3: Write the minimal implementation**
 

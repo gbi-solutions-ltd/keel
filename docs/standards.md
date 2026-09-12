@@ -16,6 +16,7 @@ These are checked by `tests/validate-skills.sh`, so they are not conventions you
 remember. Listed only so you know what you are covered for:
 
 frontmatter has `name` and `description`; the description starts with "Use when" and is under 260
+<!-- keel:claim property=validated_word_ceiling harness=claude -->
 characters; the body is within the 900 word ceiling, warns over the 700 target and says how many
 words are left once it is within 30 of the ceiling; no `@` links;
 no hardcoded `docs/keel` path
@@ -62,7 +63,7 @@ number under it is not a limit, it is where bodies settle.**
 
 **Example:** `skills/coding-standards/SKILL.md` is the case that shows moving detail out has a
 floor: `coding-standards` carried 12 reference files and 17,816 words against a body of 683 when
-ADR-0001 measured it, and carries 17 and 22,752 against 795 today. Reach for a reference
+ADR-0001 measured it, and carries 17 and 22,750 against 795 today. Reach for a reference
 because a reader needs it at one step, not as a way to buy words.
 
 ## Subagent briefs stay in the body; everything else can move
@@ -264,7 +265,7 @@ same field. Changing the severity now changes both.
 
 ## Review
 
-Either Bernard Tebandeke or Edrine Kamya reviews a skill change; both are not required. **No skill
+Either Bernard Tebandeke or `gfsekamanya` reviews a skill change; both are not required. **No skill
 change is merged by its own author unreviewed**, which is the property the two-reviewer rule exists
 to guarantee. A skill affects every repository with the plugin installed, so it is not a solo
 change even when it is a one-line change.
@@ -307,7 +308,7 @@ re-measured at each release rather than assumed. A block that grows past 700 is 
 
 **Three skills name their dispatch model without announcing it.** The rule in "A dispatch names its
 model" is unconditional and stays that way. `apex-port-plan`, `write-plan`, `shape-idea` and
-`security-audit` carry the clause, four of the seven `sonnet` fan-outs; `repo-snapshot`,
+`security-audit` carry the clause, four of the seven delegating skills; `repo-snapshot`,
 `port-assess` and `write-docs` do not, which was found on 2026-08-20 by a run that dispatched six
 correctly pinned `sonnet` agents and announced nothing.
 
@@ -359,11 +360,21 @@ is why the departures table above exists at all rather than being quietly empty.
 
 ## A dispatch names its model, and says so
 
-**Rule:** a skill that dispatches a subagent names the model at the dispatch site and announces it
-in one line. Wide mechanical reading goes to `sonnet`. Anything writing code under a gate, or
-judging another agent's verdict, stays `inherit`. No brief names a full model id, and none names
-`haiku` yet. `tests/validate-skills.sh` rejects any alias Claude Code does not accept, and since
-2026-08-20 also fails a dispatch that names no model at all.
+**Rule:** a skill that dispatches a subagent names the routing at the dispatch site and announces it
+in one line. Wide mechanical reading goes to the delegation profile `keel-fanout`. Anything writing
+code under a gate, or judging another agent's verdict, stays `inherit`.
+`tests/validate-skills.sh` fails a dispatch that names no routing at all, since 2026-08-20, and
+since 2026-09-06 fails a body that names a vendor model alias at all.
+
+**The vocabulary changed on 2026-09-06 and the reason is ADR-0005.** It used to be an alias:
+`sonnet` for the fan-outs, `inherit` for judgement. Four of the five accepted words were Anthropic
+model names, which say nothing on a second harness, so a body now names a **delegation profile** and
+each harness resolves it to its own model. keel writes the Codex one to
+`.codex/agents/keel-fanout.toml`. Only `inherit` survives the removal, and it is **not** the neutral
+replacement for the other four: it means the driver's model, which is the deliberate pin on
+judgement work and the opposite of what a fan-out wants. Reading it as neutral inverts the routing
+decision. Full model ids remain excluded, and where a profile resolves is the harness's business
+rather than a skill body's.
 
 **Why:** a session's model cannot be changed by a plugin, a hook, or the model itself. Checked
 2026-08-16 against the Claude Code hooks documentation: no hook event exposes model selection. So
@@ -373,9 +384,11 @@ re-reads context the main thread already holds. The payoff therefore depends on 
 complexity: a router that did would be wrong in the direction nobody notices, since a cheap model
 doing a poor job produces plausible output rather than an error.
 
-`haiku` waits on one measured comparison, recorded as open question 3 in
-`docs/ideas/model-routing.md`. Full model ids are excluded because an id pinned in a skill goes
-stale with nothing to notice, while an alias tracks the current model. The announcement was asked
+Which model each profile should resolve to is still open, and on Codex it is unmeasured: the pin in
+`.codex/agents/keel-fanout.toml` was chosen from a price list and nothing has checked it clears the
+fan-out quality bar. Recorded as open question 3 in `docs/ideas/model-routing.md`, which is also the
+standing evidence that a cheaper model passes every structural check and is wrong twice as often.
+The announcement was asked
 for directly and was originally recorded here as costing nothing. **Corrected 2026-08-20:** it costs
 body words, and in three skills there are none to spare. The rule stays as written and the shortfall
 is a departure, listed in the departures table with its end condition.

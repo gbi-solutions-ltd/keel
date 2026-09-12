@@ -14,10 +14,10 @@ never learns that the document exists. This lands on the next session rather tha
 the work, every time an artifact is produced.
 
 **Evidence.** This repository, 2026-08-29. `repo-snapshot` has been run against real repositories
-(`tests/evals/results.md:261-262` says so, and says it is the only evidence those three skills have),
-and `.keel/profile.json:74` still reads `"snapshot": null`. So do `prd`, `stories`, `architecture`,
-`decisions` and `plans`, on a repository that has 16 idea records, 12 plans, 3 ADRs and a full
-`docs/` tree. **Six keys, six nulls, on the repository that dogfoods the tool.**
+(`tests/evals/results.md`, at "Nothing here tests", says so, and says it is the only evidence
+those three skills have), and `.keel/profile.json:74` still reads `"snapshot": null`. So do `prd`,
+`stories`, `architecture`, `decisions` and `plans`, on a repository with 16 idea records, 12 plans,
+3 ADRs and a full `docs/` tree. **Six keys, six nulls, on the repository that dogfoods the tool.**
 
 ## What was asked for
 
@@ -145,11 +145,11 @@ anything. `FR-06` was amended for it, asked as a choice.
 `from-repo` mode to check `profile.artifacts.snapshot` before falling back to `<docs_root>/snapshot.md`,
 matching what it already does for `artifacts.prd` one line below. That is a defect fix, and it is what
 turns the key from decoration into something worth setting. **It is not free:** `write-prd` is at 791
-words, 109 below the ceiling but already over the 700 target, so `docs/standards.md:308-311` puts it
-in the class where adding words re-opens ADR-0001's obligation to hold a passing eval arm at the new
-length. That arm exists and passes: `build-with-no-prd` in `tests/evals/results.md`, most recently in
-the seven-arm gate of 2026-08-20. The cost is one re-dispatch, about $0.40, not a body that has to be
-trimmed first.
+words, 109 below the ceiling but already over the 700 target, so "What blocks each, measured the
+same day" in `docs/standards.md` puts it in the class where adding words re-opens ADR-0001's
+obligation to hold a passing eval arm at the new length. That arm exists and passes:
+`build-with-no-prd` in `tests/evals/results.md`, most recently in the seven-arm gate of 2026-08-20.
+The cost is one re-dispatch, about $0.40, not a body that has to be trimmed first.
 
 Then the writer, and it is `keel profile sync` rather than a line in five skill bodies. Decided by
 Bernard on 2026-08-29: `write-plan` has three words of headroom and cannot take the line at all, and

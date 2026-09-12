@@ -112,7 +112,7 @@ building there.
 | FR-07 | `keel init` must write `plugins.recommended` from the stack it detected. | confirmed | Bernard, 2026-08-18, choosing report-only. `detect_plugins` at `lib/detect-stack.sh:601-608` already computes it |
 | FR-08 | `keel doctor` must report a recommended plugin that is not enabled, on a repository whose `.claude/settings.json` predates keel. | confirmed | The fixture case that currently reports nothing |
 | FR-09 | For each missing plugin, `keel doctor` must name the command that installs it. | confirmed | Bernard, 2026-08-18. Pattern already used for the marketplace at `bin/keel:1407` |
-| FR-10 | Re-running `keel init` must preserve a hand-edited `plugins.recommended`. | inferred | `merge_profile` at `bin/keel:290` already gives a non-empty human value precedence. Asserted so it is not lost |
+| FR-10 | Re-running `keel init` must preserve a hand-edited `plugins.recommended`. | inferred | `merge_profile` at `bin/keel#out[k] = v            # human value wins` already gives a non-empty human value precedence. Asserted so it is not lost |
 | FR-11 | `keel init` must not add entries to an existing `.claude/settings.json`. | confirmed | Bernard, 2026-08-18, choosing report-only over merge |
 | FR-12 | The generator must omit any key `keel init` writes that the schema does not declare, and `artifacts._note` is the only such key today. | confirmed | Bernard, 2026-08-18, answering Q2. Declaring it would cost a `SCHEMA_VERSION` bump for a key nobody sets, see `CON-02` |
 

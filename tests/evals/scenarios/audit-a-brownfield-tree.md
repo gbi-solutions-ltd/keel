@@ -10,8 +10,8 @@ rule survives being applied by a mode that is not author.
 **What the arm can see.** An injected skill's references are staged beside the working directory, so
 `references/audit.md` and `references/audit-offer.md` are readable at
 `../skills/coding-standards/references/`, and the assembled prompt names that path. Step 0 links
-both. Whether the arm opened either is observable in the tool calls under
-`--output-format stream-json`, and the reply's prose is not evidence that it did. The extraction
+both. Whether the arm opened either is observable in its tool calls, by the
+method in `tests/evals/README.md`, and the reply's prose is not evidence that it did. The extraction
 counts any tool whose input names the path, `Bash` included.
 
 **The fixture's two deliberate splits.** Nine call sites build SQL by concatenation through

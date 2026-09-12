@@ -60,7 +60,7 @@ marketplace install puts `keel` on the system PATH.
 
 | Finding | Evidence | What it means for the idea |
 |---|---|---|
-| The stated reason for the symlink is false | `README.md:13-14`; `docs/03-install-and-distribution.md:40` | The claim, not just the step, has to change |
+| The stated reason for the symlink is false | `README.md:13-14`; `docs/03-install-and-distribution.md` | The claim, not just the step, has to change |
 | The symlink is documented as a first-class install step | `docs/03-install-and-distribution.md:44-47` | It becomes optional, and needs a new and narrower justification |
 | Upgrading assumes the CLI lives in a clone updated by `git pull` | `README.md:52-82`, the three-layer table | Under a marketplace install there is no clone. The table collapses from three layers to two |
 | `bin/keel` guards against a partial install | `bin/keel:35` | The guard exists. Whether it passes from a cache copy is untested and is the one real risk here |

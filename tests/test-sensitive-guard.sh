@@ -203,5 +203,88 @@ else
 fi
 rm -rf "$r" "$shim"
 
+
+# --- where the harness cannot ask ---------------------------------------------------------------
+#
+# This gate is `ask` or it is nothing. Codex CLI has no ask: openai/codex@rust-v0.153.4
+# codex-rs/protocol/src/permissions.rs:105 defines FileSystemAccessMode as Read, Write and Deny with
+# no prompt variant, so `harness_provides codex pretooluse_ask` is false and always will be.
+#
+# THIS IS THE PAYLOAD CASE. The plugin is distributed by cloning one repository, so this file is on
+# every Codex machine whatever hooks/hooks.codex.json registers. It cannot be made absent. It can be
+# made impossible to operate through, and a guard that exits 0 in silence there is a guard the
+# repository believes it has.
+r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
+: > "$r/src/auth/token.go"; git -C "$r" add -A
+ev="$(event "git commit -m x" "$r")"
+
+out="$(printf '%s' "$ev" | ( cd "$r" && CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1 >/dev/null)"; rc=$?
+if [ "$rc" -eq 2 ]; then printf '  PASS  exits 2 where the harness cannot ask\n'; pass=$((pass+1))
+else printf '  FAIL  exits 2 where the harness cannot ask (got %s)\n' "$rc"; fail=$((fail+1)); fi
+
+# Exit 2 and not 1: on Codex a PreToolUse hook exiting with any non-zero code other than 2 has its
+# stderr discarded and the tool call proceeds, so exit 1 would be quieter than doing nothing.
+if printf '%s' "$out" | grep -qi 'codex'; then printf '  PASS  names the harness on stderr\n'; pass=$((pass+1))
+else printf '  FAIL  names the harness on stderr (got: %s)\n' "${out:0:90}"; fail=$((fail+1)); fi
+
+# The invariant, and the case that catches the self-check being placed too early. A repository
+# declaring nothing must cost one builtin string match and produce nothing, on every harness. Above
+# the cheap gate this block would exit 2 on every Bash tool call in every repository on Codex.
+q="$(mktemp -d)"; fixture "$q" ''
+ev="$(event "git commit -m x" "$q")"
+out="$(printf '%s' "$ev" | ( cd "$q" && CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1)"; rc=$?
+if [ "$rc" -eq 0 ] && [ -z "$out" ]; then printf '  PASS  silent on codex when the repo declares nothing\n'; pass=$((pass+1))
+else printf '  FAIL  silent on codex when the repo declares nothing (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
+rm -rf "$q"
+
+# PLACEMENT, from the side the plan did not name. The block sits after the `git commit` filter
+# because the fail-closed branch below must not become a prompt on every Read and Grep, and the
+# same argument applies to a hard block: a Codex session running `git status` in a repository that
+# DOES declare paths must be untouched. Placed before the command filter this exits 2 there, and
+# the existing "a non-Bash call is silent even with python3 absent" case catches it too, which is
+# how the collision was found.
+out="$(printf '%s' "$(event "git status" "$r")" | ( cd "$r" && CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1)"; rc=$?
+if [ "$rc" -eq 0 ] && [ -z "$out" ]; then printf '  PASS  a non-commit command on codex is untouched\n'; pass=$((pass+1))
+else printf '  FAIL  a non-commit command on codex is untouched (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
+
+# An unreadable manifest is not a missing capability, and on Claude Code the difference is the whole
+# gate: `ask` is the contract, a hard block saying Claude Code cannot ask is a lie. The resolver
+# resolves its own path with `dirname`, so a PATH carrying only bash reaches exactly that case.
+shim2="$(mktemp -d)"; ln -s "$(command -v bash)" "$shim2/bash"
+out="$(printf '%s' "$ev" | ( cd "$r" && PATH="$shim2" "$GUARD" ) 2>/dev/null)"
+if printf '%s' "$out" | grep -q '"permissionDecision": *"ask"'; then
+    printf '  PASS  an unresolvable manifest asks rather than hard blocking\n'; pass=$((pass+1))
+else
+    printf '  FAIL  an unresolvable manifest asks rather than hard blocking (got: %s)\n' "${out:0:90}"; fail=$((fail+1))
+fi
+rm -rf "$shim2"
+
+# R-01: no Claude Code behaviour changes. The same repository, the same command, without the Codex
+# signal, still reaches the decision it always did. Every case above this block asserts that too,
+# but none of them asserts it beside the new branch, which is where a misplaced self-check shows.
+check "a Claude Code session still gets the ask, not a block" ask "$r" "git commit -m x"
+
+# The resolver unreadable. This hook's contract is that it asks whenever it cannot answer, and
+# `if [ -r ... ]; then` around the source would have SKIPPED the harness check in silence, which is
+# the one outcome a gate must never have. CLAUDE_PLUGIN_ROOT is what the hook resolves its root
+# from, so pointing it at an empty directory is the whole fixture.
+empty="$(mktemp -d)"
+out="$(printf '%s' "$ev" | ( cd "$r" && CLAUDE_PLUGIN_ROOT="$empty" "$GUARD" ) 2>/dev/null)"
+err="$(printf '%s' "$ev" | ( cd "$r" && CLAUDE_PLUGIN_ROOT="$empty" "$GUARD" ) 2>&1 >/dev/null)"
+if printf '%s' "$out" | grep -q '"permissionDecision": *"ask"'; then
+    printf '  PASS  an unreadable capability manifest asks rather than skipping the check\n'; pass=$((pass+1))
+else
+    printf '  FAIL  an unreadable capability manifest asks rather than skipping the check (got: %s)\n' "${out:0:90}"; fail=$((fail+1))
+fi
+# And it asks cleanly. Without the readability check the source fails, `harness_known` is undefined,
+# and the ask still happens by accident on a "command not found" - the right answer reached through
+# a broken install shouting at the user, which is the shape of thing nobody debugs twice.
+if printf '%s' "$err" | grep -qE 'command not found|No such file'; then
+    printf '  FAIL  it asks without shouting about a broken install (got: %s)\n' "${err:0:90}"; fail=$((fail+1))
+else
+    printf '  PASS  it asks without shouting about a broken install\n'; pass=$((pass+1))
+fi
+rm -rf "$r" "$empty"
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

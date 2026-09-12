@@ -1,5 +1,13 @@
 # Architecture
 
+| | |
+|---|---|
+| Extended by | [`architecture/tiered-multi-harness-support.md`](architecture/tiered-multi-harness-support.md), ADR-0003, ADR-0004, ADR-0005 |
+
+**Layer 1 below describes Claude Code.** Which gates a harness actually delivers is stated in one
+generated place, `docs/harness-support.md`, and nowhere else. Do not add a sentence
+here saying which harnesses have a gate; `tests/test-harness-claims.sh` will fail it.
+
 ## The core idea
 
 Three layers, each with a different lifetime and a different token cost.
@@ -11,9 +19,14 @@ Layer 3  SKILLS          25 skill bodies, loaded on demand, ~690 words each
 Layer 2  PROJECT CONFIG  .keel/profile.json + a CLAUDE.md block + docs/keel/
          (in the repo)    Cost: ~450 tokens, always in context, stable across sessions
 
-Layer 1  HARNESS GATES   hooks in .claude/settings.json
+Layer 1  HARNESS GATES   hooks registered with the harness
          (in the repo)    Cost: near zero in context, enforced by the runtime not the model
 ```
+
+Layer 1 is the layer that varies by harness. On Claude Code it is four gates in
+`.claude/settings.json`. On another harness it is whatever that harness's primitives support, which
+is not the same set, and a gate keel cannot deliver there is not registered there. See
+`docs/harness-support.md` for what each harness actually gets.
 
 The split matters. Anything the model can rationalise its way out of belongs in Layer 1.
 Anything every session needs belongs in Layer 2 and must stay small and byte-stable so
@@ -137,7 +150,7 @@ skill burns tokens rediscovering how to run tests, and each one guesses differen
     "build": "npm run build",
     "e2e": "npm run test:e2e"
   },
-  "gates": { "tdd": "required", "security_audit": "required", "review": "required" },
+  "gates": { "coding_standards": "required", "security_audit": "required", "done_verified": "required" },
   "deploy": { "target": "gcp-cloud-run", "envs": ["dev", "staging", "prod"] }
 }
 ```
@@ -149,14 +162,18 @@ verifies every command in `verify` actually runs.
 
 Skills are instructions and a model under pressure negotiates with instructions. superpowers
 answers this with rationalisation tables and all-caps prohibitions, which works, partly. The
-harness answers it better. Where a rule is genuinely non-negotiable, we put it in a hook.
+harness answers it better. Where a rule is genuinely non-negotiable, we put it in a hook, on the
+harnesses whose hook protocol can carry it. The mechanisms below are Claude Code's, and the last
+column says which harnesses actually carry each rule. `docs/harness-support.md` is generated from
+the capability manifest and is the authority; this column is prose and can go stale, which is why
+it names harnesses rather than restating what each gate does.
 
-| Rule | Mechanism | Why |
-|------|-----------|-----|
-| Session knows keel exists | `SessionStart` hook injecting the router pointer | Model cannot skip what it never sees |
-| Edits get a security pattern check | `security-guidance` plugin `PostToolUse` hook | Runs on every edit, no invocation needed |
-| Diff gets an LLM security review before the turn ends | `security-guidance` plugin `Stop` hook | This is requirement 5's "automatic audits before code ships" |
-| Format, lint and typecheck pass before a commit | optional `keel guard` `pre-commit` git hook, off until `gates.commit_guard` turns it on | See open decision 4, it can be slow |
+| Rule | Mechanism | Why | Carried on |
+|------|-----------|-----|------------|
+| Session knows keel exists | `SessionStart` hook injecting the router pointer | Model cannot skip what it never sees | Claude Code and Codex |
+| Edits get a security pattern check | `security-guidance` plugin `PostToolUse` hook | Runs on every edit, no invocation needed | Claude Code only, it is a Claude Code plugin |
+| Diff gets an LLM security review before the turn ends | `security-guidance` plugin `Stop` hook | This is requirement 5's "automatic audits before code ships" | Claude Code only, same reason |
+| Format, lint and typecheck pass before a commit | optional `keel guard` `pre-commit` git hook, off until `gates.commit_guard` turns it on | See open decision 4, it can be slow | Either, it is a git hook and not a harness one |
 
 Everything else stays in skills, where judgement belongs.
 

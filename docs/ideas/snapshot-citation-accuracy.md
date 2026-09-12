@@ -88,7 +88,7 @@ gap is coverage, and coverage is the tier-1-shaped half of the problem.
 
 | Finding | Evidence | What it means for the idea |
 |---|---|---|
-| keel already builds tier-1 checks and stops there, twice | `tests/validate-skills.sh:141` reports a broken relative link; `bin/keel:764` reports a referenced document not in HEAD | The resolver is not a new idea in this codebase, it is the third instance of an established pattern. It also shows the house style has never attempted tier 3 |
+| keel already builds tier-1 checks and stops there, twice | `tests/validate-skills.sh` reports a broken relative link; `bin/keel:764` reports a referenced document not in HEAD | The resolver is not a new idea in this codebase, it is the third instance of an established pattern. It also shows the house style has never attempted tier 3 |
 | The skill already caps verification, deliberately | `skills/repo-snapshot/SKILL.md:70-71`, "Cap at six: where being wrong changes what somebody does" | Most citations in a snapshot are *designed* to be unverified. A check that demands they all be right is arguing with the skill, not testing it |
 | The accuracy guarantee is scoped to section 10 only | `skills/repo-snapshot/references/section-templates.md:23-25`, "Verified or not recommended" | The 15% is measured across a population the skill never promised was verified. The honest headline is a section 10 rate, not a document rate |
 | The scoped guarantee is not fully delivered either | 2026-08-20: **each** arm carried exactly one defective citation inside section 10 (haiku `.gitignore:9-11`, real carve-out at `:20`; sonnet `tests/run-tests.sh:31`, real line `:34`) | This is the finding worth acting on. Step 3 verification is the skill's own promise and it leaks |
@@ -231,8 +231,8 @@ policy the repository set and never verified.
 
 **Second, the resolver**, unchanged from the earlier draft and now the junior partner: file exists,
 line in range, a free census of every citation. It catches the dominant failure of the model that
-ships and it is the third instance of a pattern `tests/validate-skills.sh:141` and `bin/keel:764`
-already establish.
+ships and it is the third instance of a pattern `tests/validate-skills.sh`, at "broken link to",
+and `bin/keel:764` already establish.
 
 **Third, and only on a model-pin change, the hand census** for tier 3. Not per release, not per
 document, pooled across runs so a rate becomes estimable over time. About two hours, paid only when

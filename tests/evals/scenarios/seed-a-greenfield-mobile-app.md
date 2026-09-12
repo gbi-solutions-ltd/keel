@@ -10,8 +10,8 @@ library-gap report is produced against a stack the house references do not fully
 **What the arm can see.** An injected skill's references are staged beside the working directory, so
 `references/seed.md`, `references/house-defaults.md` and `references/standards-template.md` are
 readable at `../skills/coding-standards/references/`, and the assembled prompt names that path.
-Step 0 links the mode. Whether the arm opened any of them is observable in the tool calls under
-`--output-format stream-json`, and the reply's prose is not evidence that it did. The extraction
+Step 0 links the mode. Whether the arm opened any of them is observable in its tool calls, by the
+method in `tests/evals/README.md`, and the reply's prose is not evidence that it did. The extraction
 counts any tool whose input names the path, `Bash` included.
 
 **The fixture is two files.** A profile and a README, no source of any kind. The profile is the only

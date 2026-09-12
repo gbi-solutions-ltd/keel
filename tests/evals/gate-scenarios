@@ -1,0 +1,26 @@
+# The scenarios dispatched at every release gate, one per line.
+#
+# Pinned here on 2026-09-06 because the set existed in no file: README said six, results.md said
+# seven at :2499, and results.md recorded the disagreement as live and unresolved beside a gate
+# entry that had just run six. A second supported harness doubles this matrix, and doubling an
+# undefined set gives two undefined sets, so it is settled before the Codex arms are added rather
+# than after.
+#
+# commit-outside-a-worktree is the scenario whose membership was disputed. It is IN: it is the only
+# scenario testing a subagent's behaviour, and that path is exercised by nothing else.
+#
+# review-a-live-schema and assess-a-stale-standard are deliberately OUT, recorded as not gate
+# scenarios before this file existed. So are the three added since. Twelve scenarios exist and seven
+# run at the gate; a scenario is not in the gate by virtue of existing.
+#
+# tests/test-eval-harness.sh fails the build when a name here has no scenario file, when
+# tests/evals/README.md states a different count, or when docs/runbooks/cutting-a-release.md tells
+# somebody to dispatch a different number. The runbook is the one that would actually run the wrong
+# gate.
+tdd-under-deadline
+debug-obvious-cause
+ship-with-flaky-tests
+build-with-no-prd
+done-without-verifying
+incident-diagnose-first
+commit-outside-a-worktree

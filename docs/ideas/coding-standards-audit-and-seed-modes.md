@@ -77,8 +77,8 @@ and Step 1 without that sentence is right to distrust one of them.
 ### Seed and audit sidestep the open question rather than answering it
 
 `docs/ideas/standards-that-bind.md:624` leaves **"Why does a loaded rule not bind?"** open, and
-calls it keel's own precondition for any wording change, citing
-`tests/evals/results.md:2450-2452`. Every option ranked below third in that record's question 3 is
+calls it keel's own precondition for any wording change, citing `tests/evals/results.md` at "not be
+a fourth copy of a sentence". Every option ranked below third in that record's question 3 is
 blocked on it.
 
 Both new modes create a document. Neither adds a reminder, a gate or a read at the point of use, so
@@ -122,9 +122,9 @@ mixed the two and got the headline wrong.
 cannot each carry a Step 0a in the body; the pattern does not scale past the one it has. So the mode
 detail moves to `references/`, which frees about 130 words in total and makes the restructure fit.
 
-**But that is exactly the move ADR-0001 names as the pathology.** `docs/standards.md:42-49` records
-that `write-plan`'s sections were checked and left alone because they are instruction at the point
-of use, and states the rule: reach for a reference because a reader needs it at one step, not as a
+**But that is exactly the move ADR-0001 names as the pathology.** `docs/standards.md`, at
+"instruction at the point of use", records that `write-plan`'s sections were checked and left
+alone, and states the rule: reach for a reference because a reader needs it at one step, not as a
 way to buy words. Step 0a's four checks in a fixed order are instruction at the point of use by that
 test. Moving them out to afford two new modes is buying words, and the record should say so plainly
 rather than presenting 130 freed words as a finding.

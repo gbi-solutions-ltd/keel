@@ -148,7 +148,7 @@ nothing, so all three keys are still null.
 
 - [x] **Step 3: Write the minimal implementation**
 
-In `bin/keel`, immediately after `profile_set`'s closing brace, `bin/keel:1017`. **Match on the
+In `bin/keel`, immediately after `profile_set`'s closing brace, `bin/keel#A directory with nothing in it means the project has no documents of that kind`. **Match on the
 comment two lines above it, not on the brace:** `profile_set` ends with the same four lines as the
 verify setter below it, `local rc=$?` / `json_cache_clear` / `return $rc` / `}`, so a text match on
 that tail lands in the wrong function. The unique anchor is the comment that begins "The refusals
@@ -530,7 +530,7 @@ Stage exactly that path and stop. **Do not commit.** `bin/keel` must be unchange
 - Test: `tests/test-keel.sh`
 
 **Interfaces:**
-- Consumes: `cmd_profile`'s existing guards at `bin/keel:1019-1020`.
+- Consumes: `cmd_profile`'s existing guards at `bin/keel#cmd_profile() {`.
 
 **Depends on:** task 1
 

@@ -14,11 +14,21 @@
   "properties": {
     "keel_version": {
       "type": "string",
-      "description": "Version of keel that last wrote this file."
+      "description": "Version of keel that last wrote this file.",
+      "x-keel-read-by": "code:bin/keel#pv=\"$(json_get .keel/profile.json keel_version"
     },
     "schema_version": {
       "type": "integer",
-      "description": "Which set of profile fields this file has. Written by `keel init`, bumped only when a field is added, removed, renamed or moved. Absent means the file predates the field, which doctor treats as stale."
+      "description": "Which set of profile fields this file has. Written by `keel init`, bumped only when a field is added, removed, renamed or moved. Absent means the file predates the field, which doctor treats as stale.",
+      "x-keel-read-by": "code:bin/keel#sv=\"$(json_get .keel/profile.json schema_version"
+    },
+    "harnesses": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Which harnesses this repository serves, as harness ids. A set and not a switch: a team with some developers on Claude Code and some on Codex works on one repository, and a switch makes that repository's configuration a running argument between them. keel init writes what it can tell from tracked files, and --harness overrides it. What each harness actually gets is in docs/harness-support.md, generated from the capability manifest; a harness listed here still only gets the gates that manifest grants it.",
+      "x-keel-read-by": "code:bin/keel#raw=\"$(json_get .keel/profile.json harnesses 2>/dev/null"
     },
     "project": {
       "type": "object",
@@ -30,7 +40,8 @@
       "properties": {
         "name": {
           "type": "string",
-          "description": "Name of this project, used in generated documents and reports. keel init takes it from the directory name; change it where the directory is not what the project is called."
+          "description": "Name of this project. keel init takes it from the directory name; change it where the directory is not what the project is called.",
+          "x-keel-read-by": "human"
         },
         "kind": {
           "enum": [
@@ -41,11 +52,13 @@
             "plugin",
             "docs"
           ],
-          "description": "`docs` means pre-implementation: no stack and no source files. doctor then skips the verify checks rather than failing on commands a documents-only repo cannot have."
+          "description": "`docs` means pre-implementation: no stack and no source files. doctor then skips the verify checks rather than failing on commands a documents-only repo cannot have.",
+          "x-keel-read-by": "code:bin/keel#echo service"
         },
         "description": {
           "type": "string",
-          "description": "One line saying what this project is for, in the terms its users would use. Skills quote it at the top of a snapshot or a PRD, so a reader who has never seen the repository knows what they are looking at. Left empty by init because only a human knows the answer."
+          "description": "One line saying what this project is for, in the terms its users would use. Left empty by init because only a human knows the answer.",
+          "x-keel-read-by": "human"
         }
       }
     },
@@ -55,37 +68,47 @@
       "properties": {
         "language": {
           "type": "string",
-          "description": "The primary language, which drives the verify commands and the conventions a skill applies. Read from a declared manifest such as package.json or go.mod for every language except plsql, which has no manifest format and is inferred from the shape of the tree instead: no other manifest present, .sql and .plsql dominant, and an Oracle-exclusive token in one of them. unknown means nothing was detected, and a skill asks rather than guessing."
+          "description": "The primary language, which drives the verify commands and the conventions a skill applies. Read from a declared manifest such as package.json or go.mod for every language except plsql, which has no manifest format and is inferred from the shape of the tree instead: no other manifest present, .sql and .plsql dominant, and an Oracle-exclusive token in one of them. unknown means nothing was detected, and a skill asks rather than guessing.",
+          "x-keel-read-by": "advisory:skills/keel/references/tool-choices.md:20"
         },
         "runtime": {
           "type": "string",
-          "description": "What actually executes the code: node, jvm, dotnet, python, native. Distinct from the language because several languages share a runtime and the runtime is what a deployment has to provide."
+          "description": "What actually executes the code: node, jvm, dotnet, python, native. Distinct from the language because several languages share a runtime and the runtime is what a deployment has to provide.",
+          "x-keel-read-by": "human"
         },
         "framework": {
           "type": "string",
-          "description": "The application framework in use, such as nextjs, laravel or spring. none means the project uses its language's standard library and no framework, which is a real answer and not a gap."
+          "description": "The application framework in use, such as nextjs, laravel or spring. none means the project uses its language's standard library and no framework, which is a real answer and not a gap.",
+          "x-keel-read-by": "advisory:skills/coding-standards/references/house-defaults.md:31"
         },
         "package_manager": {
           "type": "string",
-          "description": "How dependencies are installed and scripts are run, such as pnpm, poetry or cargo. Skills prefix commands with it, so a wrong value produces commands that do not run. A project with no package manager gets the string none rather than null."
+          "description": "How dependencies are installed and scripts are run, such as pnpm, poetry or cargo. A project with no package manager gets the string none rather than null.",
+          "x-keel-read-by": "code:bin/keel#local pmn; pmn=\"$(json_get .keel/profile.json stack.package_manager"
         },
         "also": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "Every other language detected in this repository. The primary in `language` drives the verify commands; these get a language server each."
+          "description": "Every other language detected in this repository. The primary in `language` drives the verify commands; these get a language server each.",
+          "x-keel-read-by": "advisory:skills/keel/references/tool-choices.md:21"
         },
         "datastores": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "Datastores this project talks to, detected from declared dependencies. Skills use it to know which failure modes are worth asking about: a service with postgres has migrations and transactions to reason about, one with none does not."
+          "description": "Datastores this project talks to, detected from declared dependencies.",
+          "x-keel-read-by": "human"
         },
         "has_ui": {
           "type": "boolean",
-          "description": "When true, the project has a user interface of some kind. It is read by three callers that each ask a different question of it, so each gates on it plus what it needs: the frontend standard applies when this is true and stack.framework is not flutter, because that reference is about the browser. See skills/coding-standards/references/frontend.md."
+          "description": "When true, the project has a user interface of some kind. It is read by three callers that each ask a different question of it, so each gates on it plus what it needs: the frontend standard applies when this is true and stack.framework is not flutter, because that reference is about the browser. See skills/coding-standards/references/frontend.md.",
+          "x-keel-read-by": [
+            "code:bin/keel#if have_python && [ \"$(json_get .keel/profile.json stack.has_ui",
+            "advisory:skills/coding-standards/references/house-defaults.md:31"
+          ]
         }
       }
     },
@@ -103,70 +126,83 @@
             "string",
             "null"
           ],
-          "description": "The command that runs the whole test suite, exactly as a shell would run it. Read from what the project declares rather than inferred from the stack, because the real command is frequently not the idiomatic one. null means the project genuinely has none, and a skill asks instead of substituting a guess."
+          "description": "The command that runs the whole test suite, exactly as a shell would run it. Read from what the project declares rather than inferred from the stack, because the real command is frequently not the idiomatic one. null means the project genuinely has none, and a skill asks instead of substituting a guess.",
+          "x-keel-read-by": [
+            "code:bin/keel#t0=\"$(json_get .keel/profile.json verify.test",
+            "code:hooks/done-guard:118"
+          ]
         },
         "test_one": {
           "type": [
             "string",
             "null"
           ],
-          "description": "Single test. `{path}` or `{name}` is substituted. Required by tdd and by the optional commit guard."
+          "description": "Single test. `{path}` or `{name}` is substituted. Required by tdd and by the optional commit guard.",
+          "x-keel-read-by": "code:bin/keel#t1=\"$(json_get .keel/profile.json verify.test_one"
         },
         "test_integration": {
           "type": [
             "string",
             "null"
           ],
-          "description": "Tests against a running database. Kept separate so the fast suite stays fast; both run in CI."
+          "description": "Tests against a running database. Kept separate so the fast suite stays fast; both run in CI.",
+          "x-keel-read-by": "advisory:skills/tdd/SKILL.md:31"
         },
         "lint": {
           "type": [
             "string",
             "null"
           ],
-          "description": "Must be check-only. A command that rewrites files cannot gate."
+          "description": "Must be check-only. A command that rewrites files cannot gate.",
+          "x-keel-read-by": "code:bin/keel#local c; c=\"$(json_get .keel/profile.json \"verify.$k\""
         },
         "format": {
           "type": [
             "string",
             "null"
           ],
-          "description": "Must be check-only, like lint. `prettier --check .`, not `prettier --write .`."
+          "description": "Must be check-only, like lint. `prettier --check .`, not `prettier --write .`.",
+          "x-keel-read-by": "code:bin/keel#cmd=\"$(field \"verify.$k\""
         },
         "format_fix": {
           "type": [
             "string",
             "null"
           ],
-          "description": "The writing counterpart of format. Never run by a gate: it is what a refusal names as the remedy, so the person committing runs it and reads what it changed."
+          "description": "The writing counterpart of format. Never run by a gate: it is what a refusal names as the remedy, so the person committing runs it and reads what it changed.",
+          "x-keel-read-by": "code:bin/keel#fix=\"$(field verify.format_fix"
         },
         "typecheck": {
           "type": [
             "string",
             "null"
           ],
-          "description": "The command that checks types without producing a build. null for a language with no separate typecheck step, which is most of them."
+          "description": "The command that checks types without producing a build. null for a language with no separate typecheck step, which is most of them.",
+          "x-keel-read-by": "code:bin/keel#local c; c=\"$(json_get .keel/profile.json \"verify.$k\""
         },
         "build": {
           "type": [
             "string",
             "null"
           ],
-          "description": "The command that produces the deployable artifact. null where there is nothing to build, such as an interpreted service run from source."
+          "description": "The command that produces the deployable artifact. null where there is nothing to build, such as an interpreted service run from source.",
+          "x-keel-read-by": "code:bin/keel#local c; c=\"$(json_get .keel/profile.json \"verify.$k\""
         },
         "e2e": {
           "type": [
             "string",
             "null"
           ],
-          "description": "The command that runs end-to-end tests against a running system. Separate from verify.test because it usually needs an environment, so a skill may run the unit suite and skip this one."
+          "description": "The command that runs end-to-end tests against a running system. Read by `keel doctor`, which names it and deliberately does not run it: it needs a running system that doctor has no way to provide.",
+          "x-keel-read-by": "code:bin/keel#local dc; dc=\"$(json_get .keel/profile.json \"verify.$k\""
         },
         "security": {
           "type": [
             "string",
             "null"
           ],
-          "description": "The command that runs a security scanner, such as a dependency audit. null where the project has none; security-audit then does its own reading rather than reporting a clean scan that never ran."
+          "description": "The command that runs a security scanner, such as a dependency audit. null where the project has none, and `keel init` never detects one, so null is the ordinary value rather than a gap. Read by `keel doctor`, which names it and does not run it: it reaches the network. security-audit does its own reading either way.",
+          "x-keel-read-by": "code:bin/keel#local dc; dc=\"$(json_get .keel/profile.json \"verify.$k\""
         }
       }
     },
@@ -175,7 +211,8 @@
       "additionalProperties": {
         "type": "string"
       },
-      "description": "Why a command is what it is, especially where it is deliberately not the stack's idiomatic one. Read by a human, and by anyone tempted to 'fix' it."
+      "description": "Why a command is what it is, especially where it is deliberately not the stack's idiomatic one. Read by a human, and by anyone tempted to 'fix' it.",
+      "x-keel-read-by": "human"
     },
     "artifacts": {
       "type": "object",
@@ -187,42 +224,48 @@
             "string",
             "null"
           ],
-          "description": "Path to an existing repository snapshot, where the project already has one under a different name. Skills read the mapped path instead of the default under docs_root, so a repository with its own naming convention is not duplicated. null means use the default."
+          "description": "Path to an existing repository snapshot, where the project already has one under a different name. Skills read the mapped path instead of the default under docs_root, so a repository with its own naming convention is not duplicated. null means use the default.",
+          "x-keel-read-by": "generic:bin/keel#d=json.load(open('.keel/profile.json')).get('artifacts',{})"
         },
         "prd": {
           "type": [
             "string",
             "null"
           ],
-          "description": "Path to an existing requirements document, where the project already has one under a different name. null means use the default under docs_root."
+          "description": "Path to an existing requirements document, where the project already has one under a different name. null means use the default under docs_root.",
+          "x-keel-read-by": "generic:bin/keel#d=json.load(open('.keel/profile.json')).get('artifacts',{})"
         },
         "stories": {
           "type": [
             "string",
             "null"
           ],
-          "description": "Path to an existing backlog or stories document. null means use the default under docs_root."
+          "description": "Path to an existing backlog or stories document. null means use the default under docs_root.",
+          "x-keel-read-by": "generic:bin/keel#d=json.load(open('.keel/profile.json')).get('artifacts',{})"
         },
         "architecture": {
           "type": [
             "string",
             "null"
           ],
-          "description": "Path to an existing architecture document. null means use the default under docs_root."
+          "description": "Path to an existing architecture document. null means use the default under docs_root.",
+          "x-keel-read-by": "generic:bin/keel#d=json.load(open('.keel/profile.json')).get('artifacts',{})"
         },
         "decisions": {
           "type": [
             "string",
             "null"
           ],
-          "description": "Path to an existing decision record directory, such as an adr/ folder the project already keeps. null means use the default under docs_root."
+          "description": "Path to an existing decision record directory, such as an adr/ folder the project already keeps. null means use the default under docs_root.",
+          "x-keel-read-by": "generic:bin/keel#d=json.load(open('.keel/profile.json')).get('artifacts',{})"
         },
         "plans": {
           "type": [
             "string",
             "null"
           ],
-          "description": "Path to an existing implementation plans directory. null means use the default under docs_root."
+          "description": "Path to an existing implementation plans directory. null means use the default under docs_root.",
+          "x-keel-read-by": "generic:bin/keel#d=json.load(open('.keel/profile.json')).get('artifacts',{})"
         }
       }
     },
@@ -237,29 +280,14 @@
       },
       "description": "required blocks, warn reports, off skips. Every gate has a stated escape hatch except a hard_block_paths match.",
       "properties": {
-        "tdd": {
-          "enum": [
-            "required",
-            "warn",
-            "off"
-          ],
-          "description": "Whether a failing test must be written before implementation code. Read by no skill, hook or CLI path today: the tdd skill asks for the cycle unconditionally, so changing this key changes nothing. Declared so the intent has somewhere to live once something enforces it."
-        },
         "coding_standards": {
           "enum": [
             "required",
             "warn",
             "off"
           ],
-          "description": "Whether a change must follow the conventions in the project's standards document. Read by no skill, hook or CLI path today, so nothing in keel enforces it; an agent that reads the profile may still act on it, observed 2026-08-20 in tests/evals/results.md. Declared for the same reason as gates.tdd."
-        },
-        "review": {
-          "enum": [
-            "required",
-            "warn",
-            "off"
-          ],
-          "description": "Whether review-code must run before a change ships. Read by no skill, hook or CLI path today: ship runs its own gate regardless, so changing this key changes nothing."
+          "description": "Whether a change must follow the conventions in the project's standards document. No skill, hook or CLI path is written to read it, so nothing in keel enforces it, and an agent reading the profile acts on it anyway: an eval arm was measured doing exactly that, which is what the observed: marker cites. Declared so the intent has somewhere to live until something enforces it, and docs/ideas/standards-that-bind.md already ranks that wiring.",
+          "x-keel-read-by": "observed:tests/evals/results.md#read by nothing and acted on anyway"
         },
         "security_audit": {
           "enum": [
@@ -267,23 +295,8 @@
             "warn",
             "off"
           ],
-          "description": "Whether security-audit must run before a change ships. required on anything touching money, credentials or personal data. warn elsewhere reports findings without blocking."
-        },
-        "observability": {
-          "enum": [
-            "required",
-            "warn",
-            "off"
-          ],
-          "description": "Whether new code must emit the logs and traces the observability standard describes. Read by no skill, hook or CLI path today, so changing it has no effect. A project with no telemetry backend does not need to set it to off; nothing is asking."
-        },
-        "docs_updated": {
-          "enum": [
-            "required",
-            "warn",
-            "off"
-          ],
-          "description": "Whether a change must land with the documents it makes wrong. Read by no skill, hook or CLI path today, so changing it has no effect. The obligation is carried by the standards document and by ship's own gate instead."
+          "description": "Whether security-audit must run before a change ships. ship itself runs the audit and refuses on anything red unconditionally, whatever this says; the key instead decides the verdict the audit's own report states: required says any finding blocks shipping, warn says the findings are the user's call to accept, off skips the audit outright. Read by `skills/security-audit/SKILL.md`, advisorily: it is prose the model follows, not a hook that asserts it, and it applies on both harnesses because skill bodies do.",
+          "x-keel-read-by": "advisory:skills/security-audit/SKILL.md:81"
         },
         "commit_guard": {
           "enum": [
@@ -291,7 +304,8 @@
             "warn",
             "off"
           ],
-          "description": "The pre-commit hook `keel guard install` writes. off, the default, makes it inert, so installing the guard for its push protections does not impose a commit gate nobody asked for. required runs verify.format, verify.lint and verify.typecheck before each commit and refuses on a failure; warn reports and lets the commit through."
+          "description": "The pre-commit hook `keel guard install` writes. off, the default, makes it inert, so installing the guard for its push protections does not impose a commit gate nobody asked for. required runs verify.format, verify.lint and verify.typecheck before each commit and refuses on a failure; warn reports and lets the commit through.",
+          "x-keel-read-by": "code:bin/keel#local cg; cg=\"$(json_get .keel/profile.json gates.commit_guard 2>/dev/null"
         },
         "done_verified": {
           "enum": [
@@ -299,28 +313,33 @@
             "warn",
             "off"
           ],
-          "description": "Drives hooks/done-guard on Stop and SubagentStop. required refuses to end a turn that edited code and never ran verify.test; warn says it and allows the stop. Off, or absent, and the hook does nothing."
+          "description": "Drives hooks/done-guard on Stop and SubagentStop. required refuses to end a turn that edited code and never ran verify.test; warn says it and allows the stop. Off, or absent, and the hook does nothing.",
+          "x-keel-read-by": "code:hooks/done-guard:114"
         },
         "context_watch": {
           "type": "boolean",
-          "description": "false turns the session context watchdog off for this project. Declared here rather than left to additionalProperties because it is not a required/warn/off gate."
+          "description": "false turns the session context watchdog off for this project. Declared here rather than left to additionalProperties because it is not a required/warn/off gate.",
+          "x-keel-read-by": "code:lib/context_watch.py:570"
         },
         "context_window": {
           "type": "integer",
           "minimum": 1,
-          "description": "Context window in tokens for sessions in this project, written by keel init as 200000. It is a floor and not a ceiling: the watchdog raises it once a session is observed exceeding it, since the API would have refused the request otherwise, so a value that understates the window costs nothing beyond an early first estimate. It is never raised above 1000000, the largest window any current model offers, so a mistyped extra zero cannot silence the watchdog. A value at or below 200000 has no effect, because a floor only ever raises: KEEL_CONTEXT_WINDOW is how a smaller window is forced deliberately, and it is used as set except that it too is capped at 1000000."
+          "description": "Context window in tokens for sessions in this project, written by keel init as 200000. It is a floor and not a ceiling: the watchdog raises it once a session is observed exceeding it, since the API would have refused the request otherwise, so a value that understates the window costs nothing beyond an early first estimate. It is never raised above 1000000, the largest window any current model offers, so a mistyped extra zero cannot silence the watchdog. A floor only ever raises, so setting a value at or below the window the session already has does nothing. That baseline is 200000 on a harness whose transcript does not state its own window, which is what Claude Code does; where the transcript states one, as a Codex rollout does with model_context_window, the stated number is the baseline instead. KEEL_CONTEXT_WINDOW is how a smaller window is forced deliberately, and it is used as set except that it too is capped at 1000000.",
+          "x-keel-read-by": "code:lib/context_watch.py:591"
         },
         "context_warn_pct": {
           "type": "integer",
           "minimum": 1,
           "maximum": 99,
-          "description": "Percentage of the window at which the watchdog starts warning. Default 70."
+          "description": "Percentage of the window at which the watchdog starts warning. Default 70.",
+          "x-keel-read-by": "code:lib/context_watch.py:507"
         },
         "context_stop_pct": {
           "type": "integer",
           "minimum": 1,
           "maximum": 100,
-          "description": "Percentage of the window at which the watchdog blocks tool calls until a handoff is written. Default 85."
+          "description": "Percentage of the window at which the watchdog blocks tool calls until a handoff is written. Default 85.",
+          "x-keel-read-by": "code:lib/context_watch.py:508"
         }
       }
     },
@@ -329,7 +348,8 @@
       "items": {
         "type": "string"
       },
-      "description": "Path patterns where a security finding cannot be overridden in conversation. Intended for auth, money movement, and personal data. Enforced by hooks/sensitive-guard, which asks a human before a commit touching one. Matched with fnmatch against repository-root-relative paths, where * crosses directory separators, and a bare directory such as 'src/auth' also matches everything under it."
+      "description": "Path patterns where a security finding cannot be overridden in conversation. Intended for auth, money movement, and personal data. Enforced by hooks/sensitive-guard, which asks a human before a commit touching one. That gate is Claude Code only, because it needs a hook that can put a command to a human and Codex CLI offers none, so on Codex this key is declared and not enforced. See docs/harness-support.md. Matched with fnmatch against repository-root-relative paths, where * crosses directory separators, and a bare directory such as 'src/auth' also matches everything under it.",
+      "x-keel-read-by": "code:hooks/sensitive-guard:162"
     },
     "conventions": {
       "type": "object",
@@ -337,20 +357,19 @@
       "properties": {
         "commit_style": {
           "type": "string",
-          "description": "The commit message convention this repository follows. conventional means the type(scope): subject form, and skills write messages in it. Set it to none where the repository has no convention, rather than having keel impose one."
+          "description": "The commit message convention this repository follows. conventional means the type(scope): subject form, and skills write messages in it. Set it to none where the repository has no convention, rather than having keel impose one.",
+          "x-keel-read-by": "advisory:skills/ship/SKILL.md:60"
         },
         "default_branch": {
           "type": "string",
-          "description": "The repository's default branch, which is frequently not the checked-out one. Skills refuse to implement here and repo-snapshot compares HEAD against it."
-        },
-        "working_branch": {
-          "type": "string",
-          "description": "The branch this project's work belongs on, where that is not a fresh branch per change. Read by no skill today, so setting it does not change what a skill proposes. Declared so a repository using one long-lived integration branch has somewhere to say so."
+          "description": "The repository's default branch, which is frequently not the checked-out one. Skills refuse to implement here and repo-snapshot compares HEAD against it.",
+          "x-keel-read-by": "code:bin/keel#protected=\"$(sed -n 's/.*\"default_branch\": *\"\\([^\"]*\\)\".*/\\1/p' .keel/profile.json 2>/dev/null"
         },
         "protect_default_branch": {
           "type": "boolean",
           "default": true,
-          "description": "false lets the push guard allow a push straight to default_branch. Read by the pre-push hook from `keel guard install`, which otherwise refuses one, since work lands through a pull request. `git push --no-verify` is the one-off escape hatch."
+          "description": "false lets the push guard allow a push straight to default_branch. Read by the pre-push hook from `keel guard install`, which otherwise refuses one, since work lands through a pull request. `git push --no-verify` is the one-off escape hatch.",
+          "x-keel-read-by": "code:bin/keel#protect=\"$(sed -n 's/.*\"protect_default_branch\": *\\([a-z]*\\).*/\\1/p' .keel/profile.json 2>/dev/null"
         },
         "response_style": {
           "enum": [
@@ -358,7 +377,8 @@
             "verbose"
           ],
           "default": "terse",
-          "description": "terse keeps conversation replies short and leaves artifacts at full detail; the SessionStart hook injects the rule. verbose turns it off. Absent is treated as terse."
+          "description": "terse keeps conversation replies short and leaves artifacts at full detail; the SessionStart hook injects the rule. verbose turns it off. Absent is treated as terse.",
+          "x-keel-read-by": "code:hooks/session-start:111"
         },
         "explain_level": {
           "enum": [
@@ -366,7 +386,8 @@
             "plain"
           ],
           "default": "technical",
-          "description": "technical assumes the vocabulary of the thing being described; plain has chat replies define a technical term the first time they use it. It changes replies only: artifacts stay technical whatever this says, and the SessionStart hook picks its injected paragraph from this key and response_style together. Absent is treated as technical."
+          "description": "technical assumes the vocabulary of the thing being described; plain has chat replies define a technical term the first time they use it. It changes replies only: artifacts stay technical whatever this says, and the SessionStart hook picks its injected paragraph from this key and response_style together. Absent is treated as technical.",
+          "x-keel-read-by": "code:hooks/session-start:116"
         }
       }
     },
@@ -382,15 +403,13 @@
             "none"
           ],
           "default": "signoz",
-          "description": "Instrumentation is OpenTelemetry regardless, so the vendor sits behind the exporter and switching is configuration."
+          "description": "Instrumentation is OpenTelemetry regardless, so the vendor sits behind the exporter and switching is configuration.",
+          "x-keel-read-by": "advisory:skills/coding-standards/references/observability.md:19"
         },
         "otlp_endpoint_var": {
           "type": "string",
-          "description": "Name of the environment variable holding the OTLP endpoint, not the endpoint itself. The name is a fact about the project and belongs in a committed file; the value is a fact about an environment and does not."
-        },
-        "log_shipping": {
-          "type": "string",
-          "description": "How logs reach the backend: otlp to export them directly, stdout to let the platform collect them, none where nothing is shipped. It decides whether generated code configures an exporter or simply writes to stdout."
+          "description": "Name of the environment variable holding the OTLP endpoint, not the endpoint itself. The name is a fact about the project and belongs in a committed file; the value is a fact about an environment and does not.",
+          "x-keel-read-by": "human"
         }
       }
     },
@@ -403,35 +422,40 @@
             "string",
             "null"
           ],
-          "description": "Where this project runs once shipped, such as kubernetes, lambda or a plugin marketplace. setup-deployment reads it to know which pipeline shape applies. null means it has not been decided, which is different from having no deployment."
+          "description": "Where this project runs once shipped, such as kubernetes, lambda or a plugin marketplace. null means it has not been decided, which is different from having no deployment.",
+          "x-keel-read-by": "human"
         },
         "ci": {
           "type": [
             "string",
             "null"
           ],
-          "description": "The CI system that runs this project's pipeline, such as github-actions or gitlab-ci. null means there is none yet, and setup-deployment proposes one rather than assuming."
+          "description": "The CI system that runs this project's pipeline, such as github-actions or gitlab-ci. null means there is none yet.",
+          "x-keel-read-by": "human"
         },
         "registry": {
           "type": [
             "string",
             "null"
           ],
-          "description": "Where built images or packages are published, as a registry host and path. Named here so a pipeline and a runbook agree on one value instead of each carrying its own copy. Credentials never belong here: this is the address, not the access."
+          "description": "Where built images or packages are published, as a registry host and path. Named here so a pipeline and a runbook agree on one value instead of each carrying its own copy. Credentials never belong here: this is the address, not the access.",
+          "x-keel-read-by": "human"
         },
         "envs": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "The environments this project deploys to, in promotion order, such as staging then production. An empty list means it deploys nowhere yet. Skills use the order to know what promotes to what."
+          "description": "The environments this project deploys to, in promotion order, such as staging then production. An empty list means it deploys nowhere yet.",
+          "x-keel-read-by": "human"
         },
         "secrets_manager": {
           "type": [
             "string",
             "null"
           ],
-          "description": "Where this project's secrets actually live, such as a named vault or a cloud secret store. Recorded so a runbook can say where to rotate a credential without a reader having to ask. It names the store, never a secret."
+          "description": "Where this project's secrets actually live, such as a named vault or a cloud secret store. Recorded so a runbook can say where to rotate a credential without a reader having to ask. It names the store, never a secret.",
+          "x-keel-read-by": "human"
         }
       }
     },
@@ -444,28 +468,32 @@
           "items": {
             "type": "string"
           },
-          "description": "Plugins this project expects, as marketplace-qualified names such as typescript-lsp@claude-plugins-official. keel doctor names any that are not enabled, along with the command that installs them. A value here is preserved when init is re-run, so a curated list survives."
+          "description": "Plugins this project expects, as marketplace-qualified names such as typescript-lsp@claude-plugins-official. keel doctor names any that are not enabled, along with the command that installs them. A value here is preserved when init is re-run, so a curated list survives.",
+          "x-keel-read-by": "code:lib/harness/claude.sh:79"
         },
         "excluded": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "Plugins this project deliberately does not want, as marketplace-qualified names. Read by nothing today: plugin_report checks plugins.recommended only, so listing a plugin here does not stop it being recommended. Declared so a project has somewhere to record the decision once it is honoured."
+          "description": "Plugins this project deliberately does not want, as marketplace-qualified names. `keel doctor` will not recommend one listed here, even where `plugins.recommended` also carries it, because an exclusion is the later and more specific decision. keel's own plugin is the exception and stays reported, since that warning is about keel not loading at all rather than a skill degrading. Claude Code only: keel prints no plugin report on Codex, so this key is declared and not honoured there.",
+          "x-keel-read-by": "code:lib/harness/claude.sh:80"
         }
       }
     },
     "docs_root": {
       "type": "string",
       "default": "docs/keel",
-      "description": "Must not be gitignored. keel init refuses when it is, because a skill would write there successfully and be invisible to every teammate."
+      "description": "Must not be gitignored. keel init refuses when it is, because a skill would write there successfully and be invisible to every teammate.",
+      "x-keel-read-by": "code:bin/keel#[ -f .keel/profile.json ] && r=\"$(json_get .keel/profile.json docs_root"
     },
     "notes": {
       "type": "array",
       "items": {
         "type": "string"
       },
-      "description": "Project facts a skill should know that nothing else records."
+      "description": "Project facts that nothing else records.",
+      "x-keel-read-by": "human"
     }
   }
 }

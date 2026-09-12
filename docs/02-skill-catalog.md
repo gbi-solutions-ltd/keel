@@ -62,7 +62,7 @@ the vendor sits behind the exporter and a switch is configuration rather than a 
 | 2 | PRD generation, new and existing | `write-prd`, fed by `repo-snapshot` |
 | 3 | Skill generation from good workflows | `create-skill` |
 | 4 | Project documentation | `write-docs`, `write-plan`, `design-architecture` |
-| 5 | Security aware development, audit before ship | `security-audit` + `security-guidance` plugin hooks + `ship` gate |
+| 5 | Security aware development, audit before ship | `security-audit` + `security-guidance` plugin hooks (Claude Code only) + `ship` gate |
 | 6 | Deployment setup | `setup-deployment` |
 | 7 | Implementation plan execution | `execute-plan` |
 | 8 | Debugging and root cause analysis | `debug` |
@@ -380,7 +380,7 @@ scenario and a file:line, and findings below a confidence threshold are dropped 
 listed as "consider reviewing". A report of forty maybes gets ignored; a report of three
 real ones gets fixed.
 
-**Plugin calls:** `security-guidance` for its hook-level coverage on every edit, and the
+**Plugin calls, Claude Code only:** `security-guidance` for its hook-level coverage on every edit, and the
 built-in `/security-review` command as a cross-check on the diff.
 
 Because the house works in payments, this skill also carries a payments-specific checklist: idempotency
@@ -526,14 +526,16 @@ where the model knows the rule and skips it under pressure, needs prohibitions p
 rationalisation table. A shaping failure, where the output has the wrong structure, needs a
 positive recipe instead, and prohibitions actively make it worse.
 
-**Plugin call:** hands off to `skill-creator` for its eval harness, variance benchmarking,
-and packaging scripts. Our skill owns the capture and the authoring discipline; theirs owns
-the measurement.
+**Plugin call, Claude Code only:** hands off to `skill-creator` for its eval harness, variance
+benchmarking, and packaging scripts. Our skill owns the capture and the authoring discipline; theirs
+owns the measurement. No Codex counterpart is published, so a skill authored there is unmeasured
+unless the project has its own harness.
 
 ### `context-budget`
 **Trigger:** long sessions, repeated compaction, "this is using too many tokens", a slow or
 forgetful session, or a periodic audit.
-**Reads:** `CLAUDE.md`, `.claude/settings.json`, `.keel/`, skill sizes.
+**Reads:** `CLAUDE.md` or `AGENTS.md`, the harness's own settings (`.claude/settings.json` on
+Claude Code, `.codex/config.toml` on Codex), `.keel/`, skill sizes.
 **Writes:** `<docs_root>/context-audit.md`, and fixes.
 **Does:** the practices in [doc 05](05-token-and-memory-design.md). Measures what is in the
 always-loaded prefix, flags anything volatile that breaks the prompt cache, checks skill
@@ -541,7 +543,7 @@ bodies against the word budget, finds `@` links that force-load, and proposes mo
 detail from `CLAUDE.md` into on-demand skills or `<docs_root>/`. Also empties `.keel/handoff.md`
 before it is discarded, since that file is git-ignored and anything durable left in it is lost.
 
-**Plugin call:** `claude-md-management` for its CLAUDE.md quality rubric.
+**Plugin call, Claude Code only:** `claude-md-management` for its CLAUDE.md quality rubric.
 
 ### `incident-response`
 **Trigger:** production is broken now, an outage is in progress, customers are affected, or the

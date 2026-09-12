@@ -11,8 +11,7 @@ Default is **SigNoz**, over OTLP. Alternatives are allowed and the choice belong
 ```json
 "observability": {
   "backend": "signoz",
-  "otlp_endpoint_var": "OTEL_EXPORTER_OTLP_ENDPOINT",
-  "log_shipping": "otlp"
+  "otlp_endpoint_var": "OTEL_EXPORTER_OTLP_ENDPOINT"
 }
 ```
 

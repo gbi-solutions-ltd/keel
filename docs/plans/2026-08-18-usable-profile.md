@@ -931,7 +931,7 @@ warning now names the command, the way the marketplace nudge does."
 - Modify: `tests/test-keel.sh`
 
 **Interfaces:**
-- Consumes: `merge_profile` (`bin/keel:290`), `merge_permissions_into_settings` (`bin/keel:583-606`)
+- Consumes: `merge_profile` (`bin/keel#out[k] = v            # human value wins`), `merge_permissions_into_settings` (`bin/keel:583-606`)
 - Produces: nothing
 
 **Done when:** `tests/test-keel.sh` passes and `tests/run-tests.sh` is green.
@@ -992,7 +992,7 @@ that is `FR-11` broken, not a test to adjust.
 - [x] **Step 3: There is no implementation step**
 
 Nothing to write. `bin/keel:558-561` already returns after merging permissions, and
-`merge_profile` at `bin/keel:290` already prefers a non-empty human value.
+`merge_profile` at `bin/keel#out[k] = v            # human value wins` already prefers a non-empty human value.
 
 - [x] **Step 4: Run the full suite**
 
@@ -1020,8 +1020,8 @@ survives re-init, and that the permission merge still happens."
 - None. This task runs existing assertions and checks a diff
 
 **Interfaces:**
-- Consumes: the spawn-budget assertion at `tests/test-keel.sh:389-406` and the prefix guard in
-  `tests/test-session-start.sh`
+- Consumes: the spawn-budget assertion in `tests/test-keel.sh`, at "Thirteen of doctor's nineteen
+  interpreter starts", and the prefix guard in `tests/test-session-start.sh`
 - Produces: nothing
 
 **Done when:** `tests/run-tests.sh` is green.
@@ -1033,10 +1033,10 @@ with both bounds, after the first version of that guard was found to pass vacuou
 plan touches `hooks/session-start`, so `NFR-03` holds if that assertion still passes. Adding a
 second assertion of the same thing would be duplication, not coverage.
 
-For `NFR-02` there is nothing to add either. `tests/test-keel.sh:389-406` already counts doctor's
-interpreter starts and asserts at most ten, and it already prints the number it measured. Tasks 6
-and 7 put a profile read and more output on doctor's path, so what this task does is **run that
-existing assertion and read the number**, not write a second one.
+For `NFR-02` there is nothing to add either. `tests/test-keel.sh`, at "Thirteen of doctor's
+nineteen interpreter starts", already counts them and asserts at most ten, and it already prints
+the number it measured. Tasks 6 and 7 put a profile read and more output on doctor's path, so what
+this task does is **run that existing assertion and read the number**, not write a second one.
 
 Writing a second shim was the first draft of this task and it was wrong twice over. It duplicated
 `tests/test-keel.sh:405`, and its shim ended `exec /usr/bin/env python3 "$@"` while `$shimdir` was
@@ -1092,7 +1092,8 @@ from **you** to `keel init`. The page committed in task 3 is stale from that mom
 rule does not catch it because the change is in the column, not the schema. Task 4's does, in the
 slow suite. This task closes it deliberately rather than leaving it to be discovered.
 
-`docs/standards.md:129-130` and `CONTRIBUTING.md:125` require `CHANGELOG.md` in the same commit as
+`docs/standards.md:129-130` and the Commits and review section of `CONTRIBUTING.md` require
+`CHANGELOG.md` in the same commit as
 the change. It was missed on the previous plan and caught at the ship gate.
 
 - [x] **Step 1: Confirm the page is stale**
@@ -1176,7 +1177,8 @@ page's set-by column was stale the moment init started writing it."
 | S-13 | verify | 9 | Folded: satisfied by an existing assertion plus a diff check |
 
 Thirteen stories, ten tasks. Every story maps to at least one task. Task 10 maps to no story and is
-the documentation obligation, which `CONTRIBUTING.md:125` requires and the previous plan omitted.
+the documentation obligation, which the Commits and review section of `CONTRIBUTING.md`
+requires and the previous plan omitted.
 
 ## What this plan could not settle
 

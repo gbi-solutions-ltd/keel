@@ -172,9 +172,9 @@ true of that body and is not true of this one.
 
 ### 5.3 What can come out, and the rule that forbids the obvious answer
 
-`docs/standards.md:42-49` records that `write-plan`'s sections were checked and left in the body
-because they are instruction at the point of use, and states the rule: reach for a reference because
-a reader needs it at one step, not as a way to buy words. Step 0a's four checks in a fixed order are
+`docs/standards.md`, at "instruction at the point of use", records that `write-plan`'s sections
+were checked and left in the body, and states the rule: reach for a reference because a reader
+needs it at one step, not as a way to buy words. Step 0a's four checks in a fixed order are
 instruction at the point of use by that test. Moving them to buy room for two new modes is buying
 words, and this PRD does not pretend otherwise.
 
@@ -283,7 +283,7 @@ is whether a mode's steps are followed from a reference, not whether a plugin wo
 | CON-01 | 900 word body ceiling, 700 enforced as a warning. | `ADR-0001` |
 | CON-02 | Descriptions sum to at most 1,320 tokens; 1,130 used. | `tests/validate-skills.sh` |
 | CON-03 | Skill granularity is revisited as "which should merge", not by adding a skill. | `docs/07-open-decisions.md:340` |
-| CON-04 | A reference is reached for because a reader needs it at one step, never to buy words. | `docs/standards.md:42-49` |
+| CON-04 | A reference is reached for because a reader needs it at one step, never to buy words. | `docs/standards.md`, "instruction at the point of use" |
 | CON-05 | Nothing in an assessment modifies what is assessed, and this extends to audit. | `references/assessment-report.md:3-5` |
 
 ## 9. Where check 1b sits, and why

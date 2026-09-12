@@ -75,14 +75,14 @@ Established by reading the tree on 2026-08-17, so no task has to rediscover them
 | There are six eval scenarios, five of which discriminate | `ls tests/evals/scenarios/` is six files; `tests/evals/results.md` records `done-without-verifying` passing in both arms and calls the scenario invalid |
 | `supply-chain-scan.sh --list-rules` prints 24 ids, five of them structural | `tests/supply-chain-scan.sh --list-rules \| wc -l` is 24; `grep -c structural` is 5. README says four structural |
 | `docs/07-open-decisions.md` has eleven numbered sections, all resolved | Its own status line, plus sections 10 and 11 added after the table was written. README says "Nine decisions: 5 resolved, 4 open" |
-| `keel guard install` writes **two** hooks | `bin/keel:1629-1631` writes `pre-push` and `pre-commit`. README's Tests section names only the pre-push one |
+| `keel guard install` writes **two** hooks | `bin/keel#guard_hook_body > "$GUARD_DIR/pre-push"` writes `pre-push` and `pre-commit`. README's Tests section names only the pre-push one |
 | `skills/ship` is credited nowhere in `SOURCES.md` | `grep -n ship SOURCES.md` matches only table headers. SOURCES.md claims originals are listed by name rather than left to "everything not above" |
 | No `SKILL.md` carries a source trailer | `grep -rn superpowers skills/*/SKILL.md` is empty. SOURCES.md line 9 asserts that close adaptations name their source in a trailer, which is false for all five |
 | `CHANGELOG.md` calls the project `gbaiutils` | `CHANGELOG.md:3` |
 | The 1.0.0 gate requires an install "using only `gh` auth" | `IMPLEMENTATION-PLAN.md:568-569`, contradicted by decision 2's own correction that `gh` is not required at all |
 | Shared references live under `skills/keel/references/` and are cited `../../keel/references/x.md` from a reference file | Six skills cite `asking-questions.md` that way |
 | `tests/test-validate-skills.sh` builds fixture roots with no `lib/` and no `skills/repo-snapshot` | `fixture_valid` at line 21. Any rule reading those paths must guard on existence, as the section-10 rule at `validate-skills.sh:266` already does |
-| Languages the CLI detects are enumerated by `lang_profile`'s case labels | `lib/detect-stack.sh:214-268`: typescript, javascript, go, php, python, rust, java, kotlin, csharp, ruby, swift, cpp, lua |
+| Languages the CLI detects are enumerated by `lang_profile`'s case labels | `lib/detect-stack.sh`, in `lang_profile()`: typescript, javascript, go, php, python, rust, java, kotlin, csharp, ruby, swift, cpp, lua |
 
 ## Open questions
 

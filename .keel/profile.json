@@ -1,6 +1,6 @@
 {
-  "keel_version": "0.15.0",
-  "schema_version": 2,
+  "keel_version": "0.18.0",
+  "schema_version": 4,
   "project": {
     "name": "keel",
     "kind": "plugin",
@@ -19,7 +19,7 @@
     "test": "tests/run-tests.sh",
     "test_one": "tests/{name}",
     "test_integration": null,
-    "lint": "shellcheck -x bin/keel lib/*.sh tests/*.sh tests/evals/run.sh tests/evals/stage.sh hooks/session-start hooks/context-watch hooks/sensitive-guard hooks/done-guard",
+    "lint": "shellcheck -x bin/keel lib/*.sh lib/harness/*.sh tests/*.sh tests/evals/run.sh tests/evals/stage.sh hooks/session-start hooks/context-watch hooks/sensitive-guard hooks/done-guard",
     "format": null,
     "format_fix": null,
     "typecheck": null,
@@ -28,20 +28,15 @@
     "security": null
   },
   "gates": {
-    "tdd": "required",
     "coding_standards": "required",
-    "review": "required",
     "security_audit": "warn",
-    "observability": "required",
-    "docs_updated": "required",
     "commit_guard": "off",
     "done_verified": "required",
     "context_window": 1000000
   },
   "observability": {
     "backend": "signoz",
-    "otlp_endpoint_var": "OTEL_EXPORTER_OTLP_ENDPOINT",
-    "log_shipping": "otlp"
+    "otlp_endpoint_var": "OTEL_EXPORTER_OTLP_ENDPOINT"
   },
   "conventions": {
     "commit_style": "conventional",
@@ -78,7 +73,7 @@
     "decisions": "docs/decisions",
     "plans": "docs/plans"
   },
-  "_note": "keel dogfoods itself. Written by hand until `keel init` exists (plan task 1.6).",
+  "_note": "keel dogfoods itself. Maintained by hand rather than by `keel init`, which exists now: this file carries verify_notes, a deploy note and an artifacts note that init does not write, and init merges rather than replaces, so a retired key would survive it.",
   "verify_notes": {
     "test": "Plain bash. No test framework, by design: the CLI has no runtime dependency and neither do its tests.",
     "lint": "shellcheck at default severity, so info and style findings fail too. CI runs this exact string. Running a narrower severity locally is how the pipeline went red on 52 findings that had never been seen on a laptop.",

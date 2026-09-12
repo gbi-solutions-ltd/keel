@@ -560,8 +560,9 @@ step 0 found. The fix is in the description, not the body.
 
 - [x] **Step 1: Write the failing test**
 
-No new assertion. The existing description-total check at `tests/validate-skills.sh:157` is what this
-task must not break, and the per-description 216 character ceiling is what constrains the wording.
+No new assertion. The existing description-total check in `tests/validate-skills.sh`, the one whose
+failure text begins `the skill descriptions total about`, is what this task must not break, and the
+per-description 216 character ceiling is what constrains the wording.
 Record the current total before editing:
 
 ```bash

@@ -428,7 +428,7 @@ the rule. It also takes six should-fix findings: "probe" rather than "check" in 
 clause, one table row per indexed reference rather than only the applicable ones, a definition for
 each of the four header counts, checklist headings excluded by name rather than by subtracting
 three (no topic reference carries all three), a stated tie between check 4's ledger and its counts,
-and three prose lines rewrapped under the 100 column rule at `docs/standards.md:83`.
+and three prose lines rewrapped under "Prose wraps at 100 columns" in `docs/standards.md`.
 
 **Version 3 was rejected in turn, on one blocking finding that neither earlier round reached.** Its
 five departure categories could not classify a healthy permanent departure: one whose ADR exists and
@@ -780,7 +780,7 @@ blocking findings, all of them defects in the content specified rather than in a
 Two were the same mistake made twice, prose written for a reader of the plan ending up inside an
 artifact meant for an agent under test: a comment reading `# Drift: the fee is computed in floating
 point, which section 1 forbids.` and a three line note explaining `${BASH_SOURCE[0]}` and citing
-another fixture. `tests/evals/fixtures/README.md:14-18` forbids exactly this: "Nothing in a fixture
+another fixture. `tests/evals/fixtures/README.md` forbids exactly this: "Nothing in a fixture
 may describe the exercise." The other two were the fixture's design being asserted rather than
 derived: the plan said four house references applied in one step and five in the next, and D-2's
 stated basis did not survive the re-verification FR-22 requires, so the `stale reason` category was
@@ -1341,8 +1341,8 @@ Replace with:
 ```
 
 The gate stays at six. This scenario does not join it, following the precedent at
-`tests/evals/results.md:2497-2499`, where an ADR-0001 length arm was recorded without changing the
-gate.
+`tests/evals/results.md`, "`write-prd` at 793 words", where an arm was recorded without changing
+the gate.
 
 - [x] **Step 9: Run the checks and watch them pass**
 
@@ -1377,8 +1377,8 @@ Then confirm no file in the staged fixture explains itself:
 d=$(tests/evals/stage.sh assess-a-stale-standard) && grep -rn '#' "$d/project/src" | grep -v '^.*:.*#!/usr/bin/env' ; rm -rf "$d"
 ```
 
-Expected: no output. Any comment in `src/` breaches
-`tests/evals/fixtures/README.md:14-18` and must be removed.
+Expected: no output. Any comment in `src/` breaches "Nothing in a fixture may describe the
+exercise" in `tests/evals/fixtures/README.md` and must be removed.
 
 - [x] **Step 10: Hand over**
 
@@ -1457,14 +1457,15 @@ Expected: `1`. If it prints `0`, task 2 has not landed and this task must stop. 
 
 Dispatch a single subagent with the assembled prompt, working directory `$d/project`. One arm, not
 two: this is a length measurement under ADR-0001, not a skill-versus-baseline comparison, and the
-`write-prd` length arm at `tests/evals/results.md:2495-2539` is the precedent for recording one.
+`write-prd` length arm at `tests/evals/results.md`, "`write-prd` at 793 words, the
+ADR-0001 length arm", is the precedent for recording one.
 
 **Model and settings, because "the same flags as every other arm" is not knowledge a fresh agent
-has.** Dispatch on `claude-opus-5[1m]`, the model the `write-prd` length arm recorded at
-`tests/evals/results.md:2511-2512`, with a subagent turn budget of at least 10. Record the model,
-the turn count, the wall clock and the cost in the results entry, as that arm did. Do not use a
-smaller model: this measures whether a 876 word body is followed, and a different model measures a
-different question.
+has.** Dispatch on `claude-opus-5[1m]`, the model the `write-prd` length arm recorded in
+`tests/evals/results.md`, at "before dispatch, so the run measures", with a subagent turn budget
+of at least 10. Record the model, the turn count, the wall clock and the cost in the results entry,
+as that arm did. Do not use a smaller model: this measures whether a 876 word body is followed,
+and a different model measures a different question.
 
 - [x] **Step 4: Score the reply against the scenario's criteria and record it**
 
@@ -1623,7 +1624,7 @@ Tasks 4 and 5 came back with five blocking findings, and the shape of them is wh
 split:
 
 1. **The fixture ships a comment naming its own seeded defect**, `# Drift: the fee is computed in
-   floating point, which section 1 forbids.` `tests/evals/fixtures/README.md:14-18` forbids exactly
+   floating point, which section 1 forbids.` `tests/evals/fixtures/README.md` forbids exactly
    this: "Nothing in a fixture may describe the exercise". It hands the arm check 3's finding.
 2. **A note written for the engineer landed inside the artifact.** The three lines explaining
    `${BASH_SOURCE[0]}` and citing another fixture sit inside the shipped source, telling the arm it

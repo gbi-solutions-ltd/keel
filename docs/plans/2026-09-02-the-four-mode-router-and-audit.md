@@ -57,8 +57,8 @@ reads as. It is recorded here for whoever revisits it, and changing it is not th
 
 ## The router costs 112 words, not the 98 the PRD predicted
 
-**The PRD's figure is an estimate of a text nobody had written.**
-`docs/prd/coding-standards-audit-and-seed.md:132-166` costs an honest four-mode Step 0 at 98 words
+**The PRD's figure is an estimate of a text nobody had written.** Section 5.2 of
+`docs/prd/coding-standards-audit-and-seed.md` costs an honest four-mode Step 0 at 98 words
 and lands the body at 781. The router in task 1 is written out in full below and **measures 112
 words** by the same `body_of` that `tests/validate-skills.sh:88` uses, landing the body at
 **795**. That is 105 words under the 900 ceiling and 95 over the 700 target.
@@ -179,7 +179,7 @@ Copied in full. A task executed by a fresh agent that reads only its own section
   window. Task 5 creates one, so it creates the file and the two count updates together, with no
   suite running, and only then runs the suite.
 - **A finding of the form "the arm did X" or "did not X" carries the command that extracted it**,
-  per `tests/evals/results.md:6`, and the stream is identified by its own `result` record rather
+  per `tests/evals/results.md`, and the stream is identified by its own `result` record rather
   than by which directory it sat in. Task 6 is bound by this.
 - **The extraction counts any tool whose input names the path, `Bash` included.** Every arm run so
   far used `Bash` and none used `Read`. A discriminator scanning for `Read` reports nothing on a run
@@ -1070,9 +1070,9 @@ repository's PRD, so the identifier is a dangling pointer into a document they c
 
 **Not "`bin/keel` ships them".** `bin/keel` copies nothing under `skills/`, which
 `docs/03-install-and-distribution.md:35` states outright ("Skills are never copied into a repo") and
-`docs/06-repo-layout.md:262` repeats. An adopter reaches these files through the installed plugin's
-own cache. A draft of this paragraph named the wrong mechanism, which is the fourth time in this
-plan a mechanism has been asserted without being opened.
+`docs/06-repo-layout.md` repeats at "Nothing under `skills/` is ever copied". An adopter reaches
+these files through the plugin's own cache. A draft of this paragraph named the wrong mechanism,
+which is the fourth time in this plan a mechanism has been asserted without being opened.
 
 **Eight shipped references carry an `FR-`, `NFR-`, `S-` or `CON-` identifier**, not the five an
 earlier draft listed: `prd-template.md`, `story-template.md`, `design-template.md`,
@@ -1533,7 +1533,7 @@ have gone. Can you tell me what conventions it actually follows?
 ```
 
 Update `README.md:289` from `10 scenarios exist` to `11 scenarios exist`,
-`tests/evals/README.md:122` from `Ten scenarios exist` to `Eleven scenarios exist`, and
+`tests/evals/README.md` from `Ten scenarios exist` to `Eleven scenarios exist`, and
 **`docs/06-repo-layout.md:177` from `# 10 scenarios, 10 fixtures` to `11`**. That document is in
 this task's Files list and an earlier draft listed it without commissioning the edit anywhere, which
 is the same listed-but-not-commissioned asymmetry that let task 3 loosen a check with no coverage.
@@ -1660,7 +1660,7 @@ Append to `tests/evals/results.md` under `## 2026-09-03, audit mode, the first r
 carrying: whether `references/audit.md` was opened and by which tool, the seven pass conditions each
 answered yes or no, the body word count at the time, the model, turns, duration and cost from the
 run's own `result` record, and **the extraction command above**, per the rule at
-`tests/evals/results.md:6`.
+`tests/evals/results.md`, "A finding of the form".
 
 State what the arm proved and did not: that audit is followed from behind a link on one run, and
 **not** that seed is, which does not exist.
@@ -1709,7 +1709,7 @@ passes, with `git commit -m "test(evals): exercise audit mode for the first time
 - **`CONTRIBUTING.md:46-48` is falsified by task 1 and is deliberately left.** It reads "One body
   has bought it: `coding-standards` at 876 words", which is wrong twice: the body is 795, and
   `write-docs` also has a recorded arm at its length. It is an undated present-tense claim, so by
-  `tests/test-doc-claims.sh:78-79`'s own rule it is live and ought to be asserted. **Correcting it
+  `tests/test-doc-claims.sh`'s "present-tense claim is live" rule it is asserted. **Correcting it
   is not a number substitution:** the sentence counts how many bodies have discharged ADR-0001's
   arm obligation, and answering that means reading `tests/evals/results.md` and deciding which
   recorded arms discharge which lengths, including the 795 this plan creates and task 6 does not

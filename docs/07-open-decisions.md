@@ -19,7 +19,7 @@ unblocked and can start.** Decisions 6 through 9 are needed at the phase noted o
 | 6 | Skill granularity | **Resolved:** 19, confirmed by building them. **Superseded 2026-08-13:** 24, see the note under decision 6 |
 | 7 | Artifact location | **Resolved:** `docs/keel/`, configurable via `profile.docs_root` |
 | 8 | FeatureDev | **Resolved:** excluded |
-| 9 | Ownership | **Resolved:** Bernard or Edrine reviews, monthly release, evals before the pilot |
+| 9 | Ownership | **Resolved:** Bernard or `gfsekamanya` reviews, monthly release, evals before the pilot |
 | 10 | `keel init` and `outputStyle` | **Partly resolved 2026-08-16:** see decision 10 |
 | 11 | The un-witnessed step | **Resolved 2026-08-17:** implemented as specified |
 | 12 | `keel init` and `permissions.defaultMode` | **Resolved 2026-08-20:** keep `bypassPermissions`, residual recorded |
@@ -184,9 +184,23 @@ override in its output when one is used. The hatches are listed in
 [templates/prompting-cheatsheet.md](../templates/prompting-cheatsheet.md) so they are
 documented for users, not just known to the model.
 
+<!-- keel:claim gate=sensitive-guard harness=claude -->
 **Task 4.3 is built, 2026-08-16, as `hooks/sensitive-guard` on `PreToolUse`.** Two things about it
 belong here rather than only in the plan, because both change what this decision promised.
 
+<!-- keel:claim gate=sensitive-guard harness=claude -->
+**Everything in this section is a Claude Code guarantee and nothing more**, added 2026-09-06 when
+Tier B shipped. The block needs a hook that can put a command to a human, which Codex CLI does not
+offer, so `sensitive-guard` is absent there rather than weakened.
+
+<!-- keel:claim gate=sensitive-guard harness=claude -->
+`keel init` registers nothing for it on Codex. A repository declaring `hard_block_paths` and serving
+both is protected for its Claude Code users and not for its Codex users.
+`docs/harness-support.md` is the whole picture, and since 2026-09-06 `keel doctor` says it on the
+machine too: it names the harness it is running under, lists the gates that harness gets, and where
+a repository declares the field above, warns that the block is not enforced for those users.
+
+<!-- keel:claim gate=sensitive-guard harness=claude -->
 **The field is `hard_block_paths` at the top level of the profile, not `gates.hard_block_paths`.**
 The paragraph below said `gates`, and `templates/profile.schema.json` has always defined it at the
 top level. The schema is what `keel init` writes and what the guard reads, so the prose was the
@@ -211,6 +225,7 @@ permission deny rules already warn. It raises the cost of a careless commit. It 
 against a determined one, and review remains the boundary.
 
 The list of paths that get the non-overridable block, proposed here and confirmed per repo in
+<!-- keel:claim gate=sensitive-guard harness=claude -->
 `hard_block_paths`:
 
 - anything under a path matching `auth`, `session`, `token`, or `credential`
@@ -272,6 +287,8 @@ You have it installed. Roughly a third of keel is adapted from it, and its
 response, which will compete with our router.
 
 **Recommendation: keep it until Phase 3 lands, then uninstall.** Running both costs two
+<!-- keel:claim gate=session-start harness=claude -->
+<!-- keel:claim gate=session-start harness=codex -->
 session-start injections and produces two answers to "which methodology applies".
 
 The alternative is to build keel as a thin layer on top of superpowers: we ship only
@@ -336,6 +353,8 @@ going to teach.
 descriptions are 1,066 tokens in every request, measured 2026-08-16, up from roughly 760. That is the
 real budget line and it scales linearly. The original argument against 30+ skills was routing
 precision and a map nobody can hold in their head; both still stand, and the mechanical checks added
+<!-- keel:claim gate=session-start harness=claude -->
+<!-- keel:claim gate=session-start harness=codex -->
 at 0.5.0 (every route present in the cheatsheet and in the session-start injection) exist because
 that map had already drifted at 22. **Revisit before 30, not after**, and revisit it as "which of
 these should merge", not "how short can a description be".
@@ -403,9 +422,11 @@ An internal tool with no owner rots in a quarter. Concretely this needs:
 - **Evals:** built before the pilot, not during it. Until they existed, every discipline claim in
   the README was untested.
 
-**Reviewers:** Bernard Tebandeke and Edrine Kamya. Either may review a skill change; both are not
+**Reviewers:** Bernard Tebandeke and `gfsekamanya`. Either may review a skill change; both are not
 required. That is the right call for a two-person team: requiring both would make the tool stall
 whenever one is busy, which is how internal tooling dies.
+
+**Reviewer changed 2026-09-07.** The second reviewer is now `gfsekamanya`.
 
 The property that matters is that no skill change is merged by its own author unreviewed. With two
 reviewers and either sufficing, that holds as long as the author is not the reviewer.
@@ -452,6 +473,8 @@ developer who wants the default style back does not have to edit a shared file.
 
 **RESOLVED, the part that mattered.** Terse by default was instructed on 2026-08-16 and ships, but
 not through `outputStyle`. `keel init` writes `conventions.response_style: "terse"` into
+<!-- keel:claim gate=session-start harness=claude -->
+<!-- keel:claim gate=session-start harness=codex -->
 `.keel/profile.json` and `hooks/session-start` injects the rule unless it reads `verbose`. That is
 the mechanism `claude-plugins-official/explanatory-output-style` uses for the same problem, and it
 needs no style name.
@@ -470,6 +493,8 @@ it, so there is no pressure to guess.
 ## 11. The un-witnessed step. RESOLVED 2026-08-17, implemented as specified below.
 
 **The gap.** Nothing in `execute-plan`, `skills/write-plan/references/plan-template.md`, or
+<!-- keel:claim gate=done-guard harness=claude -->
+<!-- keel:claim gate=done-guard harness=codex -->
 `hooks/done-guard` says what to do with a checkbox whose step somebody else already performed. The
 shipped rules cover ticking without running the command. They are silent on ticking a step done in
 an earlier session, which is every resumed plan, and it is the ordinary way a plan accumulates ticks
@@ -507,6 +532,8 @@ the references, which are unbudgeted:
 - `skills/execute-plan/references/subagent-prompts.md`, so a delegated agent receives it, since it
   sees only what is sent.
 
+<!-- keel:claim gate=done-guard harness=claude -->
+<!-- keel:claim gate=done-guard harness=codex -->
 **`hooks/done-guard` is deliberately not part of this.** It reads a turn's tool calls and cannot
 know who performed a step in an earlier session. Extending it here would mean inferring intent from
 a transcript, which is the English-matching mistake its header already refuses.
@@ -568,9 +595,9 @@ ask, then allow, first match wins (`code.claude.com/docs/en/permissions`, "Manag
 the mode decides only what would otherwise prompt.
 
 This corroborates, from a second source, the live-session check already recorded at
-`bin/keel:552-555` and `docs/03-install-and-distribution.md:104-107`. **So the risk is bounded and
-the split is sound**, and the finding that would have stopped this decision, that init disables
-keel's own guardrails, does not hold.
+`bin/keel:552-555` and `docs/03-install-and-distribution.md`, at "Verified against a live session".
+**So the risk is bounded and the split is sound**, and the finding that would have stopped this
+decision, that init disables keel's own guardrails, does not hold.
 
 ### What the rules do not reach, which is the actual residual
 

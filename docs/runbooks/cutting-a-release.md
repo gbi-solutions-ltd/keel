@@ -51,20 +51,22 @@ git diff --stat "v$(cat VERSION)"..HEAD -- skills/ tests/evals/
 Empty output is the only thing that lets a gate transfer, and say so in the CHANGELOG entry when it
 does.
 
-**Dispatch all six concurrently.** Staging once per arm is what makes that safe, and serial
+**Dispatch all 7 concurrently.** Staging once per arm is what makes that safe, and serial
 dispatch costs the same money for four times the wall clock. The mechanics, and why every flag on
 the `claude -p` line is load bearing, are in `tests/evals/README.md`; do not re-derive them. This is
 the script the 0.17.0 gate ran, kept here because it lives in no repository yet:
 
 ```bash
 #!/usr/bin/env bash
-# Dispatch the six release-gate treatment arms in parallel, one staged directory each.
+# Dispatch the release-gate treatment arms in parallel, one staged directory each.
 set -uo pipefail
 REPO=/path/to/keel
 OUT=./gate-run
 mkdir -p "$OUT"
 
-ARMS="tdd-under-deadline debug-obvious-cause ship-with-flaky-tests build-with-no-prd done-without-verifying incident-diagnose-first"
+# The set is tests/evals/gate-scenarios and nowhere else. It was pasted here until 2026-09-06,
+# which is how this script ran six arms while results.md said the gate was seven.
+ARMS="$(grep -vE '^$|^#' "$REPO/tests/evals/gate-scenarios")"
 
 for a in $ARMS; do
     dir="$(cd "$REPO" && tests/evals/stage.sh "$a" 2>"$OUT/$a.stage-err")"
@@ -106,19 +108,23 @@ recorded in the CHANGELOG either way.
 
 ## 2. The version bump
 
-**Three places, one commit, because `tests/test-keel.sh` pins them to each other:**
+**Four places, one commit, because `tests/test-keel.sh` pins them to each other:**
 
 1. `VERSION`, which drives the CLI and every project's profile
-2. `.claude-plugin/plugin.json`, which keys the installed plugin cache
-3. `CHANGELOG.md`'s newest `## ` heading, which is what a human reads
+2. `.claude-plugin/plugin.json`, which keys the installed plugin cache on Claude Code
+3. `.codex-plugin/plugin.json`, which keys it on Codex. Added 2026-09-06 with Tier B, and the
+   version check globs `.*-plugin/plugin.json` rather than naming them, so a third manifest is
+   covered on the day it is added rather than the day it drifts
+4. `CHANGELOG.md`'s newest `## ` heading, which is what a human reads
 
 ```bash
 printf '0.17.0\n' > VERSION
 # edit .claude-plugin/plugin.json "version"
+# edit .codex-plugin/plugin.json "version"
 # change `## Unreleased` to `## 0.17.0 - YYYY-MM-DD`, and add the gate result to that entry
 ```
 
-**Why all three and not two.** They drifted once: `VERSION` reached 0.3.0 with a whole feature
+**Why all of them and not some.** They drifted once: `VERSION` reached 0.3.0 with a whole feature
 behind it while `plugin.json` still said 0.2.0. Nothing failed, `keel version` was right and the
 CHANGELOG was right, and every install stayed on the previous skills because the cache had already
 seen 0.2.0 and had no reason to fetch again. The symptom is a skill fix that reaches nobody and
@@ -138,7 +144,7 @@ expected; anything else is not.
 
 ```bash
 tests/run-tests.sh          # expect the one failure above
-git add VERSION .claude-plugin/plugin.json CHANGELOG.md
+git add VERSION .claude-plugin/plugin.json .codex-plugin/plugin.json CHANGELOG.md
 git commit                  # "release: 0.17.0"
 tests/run-tests.sh          # expect: All test files passed
 ```
@@ -176,6 +182,13 @@ All work is on `sandbox` and reaches `main` through a PR. Never commit a release
    ```
 
 ## 4. Publish
+
+**First Tier B release only: the CHANGELOG entry must carry the CCA warning in plain words.** Not a
+link to the design, and not a sentence about capability manifests. The text to paste is in
+`docs/architecture/tiered-multi-harness-support.md` section 9, and it says that on Codex two of the
+three gates stop blocking if an upstream change lands, that nothing in keel will go red when it
+does, and what to check. A person reading only the CHANGELOG has to learn this; it is the one risk
+in Tier B that a keel user cannot detect for themselves.
 
 Nothing in this section is reversible. Making a repository private again does not recall clones or
 forks, and a fork network keeps objects reachable after the parent is locked down.
@@ -282,7 +295,7 @@ A local clone shows what you built. The API shows what people can read.
 | The export's file count and the clone's disagree | A suite run left `.pyc` files that `rsync` copied | Re-export from a clean tree, commit inside it before running the suite. *Recorded* |
 | The sweep prints `OK` with "generic patterns only" | The deny list is absent on this machine | Do not push. Restore `~/.config/keel/internal-deny-list.txt` and re-sweep |
 | Push protection rejects the public push | A test fixture shaped like a credential | Fix at the cause, not the unblock link. Sweep per provider: the first sweep missed a Stripe key by searching the OpenAI shape. *Recorded* |
-| A skill fix reaches nobody after a release | `plugin.json` disagrees with `VERSION` | The cache is keyed on `plugin.json`. Bump all three. *Recorded* |
+| A skill fix reaches nobody after a release | a `plugin.json` disagrees with `VERSION` | The cache is keyed on `plugin.json`, and there are two of them since Tier B. Bump all four. *Recorded* |
 | A `main...sandbox` range gives obviously wrong counts | Local `main` is behind `origin/main` | `git fetch` first. It has produced a wrong artifact before |
 | The release commit passes CI on the PR and fails the same checks on `main` | A `producer \| grep -q` under `pipefail`, not the tree. grep leaves at the first match and the producer's 141 fails the pipeline | Read the failures for a common shape before re-running. Fix the pipeline, not the thing it accused |
 
@@ -316,10 +329,11 @@ A local clone shows what you built. The API shows what people can read.
 
 ## Still open
 
-The gate is documented as six scenarios in `tests/evals/README.md` and as seven in
-`tests/evals/results.md`. Nine exist and two are recorded as non-gate, which leaves seven, so
-`commit-outside-a-worktree`'s membership is the live question. Releases through 0.17.0 ran the same
-six named in section 1.
+**Settled 2026-09-06: the gate is seven, and the set is `tests/evals/gate-scenarios`.**
+`commit-outside-a-worktree` is IN, being the only scenario that tests a subagent's behaviour, a path
+nothing else exercises. Releases through 0.17.0 ran six, so the next gate runs one arm more than the
+last one did. The dispatch script in section 1 reads that file now instead of carrying its own copy,
+which is what let the two disagree.
 
 The dispatch script in section 1 belongs in `tests/evals/gate.sh`, where it would be tested and
 maintained rather than pasted. It has produced two gates from a scratch directory.

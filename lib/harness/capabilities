@@ -1,0 +1,118 @@
+# What each harness provides and what each gate requires. The single source of truth.
+#
+# Read by lib/harness/resolve.sh in pure bash, because hooks/sensitive-guard reads it and must work
+# on a machine with no python3. That is why this is pipe-delimited text and not JSON.
+#
+# provides|<harness>|<primitive>|<source>|<version>|<date>
+# requires|<gate>|<primitive>
+#
+# <source> is one of two kinds and says which. `vendor:` is a published artifact belonging to the
+# harness. `probe:` is an observation somebody made and recorded. A keel file is neither: that keel
+# ships a Stop hook is not evidence that the harness honours one, and a row citing only our own tree
+# would keep asserting `provides` after the harness dropped the primitive. Nine rows were written
+# that way on 2026-09-05 and every one was replaced.
+#
+# <version> is THE HARNESS's version, never keel's. keel doctor prints it beside the version of the
+# harness it is running, and that comparison means nothing if this column holds 0.18.0.
+#
+# THE RULE THIS FILE EXISTS TO EXPRESS, which lives nowhere else in the tree: a gate is active on a
+# harness IF AND ONLY IF that harness provides EVERY primitive the gate requires. So a `requires`
+# row is not documentation. It is an instruction that silently disables that gate on every harness
+# lacking the primitive, and adding one is the most consequential edit anybody makes here.
+#
+# A gate may carry more than one `requires` row, and `done-guard` does. A new gate needs both a file
+# under hooks/ and at least one `requires` row; the test checks both directions and a missing half
+# is a red build rather than a quiet hole.
+#
+# WHY THERE ARE THREE TRANSCRIPT PRIMITIVES, and there are still three. `transcript_path` is only
+# the promise of a path. `transcript_turn_usage` is per-turn token usage, which lib/context_watch.py
+# cannot work without. `transcript_turn_tool_calls` is the turn's tool calls, attributed to the
+# agent that made them, which hooks/done-guard cannot work without. Three different promises, and
+# none implies another. `subagent_transcript_path` is a fourth thing and NOT a transcript row field
+# at all: it arrives on the SubagentStop event, so it is its own primitive with a vendor source.
+# Bundling it into a transcript probe claimed evidence a transcript cannot carry, and zero of 368
+# transcripts hold that key.
+#
+# WHAT "ATTRIBUTED" MEANS, AND WHY IT IS NOT "carries isSidechain". It said the latter until
+# 2026-09-06, and that was the schema-in-the-name mistake of the paragraph below wearing a
+# different hat: `isSidechain` is a Claude Code row field, so a primitive demanding one could only
+# ever be held by Claude Code. What done-guard cannot function without is knowing that the calls it
+# is reading are this agent's. Claude Code answers that with a per-row flag, because it interleaves
+# a subagent's rows into the main transcript. Codex answers it by never interleaving: a subagent is
+# its own thread with its own rollout, handed over as agent_transcript_path on SubagentStop, and
+# every record carries its own thread id and turn id. That is strictly finer than a boolean, so it
+# earns the primitive. The rule this settles, for the next harness: the primitive asks whether the
+# turn's calls can be told from another agent's, never how.
+#
+# A PRIMITIVE NAMES A CAPABILITY, AND <source> IS WHERE ONE HARNESS'S SHAPE BELONGS. The Claude rows
+# for these two cite message.usage and message.content[] tool_use blocks because that is how Claude
+# Code satisfies them; a second harness satisfying the same two in a completely different format
+# gets a row that is just as honest, and that is what lib/context_watch.py's two parsers exist to
+# absorb. Until 2026-09-05 both were named after Claude Code's own transcript format, which put our
+# schema in the primitive rather than in its evidence and so pinned Tier B at one gate by
+# construction: no second harness could ever hold a row named for a wire format, however much
+# evidence it had. A name that cannot be earned does not fail closed, it fails permanently.
+# tests/test-harness-resolve.sh keeps schema words out of this column.
+#
+# Codex earned all three on 2026-09-06, in task 14 of the tiered multi-harness plan, so `done-guard`
+# and `context-watch` resolve ACTIVE there and Tier B is three gates rather than one. The rows are
+# probes against tests/fixtures/transcripts/codex.jsonl, a rollout captured from inside a live Stop
+# hook, and the parsers that read it are lib/context_watch.py's _measure_codex and
+# hooks/done-guard's codex_turn_tool_calls. Neither row was added before its parser worked against
+# that capture: a row whose parser returns nothing is the "looks installed and is not" failure this
+# file exists to prevent, dressed as evidence. ADR-0003 is the standing rule, absent evidence fails.
+#
+# `subagent_transcript_path` is PROVIDED and required by nothing, deliberately. done-guard reads it
+# only on SubagentStop and falls back to transcript_path when it is absent (hooks/done-guard:316-317),
+# so requiring it would disable the whole gate on a harness whose Stop path works. Under-requiring
+# resolved done-guard active on Codex; over-requiring would resolve it inactive where it works. The
+# rule is that a gate requires what it cannot function without, not everything it can use.
+# Collapsing the three into one primitive resolved done-guard ACTIVE on Codex on the strength of
+# stop_blocking alone, where it would have read a Codex transcript looking for Claude Code rows and
+# failed open in silence. Caught in review on 2026-09-05, before it shipped, which is the whole
+# point of the file.
+#
+# NOT EVERY PRIMITIVE IS A THING THE HARNESS DOES. `validated_word_ceiling` is the odd one and it is
+# deliberate: it asks whether keel's own 900 word ceiling has been MEASURED on this harness, not
+# whether the harness offers anything. So its evidence really is in our tree, which the `vendor:`
+# and `probe:` paragraph above would otherwise forbid, and the distinction that saves it is that the
+# rule there is about not citing keel as proof of a HARNESS behaviour. An eval arm we ran is an
+# observation somebody made and recorded, so it is a probe like any other.
+#
+# There is deliberately NO codex row. ADR-0001's ceiling and its 44-tokens-per-description figure
+# were calibrated against Claude Code's preload; Codex budgets a share of the context window instead
+# and silently shortens or drops descriptions under pressure. So the ceiling is inherited and
+# unvalidated there until S-19 measures it, and any document saying it holds on Codex is making a
+# false claim today. The absence of the row is what fails that document's build.
+#
+# ADR-0003: a primitive with no source, version and date is treated as not provided. Absent
+# evidence fails, never passes. Do not add a row you have not checked.
+
+provides|claude|session_context_injection|vendor:code.claude.com/docs/en/hooks SessionStart additionalContext|2.1.261|2026-09-05
+provides|claude|stop_blocking|vendor:code.claude.com/docs/en/hooks Stop decision block|2.1.261|2026-09-05
+provides|claude|pretooluse_deny|vendor:code.claude.com/docs/en/hooks PreToolUse permissionDecision deny|2.1.261|2026-09-05
+provides|claude|pretooluse_ask|vendor:code.claude.com/docs/en/hooks PreToolUse permissionDecision ask|2.1.261|2026-09-05
+provides|claude|transcript_path|vendor:code.claude.com/docs/en/hooks common input transcript_path|2.1.261|2026-09-05
+provides|claude|transcript_turn_usage|probe:69 transcripts under ~/.claude/projects, 12269 assistant rows carrying message.usage with all four summed fields|2.1.261|2026-09-05
+provides|claude|transcript_turn_tool_calls|probe:the same 69 transcripts, 6224 message.content[] tool_use blocks, and 270 subagent transcripts whose 31865 rows are all marked isSidechain|2.1.261|2026-09-05
+provides|claude|subagent_transcript_path|vendor:code.claude.com/docs/en/hooks SubagentStop agent_transcript_path|2.1.261|2026-09-05
+provides|claude|permission_rules_command_patterns|probe:bin/keel:582-589 command-pattern rules, held under bypassPermissions in the live session at bin/keel:558-560|2.1.261|2026-09-05
+provides|claude|permission_rules_path_globs|probe:bin/keel:577-581 path-glob rules, held under bypassPermissions in the live session at bin/keel:558-560|2.1.261|2026-09-05
+provides|claude|plugin_marketplace|probe:~/.claude/plugins/known_marketplaces.json lists gbi and keel is installed from it|2.1.261|2026-09-05
+provides|claude|validated_word_ceiling|probe:ADR-0001 calibrated the 900 word ceiling against Claude Code's preload, and tests/evals/results.md, at "Both bodies over the 700 word target carry a passing arm at their length", measures the corpus against it with a passing arm per body over the target|2.1.261|2026-09-05
+
+provides|codex|session_context_injection|vendor:openai/codex@rust-v0.153.4 codex-rs/hooks/schema/generated/session-start.command.output.schema.json|0.153.4|2026-09-05
+provides|codex|stop_blocking|vendor:openai/codex@rust-v0.153.4 codex-rs/hooks/src/events/stop.rs:295|0.153.4|2026-09-05
+provides|codex|pretooluse_deny|vendor:openai/codex@rust-v0.153.4 codex-rs/core/tests/suite/hooks.rs::plugin_pre_tool_use_blocks_exec_command_before_execution|0.153.4|2026-09-05
+provides|codex|transcript_path|vendor:learn.chatgpt.com/docs/hooks common input transcript_path|0.153.4|2026-09-05
+provides|codex|transcript_turn_usage|probe:tests/fixtures/transcripts/codex.jsonl, a rollout captured from a live 0.153.4 Stop hook, whose 2 token_usage_records state payload.usage.total_tokens 13993 then 14023 and whose token_count records state model_context_window 258400|0.153.4|2026-09-06
+provides|codex|transcript_turn_tool_calls|probe:the same capture, one custom_tool_call with its custom_tool_call_output, 6 of its 9 records carrying that turn's id, the three that do not being session_meta and the two token_count records|0.153.4|2026-09-06
+provides|codex|permission_rules_path_globs|vendor:openai/codex@rust-v0.153.4 codex-rs/protocol/src/permissions.rs:105|0.153.4|2026-09-05
+provides|codex|plugin_marketplace|vendor:developers.openai.com/plugins/build/plugins|0.153.4|2026-09-05
+provides|codex|execpolicy_command_prompt|vendor:openai/codex@rust-v0.153.4 codex-rs/execpolicy/src/decision.rs Decision::Prompt|0.153.4|2026-09-05
+
+requires|session-start|session_context_injection
+requires|done-guard|stop_blocking
+requires|done-guard|transcript_turn_tool_calls
+requires|context-watch|transcript_turn_usage
+requires|sensitive-guard|pretooluse_ask

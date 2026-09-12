@@ -28,15 +28,23 @@ delete, then implement fresh from the test.
 ## Commands come from the profile
 
 Read `.keel/profile.json` first: `verify.test_one` for one test, `verify.test` for the suite,
-`verify.test_integration` for database-backed tests. Never guess the stack's idiomatic command; a
-project's real one is frequently not the obvious one. Absent? Ask rather than invent.
+`verify.test_integration` for database-backed tests.
 
 ## The cycle
 
-### RED: write one failing test
+### RED: write the unit's failing tests
 
-One behaviour, a name that states it, real code rather than mocks. Before writing it, name the
-production change that would make it fail. If you cannot, it asserts nothing.
+The unit is every case going red for one named missing production change, named as the **smallest**
+change making that case red; a case needing a second change is a second unit. Before its first test,
+write the **start record**: the starting commit, and the tests already red there, which the previous
+unit's boundary run reports (the first unit's costs one `verify.test`). Name that commit in the
+report. No VCS? Say so: the baseline is the working tree as found. Write the cases together, real
+code rather than mocks, one behaviour per case, each name stating it. Cannot name the change? It
+asserts nothing.
+
+Can you write the whole spec before writing any of it? If not, this cycle is design work: one case
+at a time. **The iron law is unchanged:** batching changes how many cases go red together, never
+whether the cases asserting new behaviour were watched failing.
 
 See [references/writing-good-tests.md](references/writing-good-tests.md) when writing or
 changing any test.
@@ -48,11 +56,13 @@ the one you expected, and it fails because the behaviour is missing, not a typo.
 
 Passed immediately? It tests existing behaviour. Errored? Fix and re-run.
 
+Report a tally: how many written, how many failed, and for each first-run pass the behaviour it
+pins. That pass is legitimate only where the case is green on the start record's commit, and it
+never counts toward the unit's coverage.
+
 ### Prefer a real database over a mocked one
 
-Where a behaviour touches persistence, test against a **running** database. A mock proves your code
-called a method; a real database proves the stored data is what you meant. They differ on exactly
-what matters: constraints, transactions, types, precision, concurrent writes.
+Where a behaviour touches persistence, test against a **running** database.
 
 Use `verify.test_integration` from the profile.
 [references/writing-good-tests.md](references/writing-good-tests.md) covers how, and when a mock is
@@ -65,12 +75,20 @@ states that cannot occur.
 
 ### Verify GREEN: watch it pass
 
-Run `verify.test_one`, then `verify.test`. The new test passes, nothing else broke, output clean.
-Still failing? Fix the code, never the test.
+Run `verify.test_one`. The new test passes, output clean. Still failing? Fix the code, never the
+test.
 
 ### REFACTOR
 
 Only once green. Remove duplication, improve names, extract helpers. No new behaviour. Stay green.
+
+### Unit boundary: run the suite
+
+The unit ends with one `verify.test` run. The suite is 313 seconds and one test is 2.
+
+Red for tests this unit did not touch? Name them and match them against the start record. All
+matched means the unit is done: record them and carry on. An unmatched red is this unit's: hand it
+to `keel:debug`.
 
 ## Exceptions, stated out loud
 
@@ -80,40 +98,34 @@ properly. "I will tidy it later" means the spike is production code with no test
 
 ### The project has no test tooling at all
 
-`verify.test` and `test_one` are both `null` and this is **not** greenfield: an established codebase
-that never had a runner. None of the three exceptions covers it, and you resolve it in neither
-direction yourself. Adding a runner to a years-old service is a standing decision about the
-repository, not a step in someone's feature.
-
-Ask, with the three options and their costs set out in
-[references/no-test-tooling.md](references/no-test-tooling.md), and record the answer.
+Both commands `null` and not greenfield? You do not resolve that yourself. Ask, with the three
+options and their costs in [references/no-test-tooling.md](references/no-test-tooling.md), and
+record the answer.
 
 ## Rationalisations
 
 | Excuse | Reality |
 |---|---|
-| "Too simple to break" | Simple code breaks. The test costs 30 seconds |
 | "I will test after" | It passes immediately, proving nothing. You never saw it fail, so never proved it catches the bug |
-| "Tests after achieve the same" | After answers "what does this do?" First answers "what should it do?" |
-| "I tested it by hand" | No record of what you covered, no way to re-run it |
-| "Deleting hours is wasteful" | Sunk cost. Rewrite with confidence, or keep code you cannot trust |
-| "Keep it as reference" | You will adapt it, which is testing after |
-| "TDD is slower" | Slower to the first commit, faster to the working one |
+| "I will backfill the tests" | They pass on the first run and prove nothing about whether the guard ever caught anything |
 | "This code has no tests" | You are improving it. Add one for what you touch. This assumes a runner exists; where none does, see the exception below rather than installing one |
 | "The suite is green, do not risk touching it" | It may be green *because* a test asserts the current wrong behaviour. Writing the test first tells you in two minutes, not mid-release |
 
+The rest, unchanged, in [references/rationalisations.md](references/rationalisations.md).
+
 ## Red flags: stop and start over
 
-Code before test. Test written after. Test passed first run. Cannot explain why it failed. "Just this
-once." "Spirit not ritual." "This case is different because."
+Code before test. Test written after. Test passed first run, pinning nothing. Cannot explain why it
+failed. "Just this once." "Spirit not ritual." "This case is different because."
 
 All of these mean: delete the code, start with the test.
 
 ## Before claiming done
 
-Every new function has a test. You watched each fail first, for the expected reason. You wrote the
-minimum. The suite passes cleanly. Edge cases and error paths are covered. Cannot claim all five? You
-skipped TDD.
+Every new function has a test. You watched each case asserting new behaviour fail first, for the
+expected reason. Any case you could not watch fail, you broke the line it covers and watched it go
+red. You wrote the minimum. The boundary suite ran, every red matched. Edge cases and error paths
+are covered. Cannot claim all six? You skipped TDD.
 
 ## Bugs
 

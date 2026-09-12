@@ -18,13 +18,39 @@
 #                     directory rather than inside it, so `../skills/<skill>/references/` resolves
 #                     from project/ and the arm has to choose to read one
 #
-# Usage: tests/evals/stage.sh <scenario-name>
+# Usage: tests/evals/stage.sh [--harness claude|codex] <scenario-name>
 #        dir=$(tests/evals/stage.sh done-without-verifying)
 #        cd "$dir/project" && claude -p "$(cat ../prompt.md)"
+#
+# --harness changes NOTHING that is staged. The staged tree is identical for both, because
+# tests/evals/run.sh pastes each injected SKILL.md into the prompt as plain text rather than relying
+# on a plugin install, so an arm is not reading keel from anywhere a harness controls. What it
+# changes is the recipe printed on stderr for the human who dispatches the arm. Keeping the flag
+# here rather than in a second script is what keeps the two arms of a comparison honest: same tree,
+# same prompt, one documented difference.
 
 set -uo pipefail
 cd "$(dirname "$0")/../.." || exit 1
 repo="$PWD"
+
+harness=claude
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --harness)
+            harness="${2:-}"
+            case "$harness" in
+                claude|codex) ;;
+                # A typo must not silently print the Claude recipe for a Codex arm. That would be a
+                # difference in treatment between two arms of the same comparison, recorded as
+                # nothing, which is the fault this whole harness exists to avoid.
+                *) printf 'unknown harness: %s\navailable: claude codex\n' "${harness:-<empty>}" >&2; exit 1 ;;
+            esac
+            shift 2 ;;
+        --) shift; break ;;
+        -*) printf 'unknown flag: %s\n' "$1" >&2; exit 1 ;;
+        *) break ;;
+    esac
+done
 
 name="${1:-}"
 f="tests/evals/scenarios/$name.md"
@@ -92,11 +118,23 @@ fi
 printf '%s\n' "$dir"
 
 # Guidance on stderr so `dir=$(stage.sh x)` still captures only the path.
+if [ "$harness" = codex ]; then
+    # Proven 2026-09-05 and recorded in tests/evals/results.md. --skip-git-repo-check is REQUIRED,
+    # not optional: the staged fixture is not a git repository and Codex refuses to run outside one.
+    # The Claude recipe needs no equivalent.
+    recipe="  cd $dir/project && codex exec \"\$(cat ../prompt.md)\" \\
+      --ignore-user-config --ignore-rules \\
+      --dangerously-bypass-approvals-and-sandbox \\
+      --skip-git-repo-check --json > $dir/result.jsonl"
+else
+    recipe="  cd $dir/project && claude -p \"\$(cat ../prompt.md)\""
+fi
+
 cat >&2 <<GUIDE
 
 Dispatch it from the staged working directory, never from this repository:
 
-  cd $dir/project && claude -p "\$(cat ../prompt.md)"
+$recipe
 
 A subagent spawned from a session whose working directory is this repository is NOT isolated: it
 inherits that directory and can read the scenario's pass criteria. Stage once per arm, because two

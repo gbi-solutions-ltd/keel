@@ -26,7 +26,7 @@ set -uo pipefail
 # was the only number enforced, bodies migrated to it: 15 of 24 skills landed within 20 words of it
 # and none met 400. The remedy the standard named, moving substance into references/, is exhausted,
 # which coding-standards demonstrated at 12 reference files and 17,816 reference words with a body
-# still at 683, measured 2026-08-16. It is 17, 22,752 and 795 today, and tests/test-doc-claims.sh
+# still at 683, measured 2026-08-16. It is 17, 22,750 and 795 today, and tests/test-doc-claims.sh
 # asserts that rather than leaving it to the next reader to notice. So the ceiling moves and the
 # target below it is enforced as a warning, because a ceiling with nothing under it is simply where
 # bodies settle.
@@ -83,6 +83,8 @@ schema_fingerprint_for() {
     case "$1" in
         1) printf '2128b5ddbcc7' ;;
         2) printf '24e947eee3ce' ;;
+        3) printf '2313ce09f5c0' ;;
+        4) printf 'd5159ecbff0b' ;;
     esac
 }
 
@@ -315,12 +317,24 @@ done
 # The match is case-insensitive because `skills/write-plan/references/plan-review.md` writes
 # `Model \`inherit\`` at the start of a sentence. Until 2026-08-20 that pin was invisible here, so a
 # capital M was a way to hold an unchecked alias.
+#
+# UNTIL 2026-09-06 THIS ACCEPTED sonnet, opus, haiku, fable OR inherit, and four of those are
+# Anthropic model names that mean nothing on a second harness. Only `inherit` survives: it is
+# neutral and says "the driver's model", which is a real instruction on any harness. Everything else
+# is now a delegation profile, a name each harness resolves to its own model, written for Codex at
+# .codex/agents/keel-fanout.toml by lib/harness/codex.sh. ADR-0005.
+#
+# `inherit` IS NOT THE NEUTRAL REPLACEMENT FOR THE OTHER FOUR, and reading it as one inverts the
+# routing decision: it means the driver's model, where a fan-out wants a cheaper one.
+# docs/ideas/model-routing.md is the standing evidence that the cheaper model can pass every
+# structural check and be wrong twice as often, which is why a profile is a name a harness resolves
+# rather than a word meaning "same again".
 # shellcheck disable=SC2016  # the $ in s/`$// is an end anchor, not an expansion; single quotes are required
 bad_models=$(grep -rhoiE 'model `[a-z0-9.-]+`' skills/*/SKILL.md skills/*/references/*.md 2>/dev/null \
     | sed 's/^[Mm]odel `//; s/`$//' | sort -u \
-    | grep -vxE 'sonnet|opus|haiku|fable|inherit' || true)
+    | grep -vxE 'inherit' || true)
 [ -z "$bad_models" ] \
-  || report "unknown model alias in a skill: $(printf '%s' "$bad_models" | tr '\n' ' '). Claude Code accepts sonnet, opus, haiku, fable or inherit."
+  || report "a skill names a vendor model alias: $(printf '%s' "$bad_models" | tr '\n' ' '). Name a delegation profile instead; ADR-0005."
 
 # The check above rejects a model that does not exist. It says nothing about a dispatch that names
 # no model at all, so until 2026-08-20 a wrong pin was caught and a missing one was invisible, which
@@ -341,7 +355,7 @@ bad_models=$(grep -rhoiE 'model `[a-z0-9.-]+`' skills/*/SKILL.md skills/*/refere
 # What it cannot do: tell a real dispatch from prose that reads like one. It is a marker, like the
 # `model` marker above, and a skill that dispatches without using either word is not covered.
 # shellcheck disable=SC2016  # the backticks are the pattern, not a command substitution
-names_model() { grep -qiE 'model `[a-z0-9.-]+`' "$1" 2>/dev/null; }
+names_model() { grep -qiE 'delegation profile `[a-z0-9-]+`|model `inherit`' "$1" 2>/dev/null; }
 for skill_doc in skills/*/SKILL.md skills/*/references/*.md; do
     [ -e "$skill_doc" ] || continue
     dispatch=$(awk 'BEGIN{RS="";FS="\n"}
@@ -612,9 +626,16 @@ def declared(node, p=""):
 want = declared(schema)
 page = open("docs/profile-keys.md").read()
 got = {}
-row = re.compile("^\\| \x60([^\x60]+)\x60 \\| [^|]* \\| [^|]* \\| (.*) \\|$", re.M)
+row = re.compile("^\\| \x60([^\x60]+)\x60 \\| [^|]* \\| [^|]* \\| [^|]* \\| (.*) \\|$", re.M)
+# The claim tag is metadata, not description text. Five rows carry one because they name a gate,
+# two in their description and three in the citation their Read by cell prints, so
+# docs/profile-keys.md makes a harness claim and tests/test-harness-claims.sh scans
+# it; the tag rides in the row because an HTML comment on its own line between two table rows ends
+# the table. It is written by tests/generate-profile-keys.sh and never by hand, so stripping it here
+# cannot hide a stale description: the text on either side of it still has to match the schema.
+tag = re.compile(r"\s*<!-- keel:claim [^>]*-->")
 for m in row.finditer(page):
-    got[m.group(1)] = m.group(2).replace("\\|", "|")
+    got[m.group(1)] = tag.sub("", m.group(2)).replace("\\|", "|")
 problems = []
 problems += ["no row for %s" % k for k in sorted(set(want) - set(got))]
 problems += ["a row for %s, which the schema does not declare" % k for k in sorted(set(got) - set(want))]
@@ -679,6 +700,294 @@ PY
     elif [ "$schema_got" != "$schema_want" ]; then
         report "templates/profile.schema.json changed its field set (fingerprint $schema_got, expected $schema_want for schema version ${schema_sv:-none}). Bump SCHEMA_VERSION in bin/keel and add a new line to schema_fingerprint_for for it, in the same commit. Do not edit the ${schema_sv:-none}) line: that is a released version's record, and rewriting it leaves every existing profile claiming a field set it does not have."
     fi
+fi
+
+# Every key bin/keel's retirement register names is gone from the schema. cmd_doctor reads that
+# register to tell a person their profile still carries a key this keel removed, so a line naming a
+# key the schema still declares tells them to delete a setting that works.
+#
+# WHAT THIS CANNOT SEE, STATED BECAUSE THE REGISTER IS ONLY AS GOOD AS THE HABIT: the other
+# direction, a key removed from the schema and never added to the register. The fingerprint above
+# hashes the field set, so it proves the set moved and can never say which way, and no record of
+# the previous field set exists to diff against. Whoever writes the removal commit is the only
+# reader that can catch it, which is why the register carries that instruction in its own comment.
+if [ -f templates/profile.schema.json ] && [ -f bin/keel ] && command -v python3 >/dev/null 2>&1; then
+    still_declared="$(python3 - <<'PYR'
+import json, re
+
+src = open("bin/keel").read()
+block = re.search(r"^retired_keys\(\) \{(.*?)^\}", src, re.S | re.M)
+registered = []
+if block:
+    for line in block.group(1).splitlines():
+        line = line.strip()
+        if line.count("|") >= 2:
+            registered.append(line.split("|")[0])
+
+d = json.load(open("templates/profile.schema.json"))
+declared = set()
+for k, v in d.get("properties", {}).items():
+    declared.add(k)
+    if isinstance(v, dict):
+        declared |= set("%s.%s" % (k, c) for c in (v.get("properties") or {}))
+
+print(" ".join(p for p in registered if p in declared))
+PYR
+)"
+    [ -z "$still_declared" ] \
+      || report "bin/keel's retirement register names keys templates/profile.schema.json still declares: $still_declared. Doctor tells every project holding one of those to stop setting a key that still works. Either drop the line from retired_keys or remove the key from the schema, and bump SCHEMA_VERSION if it is the second."
+fi
+
+# Every key templates/keel-profile.example.json sets is declared in templates/profile.schema.json.
+# The reader rule below covers every key the schema declares; it says nothing about a key a project
+# copies out of the example that the schema never declared, which is the shape conventions.
+# branch_prefix took: in the example, absent from both schema revisions, read by nothing.
+#
+# Two legitimate escapes, both already load-bearing. A leaf named _note under an object whose
+# schema marks it additionalProperties: true is bin/keel's own convention for a free-text
+# annotation (write_profile emits artifacts._note the same way). And a key under a field the schema
+# itself declares as an open map, additionalProperties holding a type rather than true, such as
+# verify_notes, is open by design and every key under it is legitimate without being itemised.
+if [ -f templates/profile.schema.json ] && [ -f templates/keel-profile.example.json ] && command -v python3 >/dev/null 2>&1; then
+    example_rc=0
+    example_bad="$(python3 - <<'PYE'
+import json
+
+schema = json.load(open("templates/profile.schema.json"))
+example = json.load(open("templates/keel-profile.example.json"))
+
+problems = []
+visited = [0]
+
+def walk(ex_node, schema_node, path):
+    if not isinstance(ex_node, dict):
+        return
+    schema_node = schema_node or {}
+    props = schema_node.get("properties") or {}
+    open_map = isinstance(schema_node.get("additionalProperties"), dict)
+    for k, v in ex_node.items():
+        if k.startswith("$"):
+            continue
+        full = "%s.%s" % (path, k) if path else k
+        visited[0] += 1
+        if k in props:
+            if isinstance(v, dict):
+                walk(v, props[k], full)
+            continue
+        if open_map or k == "_note":
+            continue
+        problems.append(full)
+
+walk(example, schema, "")
+if visited[0] == 0:
+    print("the example walk read no keys at all, so this rule is checking nothing. "
+          "templates/keel-profile.example.json is empty or has been reshaped past the walk above.")
+else:
+    print("; ".join(problems))
+PYE
+)" || example_rc=$?
+    [ "$example_rc" -eq 0 ] \
+      || example_bad="the example coverage check could not run to completion, python exited $example_rc."
+    [ -z "$example_bad" ] \
+      || report "templates/keel-profile.example.json sets keys templates/profile.schema.json does not declare: $example_bad. A project that copies the example and sets one gets a key that does nothing. Either declare it in the schema with a reader, or remove it from the example."
+fi
+
+# Every declared profile key says what reads it, and the reader it names still exists.
+#
+# THE FAILURE. On 2026-09-07, a census flagged 22 of the 61 keys templates/profile.schema.json
+# declares as read by nothing, and 20 of them genuinely were: two of the 22, stack.package_manager
+# and verify.test_integration, were already being read. Ten of the 20 carried a description naming a
+# reader that did not exist. CHANGELOG.md recorded seven. This comment first said 22 and 14, which
+# were the census's own figures; opening every key measured 20 and 10, and a live comment on a rule
+# this plan added carries the corrected figure, not the believed one. That is the delegation map's
+# failure in a different file: the wiring map in docs/04-plugin-strategy.md was false in six of its
+# ten rows, and the rule above exists for it.
+#
+# WHY A DECLARED READER AND NOT A GREP. A dotted-path matcher was written and measured against this
+# tree before this rule was chosen. It flagged 25 of 61 keys and 7 of the 25 are genuinely read:
+# artifacts.stories, .architecture, .decisions and .plans through the `get('artifacts',{})` map
+# iteration in cmd_doctor, gates.context_warn_pct and .context_stop_pct through
+# lib/context_watch.py:497-508, and conventions.default_branch through the sed in the pre-push hook
+# body that `keel guard install` writes.
+# 28% false positives, against docs/standards.md's rule that a check is never stricter than correct
+# output. It under-reports too: gates.done_verified is read as (prof.get("gates") or
+# {}).get("done_verified") at hooks/done-guard:114 and the dotted string appears in that file only
+# in comments. Bare leaf names rescue nothing: `name` occurs 337 times in this tree and `test` 484,
+# so all 22 dead keys would have passed. The two bin/keel reads above are named by phrase and not
+# by line, because a line inserted anywhere earlier in that file moves them and nothing goes red
+# when it does, which is this rule's known limit.
+#
+# So the key declares its reader and this checks the citation, the way lib/harness/capabilities
+# declares a primitive and its source. Its rule is the one that applies here: absent evidence fails,
+# never passes. `unread:` is legal and needs a citation to the record that decided it, so a
+# speculative key cannot be added without writing down where its intent lives.
+if [ -f templates/profile.schema.json ] && command -v python3 >/dev/null 2>&1; then
+    # A non-zero exit from the block below is a finding, not a pass. An x-keel-read-by whose value
+    # is a JSON number or true is truthy and not iterable, so the entry loop raises TypeError,
+    # stdout is empty, and an empty $readby would read as "no problems found". Measured on
+    # 2026-09-07: the validator exited 0 on a schema whose marker was 7. This file runs
+    # `set -uo pipefail` with no -e, so nothing downstream catches it, and a rule whose own
+    # principle is "absent evidence fails, never passes" cannot be the one that passes on silence.
+    readby_rc=0
+    readby="$(python3 - <<'PYRB'
+import json, os, re
+
+schema = json.load(open("templates/profile.schema.json"))
+
+
+def declared(node, p=""):
+    out = {}
+    for k, v in (node.get("properties") or {}).items():
+        path = "%s.%s" % (p, k) if p else k
+        if isinstance(v, dict) and v.get("properties"):
+            out.update(declared(v, path))
+        else:
+            out[path] = v.get("x-keel-read-by")
+    return out
+
+
+keys = declared(schema)
+if not keys:
+    print("the schema walk read no keys at all, so this rule is checking nothing. "
+          "templates/profile.schema.json has been reshaped past the properties walk above.")
+    raise SystemExit(0)
+
+# No literal backtick in this regex, and \x60 rather than one on purpose. This heredoc sits inside
+# a $( ), where bash 3.2 does not treat a quoted body as literal: a backtick here opens a command
+# substitution that swallows the rest of the file, and the parse error is reported a hundred lines
+# away. bin/keel:json_load carries the same warning for the apostrophe.
+form = re.compile(r"^(code|advisory|generic|unread|observed):([^:#]+)(?::([0-9]+)|#([^\x60|]+))$")
+problems = []
+for path in sorted(keys):
+    entries = keys[path]
+    if entries is None:
+        problems.append("%s declares no x-keel-read-by" % path)
+        continue
+    # A marker that is neither a string nor a list is a wrong type, and saying so beats the two
+    # ways it was diagnosed before. 0 and false fell through to the empty check below and were
+    # reported as an empty marker, which is false. 7 and true raised TypeError in the entry loop,
+    # which threw away every finding already collected and left only the rc backstop sentence, so
+    # one malformed marker hid every other defect in the schema. The backstop stays as a last
+    # resort; this guard is what names the key and the type it actually has.
+    if not isinstance(entries, (str, list)):
+        problems.append("%s has an x-keel-read-by that is %s, not a string or a list of strings" % (path, type(entries).__name__))
+        continue
+    if isinstance(entries, str):
+        entries = [entries]
+    if not entries:
+        problems.append("%s has an empty x-keel-read-by" % path)
+        continue
+    for e in entries:
+        if e == "human":
+            continue
+        m = form.match(e if isinstance(e, str) else "")
+        if not m:
+            problems.append("%s has an unreadable x-keel-read-by entry %r, "
+                            "not human and not <code|advisory|generic|unread|observed>:<path> followed by "
+                            ":<line> or #<phrase>, where a phrase carries no backtick and no pipe"
+                            % (path, e))
+            continue
+        f, line, phrase = m.group(2), m.group(3), m.group(4)
+        if m.group(1) == "advisory" and not f.endswith(".md"):
+            problems.append("%s uses advisory: for %s, which is not a markdown file. advisory: is for prose a model may follow; use code: for something that executes." % (path, e))
+        # observed: names the record that measured a model reading the key unprompted, so it names a
+        # document. A path into code would be code:, and the distinction is the whole value of the
+        # fifth marker: nothing here executes, and nothing here is prose telling a model to read the
+        # key either. It is a measurement.
+        if m.group(1) == "observed" and not f.endswith(".md"):
+            problems.append("%s uses observed: for %s, which is not a markdown file. observed: names the record that measured a model reading the key unprompted; a path into code is code:." % (path, e))
+        if m.group(1) == "code" and f.endswith(".md"):
+            problems.append("%s uses code: for %s, which is a markdown file. Prose nothing asserts is advisory:, not code:." % (path, e))
+        # generic: also names executing code, the same as code:, and is not a fifth way to write
+        # advisory:. The distinction from code: is not the target, only whether the leaf check below
+        # runs against it.
+        if m.group(1) == "generic" and f.endswith(".md"):
+            problems.append("%s uses generic: for %s, which is a markdown file. Prose nothing asserts is advisory:, not generic:." % (path, e))
+        if not os.path.isfile(f):
+            problems.append("%s names %s and that file does not exist" % (path, e))
+            continue
+        body_text = open(f, encoding="utf-8", errors="replace").read()
+        body = body_text.splitlines()
+        # A phrase, matched literally anywhere in the file, and the form to prefer for a file that
+        # changes often: bin/keel took 47 lines in one commit on the branch that added this and moved
+        # 32 citations that were correct before it. A line number stays legal, because a phrase into
+        # a file of near-identical lines is worse, and the caller knows which of the two they have.
+        # Uniqueness is not required, for the reason tests/validate-citations.sh gives: rejecting a
+        # phrase that occurs twice is stricter than correct output.
+        if phrase is not None:
+            if phrase not in body_text:
+                problems.append("%s names %s and that text is not in %s" % (path, e, f))
+                continue
+            # Every occurrence, not just the first: a phrase repeating in its file is legal by the
+            # same ruling tests/validate-citations.sh gives, and the leaf check below has to honour
+            # that too, or it silently re-adds the uniqueness requirement this branch exists to
+            # reject, just at the leaf check instead of the existence check.
+            linenos = [body_text.count("\n", 0, m2.start()) + 1
+                       for m2 in re.finditer(re.escape(phrase), body_text)]
+        else:
+            line = int(line)
+            # Line 0 gets its own sentence. Folded into the range test it reported that a one-line
+            # file has 1 lines, which reads as a contradiction and is the same needle the stale-line
+            # case asserts, so from the message alone the two faults were indistinguishable and a test
+            # pinning one was silently pinning both.
+            if line < 1:
+                problems.append("%s names %s, and line numbers start at 1" % (path, e))
+                continue
+            elif line > len(body):
+                problems.append("%s names %s and that file has %d lines" % (path, e, len(body)))
+                continue
+            elif not body[line - 1].strip():
+                problems.append("%s names %s and that line is blank" % (path, e))
+                continue
+            linenos = [line]
+
+        # code: must name the key it claims to read, or a citation that merely resolves is not
+        # evidence: project.kind's real marker once cited a phrase that resolved to a real line in
+        # bin/keel unrelated to any of its readers, and the rule above found nothing wrong with it,
+        # because it only ever checked that the text existed somewhere in the file. The key's own
+        # leaf name, its last dotted segment, has to appear on the cited line or within the three
+        # lines above it. Three and not zero: a jq read a few lines above the marker's own line is a
+        # legitimate reader, and demanding the leaf on the cited line precisely would reject it,
+        # pinned at tests/test-validate-skills.sh. Leaf and not the full dotted path: a single-
+        # purpose read of a nested key almost never repeats the parent segment
+        # (hooks/session-start:111 reads "response_style", never "conventions.response_style"), and
+        # demanding the parent too would reject nearly every real single-purpose citation in this
+        # tree, which a dotted-path matcher measured doing at 28% false positives before this rule
+        # existed in any form.
+        #
+        # generic: is the only marker form exempted, and only for a key read through a parent map or
+        # a shared helper where no source line names the individual key at all: all six artifacts.*
+        # keys share exactly one citation, cmd_doctor's `d.get('artifacts',{})` map loop, where the
+        # loop variable is k and never stories or snapshot or any of the other four. Pinned both ways
+        # at tests/test-validate-skills.sh: the parent-map fixture declared generic: must stay quiet,
+        # and a code: marker in the identical shape must not.
+        if m.group(1) == "code":
+            leaf = path.rsplit(".", 1)[-1]
+            if not any(leaf in "\n".join(body[max(0, ln - 4):ln]) for ln in linenos):
+                problems.append(
+                    "%s names %s and neither that line nor the three above it name %r. A key read "
+                    "through a parent map or a shared helper where no line names it individually is "
+                    "generic:, not code:." % (path, e, leaf))
+print("; ".join(problems))
+PYRB
+)" || readby_rc=$?
+    [ "$readby_rc" -eq 0 ] || readby="the reader rule could not run to completion, python exited $readby_rc. A schema shape the walk above cannot parse is what reaches this line, since a marker that is not a string or a list is caught and named before the loop runs."
+    # "x-keel-read-by" is in the message on EVERY firing, not only when a key is missing one. The
+    # three must-not-reject cases in tests/test-validate-skills.sh assert that this string is
+    # ABSENT, and a needle the rule sometimes omits would let those cases pass while the rule was
+    # firing for a different reason. Same class as the floors above: an assertion that cannot
+    # distinguish quiet from broken is not an assertion.
+    [ -z "$readby" ] \
+      || report "templates/profile.schema.json has an x-keel-read-by problem: $readby. Every key states what reads it: code:<path> or advisory:<path> where something does, human where a person is the reader, unread:<path> naming the record that decided nothing reads it, observed:<path> naming the record that measured a model reading it unprompted. The path is followed by :<line>, or by #<phrase> for a file that changes often."
+
+    # THERE IS NO SECOND FLOOR HERE, AND THAT IS DELIBERATE. A draft of this rule carried a count
+    # check comparing this walk against the row count in docs/profile-keys.md, on the stated ground
+    # that they were "two different walks of the same schema". They are not: the count walk was
+    # structurally identical to declared() above, same properties recursion and same isinstance
+    # guard, so it dropped exactly the same subtrees and could not see what it claimed to. The drift
+    # rule 90 lines above already reports a dropped subtree precisely, by name. A floor whose reason
+    # is false and whose needle no test asserts is the delegation floor's mistake, which
+    # tests/test-validate-skills.sh copies from nobody on purpose.
 fi
 
 if [ "$errors" -eq 0 ]; then

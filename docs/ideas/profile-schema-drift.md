@@ -67,7 +67,7 @@ Variants of building it:
 |---|---|---|
 | Re-running init already merges new keys in, non-destructively | `bin/keel:207` `merge_profile`, and its comment on why existing values win | The asked-for capability exists. The question is the signal, not the mechanism |
 | `keel_version` is tool-owned, so it always reflects the last init | `bin/keel:226` | "Has this project been re-initialised since the upgrade?" is answerable. "Did the upgrade change anything?" is not |
-| The doctor warning fires on any version difference | `bin/keel:1207`, `[ "$pv" != "$iv" ]` | It cannot distinguish a schema change from a typo fix, so it will cry wolf on most releases |
+| The doctor warning fires on any version difference | `[ "$pv" != "$iv" ]` in doctor | It cannot distinguish a schema change from a typo fix, so it will cry wolf on most releases |
 | The profile schema is a separate, versionless file | `templates/profile.schema.json` | There is nowhere to record that a release changed the schema, which is why the comparison has to fall back on the release version |
 | A field's absence has already caused a design decision once | Decision 3, `docs/07-open-decisions.md`: `hard_block_paths` at the top level, not under `gates`, and the prose was wrong for weeks | Absent and misplaced fields are a real failure mode here, not a hypothetical one |
 | `keel doctor` is not in CI and takes about 11 minutes | `.github/workflows/ci.yml` runs `run-tests.sh`, `supply-chain-scan.sh`, `test-supply-chain.sh` | Whatever the warning says, almost nobody is reading it. Fix the signal and the delivery, or fix neither |
@@ -99,7 +99,7 @@ Variants of building it:
 
 **Build something smaller.** Add `schema_version` to `templates/profile.schema.json` and to what
 `keel init` writes, bump it only when a field is added, removed, or moved, and change the
-`bin/keel:1207` comparison to read it instead of `keel_version`. Then the warning fires only when
+`[ "$pv" != "$iv" ]` comparison to read it instead of `keel_version`. Then the warning fires only when
 the project is genuinely missing something, and `keel init` already knows how to fix it.
 
 Why: the merge already works, so the whole defect is that the warning cannot tell a schema change

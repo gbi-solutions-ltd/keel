@@ -36,7 +36,7 @@ evidence behind it is the cheapest thing you will ever decline to build.
 ## Step 2: Check it against the system before challenging it
 
 Read the code, the snapshot, and the docs that bear on it. Delegate wide reading to subagents with
-model `sonnet`, and say so.
+delegation profile `keel-fanout`, and say so.
 
 A challenge carrying a `path:line` changes a decision. The same challenge from instinct starts an
 argument and loses. Every objection in step 3 cites something.

@@ -299,8 +299,12 @@ Scenario: today's shipping configuration still passes
   Then it reports no size finding
 ```
 
-**Notes:** the check today runs the hook once from the repository root, at
-`tests/validate-skills.sh:281`, so it measures whatever keel's own profile selects and nothing else.
+**Notes:** the check runs the hook four times, in the block of `tests/validate-skills.sh` that opens
+`if [ -f hooks/session-start ]; then`, writing a profile for each combination of `response_style`
+and `explain_level` into a `mktemp` probe directory, so all four are measured. **Corrected
+2026-09-09:** this said the check "runs the hook once from the repository root, so it measures
+whatever keel's own profile selects and nothing else", which was true when the story was written and
+was left behind when the loop landed.
 The 400-token ceiling at `:283-284` stays as the outer limit; the 356 rule of `NFR-01` is the tighter
 one this story adds.
 

@@ -71,8 +71,10 @@ A check rejecting output you believe correct is probably wrong: fix the check an
 
 ## Step 6: Delegate the measurement
 
-If the `skill-creator` plugin is installed, use its eval harness and variance benchmarking. Our
-skill owns capture and authoring discipline; theirs owns measurement. Recommend it if absent.
+**On Claude Code**, if the `skill-creator` plugin is installed, use its eval harness and variance
+benchmarking. Ours owns capture and authoring discipline; theirs owns measurement. Recommend it if
+absent. No Codex counterpart exists, so there a skill ships unmeasured unless the project has its
+own harness. Say which you had.
 
 ## Step 7: Ship it as a reviewed change
 

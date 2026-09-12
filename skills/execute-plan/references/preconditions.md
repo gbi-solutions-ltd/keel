@@ -35,13 +35,13 @@ matching a number.
 
 **What to run, and when.** At step 1, before the first dispatch: the plan's `lint`, `typecheck` and
 `build`, which are cheap and are where this breaks, plus `test_one` against **a test that already
-exists**. Not the full suite, which task 1's own step 2 runs minutes later anyway. Not the test file
-the plan's first task creates either: it does not exist yet, and a runner told to run a missing file
-complains about itself, which is the signature this check reads as broken.
+exists**. Not the full suite, which costs minutes and settles nothing `test_one` leaves open. Not
+the test file the plan's first task creates either: it does not exist yet, and a runner told to run
+a missing file complains about itself, which is the signature this check reads as broken.
 
 **Do not delegate this to `keel doctor`.** It runs the commands rather than reading the profile,
 which is why it looks like the right instrument, and it discards their output
-(`bin/keel:1346-1348`), so the exit code is the only thing it keeps. An exit code cannot separate a
+(`bin/keel#The managed block's size, which doc 05 has always said doctor enforces`), so the exit code is the only thing it keeps. An exit code cannot separate a
 verdict about the code from a complaint about the tool, which is the whole of the question here.
 Doctor answers "is this project healthy". It cannot answer this one, and rewording it would not
 change that.

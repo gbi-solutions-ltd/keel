@@ -34,7 +34,7 @@ half had nothing to port from and would have been sold as a translation.
 
 ## Step 3: Delegate the reading
 
-Dispatch these `Explore` agents in one message, model `sonnet`. Each is told: cite `path:line`, mark anything absent
+Dispatch these subagents in one message, delegation profile `keel-fanout`. Each is told: cite `path:line`, mark anything absent
 as `Unknown` rather than inferring it, and never estimate effort.
 
 | Agent | Brief |

@@ -65,7 +65,8 @@ Refuted? Form a new hypothesis from what you learned. Do not stack another fix o
    **REQUIRED SUB-SKILL:** `keel:tdd`.
 2. **Fix the root cause.** One change. No "while I am here" improvements, no bundled
    refactoring; both make the fix unreviewable.
-3. **Verify.** The new test passes, the suite passes, the reproduction no longer reproduces.
+3. **Verify.** Run `profile.verify.test` yourself, not an earlier run: the new test passes, no new
+   red, the reproduction no longer reproduces.
 
 ## The three-fix circuit breaker
 

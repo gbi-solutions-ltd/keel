@@ -13,7 +13,8 @@ skill-versus-baseline comparison.
 **What the arm can see.** Since 2026-09-02 `tests/evals/stage.sh` stages an injected skill's
 references beside the working directory, so `references/house-defaults.md` is readable at
 `../skills/coding-standards/references/`. Step 4 asks for it by name. Whether the arm goes and reads
-it is observable in the tool calls under `--output-format stream-json` and is not scored here.
+it is observable in the arm's tool calls, by the method in `tests/evals/README.md`, and is not
+scored here.
 
 **The fixture's two deliberate splits.** `src/invoices.js` builds SQL by string concatenation at
 seven call sites and uses parameters at three. `src/billing.js` returns a typed error object in six

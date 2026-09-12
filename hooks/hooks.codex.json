@@ -1,0 +1,83 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/session-start\"",
+            "shell": "bash",
+            "async": false,
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/context-watch\"",
+            "shell": "bash",
+            "async": false,
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/context-watch\"",
+            "shell": "bash",
+            "async": false,
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/done-guard\"",
+            "shell": "bash",
+            "async": false,
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/done-guard\"",
+            "shell": "bash",
+            "async": false,
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/context-watch\"",
+            "shell": "bash",
+            "async": false,
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

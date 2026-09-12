@@ -1,0 +1,13 @@
+{
+  "name": "keel",
+  "version": "0.19.0",
+  "description": "A standard operating procedure for AI-assisted delivery. Tier B on Codex CLI: the same 25 skills, the AGENTS.md block, the keel CLI, and the gates lib/harness/capabilities grants this harness rather than all four. docs/harness-support.md is generated from that manifest and says which.",
+  "author": {
+    "name": "GBi Solutions Ltd"
+  },
+  "homepage": "https://github.com/gbi-solutions-ltd/keel",
+  "repository": "https://github.com/gbi-solutions-ltd/keel",
+  "license": "MIT",
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.codex.json"
+}

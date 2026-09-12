@@ -140,7 +140,7 @@ carries an identifier, so an omitted rule can be counted but not named. That was
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
 | FR-11 | Check 2 must re-derive each follow-up item and each known inconsistency in `standards.md` against the tree at HEAD, rather than trusting the document's own status text. | confirmed | `docs/ideas/standards-that-bind.md:442` |
-| FR-12 | For any item the document records as done, the report must state what the fix actually covered, established from the tree, and must not rely on the fix's commit message. | confirmed | Brief item 2; `docs/ideas/standards-that-bind.md:446-447`, "Check what a fix actually covered, not what its commit message claims" |
+| FR-12 | For any item the document records as done, the report must state what the fix actually covered, established from the tree, and must not rely on the fix's commit message. | confirmed | Brief item 2; `docs/ideas/standards-that-bind.md`, "Check what a fix actually covered, not what its commit message claims" |
 | FR-13 | Each item must be reported in one of exactly three states: closed, partially covered, or open. A partially covered item must name what is not covered. | inferred | The instance's tally is "4 closed, 1 partial, 10 open" (`docs/ideas/standards-that-bind.md:157`), which is this vocabulary |
 | FR-14 | Where an item asked for both a fix and a mechanism, the report must state the two separately. | confirmed | `docs/ideas/standards-that-bind.md:162-180`, where the fix shipped, the mechanism did not, and the gap is invisible in consequence |
 | FR-26 | Check 2 must read exactly three inputs: the document's follow-up and known-inconsistency sections, the tree at HEAD, and git history. It must not treat the document's own status text or a fix's commit message as evidence of state; both are the claim under test, not a source. | confirmed | Symmetry with FR-06, requested 2026-09-01. The failure this bounds is `docs/ideas/standards-that-bind.md:162-180`, where a fix's stated scope and its actual scope differ |
@@ -152,7 +152,7 @@ carries an identifier, so an omitted rule can be counted but not named. That was
 | FR-15 | Check 3 must measure up to eight rules drawn from the document's judgement sections across the tree, taking all of them where fewer exist, and report a conforming-to-total ratio for each. **Amended 2026-09-01, from "six to eight".** Six read as a floor, which pushes an agent assessing a short document to pad the sample; the fixture holds exactly six and a shorter document could not meet it. | confirmed | `docs/ideas/standards-that-bind.md:449` |
 | FR-16 | Every imprecise pattern match must be opened and hand-verified before it is reported. A raw match count is not a finding. | confirmed | Brief item 2; `docs/ideas/standards-that-bind.md:452-454`. In the instance all seven apparent leaks were conforming once opened |
 | FR-17 | The report must state what proportion of the tree predates the commit the document was derived from. | confirmed | Brief item 2; `docs/ideas/standards-that-bind.md:452-454`. 78 percent in the instance (`:62-63`) |
-| FR-18 | A finding must state whether it is reachable in production, and must not be presented at a severity its reachability does not support. | inferred | `docs/ideas/standards-that-bind.md:220-231`: the instance's unguarded interpolation sites are unreachable and the record requires they "must not be written up as an injection bug". Cross-check `skills/coding-standards/SKILL.md:29-32` |
+| FR-18 | A finding must state whether it is reachable in production, and must not be presented at a severity its reachability does not support. | inferred | `docs/ideas/standards-that-bind.md:220-231`: the instance's unguarded interpolation sites are unreachable and the record requires they "must not be written up as an injection bug". Cross-check "Counting decides style, never correctness" in `skills/coding-standards/SKILL.md` |
 | FR-27 | Check 3 is the only check that reads project source code, and it must read it only in service of the rules it sampled. It must not report a finding outside those rules, and must not use git history for anything except the pre-derivation proportion FR-17 requires. | confirmed | Symmetry with FR-06, requested 2026-09-01. Without the bound the check becomes an unscoped code review, which `review-code` already owns over a diff (`skills/review-code/references/rubric.md:104-106`) |
 
 ### 5.5 Check 4, the departures ledger
@@ -169,7 +169,7 @@ carries an identifier, so an omitted rule can be counted but not named. That was
 
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
-| FR-23 | The mode must write `<docs_root>/audits/YYYY-MM-DD-standards.md` and must not create or modify any other file. In particular it must never edit `standards.md`. | confirmed | `docs/ideas/standards-that-bind.md:462-463`; the existing form of this rule is `skills/security-audit/references/report-template.md:105`, "Nothing in an audit modifies what is being audited" |
+| FR-23 | The mode must write `<docs_root>/audits/YYYY-MM-DD-standards.md` and must not create or modify any other file. In particular it must never edit `standards.md`. | confirmed | `docs/ideas/standards-that-bind.md:462-463`; the existing form of this rule is `skills/security-audit/references/report-template.md`, "Nothing in an audit modifies what is being audited" |
 | FR-24 | Where a report for the same repository already exists under `<docs_root>/audits/`, the new report must carry a trend section stating what closed, what is new, and what has been open longest. | author-added | The shape already exists at `skills/security-audit/references/report-template.md:85`, section 6. Applying it here is this PRD's addition, and it is what makes NFR-05 observable rather than aspirational |
 | FR-25 | All four checks must run on every assessment, and the report must present them in the CON-02 order with each check's finding count stated separately. | confirmed | Decision 1 in section 14; `docs/ideas/standards-that-bind.md:433-460` |
 
@@ -180,11 +180,11 @@ carries an identifier, so an omitted rule can be counted but not named. That was
 | NFR-01 | The `coding-standards` body must stay at or under the 900 word ceiling. Measured: the body is 876 words as shipped, from 683, with 193 words of mode text. The 150 and 833 this row first carried were measured against a draft that lacked three of the requirements. | confirmed | `CEILING_WORDS=900` at `tests/validate-skills.sh:23`; `body_of()` at `:85`. Measured by `awk 'f;/^---$/{c++; if(c==2) f=1}' skills/coding-standards/SKILL.md \| wc -w` giving 683, and 833 for the body concatenated with the 150 word draft |
 | NFR-02 | The `coding-standards` description must stay at or under 216 characters. Measured: 181 today, 213 with a 32 character assess clause appended. | confirmed | `DESC_MAX_CHARS=216` at `tests/validate-skills.sh:39`, enforced per skill at `:110-111`. Description at `skills/coding-standards/SKILL.md:3`; measured with `printf '%s' "<description>" \| wc -c` |
 | NFR-03 | Because 876 crosses the 700 warning, a passing eval arm at that length must be recorded in `tests/evals/results.md` before the change is considered done. | confirmed | ADR-0001, quoted at `docs/decisions/ADR-0001-skill-body-word-ceiling.md:48-51`: "A skill body over 700 words requires a passing eval arm at that length, recorded in `tests/evals/results.md`, so the room is taken against observed behaviour rather than against an assertion" |
-| NFR-04 | The report format must live in `skills/coding-standards/references/`, not in the skill body, and the body must reference it in one line. | confirmed | References are unbounded (`tests/validate-skills.sh:161-162`, `docs/05-token-and-memory-design.md:49`). The precedent is `skills/security-audit/SKILL.md:63` pointing at `references/report-template.md` |
+| NFR-04 | The report format must live in `skills/coding-standards/references/`, not in the skill body, and the body must reference it in one line. | confirmed | References are unbounded (`tests/validate-skills.sh:161-162`, `docs/05-token-and-memory-design.md:49`). The precedent is the "Write `<docs_root>/audits/YYYY-MM-DD-security.md`" line of `skills/security-audit/SKILL.md`, pointing at `references/report-template.md` |
 | NFR-05 | Two assessments of the same repository at different dates must be comparable without re-reading either tree: same section order, same per-check counts, same vocabulary. | confirmed | Brief item 3 |
-| NFR-06 | The mode must make no network request and must not run any command that modifies the repository being assessed. | inferred | `skills/security-audit/references/report-template.md:105-112` states this rule for audits, including that a check needing a change in order to pass belongs in "Not covered" rather than in the findings |
+| NFR-06 | The mode must make no network request and must not run any command that modifies the repository being assessed. | inferred | `skills/security-audit/references/report-template.md`, at "Nothing in an audit modifies what is being audited", states this rule for audits, including that a check needing a change in order to pass belongs in "Not covered" rather than in the findings |
 | NFR-07 | The mode's text must name the output path as `<docs_root>/audits/...`, never a literal `docs/keel/...` path, and the body's link to the new reference file must resolve. | confirmed | The hardcoded-path check at `tests/validate-skills.sh:161-168` reports "hardcodes a docs/keel path. Use `<docs_root>`"; the broken-link check is at `:148-153`. Both apply to references as well as bodies (`:161-162`) |
-| NFR-08 | **Prerequisite for NFR-03.** An eval fixture carrying a `<docs_root>/standards.md` and a tree that measurably drifts from it must exist before the ADR-0001 arm can run, together with the scenario file that resolves it. No fixture has one today. | confirmed | `find tests/evals/fixtures -name standards.md` returns nothing. Both `tests/evals/stage.sh:26` and `tests/evals/run.sh:11` resolve an arm through `tests/evals/scenarios/<name>.md`, so an arm cannot run without one. Unlike the `write-prd` length arm (`tests/evals/results.md:2509-2513`) this one can reuse nothing |
+| NFR-08 | **Prerequisite for NFR-03.** An eval fixture carrying a `<docs_root>/standards.md` and a tree that measurably drifts from it must exist before the ADR-0001 arm can run, together with the scenario file that resolves it. No fixture has one today. | confirmed | `find tests/evals/fixtures -name standards.md` returns nothing. Both `tests/evals/stage.sh:26` and `tests/evals/run.sh` resolve an arm through `tests/evals/scenarios/<name>.md`, so an arm cannot run without one. Unlike the `write-prd` length arm (`tests/evals/results.md`, "One treatment arm, `write-prd` injected") this one can reuse nothing |
 
 **What the NFR-03 arm must demonstrate.** ADR-0001's purpose for the arm is stated at
 `docs/decisions/ADR-0001-skill-body-word-ceiling.md:123-125`: "A skill that crossed 700 and whose arm
@@ -195,7 +195,7 @@ report in the ranked order (FR-25); `standards.md` is not modified (FR-23); and 
 honesty requirements are observed, meaning the report states the pre-derivation proportion (FR-17)
 and no unopened match count is reported as a finding (FR-16). The precedent for recording an
 ADR-0001 length arm without adding it to the release gate is
-`tests/evals/results.md:2495-2539`.
+`tests/evals/results.md`, "`write-prd` at 793 words, the ADR-0001 length arm".
 
 ## 7. Constraints
 
@@ -232,7 +232,7 @@ is Q3.
 ## 11. Out of scope
 
 - **Problem B, making standards bind during coding.** Already shipped in `13d90d9`, verified in the tree: the `=== PROJECT STANDARDS ===` block is now in the implementer prompt at `skills/execute-plan/references/subagent-prompts.md:29` as well as the review prompt at `:114`; the plan template names the standards document at `skills/write-plan/references/plan-template.md:28` with an example at `:34`; `docs/02-skill-catalog.md:69` now reads "Enforced by nothing at coding time"; and `:382` now reads "Not `<docs_root>/standards.md`, which this line claimed".
-- **Open question 3, why a loaded rule does not bind.** Untouched by this work and still open (`docs/ideas/standards-that-bind.md:615-618`). No requirement here depends on its answer, because the mode is a procedure that returns findings rather than a rule told to a model.
+- **Open question 3, why a loaded rule does not bind.** Untouched by this work and still open (`docs/ideas/standards-that-bind.md`, "Why does a loaded rule not bind?"). No requirement here depends on its answer, because the mode is a procedure that returns findings rather than a rule told to a model.
 - **Answering Q1, whether the ranked order generalises.** Still open, and deliberately not blocking. Section 14's decision 1 runs all four checks together whatever the answer, so nothing in this PRD waits on it. It closes when a second repository is assessed and its per-check finding counts are recorded, which is the first row of section 9. It carries in the idea record as its open question 5 (`docs/ideas/standards-that-bind.md:625-632`).
 - **Remediating anything an assessment finds.** The mode reports. Fixes route to the skill the finding names.
 - **`keel doctor` warning when `gates.coding_standards` is `required` and no `standards.md` exists.** Left undecided by the record (`docs/ideas/standards-that-bind.md:684-685`) and not reopened here.
@@ -254,7 +254,7 @@ is Q3.
 | Q1 | ~~Does the ranked order hold on a second instance, or does it collapse to "run all four"?~~ | A second assessment | **Answered 2026-09-01: the order is wrong on cost and right on yield.** See section 16 |
 | Q2 | Should the ten topic references gain stable rule identifiers, so an omitted rule can be named rather than counted? | Bernard | **Answered 2026-09-01: not now.** FR-08 stands as written, so the mode states its counting unit and per-file denominator and the number becomes reproducible without identifiers. Identifiers stay deferred: ten files of edits, no skill-word cost, larger than the mode itself, and wanting their own PRD |
 | Q3 | Is there a success metric for whether an assessment changes anything, or is the artifact the deliverable? | Bernard | Section 9 |
-| Q4 | Does the NFR-03 arm get a fixture of its own, given that no existing fixture has a `standards.md`? | Bernard | **Answered 2026-09-01: yes, and it is now NFR-08**, an explicit prerequisite rather than a question, so a plan cannot miss it. The residue, whether the new scenario joins the release gate, was also settled: it does not. The gate stays at six, following the `write-prd` precedent (`tests/evals/results.md:2497-2499`). Nothing in Q4 is open |
+| Q4 | Does the NFR-03 arm get a fixture of its own, given that no existing fixture has a `standards.md`? | Bernard | **Answered 2026-09-01: yes, and it is now NFR-08**, an explicit prerequisite rather than a question, so a plan cannot miss it. The residue, whether the new scenario joins the release gate, was also settled: it does not. The gate stays at six, following the `write-prd` precedent (`tests/evals/results.md`, "`write-prd` at 793 words, the ADR-0001 length arm"). Nothing in Q4 is open |
 | Q5 | Should `repo-snapshot`'s section template gain a "present but unassessed" state, now that one is detectable? | Bernard | Nothing in this PRD. Raised because the mode creates the state (`skills/repo-snapshot/references/section-templates.md:147,227`) |
 
 ## 14. The two decisions this PRD closes
@@ -273,8 +273,8 @@ expensive on a large repository, which nothing currently suggests.
 
 **Decision 2: the `-standards.md` suffix is stated as a convention, in one place.** The rule is that
 a dated report under `<docs_root>/audits/` is named `YYYY-MM-DD-<kind>.md`, where `<kind>` is the
-noun of the skill that wrote it: `security` for `security-audit` (`skills/security-audit/SKILL.md:63`),
-`standards` for this mode.
+noun of the skill that wrote it: `security` for `security-audit`, which writes
+`<docs_root>/audits/YYYY-MM-DD-security.md` (`skills/security-audit/SKILL.md`); `standards` here.
 
 It is stated once, on the `audits/` row of the scaffolded documentation table that `bin/keel`
 writes, and each skill's report reference follows it. It is **not** in
@@ -318,14 +318,14 @@ sample names (15, 16 and 20 characters) do not discriminate between 17 and 19; 1
 nothing for this PRD, because a mode needs no roster entry, and it strengthens CON-01.
 
 **The eval arm needs a fixture that does not exist, which nothing in the record mentions.** Both
-`tests/evals/stage.sh:26` and `tests/evals/run.sh:11` resolve an arm through
+`tests/evals/stage.sh:26` and `tests/evals/run.sh` resolve an arm through
 `tests/evals/scenarios/<name>.md`, so an arm cannot run without a scenario file. No fixture under
 `tests/evals/fixtures/` contains a `standards.md` (`find tests/evals/fixtures -name standards.md`
 returns nothing), so unlike the `write-prd` length arm, which reused an existing scenario and fixture
-(`tests/evals/results.md:2509-2513`), this arm cannot reuse anything. Adding a scenario file moves
-the count claim at `README.md:289`, "8 scenarios exist", which `tests/test-doc-claims.sh:49-51`
-enforces. The arm need not join the release gate; the `write-prd` precedent kept the gate unchanged
-(`tests/evals/results.md:2497-2499`). This is Q4.
+(`tests/evals/results.md`, "One treatment arm, `write-prd`"), this arm cannot reuse anything.
+Adding a scenario file moves the count claim at `README.md:289`, "8 scenarios exist", which
+`tests/test-doc-claims.sh:49-51` enforces. The arm need not join the release gate; the `write-prd`
+precedent kept the gate unchanged (`tests/evals/results.md`, "`write-prd` at 793 words"). This is Q4.
 
 ## 16. The second instance, 2026-09-01, and what it falsified
 

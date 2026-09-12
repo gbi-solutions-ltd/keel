@@ -28,7 +28,7 @@ nothing here has to touch `SKILL.md`.
 
 ## The result this plan is planned against
 
-**Audit's arm passed on eight of eight**, recorded at `tests/evals/results.md:3212` under
+**Audit's arm passed on eight of eight**, recorded in `tests/evals/results.md` under
 `## 2026-09-03, audit mode, the first recorded run`. `docs/stories/coding-standards-audit-and-seed.md:497`
 makes that the condition for epic C existing at all: a failing S-06 would have dropped S-07, S-08
 and S-09 and reworked audit first. It passed, so epic C is planned, and this is that plan.
@@ -1059,7 +1059,7 @@ That file is never staged.
 Then the three scenario counts, all in this same edit:
 
 - `README.md:289`, `11 scenarios exist` to `12 scenarios exist`.
-- `tests/evals/README.md:122`, `Eleven scenarios exist` to `Twelve scenarios exist`.
+- `tests/evals/README.md`, `Eleven scenarios exist` to `Twelve scenarios exist`.
 - `docs/06-repo-layout.md:177`, `# 11 scenarios, 11 fixtures` to `# 12 scenarios, 12 fixtures`.
 
 The first and third are asserted by `tests/test-doc-claims.sh` and recompute from the tree. The
@@ -1247,8 +1247,8 @@ rather than reading the count alone.
 Append to `tests/evals/results.md` under `## 2026-09-03, seed mode, the first recorded run`,
 carrying: which references were opened and by which tool, the eight conditions each answered yes or
 no, the body word count at the time, the model, turns, duration and cost from the run's own `result`
-record, and **every extraction command above, verbatim**, per the rule at `tests/evals/results.md:6`.
-Identify the stream by its own `result` record rather than by which directory it sat in.
+record, and **every extraction command above, verbatim**, per the "A finding of the form" rule in
+`tests/evals/results.md`. Identify the stream by its own `result` record, not by its directory.
 
 State what the arm proved and what it did not, in the same paragraph and with the same weight.
 

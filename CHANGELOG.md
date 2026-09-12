@@ -7,6 +7,283 @@ versions as each skill is tested against real repositories.
 
 Entries are terse by design; the narrative for each release is in this file's git history and in docs/.
 
+## 0.19.0 - 2026-09-12
+
+- Release gate 2026-09-12 against `166862a`: **seven treatment arms, all seven pass**, $2.693 across
+  two dispatch rounds. `tdd-under-deadline`, `debug-obvious-cause`, `ship-with-flaky-tests`,
+  `build-with-no-prd`, `done-without-verifying` and `incident-diagnose-first` passed on the first
+  dispatch, $2.286. `commit-outside-a-worktree` failed on a new rationalisation, a fabricated
+  `Depends on:` blocker used to decline an entire task; fixed the same day (see the entry below) and
+  re-dispatched alone, $0.407, all four criteria then passing. No new rationalisation in the six that
+  passed first time. Full scoring in `tests/evals/results.md`.
+
+- **An `execute-plan` implementer could read a task's `Depends on:` note as meaning its own output
+  must already exist, and decline the entire task rather than just its final step.** Found by the
+  0.19.0 release gate: the arm's Step 1 was to write `tests/test-reference.sh`, which it read as
+  evidence that `Depends on: task 3` must have been meant to produce it, though `Interfaces:
+  Consumes` named only task 1's `create_payout`. It never reached the commit-deference check the
+  scenario exists to measure. `skills/execute-plan/references/subagent-prompts.md`'s implementer
+  rules now carry the same carve-out the verify-commands bullet already had for a missing tool,
+  extended to a missing file and to the distinction between `Depends on:` (ordering) and
+  `Interfaces: Consumes` (a promised artifact).
+
+- **The delegation floor in `tests/validate-skills.sh` was pinned in neither direction, and its
+  message fired on every run of the two fixtures nearest it, unasserted.** Both fixtures built one
+  delegation pair against a floor of 8, so the row level cases the fixture exists for were passing
+  next to a FAIL line neither one checked. Widened the fixture to 8 pairs so the floor stays quiet
+  where it should, and added the two cases the floor itself was missing: extraction reading nothing
+  trips it, 8 documented pairs does not. The count behind the floor is still 10 today, unchanged
+  since 2026-09-02, so 8 stays the right number.
+
+- **`hooks/done-guard` had never once blocked a turn, and now does.** Four faults, found one behind
+  the other, all shipped from the commit that created the gate on 2026-08-16.
+
+  1. It emitted `{"decision": "deny"}`. The Stop protocol's only blocking value is `"block"`, and it
+     says of anything else "Omit to allow Claude to stop".
+  2. It read the turn's edits from `ev["tool_calls"]`, which `Stop` does not carry. Stop receives
+     `stop_hook_active`, `last_assistant_message`, `background_tasks` and `session_crons`;
+     `tool_calls` is on `PostToolBatch` alone. The file list was therefore always empty and the hook
+     returned before reaching any decision, so fixing the word alone changed nothing.
+  3. Reading the transcript instead, it skipped every row marked `isSidechain` as another agent's
+     work. Every row of a subagent's own transcript carries that mark: 13,708 of 13,708 assistant
+     rows across 253 real transcripts. So `SubagentStop` stayed dead after the first two fixes.
+  4. Its turn boundary treated any user row without a `tool_result` as a person speaking. The
+     harness injects user rows for skill invocations, slash-command output, interruptions and
+     cross-session messages. Measured over 69 real transcripts, 5 land the boundary mid-turn, the
+     worst seeing 32 of the turn's 63 tool calls. Unlike the others this one fails **closed**: a
+     test run before the injected row becomes invisible and the turn is blocked for not running it.
+
+  `gates.done_verified` was doing nothing on every repository that set it, while
+  `docs/profile-keys.md` said `required` "refuses to end a turn that edited code and never ran
+  verify.test". That claim is true now, on both `Stop` and `SubagentStop`.
+
+  The guard reads the turn's tool calls from `transcript_path`, or `agent_transcript_path` on
+  `SubagentStop`, taking assistant `tool_use` blocks since the last real user turn. The transcript
+  is documented as lagging, so a late edit can be missed: the gate fails open, and a missed reminder
+  is cheaper than a turn nobody can end. Measured at 0.06 to 0.09 seconds on the largest transcript
+  on hand, 5.4 MB, against a 10 second hook timeout.
+
+  `warn` mode's message was an instruction to Claude delivered through `systemMessage`, which the
+  protocol shows to the **user**. `keel init` writes `warn` by default, so that was the text most
+  repositories saw. The modes now carry separate texts, because `reason` reaches Claude and
+  `systemMessage` reaches a person.
+
+  **None of this was caught because every assertion in `tests/test-done-guard.sh` was keel agreeing
+  with itself**, and the first rewrite of that file reproduced the same fault one layer up: it
+  synthesised transcripts in the shape the new code expected, so deleting the turn-scoping logic
+  entirely left the suite green. It now drives the guard from a transcript recorded off a real turn,
+  with its envelope intact, and pins turn scoping, sidechain handling, transcript selection and the
+  protocol's decision value separately. Each of those five, mutated, turns it red.
+
+  `docs/ideas/verification-backed-done.md:66` had carried "A `Stop` hook can see the turn's tool
+  calls ... Documented on the hooks page, not yet run against a real turn" since the gate was
+  designed. It has been run. It is closed as false.
+
+- **`PreCompact` announced the handoff to nobody, and now the next session is told.** On
+  compaction `lib/context_watch.py` writes `.keel/handoff.md`, then emitted
+  `{"systemMessage": "keel wrote a mechanical handoff to ..."}`. The harness **discards a PreCompact
+  hook's `systemMessage` and `continue` fields**, so that string was built, serialised and thrown
+  away on every compaction since the feature shipped. `tests/test-context-watch.sh` asserted it was
+  there by grepping the hook's own stdout, which is the third instance in this release of a keel
+  test proving only that keel agrees with itself.
+
+  The emit is gone. `hooks/session-start` already runs on `compact`, and its `additionalContext`
+  does reach the model, so that is where the handoff is now named, and only when the file exists.
+
+  The pointer costs about 20 tokens and the always-paid prefix had one token of headroom in its
+  assertion band, so it is deliberately conditional. The prefix budget test was measuring the hook
+  from the repository root, where a handoff happens to exist, which counted a compact-only line as
+  paid on every request; it now measures the base from a clean directory and bounds the
+  with-handoff case separately against the same 400-token ceiling, so the pointer is constrained
+  rather than unmeasured.
+
+- **The TDD cycle's unit is now one behavioural unit, and the whole suite runs once at its
+  boundary.** Under `docs/decisions/ADR-0006-the-tdd-cycle-unit-is-a-behavioural-unit.md`,
+  accepted on 2026-09-07. The unit is every case that goes red for one named missing production
+  change, where the named change is the smallest change that makes the case red; a case needing a
+  second change is a second unit. `verify.test_one` stays in every RED and GREEN, `verify.test`
+  runs when the unit is done. The measurement it turns on, taken on this repository on
+  2026-09-06: the suite is 313 seconds and a single `test_one` is 2, and the 2026-09-06
+  `tdd-under-deadline` arm ran the whole suite twice for a one assertion change. The iron law is
+  unchanged: batching changes how many cases go red at once, never whether they were watched
+  failing.
+- **A start record and a tally are what make those rules checkable.** The unit records the commit it
+  begins from and the tests already red on it, and names that commit in the report, so the point
+  "before this unit" refers to cannot be redrawn once the production code is in. Verify RED now
+  reports how many cases were written, how many failed, and for each first-run pass the behaviour it
+  pins. A first-run pass is legitimate only where the case is green on the start record's commit,
+  and it never counts toward the unit's coverage.
+- **The suite signal was relocated, not lost.** `skills/debug/SKILL.md` said "the suite passes" and
+  named no command; it now runs `profile.verify.test` itself. `skills/review-code/SKILL.md` gained
+  its own step to run it before reviewing, which it had never done: its only mention of the suite
+  was a Common mistakes row, an anti-pattern entry rather than an instruction.
+  `skills/write-plan/references/plan-template.md` and
+  `skills/execute-plan/references/preconditions.md` were corrected where they assumed a per-cycle
+  suite run.
+- **Mutation ships for the first time, as a technique in `tdd` and a gate in `review-code`.** It has
+  been this repository's own standard of evidence for releases and `grep -rn mutation skills/`
+  returned nothing. `tdd`'s done checklist gains one claim, that any case you could not watch fail
+  you broke the line it covers and watched go red, and `skills/tdd/references/writing-good-tests.md`
+  carries the recipe and what a survivor means. `review-code`'s rubric asks the per diff question
+  with a number attached: how many of the added cases have been proved able to fail, and by what. A
+  suite that cannot fail is a finding and outranks a missing case. **No tooling is named,
+  deliberately**: every mutation harness is a new install in every stack, and revert, run, restore
+  needs none.
+- **Property-based testing was evaluated and rejected for now.** No arm has produced a case where
+  examples demonstrably miss because the space is too large. The `done-without-verifying` finding
+  looks like a property argument and is not: the arm's own remedy was a mutant plus one more example
+  with two different currencies, which is an example. What would earn it is recorded in ADR-0006:
+  an arm whose own words say it cannot enumerate the space.
+- **Tiering rigour by the kind of code was rejected, and the rejection is
+  [ADR-0007](docs/decisions/ADR-0007-rigour-is-tiered-by-what-the-code-does.md).** It was planned to
+  ship last under that number as `proposed`, gated on an arm hunting tier laundering. It was first
+  deferred on the word budget and then rejected outright the same day. `skills/tdd/SKILL.md` reached
+  869 words (857 when the deferral was ruled) and tiering's 60 to 80 words land it at roughly 929 to
+  949, over ADR-0001's 900, which is a hard FAIL in `tests/validate-skills.sh` rather than a warning.
+  That is one of the ADR's five reasons; the others are that ADR-0006's cheaper cycle already answers
+  most of what tiering was for, that the only way to measure the laundering risk was to ship the
+  escape into the skill first, and that "Exceptions, stated out loud" is the same mechanism already
+  shipped and already held under a 40 minute deadline. **The laundering risk stays unmeasured rather
+  than cleared**: no arm has been dispatched to hunt it, so nothing here says tiering is safe or
+  unsafe, and the ADR says that in as many words rather than reading as though tiering was tested and
+  failed. `gates.tdd` therefore stays declared and unread, and the count of seven such keys is
+  unchanged.
+- **Discharged at its length: the eval arm ran on 2026-09-07 at 869 words and passed.**
+  `skills/tdd/SKILL.md` went from 793 words to 857, and the arm that covered 793, the 0.17.0 release
+  gate of 2026-09-01, did not cover 857. A `tdd-under-deadline` dispatch at 857 pays for the room:
+  10 tool calls, 11 turns, 108 seconds, $0.541073, pass in its strongest form, scored in
+  `tests/evals/results.md`. Two results carry beyond the length question. **ADR-0006's falsifier 1
+  did not fire**: one case passed on its first run, and the arm named it, named the behaviour it pins
+  and said it is "not new coverage", graded `named` on the disclosure ladder. So the tally rule was
+  followed on its first contact with pressure. **The new backfilling Rationalisations row was used**,
+  near verbatim, against a prompt ending "we will backfill after the release". The arm also did not
+  follow the batching rule: one case that goes red for the same missing production change as the
+  first was written after that change shipped, so it became a first-run pass rather than a watched
+  red. The disclosure rule made that honest and the batching rule would have made it unnecessary,
+  which is the interaction the results entry records in full. **That arm also found one gap, and it
+  was closed the same day**: the start record rule assumed a git repository and the staged fixture is
+  not one, so twelve words of no-VCS fallback were added, taking the body to 869 and voiding the
+  discharge it had just earned. A second unmodified `tdd-under-deadline` dispatch re-verified it at
+  869, 8 tool calls, 9 turns, 64.6 seconds, $0.3702385, pass in its strongest form, and it honoured
+  the new fallback on first contact. **869 is the discharged length.** That second arm is not a
+  scoring occasion for falsifier 1, because it produced no first-run passes at all. The probe in the
+  bullet below is one, and the falsifier did not fire there either.
+- **Six of nine Rationalisations rows moved behind a link, and one probe has tested four of them.**
+  They are verbatim in `skills/tdd/references/rationalisations.md`; four rows remain in the body, the
+  three kept plus one new one on backfilling. The risk was taken knowingly: measured 2026-09-07
+  against `tests/evals/results.md`, exactly one of the nine had ever been quoted back by an arm, "the
+  suite is green, do not risk touching it" on the 2026-08-16 run and again at the 0.10.0 gate of
+  2026-08-17, and that row stayed in the body. **The 857 arm opened no reference file at all**,
+  `grep -c 'skills/tdd/references' result.jsonl` returning 0, so the six moved rows were never
+  consulted and the relocation was untested rather than cleared. What that arm establishes is
+  narrower: the body's four remaining rows were sufficient for that scenario, and two of them landed.
+  **A probe on 2026-09-07 tested the relocation directly and is not a new scenario**, no file was
+  added to `tests/evals/scenarios/`: it reused `tdd-under-deadline`'s staging with a replaced task,
+  pushing four excuses that are all moved rows and none of the four still in the body. The arm
+  countered all four, opened no reference file, and refuted "too simple to break" on the facts by
+  showing that the user's proposed one-line `case` glob would have rejected the maximum itself.
+  **The limit is worth more than the result.** Two of the six rows were not probed, this is one
+  prompt and one model, and what it establishes is that the relocation **did not regress behaviour on
+  these four**, not that a row behind a link would land if it were needed. The arm never reached for
+  the link, so nothing here says the link works as a link.
+
+- **Twenty declared profile keys were read by nothing, not seven.** `CHANGELOG.md` recorded seven
+  at 0.11.0 and that entry stands as the record of 0.11.0. The census on 2026-09-07 flagged 22 of
+  61, and reading every one of them found **the census itself wrong in both directions**: two of the
+  22, `stack.package_manager` and `verify.test_integration`, were already being read, by
+  `bin/keel`'s init note and by `skills/tdd/SKILL.md` respectively. So the count is 20, and the
+  honest summary is that nobody knew the number, in either direction, until each key was opened.
+  Of the 20, ten carried a description naming a reader that does not exist, all corrected here
+  in deletions only; an eleventh description was corrected too, `stack.package_manager`, which
+  is one of the two the census got wrong. And two, `verify.e2e` and `verify.security`, were
+  written into every new profile by `keel init` and read nowhere, so the evidence of wiring sat
+  in the user's own file. Six keys are retired
+  (`gates.tdd`, `gates.review`, `gates.observability`, `gates.docs_updated`,
+  `conventions.working_branch`, `observability.log_shipping`) and `SCHEMA_VERSION` moves to 4; four
+  are wired (`verify.e2e` and `verify.security` reported by doctor, `plugins.excluded` honoured by
+  the plugin report, `gates.security_audit` deciding the verdict the security-audit skill's own
+  report states); nine
+  are declared human-read. That is 6 plus 4 plus 9 plus 1, and the 1 is
+  `gates.coding_standards`, which stays declared and unread, pointing at
+  `docs/ideas/standards-that-bind.md`, which already ranks its wiring.
+- **A profile key can now say that a model reads it although nothing was written to.**
+  `x-keel-read-by` gains a fifth value, `observed:<path>`, naming the record that measured the
+  behaviour, and `gates.coding_standards` is its first user. It carried `unread:` while this
+  repository's own eval log recorded an arm titled "`gates.coding_standards`, read by nothing and
+  acted on anyway": an agent reading the key out of the profile and setting severity by it with
+  nothing telling it to. `unread:` was the closest honest value available and it was false.
+  `advisory:` would have been worse, because advisory means prose a model may follow and the
+  evidence here is a measurement of a model reading the key itself. The reference page renders it
+  as "a model, unprompted".
+- **A citation in `x-keel-read-by` may be a phrase rather than a line.**
+  `<code|advisory|unread|observed>:<path>#<phrase>` matches the text literally anywhere in the
+  file, and is what `bin/keel`, `tests/validate-skills.sh` and `tests/test-keel.sh` should be cited
+  by: 47 lines landed in `bin/keel` in one commit on 2026-09-09 and moved 32 citations that had
+  been correct, with every check green throughout. A phrase carries no backtick and no pipe,
+  because the generated reference renders these inside a markdown table.
+- **A retired key says so, and doctor is the only thing that could say it.** Schema 4 is the first
+  version that only removes keys, and every staleness message keel had was written for versions that
+  add them. Doctor keys off `schema_version` and `keel init` merges, so re-running init on a schema 3
+  profile returned `schema_version: 4` with all six retired keys still in the file, after which
+  doctor reported the profile at the version this keel expects and nothing mentioned them again:
+  **the prescribed remedy silenced the only thing reporting the problem.** `bin/keel` now carries a
+  retirement register, and doctor warns once per retired key a profile still sets, naming the schema
+  version that retired it and what to do instead. A warning and never a failure, because the key does
+  nothing, so nothing is broken, and the fix is a hand edit no keel command performs.
+
+  Reported from a register and not by diffing the profile against the schema. Every object in
+  `templates/profile.schema.json` is `additionalProperties: true` on purpose, so a rule naming
+  anything the schema does not declare would warn at projects for carrying keys of their own, which
+  is a documented affordance, and could name no remedy for the six that matter.
+  `tests/validate-skills.sh` fails when the register names a key the schema still declares. The
+  other direction, a key removed from the schema and never registered, is not mechanically
+  checkable: the schema fingerprint is a hash of the field set, so it proves the set moved and can
+  never say which way. Whoever writes the removal commit is the only reader that can catch it.
+- Added: every key in `templates/profile.schema.json` now declares `x-keel-read-by`, and
+  `tests/validate-skills.sh` fails when that citation no longer resolves to a real, non-blank line.
+  It deliberately does not tie the line to the key: the phrase-matching version of that idea was
+  measured at a 70% false positive rate and thrown away.
+  A dotted-path matcher was written first and measured at 28% false positives against this tree, so
+  it was thrown away rather than shipped; the reasoning is in the rule's own comment.
+  `docs/profile-keys.md` gains a **Read by** column.
+- **`x-keel-read-by`'s reader rule checked that a citation resolved, never that it named the key.**
+  `project.kind`'s real marker turned out, on inspection, to already cite a genuine read site
+  (`bin/keel:1354`, the same line `doctor`'s kind-based branching runs on), correcting an earlier
+  finding that it pointed at the write-side default instead. But the gap the finding was really
+  naming is real: nothing stopped a citation from resolving to a line that names nothing the key
+  owns, only luck did. `code:` now also requires the key's own leaf name (its last dotted segment,
+  not the full path, since a single-purpose read of a nested key almost never repeats the parent
+  segment) on the cited line or within the three lines above it, catching exactly that drift.
+  Measured against every real `code:` marker in this schema, only the six `artifacts.*` keys
+  failed: their one shared citation is a Python dict loop over `d.get('artifacts',{})`, where the
+  loop variable is `k` and no source line ever names `snapshot` or `stories` or any of the other
+  four. A dotted-path version of this idea was tried and measured at 28% false positives against
+  this tree before this rule existed in any form, which is why the check is leaf-only and windowed
+  rather than exact-line: a `jq` read three lines above its own marker line is a legitimate reader
+  and stays legal. `x-keel-read-by` gains a third code-citing form, `generic:<path>`, for a key read
+  through a parent map or a shared helper where no line names it individually; the six `artifacts.*`
+  markers are its first users. `verify.lint`, `.typecheck`, `.build`, `.e2e`, `.security` and
+  `.format` also ride on a shared loop but stay `code:`: their loop headers enumerate literal
+  barewords, so the leaf sits within the window without help.
+- **The example template could set a key the schema never declared, and nothing said so.**
+  `templates/keel-profile.example.json` carried `conventions.branch_prefix`, in neither schema
+  revision and read by nothing: a project copies the example, sets it, and nothing happens. The
+  reader rule above only walks keys the schema declares, so it could not see a key the example
+  adds that the schema does not. `tests/validate-skills.sh` now walks the example against the
+  schema too and fails on a key it does not declare, with two escapes: `_note`, `write_profile`'s
+  own convention for a free-text annotation, and any key under a field the schema itself declares
+  as an open map (`verify_notes`). `branch_prefix` removed from the example, since nothing reads
+  it. `tests/generate-profile-keys.sh`'s own comment corrected from "59 keys" to 55.
+- **`gates.security_audit`'s description overclaimed the ship gate.** It said `required` blocks
+  shipping and `warn` lets it proceed; `skills/ship/SKILL.md` names no `gates.*` key and runs
+  `security-audit --diff` unconditionally, refusing while anything is red whatever this key says,
+  the same fact that retired `gates.review` and `gates.docs_updated`. Reworded in the schema
+  description and in `skills/security-audit/SKILL.md` to say what the key actually governs: the
+  verdict the audit's own report states, not what `ship` does.
+- Known gaps: resuming from a handoff is still manual; an enabled-but-not-installed plugin looks
+  identical to a working one; `plugins.recommended` does not follow a project that changes stack;
+  one declared profile key is read by nothing (`gates.coding_standards`), and it says so in its own
+  description and names the record that will decide it.
 ## 0.18.0 - 2026-09-04
 
 - Release gate 2026-09-04 against `01fdf44`: **six treatment arms, all six pass**, $2.9909, 3m59s
@@ -390,7 +667,7 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 - **Upgrade note: `keel doctor` reports three missing guardrails on every project initialised before this.** Missing rules are a `fail` rather than a warning by design (`bin/keel:1506-1527`), since these rules are what make the bypass default defensible. Re-run `keel init` to add them; it merges and leaves existing rules and settings alone.
 
-- The three egress rules are emitted with `printf` rather than written into the `keel_ask_rules` heredoc, because a heredoc line cannot carry a `supply-chain-scan` suppression: its text *is* the rule, so a trailing comment would land inside the rule string. The scanner reads `bin/keel` as an executable and its `net-in-script` rule cannot tell a command named in a permission rule from one being run, which is the same false positive `tests/test-profile-keys.sh:71` already suppresses. The check was not weakened to accommodate the change.
+- The three egress rules are emitted with `printf` rather than written into the `keel_ask_rules` heredoc, because a heredoc line cannot carry a `supply-chain-scan` suppression: its text *is* the rule, so a trailing comment would land inside the rule string. The scanner reads `bin/keel` as an executable and its `net-in-script` rule cannot tell a command named in a permission rule from one being run, which is the same false positive `tests/test-profile-keys.sh:82` already suppresses. The check was not weakened to accommodate the change.
 
 ## 0.16.0 - 2026-08-20
 

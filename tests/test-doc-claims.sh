@@ -163,7 +163,7 @@ else
 fi
 
 # S-12: the inheritance rule is stated, and no mechanism is added to soften it. The current
-# SCHEMA_VERSION is read from bin/keel so the failure message can name the value it found; the 2 it
+# SCHEMA_VERSION is read from bin/keel so the failure message can name the value it found; the 4 it
 # is compared against is pinned here deliberately, because that pin is the tripwire.
 hd_s12="skills/coding-standards/references/house-defaults.md"
 if grep -q 'inherit it unchanged' "$hd_s12" && grep -q 'departures ledger' "$hd_s12"; then
@@ -200,12 +200,22 @@ else
         "S-12 forbids an overlay mechanism; found:$overlay and any schema key named above"
 fi
 
+# A pinned constant, and the point is that moving it has to be a deliberate act with a reason in the
+# commit. It read 2 until 2026-09-06, when S-04 added profile.harnesses and bumped to 3, and 3 until
+# 2026-09-08, when docs/plans/2026-09-07-declared-profile-keys-take-effect.md retired the six keys
+# nothing could honour (gates.tdd, gates.review, gates.observability, gates.docs_updated,
+# conventions.working_branch and observability.log_shipping) and bumped to 4. Each was a deliberate
+# schema change with its own tests, one adding rows to the schema and one removing them. S-12 still
+# adds none: the case above is what actually enforces that, by checking for the key it would have
+# introduced. This one catches a bump nobody meant, which is why it names the last plan that
+# legitimately moved it rather than simply tracking whatever bin/keel says: a pin whose expected
+# value is read from the file it guards catches nothing.
 sv="$(grep -oE '^SCHEMA_VERSION=[0-9]+' bin/keel | head -1 | cut -d= -f2)"
-if [ "$sv" = "2" ]; then
-    ok "SCHEMA_VERSION has not moved for S-12 ($sv)"
+if [ "$sv" = "4" ]; then
+    ok "SCHEMA_VERSION is where the retired-keys plan left it ($sv)"
 else
-    bad "SCHEMA_VERSION has not moved for S-12" \
-        "bin/keel is at $sv, expected 2. S-12 adds no schema change, so a bump is either a different change riding along or the overlay S-12 forbids"
+    bad "SCHEMA_VERSION is where the retired-keys plan left it" \
+        "bin/keel is at $sv, expected 4. docs/plans/2026-09-07-declared-profile-keys-take-effect.md was the last plan to move it, by retiring the six keys nothing could honour. A further bump is either a change riding along or one that needs its own story, its own schema row and its own fingerprint line in tests/validate-skills.sh"
 fi
 
 # Plan 0 left these two changes of its own untested. Both are literal strings in a file that exists
@@ -850,6 +860,82 @@ docs/ideas/database-design-and-review.md|words|references, [0-9,]+ words, and
 docs/ideas/database-design-and-review.md|body|a body of [0-9]+
 tests/evals/scenarios/assess-a-stale-standard.md|body|[0-9]+ word body
 CLAIMS
+
+# NFR-02 of docs/prd/plain-language-chat.md requires the size check to cover every combination of
+# response_style and explain_level, and its own evidence cell described the check measuring one:
+# "runs the hook once from the repository root, so it measures terse plus technical and nothing
+# else", marked confirmed. The check was changed to loop over all four in a mktemp probe, and
+# neither the cell nor the story's Notes moved. A requirement whose evidence describes it failing is
+# worse than an untested one, because the table reads as coverage.
+#
+# Both halves are pinned: the loop in the validator, and the sentence in the PRD. Either going back
+# fails this.
+combos="$(grep -c 'for combo in "terse technical" "terse plain" "verbose technical" "verbose plain"' tests/validate-skills.sh)"
+if [ "$combos" = "1" ]; then
+    ok "validate-skills.sh loops over all four style combinations"
+else
+    bad "NFR-02" "the four-combination loop is not in tests/validate-skills.sh (found $combos)"
+fi
+
+# The NFR-02 row itself, not the document. "all four combinations" already appears in the intro and
+# in FR-12's row, so a document-wide grep passes while the cell still says the opposite: the first
+# draft of this case did exactly that and reported green.
+nfr02="$(grep '^| NFR-02 |' docs/prd/plain-language-chat.md)"
+case "$nfr02" in
+  *"all four"*) ok "the PRD's NFR-02 evidence names all four combinations" ;;
+  *) bad "NFR-02" "the NFR-02 row still describes a check that measures one: ${nfr02:-row not found}" ;;
+esac
+# Positive assertions only, and that is not laziness. This table's convention, set by NFR-01 and
+# NFR-03, is to keep a superseded sentence beside its correction with the date it stopped being
+# true, so a grep for the old wording fires on the correction that quotes it. The first draft of
+# this case did exactly that and failed on the fix. A revert removes the correction and its "all
+# four", so the positive check catches it and the negative one would only catch the honest half.
+case "$nfr02" in
+  *"mktemp"*) ok "the NFR-02 row names the probe directory the check actually uses" ;;
+  *) bad "NFR-02" "the NFR-02 row does not describe the four-profile probe: ${nfr02:-row not found}" ;;
+esac
+
+if grep -q 'the check runs the hook four times' docs/stories/plain-language-chat.md; then
+    ok "the story describes a check that measures four combinations"
+else
+    bad "NFR-02" "docs/stories/plain-language-chat.md does not say the check runs the hook four times"
+fi
+
+# keel dogfoods itself, so this repository's own profile is the first thing a keel change is tested
+# against, and it sat two schema versions behind from 0.16.0. The retirement register shipped on
+# this branch made it visible: doctor printed four warnings in this tree, on keys this repository
+# retired itself.
+own_sv="$(python3 -c "import json;print(json.load(open('.keel/profile.json'))['schema_version'])")"
+bin_sv="$(sed -n 's/^SCHEMA_VERSION=\([0-9][0-9]*\)$/\1/p' bin/keel)"
+if [ "$own_sv" = "$bin_sv" ]; then
+    ok "this repository's own profile is at the schema version bin/keel expects"
+else
+    bad "dogfood profile" "profile says schema $own_sv, bin/keel says $bin_sv"
+fi
+
+# Read from the register in bin/keel rather than from a list written here, so retiring a seventh key
+# extends this check for free and a list nobody updates cannot quietly stop covering one.
+retired_in_own="$(python3 - <<'PYR'
+import json, re
+src = open("bin/keel").read()
+block = re.search(r"^retired_keys\(\) \{(.*?)^\}", src, re.S | re.M)
+keys = [l.strip().split("|")[0] for l in block.group(1).splitlines() if l.count("|") >= 2] if block else []
+prof = json.load(open(".keel/profile.json"))
+def has(p):
+    d = prof
+    for seg in p.split("."):
+        if not isinstance(d, dict) or seg not in d:
+            return False
+        d = d[seg]
+    return True
+print(" ".join(k for k in keys if has(k)))
+PYR
+)"
+if [ -z "$retired_in_own" ]; then
+    ok "this repository's own profile sets no retired key"
+else
+    bad "dogfood profile" "it still sets: $retired_in_own"
+fi
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

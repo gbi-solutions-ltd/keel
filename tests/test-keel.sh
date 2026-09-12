@@ -1847,7 +1847,7 @@ rm -rf "$d"
 # one unambiguous location. FR-01, FR-03, FR-05, FR-09, FR-15.
 #
 # The root is read from the profile rather than written as `docs`: a fresh init writes
-# `docs/keel`, bin/keel:55, and this repository's own profile says `docs`, so a hardcoded spelling
+# `docs/keel`, `bin/keel#shellcheck source=lib/merge-claude-md.sh`, and this repository's own profile says `docs`, so a hardcoded spelling
 # passes here and fails for the next person who runs it somewhere else.
 d="$(fixture node-ts)"
 ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
@@ -1864,7 +1864,8 @@ want="$root/snapshot.md $root/decisions $root/plans "
 rm -rf "$d"
 
 # FR-05. A default location that is not there leaves the key null. Writing an absent path would
-# convert a silent gap into a hard doctor failure, bin/keel:1335.
+# convert a silent gap into a hard doctor failure,
+# `bin/keel#Any artifact mapped to a path must exist`
 d="$(fixture node-ts)"
 ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
 root="$(prof_of "$d" docs_root)"
@@ -2051,7 +2052,7 @@ rm -rf "$d"
 
 # S-08, FR-10, FR-11, NFR-03. A null key whose default is present means the profile does not know
 # about a document sitting in docs_root. A warning and never a failure, because nothing is broken
-# and the remedy is one command. Shape follows the stack.has_ui warning at bin/keel:1390.
+# and the remedy is one command. Shape follows the stack.has_ui warning at `bin/keel#good "verify.$k set (not run, --fast)"`.
 d="$(fixture node-ts)"
 ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
 root="$(prof_of "$d" docs_root)"
@@ -2305,6 +2306,142 @@ PY
 if ( cd "$d" && "$KEEL" doctor >/dev/null 2>&1 ); then bad "doctor test_one" "passed"
 else ok "doctor fails when verify.test_one is absent"; fi
 rm -rf "$d"
+
+# ---- a key a schema version retired -----------------------------------------
+# Schema 4 is the first version that only removes keys, and every warning keel had about a stale
+# profile was written for versions that add them. Doctor keys off schema_version and init merges,
+# so `keel init` on a schema 3 profile returns schema_version 4 with all six retired keys still in
+# the file, after which doctor reports the profile is at the version this keel expects and never
+# mentions them again. The prescribed remedy silenced the only thing reporting the problem.
+#
+# Reported against a register, not against the schema. Every object in
+# templates/profile.schema.json is additionalProperties: true on purpose, so a key the schema does
+# not declare is not thereby wrong: a project may carry keys of its own and keel must not nag about
+# them. Only a key keel itself removed can be named, and only a list of those can name a remedy.
+rk="$(fixture node-ts)"
+( cd "$rk" && "$KEEL" init -y >/dev/null 2>&1 )
+python3 - "$rk" <<'PY_RETIRED'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".keel/profile.json"
+j = json.loads(p.read_text())
+# Two retired keys, from two different parents, so a walk that only looks under gates is caught.
+j.setdefault("gates", {})["tdd"] = "required"
+j.setdefault("observability", {})["log_shipping"] = "otlp"
+# And two keys this project invented, which additionalProperties: true permits and doctor must
+# leave alone. This is the case open question 3 said such a rule would need.
+j["team"] = {"oncall_rota": "https://wiki.example/rota"}
+j.setdefault("conventions", {})["house_style"] = "terse"
+j["verify"] = {"test": "true", "test_one": "true", "lint": "true", "typecheck": None,
+               "build": None, "format": None, "e2e": None, "security": None}
+p.write_text(json.dumps(j, indent=2) + "\n")
+PY_RETIRED
+out="$( cd "$rk" && "$KEEL" doctor 2>&1 )"
+case "$out" in
+  *'sets gates.tdd, retired in schema 4'*) ok "doctor names a retired key and the version that retired it" ;;
+  *) bad "doctor names a retired key and the version that retired it" "$out" ;;
+esac
+# The remedy, not just the name. A key that is gone with no sentence about what to do instead sends
+# the reader to a schema row that no longer exists.
+case "$out" in
+  *'observability.backend'*) ok "doctor gives the remedy for a retired key" ;;
+  *) bad "doctor gives the remedy for a retired key" "$out" ;;
+esac
+# Both parents, because a walk rooted at one object would pass the case above on its own.
+case "$out" in
+  *'sets observability.log_shipping, retired in schema 4'*) ok "doctor names a retired key under a second parent" ;;
+  *) bad "doctor names a retired key under a second parent" "$out" ;;
+esac
+# A warning and never a failure. The key does nothing, so nothing is broken, and a profile someone
+# cannot fix without editing a file by hand is not a reason to stop them working.
+if ( cd "$rk" && "$KEEL" doctor >/dev/null 2>&1 ); then
+  ok "a retired key warns without failing doctor"
+else bad "a retired key warns without failing doctor" "doctor exited non-zero"; fi
+case "$out" in
+  *'FAIL'*'retired in schema'*) bad "a retired key warns without failing doctor" "raised as FAIL" ;;
+  *) ok "the retired-key line is a WARN, not a FAIL" ;;
+esac
+# The additionalProperties: true case. Neither of these is in the schema and neither is retired.
+case "$out" in
+  *oncall_rota*|*house_style*) bad "doctor says nothing about a key the project added itself" "$out" ;;
+  *) ok "doctor says nothing about a key the project added itself" ;;
+esac
+# And nothing at all on a profile carrying none of the six, which is every profile keel writes now.
+python3 - "$rk" <<'PY_CLEAN'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".keel/profile.json"
+j = json.loads(p.read_text())
+j["gates"].pop("tdd", None)
+j["observability"].pop("log_shipping", None)
+p.write_text(json.dumps(j, indent=2) + "\n")
+PY_CLEAN
+out="$( cd "$rk" && "$KEEL" doctor 2>&1 )"
+case "$out" in
+  *'retired in schema'*) bad "doctor says nothing about retirement on a profile that has none" "$out" ;;
+  *) ok "doctor says nothing about retirement on a profile that has none" ;;
+esac
+rm -rf "$rk"
+
+# ---- verify.e2e and verify.security are named, and never run ---------------
+# verify.e2e and verify.security were written into every profile by write_profile and read by
+# nothing, so a user saw a real command sitting in a real field with nothing behind it. Doctor
+# names them without running them: e2e needs an environment doctor cannot provide and security
+# reaches the network.
+#
+# fixture node-ts, NOT a bare git init. An empty directory detects as project.kind "docs", and the
+# whole verify block including this loop sits inside doctor's `kind != docs` guard, so on a bare
+# fixture doctor prints no verify line at all and the cases below would fail forever while looking
+# like a bug in the new loop. Confirmed by running it on 2026-09-07.
+we="$(fixture node-ts)"
+( cd "$we" && "$KEEL" init -y >/dev/null 2>&1 )
+# verify.e2e is a command that leaves evidence behind, not a plausible-looking one. The last two
+# cases assert doctor did not run it, and the only way to assert that without trusting the output
+# string is to give it something whose having run is a fact on disk. Relative, because doctor's
+# `( eval "$c" )` inherits the cwd this subshell sets.
+#
+# `keel profile set` rather than a python heredoc. It is the idiom this file already uses, in the
+# cases that set a string containing spaces and clear a value to null, and it refuses a path the
+# profile does not have, so if either key were dropped from the schema this test would fail loudly
+# instead of quietly writing a key nothing reads and passing anyway.
+( cd "$we" && "$KEEL" profile set verify.e2e 'touch e2e-ran-sentinel' >/dev/null 2>&1 )
+( cd "$we" && "$KEEL" profile set verify.security null >/dev/null 2>&1 )
+out="$( cd "$we" && "$KEEL" doctor --fast 2>&1 )"
+case "$out" in
+  *'verify.e2e is set (declared, not run): touch e2e-ran-sentinel'*)
+    ok "doctor names a declared verify.e2e without running it" ;;
+  *) bad "doctor names a declared verify.e2e without running it" "$out" ;;
+esac
+# null reports as ok, not WARN. keel has no detector for either key, so a warning here fires on
+# every project ever created and no keel command can clear it; docs/standards.md:79 calls that the
+# unrecoverable kind of wrong. Asserting the `ok` prefix, because asserting the bare sentence
+# would pass a WARN too and that is the whole distinction this case exists to hold.
+case "$out" in
+  *'ok    verify.security is null'*) ok "doctor reports a null verify.security as ok, not a warning" ;;
+  *) bad "doctor reports a null verify.security as ok, not a warning" "$out" ;;
+esac
+# The command must not have run, asserted on disk rather than on the output string. An earlier
+# version of this case matched on doctor's wording instead, and a review proved by mutation that it
+# passed an implementation which ran the command but short-circuited on --fast, which is the mode
+# this case invokes. The sentinel cannot be fooled that way: either the file is there or it is not.
+if [ -e "$we/e2e-ran-sentinel" ]; then
+  bad "doctor --fast does not execute verify.e2e" "the sentinel file exists, so the command ran"
+else
+  ok "doctor --fast does not execute verify.e2e"
+fi
+# The same assertion without --fast, and this is the one with teeth. A review proved by mutation
+# that the case above passes an implementation which runs the command but short-circuits on --fast:
+# nothing asserted under --fast can see such a path, so the sentinel there catches only a loop that
+# always runs. Plain doctor costs about a second on this fixture, measured 2026-09-08: npm test,
+# lint, typecheck and build each fail immediately with no node_modules installed. Both keys carry a
+# sentinel, because one loop serves both and a mutation running only the security branch would
+# otherwise go unseen.
+( cd "$we" && "$KEEL" profile set verify.security 'touch security-ran-sentinel' >/dev/null 2>&1 )
+full="$( cd "$we" && "$KEEL" doctor 2>&1 )"
+if [ -e "$we/e2e-ran-sentinel" ] || [ -e "$we/security-ran-sentinel" ]; then
+  bad "doctor runs neither verify.e2e nor verify.security without --fast" "$full"
+else
+  ok "doctor runs neither verify.e2e nor verify.security without --fast"
+fi
+rm -rf "$we"
 
 # ---- but a project with no tests at all is a different thing ---------------
 # Found by running init on a real project with no test script and no runner. verify.test is a WARN
@@ -3609,10 +3746,17 @@ rm -rf "$c"
 # no reason to fetch again. The symptom is a skill fix that reaches nobody and cannot be reproduced
 # by its author, whose working tree is correct.
 cli_version="$(cat "$ROOT/VERSION")"
-plugin_version="$(sed -n 's/.*"version": "\(.*\)".*/\1/p' "$ROOT/.claude-plugin/plugin.json" | head -1)"
-[ "$cli_version" = "$plugin_version" ] \
-  && ok "VERSION and plugin.json agree ($cli_version)" \
-  || bad "version drift" "VERSION is $cli_version, .claude-plugin/plugin.json is $plugin_version. The plugin cache is keyed on plugin.json, so installs stay on $plugin_version"
+# Every plugin manifest in the tree, not just Claude Code's. There are two since 2026-09-06, and a
+# second one carrying a version is a second thing to drift: Codex keys its plugin cache the same
+# way, so a Codex user would sit on the previous skills with nothing failing. Globbed rather than
+# listed, so the third manifest is covered on the day it is added rather than the day it drifts.
+for m in "$ROOT"/.*-plugin/plugin.json; do
+    [ -f "$m" ] || continue
+    plugin_version="$(sed -n 's/.*"version": "\(.*\)".*/\1/p' "$m" | head -1)"
+    [ "$cli_version" = "$plugin_version" ] \
+      && ok "VERSION and $(basename "$(dirname "$m")")/plugin.json agree ($cli_version)" \
+      || bad "version drift" "VERSION is $cli_version, $(basename "$(dirname "$m")")/plugin.json is $plugin_version. The plugin cache is keyed on plugin.json, so installs stay on $plugin_version"
+done
 
 # The CHANGELOG's newest heading is the third copy of the number, and the one a human reads.
 changelog_version="$(sed -n 's/^## \([0-9][0-9.]*\).*/\1/p' "$ROOT/CHANGELOG.md" | head -1)"
@@ -3745,7 +3889,7 @@ mkdir -p "$pu/.claude" "$pu/userconf"
 printf '{\n  "permissions": { "allow": ["Bash(ls:*)"] }\n}\n' > "$pu/.claude/settings.json"
 printf '{ "enabledPlugins": { "keel@gbi": true } }\n' > "$pu/userconf/settings.json"
 ( cd "$pu" && "$KEEL" init -y >/dev/null 2>&1 )
-out="$( cd "$pu" && CLAUDE_CONFIG_DIR="$pu/userconf" "$KEEL" doctor 2>&1 )"
+out="$( cd "$pu" && CLAUDE_CONFIG_DIR="$pu/userconf" HOME="$pu" "$KEEL" doctor 2>&1 )"
 case "$out" in *"not enabled: keel@gbi"*) bad "plugin scope" "doctor called keel@gbi missing while it is enabled at user scope" ;;
   *) ok "a plugin enabled at user scope is not reported missing" ;; esac
 # And one that really is missing everywhere is still reported, so the fix does not silence the check.
@@ -3753,7 +3897,716 @@ case "$out" in *"not enabled: typescript-lsp"*) ok "a plugin missing from every 
   *) bad "plugin scope" "the scope fix silenced a genuinely missing plugin" ;; esac
 rm -rf "$pu"
 
+# plugins.excluded was declared so a project had somewhere to record the decision, and nothing
+# honoured it, so a plugin a team had deliberately rejected was recommended to them on every
+# doctor run. The recommended list wins nothing here: excluded is the later decision.
+#
+# THE FIXTURE HAS TO TAKE THE MERGE PATH. On a fresh node-ts fixture `keel init` writes
+# .claude/settings.json with typescript-lsp and the rest already enabled, so plugin_report has
+# nothing to report and both cases below would pass while asserting nothing. Writing a settings
+# file first takes the merge path, which touches permissions only and enables no plugin, which is
+# what the existing `pm` merge-path case in this file already exists to set up.
+#
+# CLAUDE_CONFIG_DIR and HOME are not optional. The `pu` user-scope case in this file records why: a
+# developer whose plugins are enabled at user scope, which is how keel is normally installed,
+# would see doctor correctly stay quiet and the assertion would fail for them alone.
+px="$(fixture node-ts)"
+mkdir -p "$px/.claude" "$px/emptyconf"
+printf '{\n  "permissions": { "allow": ["Bash(ls:*)"] }\n}\n' > "$px/.claude/settings.json"
+( cd "$px" && "$KEEL" init -y >/dev/null 2>&1 )
+( cd "$px" && python3 - <<'PY'
+import json
+p = ".keel/profile.json"
+d = json.load(open(p))
+d["plugins"] = {"recommended": ["context7@claude-plugins-official",
+                                "claude-md-management@claude-plugins-official"],
+                "excluded": ["context7@claude-plugins-official"]}
+json.dump(d, open(p, "w"), indent=2)
+PY
+)
+out="$( cd "$px" && CLAUDE_CONFIG_DIR="$px/emptyconf" HOME="$px" "$KEEL" doctor 2>&1 )"
+case "$out" in *context7@claude-plugins-official*)
+    bad "an excluded plugin is not recommended" "$out" ;;
+  *) ok "an excluded plugin is not recommended" ;;
+esac
+# The floor for this pair. Without it, a plugin_report that reported nothing at all would pass the
+# case above, and reporting nothing is exactly what a broken settings read looks like.
+#
+# The companion is claude-md-management and NOT code-review, deliberately. code-review is one of
+# the three hardcoded names the fallback list carries, so it is reported even when the profile read
+# throws and the fallback substitutes: the assertion would pass while proving nothing about the
+# project's own list. That matters more since excluded parsing moved inside the same try. Any name
+# in expected_plugins that is not one of security-guidance, code-review or skill-creator works.
+case "$out" in *claude-md-management@claude-plugins-official*)
+    ok "a recommended plugin beside it is still reported" ;;
+  *) bad "a recommended plugin beside it is still reported" "$out" ;;
+esac
+
+( cd "$px" && python3 - <<'PY'
+import json
+p = ".keel/profile.json"
+d = json.load(open(p))
+d["plugins"]["excluded"] = []
+json.dump(d, open(p, "w"), indent=2)
+PY
+)
+out="$( cd "$px" && CLAUDE_CONFIG_DIR="$px/emptyconf" HOME="$px" "$KEEL" doctor 2>&1 )"
+case "$out" in *context7@claude-plugins-official*)
+    ok "the same plugin is reported when the exclusion is removed" ;;
+  *) bad "the same plugin is reported when the exclusion is removed" "$out" ;;
+esac
+
+# The ordering case, and it is the only one that fails if the subtraction moves ahead of the
+# fallback. Every case above excludes one of two recommended plugins, so `rec` never empties and
+# the ordering is never exercised: a review proved by mutation that moving the subtraction before
+# the fallback survives all three. Here the project excludes everything it recommends, so a
+# subtraction that ran first would empty `rec`, hit `if not rec`, and hand back the hardcoded
+# three, which is the exact opposite of what the project asked for.
+( cd "$px" && python3 - <<'PY'
+import json
+p = ".keel/profile.json"
+d = json.load(open(p))
+d["plugins"] = {"recommended": ["context7@claude-plugins-official"],
+                "excluded": ["context7@claude-plugins-official"]}
+json.dump(d, open(p, "w"), indent=2)
+PY
+)
+out="$( cd "$px" && CLAUDE_CONFIG_DIR="$px/emptyconf" HOME="$px" "$KEEL" doctor 2>&1 )"
+case "$out" in
+  *security-guidance@claude-plugins-official*|*skill-creator@claude-plugins-official*)
+    bad "excluding every recommended plugin does not resurrect the fallback list" "$out" ;;
+  *) ok "excluding every recommended plugin does not resurrect the fallback list" ;;
+esac
+
+# keel itself is not excludable, and this pins it. Every other plugin warning says a skill degrades
+# to an inline fallback; the keel@ branch says no keel skill loads at all, which is not the same
+# kind of advice. A project that listed keel@gbi under excluded would otherwise switch off the one
+# warning here that is not about degradation. Decided by Bernard on 2026-09-08.
+( cd "$px" && python3 - <<'PY'
+import json
+p = ".keel/profile.json"
+d = json.load(open(p))
+d["plugins"] = {"recommended": ["keel@gbi"], "excluded": ["keel@gbi"]}
+json.dump(d, open(p, "w"), indent=2)
+PY
+)
+out="$( cd "$px" && CLAUDE_CONFIG_DIR="$px/emptyconf" HOME="$px" "$KEEL" doctor 2>&1 )"
+case "$out" in *"keel itself is not enabled here"*)
+    ok "excluding keel@gbi does not silence the warning that keel is not loaded" ;;
+  *) bad "excluding keel@gbi does not silence the warning that keel is not loaded" "$out" ;;
+esac
+
+# The type guard, which is the one property the implementation states in prose and nothing else
+# pins. A review ran five mutations against the five cases above and every one died; a sixth,
+# computing exc as set(_x or []) back inside the try, survived all of them. With a non-list
+# excluded that mutation raises a TypeError into an except sized for "the profile does not load",
+# discards the recommended list this project wrote, and reports against the hardcoded three
+# instead. Asserting security-guidance is ABSENT is what catches it: that name can only appear via
+# the fallback, never via the list set here.
+( cd "$px" && python3 - <<'PY'
+import json
+p = ".keel/profile.json"
+d = json.load(open(p))
+d["plugins"] = {"recommended": ["context7@claude-plugins-official",
+                                "claude-md-management@claude-plugins-official"],
+                "excluded": 5}
+json.dump(d, open(p, "w"), indent=2)
+PY
+)
+out="$( cd "$px" && CLAUDE_CONFIG_DIR="$px/emptyconf" HOME="$px" "$KEEL" doctor 2>&1 )"
+# Three arms, and the third is not decoration. Asserting only that the fallback name is absent
+# passes vacuously when the whole block dies and doctor prints no plugin line at all, which is one
+# of the two failure modes a malformed excluded can cause. A mutation proved that; the case has to
+# see the list this project wrote, not merely fail to see the hardcoded one.
+case "$out" in
+  *security-guidance@claude-plugins-official*)
+    bad "a malformed excluded is ignored, not treated as a failed profile read" "$out" ;;
+  *claude-md-management@claude-plugins-official*)
+    ok "a malformed excluded is ignored, not treated as a failed profile read" ;;
+  *) bad "a malformed excluded is ignored, not treated as a failed profile read" "$out" ;;
+esac
+
+# The element check, which is a failure this change would otherwise introduce rather than inherit.
+# A non-string element raises out of set() past the whole block, so SETTINGS_REPORT comes back
+# empty and the conflict and duplicate reports die with this one. Before this change nothing read
+# excluded, so the same profile was harmless. Asserting a recommended plugin IS still named is what
+# catches it, because the symptom is silence rather than a wrong line.
+( cd "$px" && python3 - <<'PY'
+import json
+p = ".keel/profile.json"
+d = json.load(open(p))
+d["plugins"] = {"recommended": ["claude-md-management@claude-plugins-official"],
+                "excluded": [{"name": "context7@claude-plugins-official"}]}
+json.dump(d, open(p, "w"), indent=2)
+PY
+)
+out="$( cd "$px" && CLAUDE_CONFIG_DIR="$px/emptyconf" HOME="$px" "$KEEL" doctor 2>&1 )"
+case "$out" in *claude-md-management@claude-plugins-official*)
+    ok "a non-string element in excluded does not silence the whole plugin report" ;;
+  *) bad "a non-string element in excluded does not silence the whole plugin report" "$out" ;;
+esac
+
+# recommended gets the same treatment, and this case is why the check covers both fields. A string
+# is truthy, so it skips the fallback and the loop walks it character by character: a recommended
+# of "abc" produced three warnings naming plugins a, b and c, each with an install command for a
+# plugin that cannot exist. Measured 2026-09-08. An int raised instead and killed every report.
+( cd "$px" && python3 - <<'PY'
+import json
+p = ".keel/profile.json"
+d = json.load(open(p))
+d["plugins"] = {"recommended": "context7@claude-plugins-official", "excluded": []}
+json.dump(d, open(p, "w"), indent=2)
+PY
+)
+out="$( cd "$px" && CLAUDE_CONFIG_DIR="$px/emptyconf" HOME="$px" "$KEEL" doctor 2>&1 )"
+case "$out" in *"not enabled: c."*|*"not enabled: o."*|*"not enabled: n."*)
+    bad "a string recommended is not walked character by character" "$out" ;;
+  *) ok "a string recommended is not walked character by character" ;;
+esac
+rm -rf "$px"
+
 rm -rf "$FIXTURE_CACHE"
+
+# ---- the harness contract --------------------------------------------------
+#
+# R-01. The refactor may not change one byte of what a Claude Code user gets.
+#
+# The baseline is GENERATED from the pre-refactor commit, not committed as a fixture. Lines 1 to 3
+# of this file state the policy the suite runs on: fixtures are generated per case rather than
+# committed, so they cannot go stale against the code they exercise. A committed baseline of init
+# output is exactly the fixture that policy forbids.
+#
+# KEEL_BASELINE_REF names the commit to compare against. Unset, it defaults to HEAD, which makes
+# this a no-op comparison of the tree against itself: green, and proving nothing. That is why the
+# refactor's hand-over records the SHA, and why this prints which ref it used rather than leaving a
+# reader to guess whether the case meant anything.
+BASELINE_REF="${KEEL_BASELINE_REF:-HEAD}"
+base="$(mktemp -d)"; after="$(mktemp -d)"
+if git -C "$ROOT" worktree add -q --detach "$base/repo" "$BASELINE_REF" 2>/dev/null; then
+    ( cd "$base" && git init -q -b main . && "$base/repo/bin/keel" init -y > "$base/init.txt" 2>&1 )
+    ( cd "$after" && git init -q -b main . && "$ROOT/bin/keel" init -y > "$after/init.txt" 2>&1 )
+    # init's own stdout is compared too, with the fixture's directory name normalised out: that is
+    # the only line that legitimately differs between two runs in two temp directories. Without it
+    # the summary block is uncovered, and the refactor changed "CLAUDE.md, AGENTS.md" to
+    # "CLAUDE.md AGENTS.md" with nothing noticing. Found in review of this task's own work.
+    sed -E 's/configured .*/configured FIXTURE/' "$base/init.txt" > "$base/init.norm"
+    sed -E 's/configured .*/configured FIXTURE/' "$after/init.txt" > "$after/init.norm"
+    if diff -q "$base/init.norm" "$after/init.norm" >/dev/null 2>&1; then
+        ok "init output unchanged against $BASELINE_REF: what it prints"
+    else
+        bad "init output unchanged against $BASELINE_REF: what it prints" \
+          "$(diff "$base/init.norm" "$after/init.norm" 2>&1 | head -4 | tr '\n' ' ')"
+    fi
+
+    for f in .claude/settings.json .claude/settings.local.json CLAUDE.md AGENTS.md; do
+        if diff -q "$base/$f" "$after/$f" >/dev/null 2>&1; then
+            ok "init output unchanged against $BASELINE_REF: $f"
+        else
+            bad "init output unchanged against $BASELINE_REF: $f" \
+              "$(diff "$base/$f" "$after/$f" 2>&1 | head -3 | tr '\n' ' ')"
+        fi
+    done
+
+    # Doctor too, and this is the half the task's own step 1 leaves uncovered. The writers are one
+    # part of the refactor; the other is that cmd_doctor's Claude Code checks move behind
+    # harness_doctor_findings, and nothing above would notice those changing what a person reads.
+    # Doctor's output is deterministic run to run in a fixture, checked before this was written.
+    #
+    # The schema version NUMBER is normalised out of both sides, and only the number. Task 8 bumps
+    # SCHEMA_VERSION to 3 on purpose, so that one line differs from every pre-task-8 baseline for
+    # the rest of the project's life, and a comparison that failed on it would be switched off
+    # within a week. The line's wording and its level are still compared, and the number itself has
+    # its own assertion further down, where a bump is the thing being tested rather than noise.
+    #
+    # The harness section is dropped from BOTH sides, and only that section. It is output the
+    # refactor did not move: it did not exist until the doctor task added it, so a comparison that
+    # included it would be red for the whole of that task and green again the moment it was
+    # committed, which is a comparison that reports when somebody last committed rather than what
+    # changed. Every line the filter drops carries its own assertion in this file. The alternatives
+    # are anchored and name one line each, because a pattern loose enough to swallow a neighbouring
+    # check would silence exactly what this comparison exists to catch.
+    #
+    # The closing tally goes with it, for the same reason and no other: it is the sum of the lines
+    # above, so filtering a section out of the comparison and leaving its contribution in the total
+    # would fail on arithmetic that is correct. That total has its own case, "doctor's summary
+    # counts its warnings", which counts the WARN lines and compares.
+    HSECTION='^(ok    running under |WARN  cannot determine which harness is running|ok    [a-z]+ gates active:|WARN  [a-z]+ will run none of keel|WARN  [a-z]+ gates the manifest grants:|WARN  [a-z]+ does not get |WARN  this repository declares hard_block_paths|WARN  codex is installed on this machine|keel doctor: )'
+    ( cd "$base" && "$base/repo/bin/keel" doctor 2>&1 \
+        | sed -E 's/schema version [0-9]+/schema version N/g' | grep -vE "$HSECTION" > "$base/doctor.txt" )
+    ( cd "$after" && "$ROOT/bin/keel" doctor 2>&1 \
+        | sed -E 's/schema version [0-9]+/schema version N/g' | grep -vE "$HSECTION" > "$after/doctor.txt" )
+    if diff -q "$base/doctor.txt" "$after/doctor.txt" >/dev/null 2>&1; then
+        ok "doctor output unchanged against $BASELINE_REF"
+    else
+        bad "doctor output unchanged against $BASELINE_REF" \
+          "$(diff "$base/doctor.txt" "$after/doctor.txt" 2>&1 | head -4 | tr '\n' ' ')"
+    fi
+    git -C "$ROOT" worktree remove --force "$base/repo" 2>/dev/null
+else
+    bad "a baseline worktree at $BASELINE_REF" "git worktree add failed; the R-01 comparison did not run"
+fi
+rm -rf "$base" "$after"
+
+# The neutral code names no harness OUTSIDE A COMMENT.
+#
+# `grep -n ... | grep -v '^ *#'` does not do that: grep -n prefixes every line with NNN:, so the
+# comment filter matches nothing and the check demands bin/keel stop mentioning .claude even in
+# prose. Measured: 50 hits before that filter and 50 after. Strip the prefix before filtering.
+leak="$(grep -nE '\.claude|CLAUDE\.md|enabledPlugins|known_marketplaces' "$KEEL" \
+        | sed 's/^[0-9]*://' | grep -vE '^[[:space:]]*#' | head -3)"
+[ -z "$leak" ] && ok "bin/keel names no harness outside lib/harness/ and its comments" \
+  || bad "bin/keel names no harness outside lib/harness/ and its comments" "$leak"
+
+# The contract is complete, and it is checked by name rather than by whether init happened to work.
+# A harness file missing one function fails at the call site, in a message about an undefined
+# command, on somebody's machine. Here it is a red build with the function's name in it.
+for fn in harness_write_config harness_write_local_config harness_permission_rules \
+          harness_recommend_plugins harness_config_paths harness_doctor_findings; do
+    grep -qE "^${fn}\(\)" "$ROOT/lib/harness/claude.sh" 2>/dev/null \
+      && ok "claude.sh implements $fn" || bad "claude.sh implements $fn" "not defined"
+done
+
+# ---- which harnesses a repository serves ------------------------------------
+
+h_case() {  # h_case <setup command> <init flag> <expected harnesses json>
+    local setup="$1" flag="$2" want="$3" w got
+    # $flag is deliberately split: it is empty in most cases and "--harness codex" in others.
+    # Quoting it would pass one empty argument or one two-word one, and both break init.
+    w="$(mktemp -d)"
+    # A repository-local git identity, because two of the setups below commit. Without one, a
+    # machine with no global user.name fails the commit, the `&&` chain aborts before `keel init`
+    # runs, and the case reports an empty `got` for a profile that was never written. That is how
+    # CI went red on 2026-09-07 on cases every laptop passed: the blank value was a missing file,
+    # not a wrong answer. tests/run-tests.sh removes the ambient identity so this cannot recur
+    # unseen.
+    # shellcheck disable=SC2086
+    ( cd "$w" && git init -q -b main . && git config user.email t@t.t && git config user.name t \
+        && eval "$setup" \
+        && "$ROOT/bin/keel" init $flag -y >/dev/null 2>&1 )
+    got="$(python3 -c 'import json,sys;print(json.dumps(json.load(open(sys.argv[1])).get("harnesses")))' "$w/.keel/profile.json" 2>/dev/null)"
+    [ "$got" = "$want" ] && ok "harnesses $want ($setup $flag)" \
+      || bad "harnesses $want ($setup $flag)" "got $got"
+    rm -rf "$w"
+}
+
+h_case "true"                                             ""                       '["claude"]'
+h_case "true"                                             "--harness codex"        '["codex"]'
+h_case "true"                                             "--harness claude,codex" '["claude", "codex"]'
+h_case "mkdir -p .codex && echo x > .codex/config.toml && git add -A && git commit -qm x" "" '["claude", "codex"]'
+h_case "mkdir -p .codex && echo x > .codex/config.toml"    ""                      '["claude"]'
+h_case "echo x > AGENTS.md && git add -A && git commit -qm x" ""                   '["claude"]'
+
+# Upgrading an existing schema 2 profile must not infer a harness from anything. An installed base
+# that has been dual writing AGENTS.md since long before Codex was supported would otherwise be
+# marked Codex-serving in one upgrade, and every one of those repositories would start claiming a
+# tier nobody chose for it.
+w="$(mktemp -d)"
+( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init -y >/dev/null 2>&1 )
+python3 - "$w/.keel/profile.json" <<'DOWNGRADE'
+import json,sys
+p=sys.argv[1]; d=json.load(open(p)); d["schema_version"]=2; d.pop("harnesses",None)
+json.dump(d, open(p,"w"), indent=2)
+DOWNGRADE
+( cd "$w" && "$ROOT/bin/keel" init -y >/dev/null 2>&1 )
+got="$(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(d.get("schema_version"), json.dumps(d.get("harnesses")))' "$w/.keel/profile.json")"
+[ "$got" = '4 ["claude"]' ] && ok "a schema 2 profile upgrades to claude only" \
+  || bad "a schema 2 profile upgrades to claude only" "got $got"
+rm -rf "$w"
+
+# An explicit --harness must win on a repository that ALREADY has a profile, and until this was
+# found in review it silently lost. merge_profile defends every human value in the profile, which is
+# right for a set somebody edited by hand and wrong for the flag that exists to change it: the only
+# ways to move the set were --force, which discards every human value in the file, and hand-editing.
+w="$(mktemp -d)"
+( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init -y >/dev/null 2>&1 \
+    && "$ROOT/bin/keel" init --harness codex -y >/dev/null 2>&1 )
+got="$(python3 -c 'import json,sys;print(json.dumps(json.load(open(sys.argv[1])).get("harnesses")))' "$w/.keel/profile.json" 2>/dev/null)"
+[ "$got" = '["codex"]' ] && ok "--harness wins over an existing profile" \
+  || bad "--harness wins over an existing profile" "got $got"
+
+# ...and a plain re-init does NOT re-infer it, which is the behaviour the merge is there to protect.
+( cd "$w" && "$ROOT/bin/keel" init -y >/dev/null 2>&1 )
+got="$(python3 -c 'import json,sys;print(json.dumps(json.load(open(sys.argv[1])).get("harnesses")))' "$w/.keel/profile.json" 2>/dev/null)"
+[ "$got" = '["codex"]' ] && ok "a plain re-init leaves the harness set alone" \
+  || bad "a plain re-init leaves the harness set alone" "got $got"
+rm -rf "$w"
+
+# --harness takes a value, and an unvalidated one ate the next flag: the profile recorded a harness
+# called "--team", --team never ran, nothing was staged, and init reported success.
+w="$(mktemp -d)"
+( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init --harness --team -y >/dev/null 2>&1 )
+[ -f "$w/.keel/profile.json" ] && bad "--harness refuses to swallow the next flag" "init wrote a profile" \
+  || ok "--harness refuses to swallow the next flag"
+rm -rf "$w"
+
+w="$(mktemp -d)"
+( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init --harness bogus -y >/dev/null 2>&1 )
+[ -f "$w/.keel/profile.json" ] && bad "an unknown harness id is refused" "init wrote a profile" \
+  || ok "an unknown harness id is refused"
+rm -rf "$w"
+
+# R-01: init still prompts for nothing.
+w="$(mktemp -d)"
+if ( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init -y </dev/null >/dev/null 2>&1 ); then
+    ok "init completes with no tty and no prompt"
+else
+    bad "init completes with no tty and no prompt" "non-zero exit"
+fi
+rm -rf "$w"
+
+# ---- a repository that serves Codex -----------------------------------------
+
+w="$(mktemp -d)"; ( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init --harness codex -y >"$w/init.txt" 2>&1 )
+
+[ -f "$w/.codex/config.toml" ] && ok "codex config written" || bad "codex config written" "absent"
+[ -f "$w/.claude/settings.json" ] && bad "no Claude settings for a codex-only repo" "written" \
+  || ok "no Claude settings for a codex-only repo"
+grep -q 'keel:start' "$w/AGENTS.md" 2>/dev/null && ok "AGENTS.md carries the managed block" \
+  || bad "AGENTS.md carries the managed block" "absent"
+[ -f "$w/CLAUDE.md" ] && bad "no CLAUDE.md for a codex-only repo" "written" \
+  || ok "no CLAUDE.md for a codex-only repo"
+
+# The five path denies port and get stronger. A path deny also stops `cat`.
+n="$(grep -c 'deny' "$w/.codex/config.toml" 2>/dev/null || echo 0)"
+[ "$n" -ge 5 ] && ok "path denies written ($n)" || bad "path denies written" "got $n, wanted at least 5"
+
+# Codex has no command-pattern rule syntax and no ask. Neither may be faked. A rule that looks like
+# a prompt and is not one is the failure this whole design exists to prevent.
+grep -qE 'Bash\(|"ask"|prompt' "$w/.codex/config.toml" 2>/dev/null \
+  && bad "no command-pattern or ask rule is faked" "$(grep -nE 'Bash\(|"ask"|prompt' "$w/.codex/config.toml" | head -1)" \
+  || ok "no command-pattern or ask rule is faked"
+
+# Open question 6 of the architecture. Codex runs no hook until its source is trusted and says
+# nothing when it skips one, so an install that says nothing leaves every gate silently dark. keel
+# cannot grant that trust: it lives in the user's own config, not in this repository. What it can do
+# is say so, and a message nothing pins is a message the next refactor deletes.
+grep -qi 'trust' "$w/init.txt" 2>/dev/null && ok "init tells a Codex user about the hook trust step" \
+  || bad "init tells a Codex user about the hook trust step" "no mention of trust in the init output"
+grep -q 'dangerously-bypass-hook-trust' "$w/init.txt" 2>/dev/null \
+  && bad "the bypass flag is not offered to a user" "init output names it" \
+  || ok "the bypass flag is not offered to a user"
+rm -rf "$w"
+
+# A repository serving BOTH gets both, and this is the case a "last harness sourced wins" design
+# passes for one harness and silently fails for the other.
+w="$(mktemp -d)"; ( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init --harness claude,codex -y >/dev/null 2>&1 )
+if [ -f "$w/.codex/config.toml" ] && [ -f "$w/.claude/settings.json" ] \
+   && [ -f "$w/CLAUDE.md" ] && [ -f "$w/AGENTS.md" ]; then
+    ok "a repository serving both harnesses gets both configurations"
+else
+    bad "a repository serving both harnesses gets both configurations" \
+      "codex=$([ -f "$w/.codex/config.toml" ] && echo y || echo n) claude=$([ -f "$w/.claude/settings.json" ] && echo y || echo n) CLAUDE.md=$([ -f "$w/CLAUDE.md" ] && echo y || echo n)"
+fi
+rm -rf "$w"
+
+
+# --- The harness section in `keel doctor` ------------------------------------------------------
+#
+# ADR-0004: a guarantee is a property of (repository, harness). Doctor is the one place somebody
+# asks what THEY get, so it answers for the harness in front of them and names what the others do
+# not get.
+#
+# THE MANIFEST ANSWERS WHAT A HARNESS CAN DO. DOCTOR ANSWERS WHAT THIS INSTALLATION DOES. The two
+# differ on Codex, which runs no hook until its source is trusted and says nothing when it skips
+# one, so `harness_active_gates codex` is a true statement about Codex and a false one about a user
+# whose hooks are untrusted. Doctor reporting the manifest's answer there would be keel agreeing
+# with itself, which is the fault this plan has been bitten by twice.
+#
+# CODEX_HOME is set on every case below, and that is not tidiness. Unset, the trust reader falls
+# back to the developer's own ~/.codex/config.toml and the verdict becomes a property of whoever is
+# running the suite.
+trust_home() {   # trust_home <state>; prints a CODEX_HOME holding a config in that state
+    local state="$1" d; d="$(mktemp -d)"
+    case "$state" in
+        # What the 2026-09-06 probe actually wrote: the plugin enabled, and no trust entry of any
+        # kind. The absence of trusted_hash is the whole signal.
+        untrusted) printf '[plugins."keel@gbi"]\nenabled = true\n' > "$d/config.toml" ;;
+        trusted)   printf '[plugins."keel@gbi"]\nenabled = true\n\n[hooks.state."keel@gbi"]\nenabled = true\ntrusted_hash = "9f2c"\n' > "$d/config.toml" ;;
+        disabled)  printf '[plugins."keel@gbi"]\nenabled = true\n\n[hooks.state."keel@gbi"]\nenabled = false\ntrusted_hash = "9f2c"\n' > "$d/config.toml" ;;
+        # A config that exists and says nothing about keel. Not proof of anything: what that machine
+        # needs is the plugin installed, not the hooks trusted, so it must not read as dark. It
+        # carries a trusted_hash in an UNRELATED table on purpose. `enabled` and `trusted_hash` are
+        # ordinary field names, and a reader that grepped for either without asking which table it
+        # sat in would call this machine trusted.
+        stranger)  printf '[projects."/tmp/x"]\ntrust_level = "trusted"\ntrusted_hash = "9f2c"\n' > "$d/config.toml" ;;
+        # keel installed and NOT trusted, beside a different plugin the user did trust. This is the
+        # fail-open direction: read across every table rather than keel's own, a stranger's
+        # trusted_hash answers for keel and doctor calls three gates active on a machine where none
+        # of them will ever run. Found in review, not by the sweep, because every fixture above
+        # holds exactly one plugin.
+        foreign_trusted) printf '[plugins."keel@gbi"]\nenabled = true\n\n[hooks.state."other@market"]\nenabled = true\ntrusted_hash = "deadbeef"\n' > "$d/config.toml" ;;
+        # And the other direction, which only cries wolf: keel trusted beside a plugin the user
+        # turned off.
+        foreign_disabled) printf '[plugins."keel@gbi"]\nenabled = true\n\n[hooks.state."keel@gbi"]\nenabled = true\ntrusted_hash = "9f2c"\n\n[plugins."other@market"]\nenabled = false\n' > "$d/config.toml" ;;
+        absent)    : ;;
+    esac
+    printf '%s' "$d"
+}
+
+w="$(mktemp -d)"; ( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init --harness claude,codex -y >/dev/null 2>&1 \
+  && python3 - .keel/profile.json <<'PY'
+import json,sys
+p=sys.argv[1]; d=json.load(open(p)); d["hard_block_paths"]=["src/auth/**"]
+json.dump(d, open(p,"w"), indent=2)
+PY
+)
+
+th_trusted="$(trust_home trusted)"
+out="$( cd "$w" && CODEX_VERSION=0.153.4 CODEX_HOME="$th_trusted" "$ROOT/bin/keel" doctor 2>&1 )"
+# The plan's text greps for `codex` anywhere in the output, which the gate list and the
+# installed-here warning both satisfy whatever the detector answered. Pin the sentence instead.
+printf '%s' "$out" | grep -q 'running under codex' && ok "doctor names the running harness" \
+  || bad "doctor names the running harness" "no 'running under codex' line"
+printf '%s' "$out" | grep -qi 'sensitive-guard' && ok "doctor reports the missing gate" \
+  || bad "doctor reports the missing gate" "no mention of sensitive-guard"
+printf '%s' "$out" | grep -qi 'hard_block_paths' && ok "doctor warns on an unenforceable hard block" \
+  || bad "doctor warns on an unenforceable hard block" "no warning"
+
+# Both signals unset. CLAUDECODE=1 is exported by Claude Code, and this repository is developed
+# inside it, so `env -u CODEX_VERSION` alone would leave the detector confidently answering
+# "claude" locally and "unknown" in CI. Verified set in the development environment before writing
+# this case.
+out="$( cd "$w" && env -u CODEX_VERSION -u CLAUDECODE CODEX_HOME="$th_trusted" "$ROOT/bin/keel" doctor 2>&1 )"
+printf '%s' "$out" | grep -qi 'cannot determine' && ok "doctor says when it cannot tell" \
+  || bad "doctor says when it cannot tell" "no such line"
+
+# The acceptance case the plan names: the manifest grants the gate, the trust state withholds it,
+# and doctor says dark. Without this case the whole trust reader is a comment.
+#
+# The failure it describes is not "nothing works". The same probe found the 25 skills load without
+# trust and the hooks do not, so an untrusted install looks like most of keel working. That is why
+# doctor must not also print the manifest's "gates active" line here: two lines, one saying the
+# gates are live and one saying they are dark, is worse than either alone.
+th_untrusted="$(trust_home untrusted)"
+out="$( cd "$w" && CODEX_VERSION=0.153.4 CODEX_HOME="$th_untrusted" "$ROOT/bin/keel" doctor 2>&1 )"
+printf '%s' "$out" | grep -qi 'dark' && ok "doctor reports an untrusted hook as a dark gate" \
+  || bad "doctor reports an untrusted hook as a dark gate" "no dark line for an untrusted install"
+printf '%s' "$out" | grep -qi 'codex gates active' \
+  && bad "doctor does not also call the dark gates active" "both lines printed" \
+  || ok "doctor does not also call the dark gates active"
+
+# Trusted and disabled are different states with the same consequence, and only the first is safe
+# to report as live.
+th_disabled="$(trust_home disabled)"
+out="$( cd "$w" && CODEX_VERSION=0.153.4 CODEX_HOME="$th_disabled" "$ROOT/bin/keel" doctor 2>&1 )"
+printf '%s' "$out" | grep -qi 'dark' && ok "doctor reports a disabled hook as a dark gate" \
+  || bad "doctor reports a disabled hook as a dark gate" "a disabled hook was reported as live"
+
+out="$( cd "$w" && CODEX_VERSION=0.153.4 CODEX_HOME="$th_trusted" "$ROOT/bin/keel" doctor 2>&1 )"
+printf '%s' "$out" | grep -qi 'codex gates active' && ok "doctor reports a trusted install's gates as active" \
+  || bad "doctor reports a trusted install's gates as active" "no gates active line"
+printf '%s' "$out" | grep -qi 'dark' \
+  && bad "doctor does not cry dark on a trusted install" "$(printf '%s' "$out" | grep -i dark | head -1)" \
+  || ok "doctor does not cry dark on a trusted install"
+
+# Absent or unreadable Codex config is not proof of anything. The manifest fails closed on missing
+# evidence because a wrong `provides` row is unsafe; a doctor line that cries wolf on every machine
+# gets ignored, which costs more than it saves.
+th_absent="$(trust_home absent)"
+out="$( cd "$w" && CODEX_VERSION=0.153.4 CODEX_HOME="$th_absent" "$ROOT/bin/keel" doctor 2>&1 )"
+printf '%s' "$out" | grep -qi 'cannot tell' && ok "doctor says trust could not be determined" \
+  || bad "doctor says trust could not be determined" "no such line"
+printf '%s' "$out" | grep -qi 'dark' \
+  && bad "an unreadable Codex config is not reported as dark" "$(printf '%s' "$out" | grep -i dark | head -1)" \
+  || ok "an unreadable Codex config is not reported as dark"
+
+th_stranger="$(trust_home stranger)"
+out="$( cd "$w" && CODEX_VERSION=0.153.4 CODEX_HOME="$th_stranger" "$ROOT/bin/keel" doctor 2>&1 )"
+printf '%s' "$out" | grep -qi 'dark' \
+  && bad "a Codex config that never mentions keel is not reported as dark" "$(printf '%s' "$out" | grep -i dark | head -1)" \
+  || ok "a Codex config that never mentions keel is not reported as dark"
+printf '%s' "$out" | grep -qi 'codex gates active' \
+  && bad "a trusted_hash in an unrelated table does not grant trust" "the gates were reported active" \
+  || ok "a trusted_hash in an unrelated table does not grant trust"
+
+th_foreign_t="$(trust_home foreign_trusted)"
+out="$( cd "$w" && CODEX_VERSION=0.153.4 CODEX_HOME="$th_foreign_t" "$ROOT/bin/keel" doctor 2>&1 )"
+printf '%s' "$out" | grep -qi 'dark' && ok "another plugin's trust does not make keel's hooks trusted" \
+  || bad "another plugin's trust does not make keel's hooks trusted" "keel read as trusted on a stranger's trusted_hash"
+
+th_foreign_d="$(trust_home foreign_disabled)"
+out="$( cd "$w" && CODEX_VERSION=0.153.4 CODEX_HOME="$th_foreign_d" "$ROOT/bin/keel" doctor 2>&1 )"
+printf '%s' "$out" | grep -qi 'codex gates active' && ok "another plugin being disabled does not darken keel's gates" \
+  || bad "another plugin being disabled does not darken keel's gates" "keel read as untrusted because a stranger was disabled"
+
+# HOME unset, which a container or a cron shell does. bin/keel runs under `set -u`, and the trust
+# reader is called inside a command substitution: a bare `$HOME` there kills the SUBSHELL, leaves
+# the verdict empty, and doctor falls through to "gates active" on a machine whose config it never
+# read. That is silent and it fails open, so the case asserts the answer and not merely survival.
+out="$( cd "$w" && env -u HOME -u CODEX_HOME CODEX_VERSION=0.153.4 "$ROOT/bin/keel" doctor 2>&1 )"
+printf '%s' "$out" | grep -qi 'cannot tell' && ok "an unset HOME reads as unknown, not as trusted" \
+  || bad "an unset HOME reads as unknown, not as trusted" "${out:0:120}"
+
+# A harness installed on this machine that the repository does not list. A machine fact, so it
+# belongs in doctor and never in init, which writes a committed team fact.
+v="$(mktemp -d)"; ( cd "$v" && git init -q -b main . && "$ROOT/bin/keel" init --harness claude -y >/dev/null 2>&1 )
+bindir="$(mktemp -d)"; printf '#!/bin/sh\nexit 0\n' > "$bindir/codex"; chmod +x "$bindir/codex"
+out="$( cd "$v" && env -u CODEX_VERSION -u CLAUDECODE PATH="$bindir:$PATH" CODEX_HOME="$th_trusted" "$ROOT/bin/keel" doctor 2>&1 )"
+printf '%s' "$out" | grep -qi 'installed on this machine' && ok "doctor names a harness installed here that the repository omits" \
+  || bad "doctor names a harness installed here that the repository omits" "no such line"
+rm -rf "$bindir"
+
+# The two context window messages were Claude Code numbers. A Codex rollout states its own window,
+# `model_context_window`, 258400 on the probed session, so on Codex "assuming 200000" and "below the
+# 200000 default" both name a baseline that is not the one in force.
+python3 - "$v" <<'PY5'
+import json,sys,pathlib
+p=pathlib.Path(sys.argv[1])/".keel/profile.json"; d=json.loads(p.read_text())
+del d["gates"]["context_window"]
+p.write_text(json.dumps(d,indent=2)+"\n")
+PY5
+out="$( cd "$v" && CODEX_VERSION=0.153.4 CODEX_HOME="$th_trusted" "$ROOT/bin/keel" doctor 2>&1 )"
+printf '%s' "$out" | grep -q 'model_context_window' && ok "doctor names the window Codex states, not one it assumes" \
+  || bad "doctor names the window Codex states, not one it assumes" "no mention of model_context_window"
+printf '%s' "$out" | grep -q 'window assumed 200000' \
+  && bad "doctor does not tell a Codex user the window is assumed 200000" "the Claude Code sentence is still printed" \
+  || ok "doctor does not tell a Codex user the window is assumed 200000"
+
+# R-01: the Claude Code sentence is unchanged. Nothing about this task may alter what a Claude Code
+# user reads, and the branch above is the one place it could have.
+out="$( cd "$v" && env -u CODEX_VERSION CLAUDECODE=1 CODEX_HOME="$th_trusted" "$ROOT/bin/keel" doctor 2>&1 )"
+printf '%s' "$out" | grep -q 'window assumed 200000' && ok "the Claude Code window sentence is unchanged" \
+  || bad "the Claude Code window sentence is unchanged" "the 200000 sentence stopped being printed under Claude Code"
+
+# The floor message, the second of the two. A value below the floor never takes effect on either
+# harness; naming 200000 as the baseline it is below is what is wrong on Codex.
+python3 - "$v" <<'PY6'
+import json,sys,pathlib
+p=pathlib.Path(sys.argv[1])/".keel/profile.json"; d=json.loads(p.read_text())
+d.setdefault("gates",{})["context_window"]=50000
+p.write_text(json.dumps(d,indent=2)+"\n")
+PY6
+out="$( cd "$v" && CODEX_VERSION=0.153.4 CODEX_HOME="$th_trusted" "$ROOT/bin/keel" doctor 2>&1 )"
+printf '%s' "$out" | grep -q 'below the 200000 default' \
+  && bad "doctor does not name 200000 as the Codex baseline" "the Claude Code floor sentence is still printed" \
+  || ok "doctor does not name 200000 as the Codex baseline"
+printf '%s' "$out" | grep -q '50000' && ok "doctor still names the floor a Codex user set" \
+  || bad "doctor still names the floor a Codex user set" "the configured 50000 went unmentioned"
+out="$( cd "$v" && env -u CODEX_VERSION CLAUDECODE=1 CODEX_HOME="$th_trusted" "$ROOT/bin/keel" doctor 2>&1 )"
+printf '%s' "$out" | grep -q 'below the 200000 default' && ok "the Claude Code floor sentence is unchanged" \
+  || bad "the Claude Code floor sentence is unchanged" "the floor sentence stopped being printed under Claude Code"
+
+rm -rf "$w" "$v" "$th_trusted" "$th_untrusted" "$th_disabled" "$th_absent" "$th_stranger" \
+       "$th_foreign_t" "$th_foreign_d"
+
+
+# --- init must not destroy a Codex configuration it did not write --------------------------------
+#
+# `keel init` is documented as re-runnable and cmd_new calls the same path. The Claude writer
+# branches on an existing settings.json and merges into it; the Codex writer truncated. Worse, a
+# TRACKED .codex/config.toml is the only signal harness_set_for_repo uses to decide a repository
+# serves Codex, so the file that opts a team in was the file the next init destroyed, taking their
+# model choice, MCP servers and their own permission profiles with it.
+w="$(mktemp -d)"
+# The identity is load bearing here, not boilerplate: the commit below is what makes
+# .codex/config.toml a TRACKED file, which is the only signal harness_set_for_repo reads. On a
+# machine with no global user.name the commit fails, init never runs, and this reads as keel
+# dropping its own table from a config it never saw.
+( cd "$w" && git init -q -b main . && git config user.email t@t.t && git config user.name t \
+  && mkdir -p .codex && cat > .codex/config.toml <<'TOML'
+model = "gpt-5-codex"
+
+[mcp_servers.internal]
+command = "node"
+
+[permissions.team.filesystem.":workspace_roots"]
+"vendor/**" = "read"
+TOML
+git add -A && git commit -qm x && "$ROOT/bin/keel" init --harness claude,codex -y >/dev/null 2>&1 )
+
+for keep in 'model = "gpt-5-codex"' '[mcp_servers.internal]' '[permissions.team.filesystem' '"vendor/**" = "read"'; do
+    grep -qF "$keep" "$w/.codex/config.toml" \
+      && ok "init preserves an existing codex config: $keep" \
+      || bad "init preserves an existing codex config: $keep" "gone after init"
+done
+grep -qF '"**/.env" = "deny"' "$w/.codex/config.toml" \
+  && ok "init still adds keel's denies to an existing codex config" \
+  || bad "init still adds keel's denies to an existing codex config" "keel's own table is missing"
+
+# Idempotent. Re-running must not append a second copy of keel's table, which is how a managed
+# block turns into a file that grows by one block per init.
+( cd "$w" && "$ROOT/bin/keel" init --harness claude,codex -y >/dev/null 2>&1 )
+n="$(grep -c '\[permissions.keel.filesystem' "$w/.codex/config.toml")"
+[ "$n" = 1 ] && ok "re-running init leaves one keel table, not two" \
+  || bad "re-running init leaves one keel table, not two" "found $n"
+n="$(grep -c 'model = "gpt-5-codex"' "$w/.codex/config.toml")"
+[ "$n" = 1 ] && ok "re-running init does not duplicate the team's own keys" \
+  || bad "re-running init does not duplicate the team's own keys" "found $n"
+
+# A rule keel drops has to leave, or the managed region only ever grows. The whole region is
+# replaced rather than merged into, which is what makes that true.
+python3 - "$w/.codex/config.toml" <<'PY'
+import sys
+p = sys.argv[1]
+t = open(p).read().replace('"**/.env" = "deny"', '"**/gone-from-keel" = "deny"')
+open(p, "w").write(t)
+PY
+( cd "$w" && "$ROOT/bin/keel" init --harness claude,codex -y >/dev/null 2>&1 )
+grep -qF '"**/gone-from-keel" = "deny"' "$w/.codex/config.toml" \
+  && bad "a rule keel no longer writes is removed from its own table" "the stale rule survived" \
+  || ok "a rule keel no longer writes is removed from its own table"
+rm -rf "$w"
+
+# --- every harness's context file, not whichever was sourced last --------------------------------
+#
+# The rule this file states at `bin/keel#makes the loaded harness whichever ran last` is that nothing outside a harness_each call may assume
+# which harness is loaded. referenced_docs_findings called harness_context_file bare, so it scanned
+# whatever happened to be loaded last. Benign only while codex.sh returns nothing; a harness that
+# returns a context file would have had its links silently unchecked.
+grep -n 'harness_context_file' "$ROOT/bin/keel" | grep -v 'harness_each harness_context_file' \
+  | sed 's/^[0-9]*://' | grep -vE '^[[:space:]]*#' | grep -q 'harness_context_file' \
+  && bad "every harness_context_file call goes through harness_each" \
+       "$(grep -n 'harness_context_file' "$ROOT/bin/keel" | grep -v 'harness_each harness_context_file' | grep -vE ':[[:space:]]*#' | head -1)" \
+  || ok "every harness_context_file call goes through harness_each"
+
+
+# --- the six keys nothing could honour -----------------------------------------------------------
+#
+# Six keys were retired because nothing could honour them, and init must stop writing the five it
+# writes. A profile that still carries them is not broken; it is stale, and doctor's version
+# comparison says so. What this pins is init writing a key the schema no longer declares, which is
+# the silent half: `tests/validate-skills.sh#A key with no description is a key a reader cannot act on` records that the fingerprint checks the schema
+# document and not what write_profile emits, so nothing else compares the two.
+#
+# READ THE SUBTREE, NOT THE FILE. A bare grep for "observability" matches the top-level
+# "observability" object init also writes at bin/keel#"observability": { "backend": "signoz", so a gates.observability case would fail
+# forever against a correct implementation. "review" has the same trap inside
+# "code-review@claude-plugins-official" in plugins.recommended. Parse the JSON and look in the one
+# place the key would be.
+wr="$(fixture node-ts)"
+( cd "$wr" && "$KEEL" init -y >/dev/null 2>&1 )
+left="$( python3 - "$wr/.keel/profile.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+gone = [("gates", k) for k in ("tdd", "review", "observability", "docs_updated")]
+gone += [("conventions", "working_branch"), ("observability", "log_shipping")]
+print(" ".join("%s.%s" % (p, k) for p, k in gone if k in (d.get(p) or {})))
+PY
+)"
+[ -z "$left" ] && ok "init writes none of the six retired keys" \
+  || bad "init writes none of the six retired keys" "still written: $left"
+
+sv="$(python3 -c "import json;print(json.load(open('$wr/.keel/profile.json'))['schema_version'])")"
+[ "$sv" = "4" ] && ok "init writes schema version 4" \
+  || bad "init writes schema version 4" "got $sv"
+
+# The floor for the first case. What it covers is a profile that parses but carries a gates object
+# missing keys: that would satisfy "none of the six are present" while breaking every gate that
+# survived, so the five survivors are named here rather than counted. It is not a floor for a
+# missing or unparseable profile. This file runs without set -e, so on one of those both heredoc
+# python3 calls die with empty stdout, left and kept are both empty, and cases 1 and 3 both report
+# PASS. The schema version case above is what catches that, because sv comes back empty and the
+# comparison against 4 fails.
+kept="$( python3 - "$wr/.keel/profile.json" <<'PY'
+import json, sys
+g = json.load(open(sys.argv[1])).get("gates") or {}
+print(" ".join(k for k in ("coding_standards", "security_audit", "commit_guard",
+                           "done_verified", "context_window") if k not in g))
+PY
+)"
+[ -z "$kept" ] && ok "init still writes the five gates that survive" \
+  || bad "init still writes the five gates that survive" "missing: $kept"
+rm -rf "$wr"
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

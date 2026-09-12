@@ -612,7 +612,7 @@ If the first assertion fails, stop: `merge_profile` does not protect this key an
 
 - [x] **Step 3: There is no implementation step**
 
-Nothing to write. `merge_profile` at `bin/keel:290` already prefers a non-empty existing value.
+Nothing to write. `merge_profile` at `bin/keel#out[k] = v            # human value wins` already prefers a non-empty existing value.
 
 - [x] **Step 4: Run the full suite**
 
@@ -1034,7 +1034,7 @@ it.
 | A value wider than a 64 bit integer leaked `integer expression expected` into doctor's output and then fell through to the healthy branch | Width capped before comparison, and a non-numeric value warns rather than being reported | `a5bf6bc` |
 | Task 10's session-prefix guard ran the hook by a relative path with only an upper bound, so from any other directory it measured 0 tokens and passed. The hook could have been deleted and it stayed green | Absolute `$HOOK`, plus a lower bound so a silent failure is a failure | `8bdb5ee` |
 | `measure` and `handoff` ignored the profile, so a 1M project's handoff header read 75% where the hook sat silent at 15% | Both take an optional project directory | `5ce4eab` |
-| No `CHANGELOG.md` entry, required in the same commit by `docs/standards.md:129` and `CONTRIBUTING.md:125` | An `Unreleased` section covering Added, Changed, Fixed and a known gap | `9313b44` |
+| No `CHANGELOG.md` entry, required in the same commit by `docs/standards.md:129` and the Commits and review section of `CONTRIBUTING.md` | An `Unreleased` section covering Added, Changed, Fixed and a known gap | `9313b44` |
 
 **One of those fixes was itself wrong and had to be debugged.** The first attempt at the `measure`
 fix read the profile from `os.getcwd()`, which made the same transcript report two different windows
@@ -1052,6 +1052,6 @@ own `cwd`. The project is now named rather than guessed.
 - `docs/05-token-and-memory-design.md` documents the watchdog in detail and says nothing about how
   the window is decided, which is now a four part rule. The schema description carries it instead.
 
-**A finding that cannot be closed by more work.** `CONTRIBUTING.md:128` requires review by someone
-other than the change's own author. This change was written and reviewed by the same session, so the
-review above is a first pass and not the required one.
+**A finding that cannot be closed by more work.** `CONTRIBUTING.md`, at "never the change's own
+author", requires review by someone other than the author. This change was written and reviewed by
+the same session, so the review above is a first pass and not the required one.

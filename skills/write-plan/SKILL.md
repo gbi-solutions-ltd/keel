@@ -40,8 +40,8 @@ fails.
 List every file to create or modify and what each is responsible for. Decomposition decisions
 get locked in here, and they are much cheaper to change now than inside task 7.
 
-**Where the area to map is larger than you can hold, delegate the reading**: `Explore` agents in
-one message, model `sonnet`, each citing `path:line`, said in one line. The predicate is the tree,
+**Where the area to map is larger than you can hold, delegate the reading**: subagents in
+one message, delegation profile `keel-fanout`, each citing `path:line`, said in one line. The predicate is the tree,
 not the mood: more directories than you can list from memory. Under that, read it yourself.
 
 Their findings are leads; the decomposition stays yours. Step 4 forbids naming a function no task

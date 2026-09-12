@@ -26,10 +26,10 @@ For **A**, an instance now exists and is measured below. The earlier reading of 
 "structural only, no named victim", and that is what parked A. It is superseded.
 
 For **B**, an instance exists and it points the other way.
-`tests/evals/results.md:2345-2493` ran exactly this experiment on 2026-08-20 and scored "code
+`tests/evals/results.md` ran exactly this experiment on 2026-08-20 and scored "code
 produced follows the standards" as **"Met, unprompted, both coding arms"**, adding that
 "`skills/tdd/SKILL.md` mentions standards nowhere in its directory, and both arms found
-`docs/standards.md` and complied" (`tests/evals/results.md:2433`). The behaviour keel does not
+`docs/standards.md` and complied" (`tests/evals/results.md`). The behaviour keel does not
 instruct happened anyway. Nothing in the instance below contradicts this, and the instance's own
 sample agrees with it.
 
@@ -228,7 +228,7 @@ injection bug**: `PartitionService` has no controller anywhere in `src/`, it is 
 `partition.processor.ts` on cron schedules registered at `partition.module.ts:33-37`, `tableName`
 traces to a hardcoded array in `src/common/config/partitioned-tables.config.ts`, and
 `listPartitions` (declared `:351`) is called from nowhere at all. This is a style deviation from the
-rule's stated form. Read against `skills/coding-standards/SKILL.md:29-32`, the "counting decides
+rule's stated form. Read against `skills/coding-standards/SKILL.md`, the "counting decides
 style, never correctness" carve-out whose worked example is SQL injection, and against `:78-79`,
 where step 5 is supposed to report "any inconsistency you found but did not resolve".
 
@@ -273,8 +273,8 @@ backlog and in house-defaults coverage, not in stale departure reasoning.
 
 **The demonstrated cost is an information gap, not a quality gap.** The owner believed the code was
 out of compliance. The sample says it broadly is not: five of six judgement rules fully or
-near-fully observed. What decayed is the mechanical and house-defaults backlog. That matches
-`tests/evals/results.md:2433` rather than contradicting it, and the record should not oversell it.
+near-fully observed. What decayed is the mechanical and house-defaults backlog. That matches "Code
+produced follows" in `tests/evals/results.md` rather than contradicting it; do not oversell it.
 
 What the instance does establish is that four different checks, run against one document, return
 four different verdicts, and that one of them found far more than the other three. Nobody would have guessed the
@@ -286,12 +286,12 @@ ranking in advance, which is the argument for writing it down.
 the answer, and the answer was that the rule keel *did* write down and *did* load changed nothing,
 while the rule it never wrote down was followed anyway. Arm 3 read the surgical-changes rule from the
 managed block and edited adjacent code regardless; arm 1, which had not read it, "behaved identically
-and disclosed just as much" (`tests/evals/results.md:2420-2422`). The entry draws the conclusion
+and disclosed just as much" (`tests/evals/results.md`). The entry draws the conclusion
 itself: "Adding a third copy, to a body 93 words over its target, would restate a sentence the agent
-has already read and reasoned past" (`tests/evals/results.md:2426-2427`), and closes with the
+has already read and reasoned past" (`tests/evals/results.md`), and closes with the
 prerequisite: "the question to answer first is not 'where should the rule go' but **'why does a
 loaded rule not bind'**, because the second question decides whether any wording change is worth
-making" (`tests/evals/results.md:2450-2452`). Every prose-shaped option for B is a fourth copy of a
+making" (`tests/evals/results.md`). Every prose-shaped option for B is a fourth copy of a
 sentence with a measured hit rate of zero, and this repository has already priced it.
 
 **This argument survives the instance, and only applies to B.** The assessment mode is not a rule
@@ -300,7 +300,7 @@ returns findings, and the instance shows it returns findings nobody had.
 
 Against that, the honest cheapest fix for B is to stop claiming the thing. Two of keel's own
 documents assert an enforcement that does not exist: `docs/02-skill-catalog.md:69` says
-"Coding standards enforcement", and `docs/02-skill-catalog.md:382` says `refactor`
+"Coding standards enforcement", and `docs/02-skill-catalog.md` says `refactor`
 "**Reads:** the target code, tests, `<docs_root>/standards.md`" while `skills/refactor/` contains no
 occurrence of the word (`/usr/bin/grep -rn -i standard skills/refactor/` returns nothing). The claim
 is the defect. Deleting a claim costs no words at all.
@@ -310,8 +310,8 @@ is the defect. Deleting a claim costs no words at all.
 | Option | What it costs | Why not this |
 |---|---|---|
 | Do nothing | Nothing | Two documents keep asserting an enforcement that does not exist, and the payments-api instance shows what nobody notices: four house-defaults references skipped whole, 10 open follow-ups after 169 commits, and an unquantised money write inside the corpus the rules were derived from |
-| Do it manually | The user pastes `standards.md` into the prompt each time | This works for B. `tests/evals/results.md:2433` shows it works without even being pasted. It does not work for A: the payments-api owner had the document, had read it, and still did not know which of its four sections had decayed |
-| Buy it | Nothing available | `tests/evals/results.md:2456-2461` checked the closest candidate on paper: the `code-review` plugin "has **no input that accepts a project's conventions**", and asking it for standards findings would make it infer them, which `rubric.md:63-65` forbids in as many words |
+| Do it manually | The user pastes `standards.md` into the prompt each time | This works for B. `tests/evals/results.md`, "Code produced follows the standards", shows it works without even being pasted. It does not work for A: the payments-api owner had the document, had read it, and still did not know which of its four sections had decayed |
+| Buy it | Nothing available | `tests/evals/results.md` checked the closest candidate on paper: the `code-review` plugin "has **no input that accepts a project's conventions**", and asking it for standards findings would make it infer them, which `rubric.md:63-65` forbids in as many words |
 | Build only the small thing | Two lines in two reference files, plus deleting two false claims | Still the whole of B, and still recommended. It does nothing for A, which now has an instance |
 
 **Variants of building A**
@@ -333,8 +333,8 @@ is the defect. Deleting a claim costs no words at all.
 |---|---|---|---|
 | Somebody actually wants an existing codebase assessed | A real inherited repo with a `standards.md` and an unanswered compliance question | Named 2026-09-01: payments-api, 1,271-line document, 169 commits past its derivation point | **Yes. This was the blocking gap and it is closed** |
 | An agent will not find `standards.md` on its own in a large tree | The 2026-08-20 result does not generalise | An agent located and applied `docs/keel/standards.md` in a 388-file tree without a path in its brief | **Checked, and it came out no.** It found it |
-| A delegated implementer is worse off than an inline one | The subagent's brief is the only context it gets | `skills/execute-plan/references/subagent-prompts.md:17-18` says so; `tests/evals/results.md:2491-2493` says this path "was not tested here at all" | Asserted by the prompt, never measured |
-| Prose in a skill body changes behaviour | Not established, and one measurement says no | `tests/evals/results.md:2420-2422` | **Measured, and it came out no** |
+| A delegated implementer is worse off than an inline one | The subagent's brief is the only context it gets | `skills/execute-plan/references/subagent-prompts.md:17-18` says so; `tests/evals/results.md` says this path "was not tested here at all" | Asserted by the prompt, never measured |
+| Prose in a skill body changes behaviour | Not established, and one measurement says no | `tests/evals/results.md`, "Arm 1, without the rule, disclosed the same `except:` change" | **Measured, and it came out no** |
 | `coding-standards` re-run on a repo that already has a `standards.md` rewrites rather than assesses | Step 1 says "Read the code before writing anything" (`skills/coding-standards/SKILL.md:18`) and step 4 says "Write `<docs_root>/standards.md`" (`:63`) with no branch for an existing file | Read, not run | Read only |
 | The authoring pass catches the violations it writes rules about | The derived rule and the compliant tree are the same evidence | payments-api: the unquantised money write and the unguarded `sql.raw` sites both sit **inside** the 303-file derivation corpus | **Checked, and it came out no.** This is the case for the mode |
 
@@ -348,14 +348,14 @@ is the defect. Deleting a claim costs no words at all.
 | The snapshot only covers the *missing* case | `skills/repo-snapshot/references/section-templates.md:147` lists "Coding standards" under **Missing**, produced by `coding-standards`; `:227-228` recommends it "to establish what this repository's conventions are, and where they are **not written down anywhere**" | There is no route for "the doc exists and nobody knows if the code follows it" |
 | `security-audit` is the precedent for a whole-repo mode and for its output path | `skills/security-audit/SKILL.md:18-21`, a two-row `--diff` / `--full` scope table, costing 52 words including the gate line at `:23`; `:63` writes `<docs_root>/audits/YYYY-MM-DD-security.md` | A mode is a proven shape here, it is cheap, and its output convention answers question 4 |
 | `tdd`, `write-plan` and `refactor` never mention standards | No occurrence of "standard" or "convention" in `skills/tdd/`, `skills/write-plan/`, `skills/refactor/` | Claim B is true for three of the four skills named |
-| `execute-plan` mentions them once, in the wrong prompt | `skills/execute-plan/references/subagent-prompts.md:105-106` puts `=== PROJECT STANDARDS ===` in the **quality review** prompt; the implementer prompt at `:20-61` has no such block | The reviewer is told the conventions; the agent writing the code is not. This is an inconsistency, not a missing rule |
+| `execute-plan` mentions them once, in the wrong prompt | `skills/execute-plan/references/subagent-prompts.md` puts `=== PROJECT STANDARDS ===` in the **quality review** prompt; the implementer prompt at `:20-61` has no such block | The reviewer is told the conventions; the agent writing the code is not. This is an inconsistency, not a missing rule |
 | `gates.coding_standards` is inert in code | `templates/profile.schema.json:254`; `docs/profile-keys.md:45`; a repo-wide grep finds it only in the schema, generated docs, an example file, this repo's own profile, a `printf` template in `bin/keel:430`, and eval prose. No hook, skill, lib or CLI path reads it | Claim B is true |
 | One gate *is* read by a skill | `skills/security-audit/SKILL.md:23`: "Read `.keel/profile.json` for `gates.security_audit` and any `hard_block_paths`", 7 words | "A gate the skills read" is a shape that already exists and costs 7 words per site |
-| keel says this about itself in its release notes | `CHANGELOG.md:288`: "seven declared profile keys are read by nothing (`gates.tdd`, `gates.coding_standards`, `gates.review`, ...)" | The gap is admitted, not hidden. Nothing here is news to keel |
+| keel says this about itself in its release notes | `CHANGELOG.md:306`: "seven declared profile keys are read by nothing (`gates.tdd`, `gates.coding_standards`, `gates.review`, ...)" | The gap is admitted, not hidden. Nothing here is news to keel |
 | `ship` has no standards item | `skills/ship/SKILL.md:16-30`, eight items, none naming standards; items 5 and 6 are prose with no command behind them | Claim B is true |
 | Two documents claim an enforcement that does not exist | `docs/02-skill-catalog.md:69` "Coding standards enforcement"; `:382` says `refactor` reads `standards.md` | The false claim is fixable for free and is arguably the whole of B |
 | Hooks cannot decide this | `hooks/done-guard:127` works by substring-matching the configured test command in a `Bash` call; `hooks/done-guard:34-36` says outright "It cannot see the exit code, and does not pretend to" | There is no observable event whose presence proves standards were followed. A hook is not available for B |
-| A model acted on the inert gate unprompted | `tests/evals/results.md:2470-2474`: "arm 2 read the key out of the profile itself and used it to set severity" | See question 5 |
+| A model acted on the inert gate unprompted | `tests/evals/results.md`: "arm 2 read the key out of the profile itself and used it to set severity" | See question 5 |
 
 ## 1. Are A and B separate problems, or one?
 
@@ -367,9 +367,9 @@ diff. That is one sentence and it is true of both.
 They separate on evidence and on fix. A is a capability that does not exist and now has one named
 case, with four measured findings and a ranking nobody predicted. B is a capability keel *claims* in
 `docs/02-skill-catalog.md:69` and whose absence a measurement failed to detect
-(`tests/evals/results.md:2433`), and the payments-api sample independently reproduces that result: the
-code broadly does follow its own judgement rules. Fusing them would let A's now-evidenced hole carry
-B's unevidenced fix through on its coat-tails.
+(`tests/evals/results.md`, "Code produced follows the standards"), and the payments-api sample
+independently reproduces that result: the code broadly does follow its own judgement rules. Fusing
+them would let A's now-evidenced hole carry B's unevidenced fix through on its coat-tails.
 
 They also cost differently. A is a body-words problem with an eval arm attached, and the instance
 made it more expensive, not less. B, done well, costs zero body words, because the two places it
@@ -468,13 +468,13 @@ needing an ADR that does not exist, or kept on a reason the tree no longer suppo
 and the dangerous category empty. Keep it anyway. **A check that comes back clean is a result**, and
 this record's job is to say that a check ranked fourth is still a check, not to quietly drop it.
 
-The output is a dated report at `<docs_root>/audits/YYYY-MM-DD-standards.md`, following
-`skills/security-audit/SKILL.md:63`. It never edits `standards.md`.
+The output is a dated report at `<docs_root>/audits/YYYY-MM-DD-standards.md`, following the
+"YYYY-MM-DD-security.md" line in `skills/security-audit/SKILL.md`. It never edits `standards.md`.
 
 ## 3. For B: which of a hook, a read gate, a `ship` line, or a sentence per skill would change behaviour?
 
-Ranked. The ordering is by whether the thing is structural, because
-`tests/evals/results.md:2420-2427` measured what prose is worth here and the answer was nothing.
+Ranked. The ordering is by whether the thing is structural, because `tests/evals/results.md`, at
+"Arm 1, without the rule", measured what prose is worth here and the answer was nothing.
 
 **The ranking is unchanged by the instance, but the rationale for first place is not.** Open
 question 2 was "does an agent find `standards.md` in a large tree", and the instance answers **yes**:
@@ -486,13 +486,13 @@ not the same as a subagent that was given it, and the plan-template line at seco
 same correction.
 
 **1. The `=== PROJECT STANDARDS ===` block in the delegated implementer prompt.** Zero body words.
-`skills/execute-plan/references/subagent-prompts.md:105-106` already puts this block in the quality
+`skills/execute-plan/references/subagent-prompts.md` already puts this block in the quality
 review prompt; the implementer prompt at `:20-61` does not have it. So keel tells the reviewer the
 conventions and does not tell the writer. This is the only option on the list that is not a new rule:
 it is an existing rule applied to the one context where the model provably cannot compensate, because
 "the subagent sees only what you send. It has no conversation, no plan file loaded, and no memory of
 the previous task, so anything omitted is unavailable rather than merely unmentioned"
-(`:17-18`). It is also the exact path `tests/evals/results.md:2491-2493` names as untested:
+(`:17-18`). It is also the exact path `tests/evals/results.md` names as untested:
 "the coding arms were dispatched with `tdd` injected, not through `execute-plan`". Highest leverage,
 lowest cost, and it closes an inconsistency rather than opening an argument.
 
@@ -507,8 +507,8 @@ must obey. Ten words in a reference file, and it reaches every task and every di
 measured length of `skills/security-audit/SKILL.md:23`, which is the only gate any skill reads today.
 This would make the schema's own admission at `templates/profile.schema.json:254` false in the good
 direction. Ranked third rather than higher because it is still a sentence, and because
-`tests/evals/results.md:2470-2474` shows an agent already reading that key out of the profile and
-setting severity by it, unprompted, without being told to.
+`tests/evals/results.md`, at "read by nothing and acted on anyway", shows an agent already
+reading that key out of the profile and setting severity by it, unprompted, without being told to.
 
 **4. A ninth `ship` checklist item.** About 17 words, the average of items 1 to 8
 (`skills/ship/SKILL.md:20-30`, 135 words over 8 items). It fires only when the user says ship, and it
@@ -582,16 +582,16 @@ ceiling at all.
 
 ## 5. What the eval entry implies about the size of the fix
 
-`tests/evals/results.md:2470-2474` records that arm 2 "read the key out of the profile itself and
+`tests/evals/results.md` records that arm 2 "read the key out of the profile itself and
 used it to set severity", unprompted, for a gate that
 `templates/profile.schema.json:254` said had "no effect". Three things follow, and all three make the
 fix for **B** smaller. None of them shrinks A.
 
 **The behaviour was already there.** The model found `docs/standards.md` with no skill pointing at
 it, complied with it, and read the gate out of the raw profile to set severity. keel was not adding
-a capability; it was documenting one it did not know it had. The correction that shipped was
-one line of schema wording plus a regenerated `docs/profile-keys.md` (`tests/evals/results.md:2479`).
-That is the size of the fix the evidence actually supports for B: a documentation correction.
+a capability; it was documenting one it did not know it had. The correction that shipped was one
+line of schema wording plus a regenerated `docs/profile-keys.md` (`tests/evals/results.md`, at
+"Corrected in `templates/profile.schema.json`"). That is the fix the evidence supports for B.
 
 **The gap is in the claim, not the behaviour.** What the run falsified was keel's description of
 itself, twice in the same file. Two more such claims are still live and uncorrected:
@@ -600,11 +600,11 @@ true, which is the whole of B as measured.
 
 **And it makes the prose options worse, not better.** The same entry showed that the rule keel *had*
 written and the model *had* loaded produced no behavioural difference at all
-(`tests/evals/results.md:2420-2422`), and instructed that "why does a loaded rule not bind" be
+(`tests/evals/results.md`), and instructed that "why does a loaded rule not bind" be
 answered before any wording change is made (`:2450-2452`). A run where the unwritten rule was
 obeyed and the written rule was not is an argument for structural edits and against sentences.
 
-**What it does not license.** `tests/evals/results.md:2488-2493` states its own limits: one run per
+**What it does not license.** `tests/evals/results.md` states its own limits: one run per
 arm, one fixture, one language, "one small repo where `standards.md` sits at a path an arm will find
 without trying", `refactor` and `debug` never exercised, and the delegated `execute-plan` path "not
 tested here at all". So the evidence supports shrinking B to a documentation fix plus the delegated
@@ -622,11 +622,11 @@ nothing else.
    demote the plan-template constraint line, and question 3 above carries the rewritten rationale:
    the delegated case is about what a subagent is *sent*, not what it could find.
 3. **Why does a loaded rule not bind?** Still open, and still keel's own precondition for any wording
-   change (`tests/evals/results.md:2450-2452`). Every option in question 3 ranked below third is
-   blocked on it; the two ranked above are not, because neither is a rule. The instance does not
-   touch this question.
+   change (`tests/evals/results.md`, at "not be a fourth copy of a sentence"). Every option in
+   question 3 ranked below third is blocked on it; the two ranked above are not, because neither is
+   a rule. The instance does not touch this question.
 4. ~~**Should the assessment write a dated report or amend `standards.md`?**~~ **Answered: a dated
-   report.** `skills/security-audit/SKILL.md:63` writes `<docs_root>/audits/YYYY-MM-DD-security.md`,
+   report.** `skills/security-audit/SKILL.md` writes `<docs_root>/audits/YYYY-MM-DD-security.md`,
    so an assessment writes `<docs_root>/audits/YYYY-MM-DD-standards.md`. payments-api already follows that
    directory shape, with four files in `docs/keel/audits/`, though two of the four do not use the
    `-security.md` suffix. That drift was the argument for stating the convention, which
@@ -654,7 +654,7 @@ standards line to the Global constraints in `skills/write-plan/references/plan-t
 delete the enforcement claim at `docs/02-skill-catalog.md:69` and correct the false `refactor` read
 at `:382`. All four cost zero body words, none touches a skill body, none needs an eval arm, and each
 fixes something inconsistent inside keel today rather than adding a rule whose measured effect on
-this exact question was zero (`tests/evals/results.md:2420-2427`).
+this exact question was zero (`tests/evals/results.md`, at "Arm 1, without the rule").
 
 **For A, build the assessment mode.** It was parked for want of a named instance; the instance
 exists and is measured above. Build it inside `coding-standards` as a scope branch, at the measured
@@ -678,8 +678,8 @@ evidence for the latter. Full figures and six defects the run found in the shipp
 
 **What the instance did not show, stated plainly.** It did not show that the code had drifted from
 its judgement rules. Five of six sampled rules were fully or near-fully observed, which agrees with
-`tests/evals/results.md:2433` rather than contradicting it. It did not find a stale departure
-ruling; that category came back empty against a brief that predicted it would be the dangerous one.
+"Code produced follows" in `tests/evals/results.md` rather than contradicting it. It did not find a
+stale departure ruling; that category came back empty against a brief predicting it as dangerous.
 The cost this instance demonstrates is an **information gap**: four checks with four different
 answers and no way to know which one to run. That is a smaller claim than the brief made and it is
 the one the evidence supports.
@@ -706,9 +706,9 @@ than deleted, so the decision keeps its trace.
    in `docs/02-skill-catalog.md` rather than in a skill body.
 
 Still undecided: whether `refactor` and `debug` should read the standards doc at all, since neither
-was ever exercised (`tests/evals/results.md:2490`); whether the other four "read by nothing" gate
-descriptions in `templates/profile.schema.json` should be reworded, which
-`tests/evals/results.md:2483-2484` explicitly leaves open on the grounds that "one run against two
+was ever exercised (`tests/evals/results.md`, "mention standards nowhere"); whether the other four
+"read by nothing" gate descriptions in `templates/profile.schema.json` should be reworded, which
+`tests/evals/results.md` explicitly leaves open on the grounds that "one run against two
 keys is not the evidence for rewriting five"; and whether `keel doctor` should warn when
 `gates.coding_standards` is `required` and no `standards.md` exists.
 

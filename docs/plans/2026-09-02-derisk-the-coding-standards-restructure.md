@@ -32,10 +32,10 @@ them.
    then made it emit two. The suite would have gone red at task 3. This draft tests against
    `debug-obvious-cause` and `ship-with-flaky-tests`, which no later task touches, and creates no
    file under `tests/evals/scenarios/`.
-3. **It claimed the harness limit was newly found.** `tests/evals/results.md:2700` recorded it on
+3. **It claimed the harness limit was newly found.** `tests/evals/results.md` recorded it on
    2026-09-01: "No eval in this repository can currently exercise a skill whose behaviour depends on
    a reference file." A planner who had read that entry would also have found defect 4.
-4. **It ignored the only prior run of the scenario it builds on.** `tests/evals/results.md:2644`
+4. **It ignored the only prior run of the scenario it builds on.** `tests/evals/results.md`
    records the 2026-09-01 assess arm **failing** "Names all four checks, in the ranked order". A
    pass condition of "no worse than the baseline" would have passed by failing the same way.
    Task 4's discriminator is now binary and different: whether the reference was read.
@@ -444,7 +444,7 @@ or more.
 
 **This baseline is a new condition, and saying otherwise would be false.** Task 1 makes
 `assessment-report.md` and `house-defaults.md` readable by an arm for the first time, so check 1
-becomes runnable and the two honesty requirements `tests/evals/results.md:2698-2701` records as "not
+becomes runnable and the two honesty requirements `tests/evals/results.md` records as "not
 reachable and not scored" become reachable. The baseline is therefore comparable with task 4 and
 with nothing else, **including the 2026-09-01 run of the same scenario**, whose body was 865 words
 and which had no references at all.
@@ -487,7 +487,7 @@ move`. Record as a list, because task 4 compares item by item:
 6. model, turns, duration, cost
 
 Then record, in the same entry, that the 2026-09-01 run of this scenario **failed** the "names all
-four checks, in the ranked order" criterion at `tests/evals/results.md:2644`, and whether this run
+four checks, in the ranked order" criterion in `tests/evals/results.md`, and whether this run
 reproduces that. It is the only prior run of this scenario, and task 4's reading of item 3 depends
 on knowing it.
 
@@ -544,10 +544,10 @@ baseline; or `docs/standards.md` was modified; or no report was produced.
 
 **Item 3, the presentation order, is not a discriminator here, and the reason is on the record.**
 The 2026-09-01 run failed that criterion with the checks inline in the body
-(`tests/evals/results.md:2644`), so it was already failing before anything moved. Record whether it
-changed and do not let it decide the verdict in either direction. A pass condition that can be met
-by failing the same way as the baseline is not a test, which is the defect that sank the first
-draft.
+(`tests/evals/results.md`, "Names all four checks, in the ranked order"), so it was already
+failing before anything moved. Record whether it changed and do not let it decide the verdict in
+either direction. A pass condition that can be met by failing the same way as the baseline is not
+a test, which is the defect that sank the first draft.
 
 **Why this task does not claim NFR-05.** NFR-05 says each mode has a passing arm "with its steps
 behind a link". This task measures whether one mode's steps are read from behind a link, on one

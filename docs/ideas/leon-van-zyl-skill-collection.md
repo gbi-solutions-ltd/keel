@@ -46,7 +46,7 @@ Lint was therefore not run here. That is the standing local state and not a new 
 
 **How many new skills the headroom actually buys.** 199 divided by 44.84 is 4.4, so **four**, and
 the fifth fails the build. Checked arithmetically against the estimator the validator uses
-(`desc_chars * 10 / 36`, `tests/validate-skills.sh:156`):
+(`desc_chars * 10 / 36`, `tests/validate-skills.sh`):
 
 - Four skills at the measured mean: 4,037 + 644 = 4,681 chars, **1,300 tokens**. Passes, with 20
   tokens left over.
@@ -68,7 +68,7 @@ narrow**. That is the whole budget, forever, until something is removed.
 > build. **The check's own message says the remedy is fewer skills, because "how short can a
 > description be" is the answer this decision already rejected.**
 
-And earlier in the same decision, at `docs/07-open-decisions.md:335`: **"Revisit before 30, not
+And earlier in the same decision, in `docs/07-open-decisions.md`: **"Revisit before 30, not
 after, and revisit it as 'which of these should merge', not 'how short can a description be'."**
 
 The check's own failure text, `tests/validate-skills.sh:158`, says the same thing to whoever
@@ -108,7 +108,7 @@ no warning tier above the ceiling.
 to lose **87 percent** of its body to become a legal keel skill. What survives that cut is not an
 adaptation of the file, it is a different file that happens to share a topic. ADR-0001's own
 context section already establishes that the relief valve, moving substance into `references/`,
-has a floor: `coding-standards` sits at 795 words with 17 references carrying 22,752 words. Moving
+has a floor: `coding-standards` sits at 795 words with 17 references carrying 22,750 words. Moving
 material out does not pull a body below roughly 680, so "put the other 7,200 words in references"
 does not rescue this either; it produces a body that still has to be written from scratch.
 
@@ -259,7 +259,7 @@ Where that happens the note says so.
 | `<docs_root>` notation, never a literal path | `tests/validate-skills.sh:135-138` | Zero `docs/keel` hits, but the reverse problem applies: the collection writes to fixed repository-root paths (`DESIGN.md`, `AGENTS.md`, `BRIEF.md`, `brand/LAW.md`). keel skills resolve every artifact path from `profile.docs_root` and `profile.artifacts` |
 | Relative links resolve | `tests/validate-skills.sh:149-153`, `:177-182` | Not yet a defect. It becomes one the moment a file is moved into `skills/`, because its sibling links change |
 | Verify commands come from the profile | `setup-deployment/SKILL.md:30`: *"Every pipeline stage runs a command from `profile.verify`. If a command is `null`, the pipeline cannot check that thing and you must say so rather than substituting a guess"* | Every command is hardcoded: `pnpm build`, `npx tsc`, `pnpm audit`, `npx --yes vercel@latest`. **This is the single largest rewrite cost per file** and it is invisible until you try |
-| Vendor-neutral stack detection | `lib/detect-stack.sh:306-369` emits fifteen language values (dart, typescript, javascript, go, php, python, rust, ruby, swift, lua, cpp, csharp, kotlin, java, plsql) from fourteen marker checks. `bin/keel:1946` offers `--stack node\|python\|go\|minimal` | One target. `start-an-app/SKILL.md:22`: *"The stack is fixed: Next.js, TypeScript, Tailwind, shadcn/ui, Drizzle, Better Auth."* **445 mentions of the eight named vendors across the tree** |
+| Vendor-neutral stack detection | `lib/detect-stack.sh:306-369` emits fifteen language values (dart, typescript, javascript, go, php, python, rust, ruby, swift, lua, cpp, csharp, kotlin, java, plsql) from fourteen marker checks. `bin/keel#new)         shift; cmd_new "$@" ;;` offers `--stack node\|python\|go\|minimal` | One target. `start-an-app/SKILL.md:22`: *"The stack is fixed: Next.js, TypeScript, Tailwind, shadcn/ui, Drizzle, Better Auth."* **445 mentions of the eight named vendors across the tree** |
 
 **On the "13 languages" in the brief.** The current count is fifteen emitted values, not thirteen.
 Thirteen was correct before PL/SQL and Dart were added; `docs/ideas/plsql-stack-detection.md:53`

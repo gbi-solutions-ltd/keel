@@ -257,7 +257,7 @@ Scenario: an unknown profile subcommand still names the real ones
 ```
 
 **Notes:** `verify` rather than `build` because `cmd_profile` already guards the missing-profile
-case at `bin/keel:1019-1020` and `sync` inherits it by entering through the same function. The work
+case at `bin/keel#cmd_profile() {` and `sync` inherits it by entering through the same function. The work
 is a test proving it, plus the one word added to the unknown-subcommand message, which is the only
 part not already true.
 

@@ -22,11 +22,19 @@ files and this repository's entire self-hosted docs root.
 ```
 keel/
 ├── .claude-plugin/
-│   ├── marketplace.json                # the repo is its own marketplace
+│   ├── marketplace.json                # the repo is its own marketplace. Codex reads this one too
 │   └── plugin.json                     # plugin manifest. Its version keys the install cache
+│
+├── .codex-plugin/
+│   └── plugin.json                     # the same skills/, and hooks/hooks.codex.json for Tier B
 │
 ├── bin/
 │   └── keel                            # the CLI. Every `keel` subcommand lives in this one file
+│
+├── agents/
+│   └── keel-fanout.md                  # the delegation profile the fan-out skills name, Claude Code
+│                                       # side. Auto-discovered from the plugin root; the Codex side
+│                                       # is written per project by lib/harness/codex.sh
 │
 ├── skills/                             # 25 skills, flat namespace
 │   ├── apex-export/
@@ -121,6 +129,7 @@ keel/
 │   ├── tdd/
 │   │   ├── SKILL.md
 │   │   ├── references/no-test-tooling.md
+│   │   ├── references/rationalisations.md
 │   │   └── references/writing-good-tests.md
 │   ├── write-docs/
 │   │   ├── SKILL.md
@@ -182,10 +191,12 @@ keel/
 │   ├── test-sensitive-guard.sh
 │   ├── test-session-start.sh
 │   ├── test-supply-chain.sh
+│   ├── test-validate-citations.sh
 │   ├── test-validate-skills.sh
+│   ├── validate-citations.sh
 │   ├── validate-skills.sh
 │   ├── fixtures/                       # per-stack detection fixtures, and an APEX capture
-│   └── evals/                          # 12 scenarios, 12 fixtures, results.md
+│   └── evals/                          # 13 scenarios, 13 fixtures, results.md
 │
 ├── .github/
 │   └── workflows/ci.yml                # the pipeline. Its lint comes from .keel/profile.json
@@ -230,11 +241,25 @@ keel/
 └── VERSION
 ```
 
-## The two manifests
+## The manifests, of which there are now three
 
-Both exist. See [`.claude-plugin/plugin.json`](../.claude-plugin/plugin.json) and
-[`.claude-plugin/marketplace.json`](../.claude-plugin/marketplace.json) for the live files
-rather than a copy that can drift.
+One marketplace manifest and two plugin manifests. See
+[`.claude-plugin/marketplace.json`](../.claude-plugin/marketplace.json),
+[`.claude-plugin/plugin.json`](../.claude-plugin/plugin.json) and
+[`.codex-plugin/plugin.json`](../.codex-plugin/plugin.json) for the live files rather than a copy
+that can drift.
+
+**There is one marketplace manifest and not two, and that is a fact rather than a convenience.**
+Probed 2026-09-06 on codex-cli 0.153.4: `codex plugin marketplace add` refuses a root holding only a
+`.codex-plugin` marketplace with "marketplace root does not contain a supported manifest". Codex
+reads `.claude-plugin/marketplace.json`, so the file that was already here is the one it reads.
+
+**Both plugin manifests point `skills` at the same `./skills/` directory.** Nothing is copied,
+symlinked or synchronised, so drift between the two harnesses' skills is not prevented by a check;
+there is nothing to drift from. What differs is `hooks`: Claude Code gets `hooks/hooks.json` by
+convention and Codex is pointed at `hooks/hooks.codex.json`, which is generated without the gates
+the capability manifest withholds from it. Both versions are pinned to `VERSION` by
+`tests/test-keel.sh`, which globs `.*-plugin/plugin.json` rather than naming them.
 
 Facts worth recording, each verified against the plugin documentation:
 
@@ -293,6 +318,16 @@ Three tiers, matching cost.
 - no `@` links
 - every relative link resolves
 - every `**REQUIRED SUB-SKILL:**` names a skill that exists
+
+And `tests/validate-citations.sh`, which checks the other half of a link, the `path/file.md:123`
+citations this repository makes about itself a thousand times over. The cited file exists, the cited
+lines are inside it, and the first cited line is not blank. Nothing checked them until 2026-09-07,
+when two entries prepended to `tests/evals/results.md` shifted it by 479 lines and moved every
+citation into it off its content in silence. It scans every document under `docs/` and `skills/`,
+the top-level markdown, and the whole-line comments of `bin/`, `hooks/`, `lib/` and the two eval
+scripts. The code trees were added the same day, after the first version shipped without them and
+left 28 comment citations checked by nobody, two of them already stale. A path inside executing code
+is an argument to a command rather than a claim, so only comments are read.
 
 **Tier 2, integration, free, runs on every commit.** `keel init` against each fixture repo:
 - profile detection is correct per stack

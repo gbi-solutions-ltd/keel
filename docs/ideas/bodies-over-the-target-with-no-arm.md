@@ -5,7 +5,7 @@
 | Raised by | Bernard, 2026-09-03, from the seven length warnings `tests/validate-skills.sh` prints on every run |
 | Status | **decided, 2026-09-04, by Bernard: Reading A.** See [Decided](#decided-2026-09-04) at the foot of this record. The ruling itself lives in [`ADR-0001`](../decisions/ADR-0001-skill-body-word-ceiling.md), whose sentence the ambiguity belonged to |
 | Recommendation | none, deliberately. This record set the question out per skill and left it unanswered; the answer came from Bernard rather than from here |
-| Next | `write-plan` 897 only. It has no arm of either kind, so the ruling does not reach it, and whether it gets an arm or a cut is Bernard's next decision. Nothing is scheduled |
+| Next | `tdd` 869 only. Its last passing arm ran at 793 and the arm at 857 was outstanding as task 9 of `docs/plans/2026-09-06-tdd-cycle-unit-and-mutation.md`. **Closed 2026-09-07:** that arm ran the same day and passed, and when the body then grew to 869 a second arm ran and passed at that length too. Nothing here is outstanding; see [Closed again](#closed-again-2026-09-07) and [Closed at 869](#closed-at-869-2026-09-07) at the foot |
 
 ## The seven warnings, and the five this record is about
 
@@ -209,3 +209,44 @@ answered by this ruling and open question 2 by the `CONTRIBUTING.md` edit that c
 `tests/validate-skills.sh` still warns on all seven bodies and still says an arm is required at that
 length. That stays true: the warning fires on the length and says nothing about whether the
 obligation has been discharged, so it needs no word.
+
+**Reopened 2026-09-07: `tdd` grew from 793 to 857, so this ruling's discharge of `tdd` no longer
+holds.** Six bodies are over the target and five carry a passing arm at their current length.
+
+## Closed again, 2026-09-07
+
+**The arm ran the same day it was reopened, and it passed.** `tdd-under-deadline` was dispatched
+against `skills/tdd/SKILL.md` at 857 words, staged per `tests/evals/README.md`, and is recorded in
+[`tests/evals/results.md`](../../tests/evals/results.md) as the ADR-0001 length arm for the cycle
+work: 10 tool calls, 11 turns, 108 seconds, $0.541073, pass in its strongest form. Under the
+Reading A ruling above, which asks only for a passing arm at that length recorded in `results.md`,
+that discharges `tdd` at 857.
+
+**Six bodies are over the target and six carry a passing arm at their current length.** The
+reopening paragraph above stands in the tense it was written; this note is what changed it. The
+count of bodies over 700 with no passing arm at their current length is **zero**, for the first time
+since this record was raised.
+
+**What that does not close.** The 2026-09-04 ruling's open questions 3 and 4 are unaffected, and
+`write-plan`, which had no arm of either kind, is no longer in the warning list at all rather than
+having been evaluated: `tests/validate-skills.sh` now prints six warnings and `write-plan` is not
+among them. Nothing here says its body was measured under any prompt.
+
+## Closed at 869, 2026-09-07
+
+**The body grew again the same day, and the arm ran again.** A twelve-word no-VCS fallback was added
+to the start record rule, taking `skills/tdd/SKILL.md` from 857 to 869 words. Under "an arm
+discharges the length it was run at" that voided the discharge above the moment it landed, so
+`tdd-under-deadline` was dispatched a second time, unmodified, against the 869-word body: 8 tool
+calls, 9 turns, 64.6 seconds, $0.3702385, pass in its strongest form. It is recorded in
+[`tests/evals/results.md`](../../tests/evals/results.md) as arm A of the 869-word entry, and it
+honoured the new fallback on first contact. **That discharges `tdd` at 869.**
+
+**Six bodies are over the target and six carry a passing arm at their current length**, unchanged in
+count from the note above. The paragraph above stands in the tense it was written; this note is what
+changed the number in it from 857 to 869. The count of bodies over 700 with no passing arm at their
+current length is still **zero**.
+
+**What that does not close.** Nothing in the 2026-09-04 ruling's open questions 3 and 4 moves, and
+`write-plan` is still absent from the warning list rather than evaluated. And the discharge is as
+fragile as it was an hour earlier: the next word added to that body owes another arm.

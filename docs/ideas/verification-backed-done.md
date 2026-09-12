@@ -63,7 +63,7 @@ be disabled.
 
 | Assumption | True if | How we would know | Checked? |
 |---|---|---|---|
-| A `Stop` hook can see the turn's tool calls | The event input carries `tool_calls` and `last_assistant_message` | Documented on the hooks page; not yet run against a real turn | Documented, not run |
+| A `Stop` hook can see the turn's tool calls | The event input carries `tool_calls` and `last_assistant_message` | Documented on the hooks page; not yet run against a real turn | **RUN 2026-09-05. FALSE.** Stop carries no `tool_calls`; it exists on `PostToolBatch` alone. The gate built on this never fired. See CHANGELOG Unreleased |
 | Blocking `Stop` does not loop | The model runs the verify command and the second `Stop` passes | Needs a test with a deliberately unverified turn | No |
 | The profile's `verify.test` is recognisable in a `Bash` call | The command string appears in the tool input | True for `tests/run-tests.sh`; unproven for commands with wrappers or a changed cwd | No |
 | A per-task done condition is writable for every task | Some tasks are documentation-only | Documentation tasks would need a non-test check, or an explicit "no command" marker | No |

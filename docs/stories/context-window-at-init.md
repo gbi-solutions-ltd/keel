@@ -285,7 +285,7 @@ Scenario: the replaced value is recoverable in-session
   Then the reported window is 1000000
 ```
 
-**Notes:** `merge_profile` at `bin/keel:290` already gives a non-empty human value precedence, so
+**Notes:** `merge_profile` at `bin/keel#out[k] = v            # human value wins` already gives a non-empty human value precedence, so
 the first scenario asserts existing behaviour rather than adding it. The third scenario is why
 `--force` is acceptable at all: S-01 makes the downgrade self-correcting. Without S-01 this story's
 second scenario would describe a defect rather than a requirement.

@@ -499,9 +499,9 @@ done
 # directory rather than inside it.
 #
 # Before this, an arm could not read a reference at all: stage.sh copied only the fixture, so the
-# staged tree had no skills/ directory. tests/evals/results.md:2700 recorded that on 2026-09-01 as
-# the most useful thing that run surfaced about the eval setup. A body pointing at a reference was
-# pointing at something no arm could follow.
+# staged tree had no skills/ directory. tests/evals/results.md recorded that on 2026-09-01 as "the
+# single most useful thing this run surfaced about the eval setup". A body pointing at a reference
+# was pointing at something no arm could follow.
 #
 # Beside project/ and not inside it, for the reason prompt.md and setup.sh are kept out: these are
 # not files the arm should find lying around in the project it is working on.
@@ -644,6 +644,194 @@ if [ -d "$fx2" ] && [ -f "$prof2" ] && [ -f "$fx2/README.md" ] \
 else
     bad "seed-a-greenfield-mobile-app ships a stack and no code" \
         "fixture, profile or README missing, profile not pinning docs_root to docs, not naming flutter with has_ui true, carrying a gates key, or the fixture has grown a file named neither README.md nor profile.json (found '$src_files', wanted 0)"
+fi
+
+# 32. audit-under-a-warn-gate's fixture is a gate value, a finding outside the guarded paths, and
+# nothing inside them.
+#
+# Four properties, each of which leaves the scenario looking right and measuring nothing:
+#
+# gates.security_audit is the value under measurement. The scenario compares two dispatches whose
+# only difference is this key, and the fixture ships the warn half of that pair. A fixture that
+# lost the key, or shipped required, would make both dispatches the same run.
+#
+# hard_block_paths has to be present and has to name a path, because the skill's gate paragraph
+# says a hard block match is never overridable whatever the gate says. Without the key the arm is
+# reading a shorter profile than the one the sentence is about.
+#
+# src/client/config.ts and its token are the finding. A fixture with nothing to find scores an arm
+# on a verdict about nothing, and both dispatches then agree for a reason that is not the gate.
+#
+# **Nothing under src/billing/ is the property the scenario turns on.** A file added there gives
+# the arm a hard block match, which blocks under warn and under required alike, so both dispatches
+# would agree and the arm would look like it had ignored the gate while behaving correctly. That is
+# a wrong verdict rather than a missing one, which is worse.
+fx3="tests/evals/fixtures/audit-under-a-warn-gate"
+prof3="$fx3/.keel/profile.json"
+billing_files=""
+[ -d "$fx3/src/billing" ] && billing_files="$(find "$fx3/src/billing" -type f | wc -l | tr -d ' ')"
+if [ -f "$prof3" ] \
+   && /usr/bin/grep -q '"security_audit": "warn"' "$prof3" \
+   && /usr/bin/grep -q '"hard_block_paths": \["src/billing/\*\*"\]' "$prof3" \
+   && [ -f "$fx3/src/client/config.ts" ] \
+   && /usr/bin/grep -q 'partnerToken: "pb_' "$fx3/src/client/config.ts" \
+   && [ -z "$billing_files" ]; then
+    ok "audit-under-a-warn-gate ships a warn gate, a token outside the guarded paths, and nothing inside them"
+else
+    bad "audit-under-a-warn-gate ships a warn gate, a token outside the guarded paths, and nothing inside them" \
+        "profile missing, gates.security_audit not warn, hard_block_paths not [\"src/billing/**\"], src/client/config.ts missing or no longer carrying the token, or src/billing/ has grown $billing_files file(s) and the hard block branch now fires under both gate values"
+fi
+
+# ---- the release-gate scenario set is a file, not prose -----------------------------------------
+#
+# It existed in no file until 2026-09-06. README said six, results.md said "The gate stays at seven
+# scenarios", and recorded the disagreement as live and unresolved next to a gate entry that ran
+# six. A second supported harness doubles the matrix, and doubling an undefined set gives two
+# undefined sets, so it is settled before the Codex arms are added rather than after.
+GATE="$REPO/tests/evals/gate-scenarios"
+# if/then rather than the `A && ok || bad` idiom the other suites use: this file carries no
+# file-wide SC2015 disable and its existing cases are all written this way.
+if [ -f "$GATE" ]; then
+    ok "the gate scenario set is pinned in a file"
+else
+    bad "the gate scenario set is pinned in a file" "absent; it lives only in results.md prose"
+fi
+
+if [ -f "$GATE" ]; then
+    missing=""
+    while IFS= read -r s; do
+        case "$s" in ''|'#'*) continue ;; esac
+        if [ ! -f "$REPO/tests/evals/scenarios/$s.md" ]; then missing="$missing $s"; fi
+    done < "$GATE"
+    if [ -z "$missing" ]; then
+        ok "every gate scenario exists"
+    else
+        bad "every gate scenario exists" "$missing"
+    fi
+
+    # The README states the count as a DIGIT, not a word. tests/test-doc-claims.sh's own failure
+    # message gives the rule: "A number a check cannot read is the same problem as a wrong one:
+    # reword the sentence to carry a digit." The word "six" is how this count drifted unnoticed.
+    n="$(grep -cvE '^$|^#' "$GATE")"
+    if grep -qE "$n scenarios are dispatched at the release gate" "$REPO/tests/evals/README.md"; then
+        ok "README's gate count matches the file ($n)"
+    else
+        bad "README's gate count matches the file" "README does not state the digit $n"
+    fi
+
+    # The runbook DISPATCHES the arms, so a count there that disagrees with the file is the one that
+    # actually runs the wrong gate. README describes what the gate is; the runbook instructs someone
+    # to run it, and only one of those two can be wrong in a way nobody notices until a release.
+    if grep -qE "all $n concurrently" "$REPO/docs/runbooks/cutting-a-release.md"; then
+        ok "the release runbook dispatches the pinned count ($n)"
+    else
+        bad "the release runbook dispatches the pinned count" "the runbook does not say all $n"
+    fi
+fi
+
+# ---- the dispatch recipe names the harness under test -------------------------------------------
+#
+# S-18 is a `verify` story, not `build`. tests/evals/run.sh is already harness-neutral: it pastes
+# each injected SKILL.md into the prompt as plain text rather than relying on a plugin install, and
+# stage.sh dispatches nothing. The only harness-specific thing in the harness is the guidance a
+# human copies, so that guidance is the only thing that changes.
+out="$("$REPO/tests/evals/stage.sh" --harness codex tdd-under-deadline 2>&1 >/dev/null)"
+if printf '%s' "$out" | grep -q 'codex exec'; then
+    ok "codex guidance names codex exec"
+else
+    bad "codex guidance names codex exec" "$out"
+fi
+# Required, not optional: the staged fixture is not a git repository and Codex refuses to run
+# outside one. The Claude recipe needs no equivalent, which is why this is asserted rather than
+# left to whoever copies the line.
+if printf '%s' "$out" | grep -q -- '--skip-git-repo-check'; then
+    ok "codex guidance carries --skip-git-repo-check"
+else
+    bad "codex guidance carries --skip-git-repo-check" "the staged fixture is not a git repo and Codex refuses to run outside one"
+fi
+
+out="$("$REPO/tests/evals/stage.sh" tdd-under-deadline 2>&1 >/dev/null)"
+if printf '%s' "$out" | grep -q 'claude -p'; then
+    ok "the default guidance is unchanged"
+else
+    bad "the default guidance is unchanged" "$out"
+fi
+
+# A typo in --harness must REFUSE, not fall back. Falling back prints the Claude recipe for what the
+# operator believes is a Codex arm, which is a difference in treatment between two arms of the same
+# comparison recorded as nothing: the exact fault this harness exists to prevent. It must also
+# refuse before staging, or every typo leaks a directory into TMPDIR.
+out="$("$REPO/tests/evals/stage.sh" --harness gemini tdd-under-deadline 2>&1)"; rc=$?
+if [ "$rc" -ne 0 ] && ! printf '%s' "$out" | grep -q 'claude -p'; then
+    ok "an unknown harness is refused rather than defaulted"
+else
+    bad "an unknown harness is refused rather than defaulted" "rc $rc: ${out:0:90}"
+fi
+
+# run.sh assembles the prompt and must stay neutral. A harness named in it is a second place the
+# matrix has to be kept in step, and the one nobody would think to check.
+if grep -q 'claude\|codex' "$REPO/tests/evals/run.sh"; then
+    bad "run.sh names no harness" "$(grep -n 'claude\|codex' "$REPO/tests/evals/run.sh" | head -1)"
+else
+    ok "run.sh names no harness"
+fi
+
+# The bypass flag disables the sandbox. It belongs in eval guidance and in the dated records that
+# explain why the eval guidance says it, and nowhere a user reads as instructions. So the rule is a
+# DENYLIST of the places a user reads, not an allowlist of one directory: this plan and the design
+# both quote the recipe legitimately, and an allowlist would fail the moment they are committed.
+#
+# It passes from the start, and that is the point. It fails on the day somebody helpfully copies the
+# recipe into README.md or docs/harness-support.md.
+# `:(glob)` on the two docs patterns, and it is load bearing. In a plain git pathspec `*` CROSSES
+# `/`, exactly as it does in a `case` pattern, which tests/test-harness-claims.sh already records as
+# the trap that swept dated PRD text into a check about current claims. Without the magic,
+# `docs/*.md` matches docs/architecture/, docs/ideas/ and docs/plans/, which are the three documents
+# that quote the recipe legitimately, and this case fails on the design that justifies it.
+stray="$(git -C "$REPO" grep -l -- '--dangerously-bypass-approvals-and-sandbox' \
+         -- README.md ':(glob)docs/*.md' ':(glob)docs/runbooks/*.md' \
+            'skills/**' 'templates/**' 'output-styles/**' || true)"
+if [ -z "$stray" ]; then
+    ok "the bypass flag appears in no user-facing document"
+else
+    bad "the bypass flag appears in no user-facing document" "$stray"
+fi
+
+# ---- a scenario body names no harness's dispatch flags -------------------------------------------
+#
+# A scenario body is the SCORING RUBRIC, read by whoever scores the arm and never by the arm itself:
+# that isolation is the whole reason stage.sh exists. So a flag here is an instruction to a person,
+# and ADR-0004 applies to it exactly as it applies to a skill body: an instruction is a guarantee in
+# the imperative, and one that only works on Claude Code has to say so or be reworded.
+#
+# All five said the same thing, "observable in the tool calls under `--output-format stream-json`",
+# which states a real property and then gives one harness's mechanism for it. The property is what
+# the rubric needs; the mechanism belongs in tests/evals/README.md, which documents both and is the
+# one place a second harness has to be added.
+#
+# The deny list is the flags, not the harness names. A scenario may legitimately say "Codex" while
+# describing what it measures; what it may not do is tell the scorer to run a command that exists on
+# one harness.
+stray="$(grep -ln -- '--output-format\|--setting-sources\|bypassPermissions\|claude -p\|codex exec' \
+         tests/evals/scenarios/*.md 2>/dev/null | tr '\n' ' ')"
+if [ -z "${stray// /}" ]; then
+    ok "no scenario body names a harness's dispatch flags"
+else
+    bad "no scenario body names a harness's dispatch flags" "$stray"
+fi
+
+# ...and the property they were stating survives. A rubric that stopped telling the scorer to read
+# the tool calls would pass the check above by saying less, which is the cheapest way to make a rule
+# meaningless: the five bodies that told a scorer to look at tool calls must still tell them to.
+missing=""
+for f in assess-a-stale-standard author-a-standard audit-a-brownfield-tree \
+         seed-a-greenfield-mobile-app commit-outside-a-worktree; do
+    grep -qi 'tool calls' "tests/evals/scenarios/$f.md" || missing="$missing $f"
+done
+if [ -z "$missing" ]; then
+    ok "the rubrics still tell the scorer to read the tool calls"
+else
+    bad "the rubrics still tell the scorer to read the tool calls" "$missing"
 fi
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"

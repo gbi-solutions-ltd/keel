@@ -419,7 +419,7 @@ end of this step, once `has_oracle_token` exists; apply it once rather than edit
 
 Without the defaults, an `awk` that fails to run leaves both empty and bash prints
 `[: : integer expression expected` onto the user's terminal during `init`. The answer stays
-correctly negative either way; the error message is the defect. `bin/keel:327` already uses this
+correctly negative either way; the error message is the defect. `bin/keel#[ "${src:-0}" -gt 0 ] && printf 'service'` already uses this
 idiom.
 
 Then correct the `is_plsql_tree` comment, which is wrong in both of its numbers and in its
@@ -1286,7 +1286,7 @@ reading the cited lines directly:
 2. `detect_datastores` re-ran the entire `detect_languages` cascade (including both PL/SQL tree
    walks) to test membership, contradicting the precedent `detect_verify` already set in this same
    file for exactly this reason (language passed in by the caller, which already knows it). **Fixed**:
-   now takes `lang` as an optional first argument; `write_profile` (`bin/keel:358`) passes it.
+   now takes `lang` as an optional first argument; `write_profile` (`bin/keel#"$(json_str_array "$(detect_datastores "$lang")")" "$ui"`) passes it.
 3. `lang_profile`'s APEX marker was a bare substring grep on `manifest.json`, so a value equal to the
    string `apex_version` (not a key) would false-positive, contradicting the comment's own claim.
    **Fixed**: anchored to `"apex_version"[[:space:]]*:`.

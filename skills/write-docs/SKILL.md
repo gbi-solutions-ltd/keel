@@ -52,7 +52,8 @@ Most of what a README needs has already been established, and re-deriving it pro
 subtly different account.
 
 Where those do not exist and the code must be read instead, delegate that reading to concurrent
-`Explore` agents in one message, model `sonnet`: theirs is discarded, yours sits in context all
+subagents in one message, delegation profile `keel-fanout`: theirs is discarded, yours sits in
+context all
 session. Findings are leads, so verify anything you state as fact.
 
 Where something is genuinely unknown, write `Unknown` rather than a plausible guess. A confidently

@@ -192,7 +192,27 @@ m_invisible() { printf 'let admin = false; // %s\n' "$(printf '\xe2\x80\xae')" >
 run "an invisible bidirectional character is rejected" 1 m_invisible
 
 m_orphan()   { printf '#!/bin/sh\necho hi\n' > "$1/hooks/extra-hook"; chmod +x "$1/hooks/extra-hook"; }
-run "a hook not registered in hooks.json is rejected" 1 m_orphan
+run "a hook not registered in any manifest is rejected" 1 m_orphan
+
+# There is more than one manifest since 2026-09-06, and both halves of that need pinning.
+#
+# A hook registered only on the SECOND harness is registered. Without this the rule reads hooks.json
+# alone and flags the first gate that is Codex-only, which is a false stop on a correct tree, and
+# the check people learn to ignore.
+m_orphan_codex() {
+    printf '#!/bin/sh\necho hi\n' > "$1/hooks/codex-only-hook"; chmod +x "$1/hooks/codex-only-hook"
+    printf '{"hooks":{"Stop":[{"hooks":[{"command":"codex-only-hook"}]}]}}\n' > "$1/hooks/hooks.codex.json"
+}
+run "a hook registered only in the codex manifest is allowed" 0 m_orphan_codex
+
+# ...and a manifest is not itself an orphan hook. This is the case that went red the day
+# hooks/hooks.codex.json was first generated, because the rule exempted the one manifest it knew by
+# name. Exempting by shape rather than by name is what stops the third manifest doing it again.
+m_second_manifest() {
+    printf '{"hooks":{"SessionStart":[{"hooks":[{"command":"session-start"}]}]}}\n' \
+      > "$1/hooks/hooks.codex.json"
+}
+run "a second hooks manifest is not an orphan hook" 0 m_second_manifest
 
 # ---- must NOT be rejected --------------------------------------------------
 #

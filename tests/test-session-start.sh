@@ -279,7 +279,6 @@ for spec in "b:1279:terse and technical" "g:1278:terse and plain" \
     fi
 done
 
-
 # Every request of every session carries this prefix, so a byte added here is paid forever. It
 # measured about 356 estimated tokens on 2026-08-18 against a 400 ceiling, and the remaining
 # headroom is already spoken for by two other ideas. Nothing in the context window work touches
@@ -293,7 +292,12 @@ done
 # 0, and `0 -le 356` passed: the hook could have been deleted and this stayed green. And a bound
 # with no floor cannot tell "unchanged" from "produced nothing". $HOOK is absolute, and the lower
 # bound is what makes a silent failure a failure.
-chars=$("$HOOK" 2>/dev/null | wc -c | tr -d ' ')
+# Measured from a directory with no .keel/handoff.md, because that is what "every request of every
+# session" means. This repository happens to have a handoff on disk, and running the hook from the
+# repo root therefore measured the compact-only pointer as though it were paid on every request.
+# The pointer is bounded separately below rather than left unmeasured.
+clean_dir="$(mktemp -d)"
+chars=$( cd "$clean_dir" && "$HOOK" 2>/dev/null | wc -c | tr -d ' ')
 est=$(( chars * 10 / 36 ))
 if [ "$est" -ge 300 ] && [ "$est" -le 356 ]; then
     ok "the injected session prefix is still about $est tokens, between 300 and 356"
@@ -302,6 +306,18 @@ elif [ "$est" -lt 300 ]; then
 else
     bad "prefix" "the prefix grew to about $est tokens; the 400 ceiling has 44 tokens of headroom and it is spoken for"
 fi
+
+# The compact-only pointer is not paid on every request, but it is paid at the one moment context is
+# scarcest, so it gets its own bound against the same 400 ceiling rather than going unmeasured.
+mkdir -p "$clean_dir/.keel" && printf 'a handoff\n' > "$clean_dir/.keel/handoff.md"
+h_chars=$( cd "$clean_dir" && "$HOOK" 2>/dev/null | wc -c | tr -d ' ')
+h_est=$(( h_chars * 10 / 36 ))
+if [ "$h_est" -le 400 ] && [ "$h_est" -gt "$est" ]; then
+    ok "with a handoff the prefix is about $h_est tokens, inside the 400 ceiling"
+else
+    bad "prefix with handoff" "about $h_est tokens against a 400 ceiling, base $est"
+fi
+rm -rf "$clean_dir"
 
 # Both plain forms must keep artifacts exempt from the brevity rule, not merely from the vocabulary
 # rule. "artifacts stay full" is the only thing in the injected context that says a PRD or a plan is
@@ -320,5 +336,53 @@ for spec in "g:terse and plain" "h:verbose and plain"; do
     esac
 done
 
+# After a compaction the session has lost the conversation, and .keel/handoff.md is the one thing
+# written to survive it. PreCompact cannot announce it: the harness discards that hook's
+# systemMessage. This hook already runs on compact, and additionalContext genuinely reaches the
+# model, so this is where the next session finds out the file exists.
+w="$(mktemp -d)"; mkdir -p "$w/.keel"
+out="$( cd "$w" && "$HOOK" 2>/dev/null )"
+case "$out" in *handoff*) bad "no handoff, no mention" "named a handoff that does not exist" ;;
+  *) ok "no handoff, no mention" ;; esac
+
+printf 'a handoff\n' > "$w/.keel/handoff.md"
+out="$( cd "$w" && "$HOOK" 2>/dev/null )"
+case "$out" in *handoff*) ok "an existing handoff is named to the new session" ;;
+  *) bad "handoff not named" "the file exists and the injected context does not mention it" ;; esac
+
+# ONCE, AND ONLY ONCE. Nothing ever deletes .keel/handoff.md, and this hook fires on startup and
+# clear as well as compact, so the pointer was permanent: from the first compaction onward every
+# session in that repository, days later and about other work, was told "the previous context was
+# compacted into it" and sent to a stale summary of a conversation it never had. The sentence is
+# true for the session that resumes the compaction and false for every one after it.
+out="$( cd "$w" && "$HOOK" 2>/dev/null )"
+case "$out" in *handoff*) bad "a handoff is named once, not forever" "the second session was sent to the same stale handoff" ;;
+  *) ok "a handoff is named once, not forever" ;; esac
+
+# A NEW compaction is a new handoff, and it must be announced again. Without this the fix is a
+# one-shot that silences every handoff after the first, which is the same bug pointing the other
+# way. The marker is compared by modification time, so the fixture has to move the clock rather
+# than only rewrite the file.
+sleep 1
+printf 'a second handoff
+' > "$w/.keel/handoff.md"
+out="$( cd "$w" && "$HOOK" 2>/dev/null )"
+case "$out" in *handoff*) ok "a fresh handoff is named again" ;;
+  *) bad "a fresh handoff is named again" "a new compaction went unannounced" ;; esac
+
+# An EMPTIED handoff is not a handoff. skills/context-budget step 7 empties this file rather than
+# deleting it, deliberately, because it is git-ignored and anything durable left in it is lost. A
+# test for existence rather than content sent every later session to read nothing, which defeats the
+# one documented way to clear the pointer.
+sleep 1
+: > "$w/.keel/handoff.md"
+out="$( cd "$w" && "$HOOK" 2>/dev/null )"
+case "$out" in *handoff*) bad "an emptied handoff is not named" "sent the session to an empty file" ;;
+  *) ok "an emptied handoff is not named" ;; esac
+rm -rf "$w"
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
+
+
+

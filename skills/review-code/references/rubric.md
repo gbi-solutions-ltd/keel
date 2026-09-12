@@ -51,8 +51,20 @@ through:
 
 ## 3. Tests
 
-- Does a new behaviour have a test, and would that test fail if the behaviour were removed? Try
-  to answer the second part concretely; it is the one that catches vacuous tests.
+- Does a new behaviour have a test, and would that test fail if the behaviour were removed?
+- **On a diff that adds tests: how many of the added cases have been proved able to fail, and by
+  what?** A case watched going red in RED is proved. A case that could not be watched, one pinning
+  behaviour that already existed or one written against code that already worked, is proved only
+  once someone reverted the line it covers and saw it go red. Ask for the count and for what
+  produced it. "They all pass" is the answer this question exists to catch.
+- **A suite that cannot fail is a finding, and it outranks a missing case.** Read what the added
+  cases hold constant. Where every case passes the same value on both sides of the distinction the
+  change turns on, `GBP GBP` where the bug is a payout currency read from the wrong variable, every
+  case is correct, every case is green, and none of them could have caught it. `verify.test` is
+  already running from step 3, so this costs two minutes: revert the line, run the file, restore it.
+  A green run is the finding, and the fix is the case that would kill it. The recipe and the worked
+  example are in
+  [../../tdd/references/writing-good-tests.md](../../tdd/references/writing-good-tests.md).
 - Does the test assert on observable behaviour, or on a mock having been called?
 - Was it written first? Check commit order, not the author's word.
 - Is the failure path tested, or only the happy path?

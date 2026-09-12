@@ -11,8 +11,8 @@ cd "$(dirname "$0")/.." || exit 1
 # parallelising by grepping every test file for hardcoded /tmp paths and shared env: the only
 # "shared" looking strings found are literal "$HOME" and "/tmp/..." text some supply-chain-scan
 # fixtures write INTO a scanned file, never executed. tests/validate-skills.sh,
-# tests/no-internal-leaks.sh and tests/supply-chain-scan.sh, run "against this repo" below, only
-# read the tree (git ls-files) and are safe alongside everything else for the same reason. That
+# tests/no-internal-leaks.sh, tests/supply-chain-scan.sh and tests/validate-citations.sh, run
+# "against this repo" below, only read the tree and are safe alongside everything else. That
 # makes all of the jobs below independent, so they run in parallel rather than one after another.
 
 names=(); cmds=()
@@ -32,9 +32,13 @@ add "tests/test-session-start.sh"   "tests/test-session-start.sh"
 add "tests/test-cache-install.sh"   "tests/test-cache-install.sh"
 add "tests/test-doc-claims.sh"      "tests/test-doc-claims.sh"
 add "tests/test-eval-harness.sh"    "tests/test-eval-harness.sh"
+add "tests/test-harness-resolve.sh"  "tests/test-harness-resolve.sh"
+add "tests/test-harness-claims.sh"   "tests/test-harness-claims.sh"
+add "tests/test-validate-citations.sh" "tests/test-validate-citations.sh"
 add "tests/validate-skills.sh (against this repo)"   "tests/validate-skills.sh"
 add "tests/no-internal-leaks.sh (against this repo)" "tests/no-internal-leaks.sh"
 add "tests/supply-chain-scan.sh (against this repo)" "tests/supply-chain-scan.sh"
+add "tests/validate-citations.sh (against this repo)" "tests/validate-citations.sh"
 
 # The same lint CI runs, read from the profile so the two cannot drift. Skipped when shellcheck is
 # absent, with a warning, because it is a developer dependency and not a runtime one. Wrapped as a
@@ -63,6 +67,21 @@ add "lint (verify.lint from .keel/profile.json)" "run_lint"
 LOG_DIR="$(mktemp -d)"
 trap 'rm -rf "$LOG_DIR"' EXIT
 MAX_JOBS=4
+
+# No ambient git identity, for every job below. The CI runner has none, and on 2026-09-07 three
+# cases in tests/test-keel.sh failed there with `fatal: empty ident name (for <runner@...>) not
+# allowed`: their setup's `git init && ... && git commit && keel init` chain aborted at the commit,
+# no .keel/profile.json was ever written, and the assertion reported an empty value rather than a
+# wrong one. All three passed on every laptop, because a laptop has a global user.name. Setting
+# user.useConfigOnly turns git's identity auto-detection off, so a fixture that means to commit has
+# to configure its own identity, and the next setup copied from one of these fails on the machine
+# that wrote it instead of in CI. The file is real and writable, not /dev/null, because
+# tests/test-keel.sh asserts `keel guard install` leaves the global config alone and that assertion
+# has to be able to see a global write.
+GIT_CONFIG_SYSTEM=/dev/null
+GIT_CONFIG_GLOBAL="$LOG_DIR/gitconfig"
+printf '[user]\n\tuseConfigOnly = true\n' > "$GIT_CONFIG_GLOBAL"
+export GIT_CONFIG_SYSTEM GIT_CONFIG_GLOBAL
 
 n=${#names[@]}
 i=0

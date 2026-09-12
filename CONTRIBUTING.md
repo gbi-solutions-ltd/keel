@@ -48,8 +48,10 @@ you are covered for.
   grows past the length of its last passing arm owes a new one. A gate arm counts, per ADR-0001's
   clarification of 2026-09-04. Six bodies carry a passing arm at their current length:
   `coding-standards` 795 (2026-09-03), `write-docs` 756 (2026-09-02), `context-budget` 723
-  (2026-09-02) and `write-prd` 793 (2026-08-30) on dedicated length arms, and `tdd` 793 and
-  `execute-plan` 884 on the 0.17.0 release gate of 2026-09-01, all in `tests/evals/results.md`.
+  (2026-09-02), `write-prd` 793 (2026-08-30) and `tdd` 869 (2026-09-07) on dedicated length arms,
+  and `execute-plan` 884 on the 0.17.0 release gate of 2026-09-01, all in `tests/evals/results.md`.
+  `tdd` reached 869 on 2026-09-07, over two edits the same day, and the `tdd-under-deadline` arm
+  dispatched at each of those lengths the same day passes, so it is discharged rather than owed.
   Assume 700 is the limit unless you are willing to run one. Aim at 400 for one linear path, 600
   when it fans out to subagents or carries modes.
 - No `@` links. They force-load at parse time and burn context before it is needed.
@@ -76,6 +78,30 @@ you are covered for.
 - `templates/profile.schema.json` cannot change shape without `SCHEMA_VERSION` moving, because
   `doctor` compares the version and not the fields, so a silent schema change is one it stays quiet
   about.
+- **Write prose about a stale citation without using the citation form.** "line 1207 of `bin/keel`",
+  or a fenced block, never the colon form. `tests/validate-citations.sh` cannot tell a claim from a
+  quotation and must not try, so a document that lists broken citations makes them: this happened
+  three times in one afternoon on 2026-09-09, including in the sentence recording it.
+- A key **removed** from `templates/profile.schema.json` gets a line in `bin/keel`'s `retired_keys`
+  in the same commit, saying which schema version removed it and what to do instead. Doctor reads
+  that register to tell a project its profile still carries a dead key, and nothing can detect a
+  removal you did not record: the schema fingerprint is a hash of the field set, so it proves the
+  set moved and can never say which way. The validator checks only the other direction, that no
+  registered key is still declared.
+- Every key in `templates/profile.schema.json` declares `x-keel-read-by`, and the citation it gives
+  still resolves. `code:<path>` where something executes, `advisory:<path>` where a markdown file is
+  prose a model may follow and nothing asserts it, `human` where a person is the reader,
+  `unread:<path>` naming the record that decided nothing reads it, `observed:<path>` naming the
+  record that measured a model reading it unprompted. The path is followed by
+  `:<line>`, or by `#<phrase>` where the phrase is matched literally anywhere in the file.
+  **Prefer the phrase for `bin/keel`, `tests/validate-skills.sh` and `tests/test-keel.sh`**, which
+  take insertions in most weeks: 47 lines landed in `bin/keel` in one commit on 2026-09-09 and moved
+  32 citations that had been correct, with every check green. A phrase carries no backtick and no
+  pipe, because `docs/profile-keys.md` renders these citations inside a markdown table. **The check does not tie the line to the key**, deliberately: the
+  phrase-matching version of that idea was measured at a 70% false positive rate and thrown away,
+  which `tests/validate-citations.sh` records. 22 of 61 keys were read by nothing on 2026-09-07
+  while the changelog recorded seven; a key that cannot say what reads it is a key a user tests by
+  hand.
 - **Shipped content names no organisation.** Nothing under `skills/`, `templates/` or
   `output-styles/` carries the house's own name; say "the house defaults" or "a service following
   the observability standard" instead. `tests/no-internal-leaks.sh` enforces it, so publishing stays
@@ -132,9 +158,9 @@ unrecoverable.
 - **Documentation lands in the same commit.** `README.md`, `CHANGELOG.md`, and the plan. A status line
   claiming 3 of 19 when 5 exist makes every other claim suspect.
 
-**Review:** either Bernard Tebandeke or Edrine Kamya, and never the change's own author. Both are not
-required; requiring both would stall the tool whenever one is busy, which is how internal tooling
-dies.
+**Review:** either Bernard Tebandeke or `gfsekamanya`, and never the change's own author. Both are
+not required; requiring both would stall the tool whenever one is busy, which is how internal
+tooling dies.
 
 ## Releases
 

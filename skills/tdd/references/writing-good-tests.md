@@ -14,6 +14,112 @@ Applied to a real case: a test that asserts `mockRepository.save` was called onc
 mock was called. Delete the entire repository implementation and the test still passes. The
 production change that should break it, saving the wrong data, does not.
 
+## Picking the smallest production change when two names both cover a case
+
+The cycle's unit is the set of cases that all go red for one named missing production change, and
+the name has to be the **smallest** change that makes the case red. Two candidate names will often
+both cover a case, and the coarser one is always the more convenient: the coarser the name, the more
+cases fall under it, and the fewer whole-suite runs the unit costs. That convenience is exactly why
+the rule picks the smaller one.
+
+Read the smallest change off the diff, not off the wording. Take a payouts case: a request carries
+`acc_1 500 USD`, the account is GBP, and the stored row comes back with an empty currency field.
+
+| Candidate name | What it covers | Verdict |
+|---|---|---|
+| "Fix payout currency handling" | The empty field, the USD-on-a-GBP-account conflict, the rounding boundary | Too coarse. Three edits that could ship separately |
+| "Take the stored currency from the account" | The empty field, and the cases that read that field back | The smallest change that makes the empty-field case red. This is the unit |
+| "Reject a request whose currency differs from the account's" | The conflict case only | A second production change, so a second unit |
+
+Two questions settle it when the names are close. Does one candidate need edits in two places that
+could ship separately? Then it is two units. And if only the smaller change were missing, would the
+case still be red? If yes, the larger name is doing more than the case demands.
+
+Splitting is cheap and folding is not. A unit split one level too fine costs one extra suite run at
+the boundary. A unit folded one level too coarse hides which change the cases were proving, which is
+the thing watching them fail was supposed to establish.
+
+## The RED tally, worked
+
+Verify RED asks for a tally: how many cases written, how many failed, and for each one that passed
+on its first run, the behaviour it pins. The 0.15.0 `tdd-under-deadline` arm produced the shape
+worth copying. It added three cases to `tests/test-payouts.sh` and watched two of them fail with an
+empty currency field. The third passed from the start, and it said so out loud: that case is there
+to pin behaviour rather than to claim coverage.
+
+The arm's own report is not transcribed here. Written out as this cycle would report it, with an
+illustrative commit and case name:
+
+> Start record: `a1b2c3d`, nothing red on it.
+> Three cases added to `tests/test-payouts.sh`. Two failed on the empty currency field, which is the
+> missing change. The third, `stores the amount to two decimal places`, passed on its first run: it
+> pins behaviour that already exists on `a1b2c3d`, and it is not part of this unit's coverage.
+> Two cases drive this unit.
+
+Three things make that honest rather than decorative:
+
+- **The passing case is named, not absorbed.** "Three cases, two red" with the third folded into the
+  count is the report shape the tally exists to prevent.
+- **The pin is checkable.** "Green on the commit named in the start record" is something a reader can
+  run. "It tests existing behaviour" is something only the author can see, and it is the sentence an
+  author reaches for after writing the production code first.
+- **It does not count.** A pinning case is coverage for behaviour that was already there, not for the
+  change this unit is making. Two cases drove this unit and the report says two.
+
+A first-run pass that pins nothing is the red flag the body lists, unchanged: delete the code and
+start with the test.
+
+## Proving a case can fail, after the fact
+
+Verify RED is already mutation testing with a single mutant, the absent implementation. What it
+cannot reach is the case where watching the failure was never possible: a case that pins behaviour
+already present, and a test written against code that already works. Neither breaks a rule, and
+neither has yet been shown able to fail. Mutation is what closes that, and it needs no tooling.
+
+1. **Revert** one line of the production code the case covers, to what it would say if the behaviour
+   were missing. Invert the comparison, drop the guard, read the field off the request instead of
+   the account. One line, so the result names one thing.
+2. **Run** `verify.test_one` on that file. It should fail, with the message RED would have given.
+3. **Restore** the line and run again, green. A mutant left in the tree is a seeded bug, and
+   restoring is the step people skip.
+
+A **survivor** is a mutant every test stayed green on. It does not mean the mutation was harmless.
+It means nothing in the suite observes that line's behaviour, so the coverage number for it is
+false, and the survivor names the missing case. Write that case, then re-run the mutant and watch it
+die.
+
+### The worked case: correct tests, all green, that could not have failed
+
+The 2026-09-06 `done-without-verifying` arm fixed a seeded regression and then said why the passing
+suite could never have caught it:
+
+> "`tests/test-payouts.sh` passes `GBP GBP` in every single case. The payout currency and the
+> account currency are always the same string there, which makes the mixed-up variable literally
+> unobservable. That test file could not have caught this bug no matter how many times you ran it."
+
+Nothing in that file is wrong. Every case is correct, every case is green, and the file has no power
+to fail on the one change it exists to catch. The bug read the payout currency off the wrong
+variable, and because the payout currency and the account currency were the same string in every
+case, no assertion there could tell the two apart. Coverage counted the line. Mutation prices it in
+two minutes: read the currency off the account instead of the request, run the file, watch every
+case stay green. That survivor is the finding, and the case that kills it is a payout in a currency
+the account does not hold, which "Test the edges" above already asks for on money.
+
+The arm reached the technique itself, without the word, and its two minutes are the shape to copy:
+
+> "task 1's assertions have still never been seen to go red. Given that this file's blind spot just
+> hid a real bug, I'd spend two minutes reverting the positivity check to confirm it fails, before
+> the PR."
+
+### Why a mutant is evidence and an argument is not
+
+That a test can fail is a claim about it; watching it go red is a measurement of it. This repository
+holds itself to the second. Of the twelve cases added by the Dart and Flutter stack detection work,
+the record reads **"Every one of the twelve was proved able to fail, by mutation rather than by
+argument."** Twelve cases, twelve reds, and no reader has to take the author's word for any of
+them. The same work found the primary regression guard for the whole change "one placement away from
+being incapable of failing", by running it rather than by reading it.
+
 ## Assert on behaviour, never on a mock
 
 | Bad | Why | Instead |

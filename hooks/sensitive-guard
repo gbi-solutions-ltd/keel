@@ -10,7 +10,7 @@
 # can run. So nothing here can verify that an audit "ran clean", and any receipt the model could
 # write is a receipt a sentence in chat could obtain. `ask` is the only decision in the protocol the
 # model cannot satisfy for itself: the harness puts it to the human. It also survives
-# bypassPermissions, which bin/keel:393 records as verified against a live session, and which is
+# bypassPermissions, which `lib/harness/claude.sh#Verified against a live session rather than taken from the documentation` records as verified against a live session, and which is
 # what makes it worth anything at all.
 #
 # SILENT UNLESS THE REPOSITORY ASKS FOR IT. A profile with no `hard_block_paths` costs one builtin
@@ -28,7 +28,7 @@
 #
 # ITS LIMIT, STATED RATHER THAN DISCOVERED. It reads a command string, so `sh -c`, an alias, a
 # here-doc, or `git -C dir commit` reaches a commit without passing through here, exactly as the
-# permission deny rules in bin/keel:406 already warn. This raises the cost of a careless commit; it
+# permission deny rules in `lib/harness/claude.sh#harness_permission_rules() {` already warn. This raises the cost of a careless commit; it
 # is not a boundary against a determined one. The boundary is review.
 
 set -uo pipefail
@@ -67,6 +67,70 @@ case "$event" in
     *'git commit'*) ;;
     *) exit 0 ;;
 esac
+
+# THE HARNESS CANNOT ALWAYS HONOUR THIS GATE, AND SILENCE IS THE WRONG ANSWER WHEN IT CANNOT.
+# Everything above this line is harness-neutral. Everything below depends on `ask`, which is the
+# only decision in the protocol the model cannot satisfy for itself, and Codex CLI has none:
+# openai/codex@rust-v0.153.4 codex-rs/protocol/src/permissions.rs:105 defines FileSystemAccessMode
+# as Read, Write and Deny, with no prompt variant.
+#
+# PLACEMENT IS THE WHOLE OF THIS CHECK, and it is one step later than it looks like it should be.
+# It sits after the `git commit` filter, not straight after the hard_block_paths gate. Two
+# invariants bound it from opposite sides and only this position satisfies both. Above the
+# hard_block_paths gate it would exit 2 on every Bash tool call in every repository on Codex, which
+# is the invariant this file's header states at the top: silent unless the repository asks for it.
+# Above the command filter it exits 2 on every Read and Grep in a repository that DOES declare
+# paths, which is the invariant the fail-closed python3 branch below already carries: the tool and
+# command filters run first, or the gate becomes the thing people delete. So the order is profile
+# found, hard_block_paths non-empty, this is a commit, THEN ask whether this harness can honour it.
+#
+# WHY EXIT 2 AND NOT 1. On Codex a PreToolUse hook that exits with any non-zero code other than 2
+# has its stderr DISCARDED: codex-rs/hooks/src/events/pre_tool_use.rs replaces it with the string
+# "hook exited with code N" and the tool call proceeds. Exit 2 takes a different arm entirely, which
+# sets should_block and surfaces stderr as the block reason. So exit 1 here would be quieter than
+# doing nothing, and exit 2 both stops the command and says why.
+#
+# This is the payload case. The plugin is distributed by cloning one repository, so this file is on
+# every Codex machine whatever hooks/hooks.codex.json registers. It cannot be made absent. It can be
+# made impossible to operate through, and that is what this block does.
+# AN EMPTY LIST DECLARES NOTHING, AND THE CHEAP GATE ABOVE CANNOT SEE THAT: it matches the key, not
+# the list, so `"hard_block_paths": []` reaches here. On Claude Code that has never mattered, because
+# the walk below finds no pattern to match and ends in the same silence. Here it would be a hard
+# block on a repository that asked for nothing, which is the invariant this file's header states.
+# Checked with a builtin and no external command, for the reason the cheap gate gives: `grep ... ||
+# exit 0` cannot tell "no match" from "grep is not on PATH". Claude Code's output is unchanged; it
+# reaches the same exit 0 sooner.
+empty_paths='"hard_block_paths"[[:space:]]*:[[:space:]]*\[[[:space:]]*\]'
+if [[ "$profile_text" =~ $empty_paths ]]; then exit 0; fi
+
+# `${BASH_SOURCE[0]%/*}` and not `dirname`: this hook runs on whatever PATH the harness hands it,
+# and an external command here would resolve the root differently depending on what is installed.
+# `cd` and `pwd` are builtins.
+ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "${BASH_SOURCE[0]%/*}/.." 2>/dev/null && pwd)}"
+running=claude
+[ -n "${CODEX_VERSION:-}" ] && running=codex
+if [ ! -r "$ROOT/lib/harness/resolve.sh" ]; then
+    # Fails CLOSED. This hook's contract, stated in the header above, is that it asks whenever it
+    # cannot answer. An unreadable resolver is exactly that case, and `if [ -r ... ]; then` around
+    # the source would have skipped the check silently, which is the one outcome a gate must never
+    # have.
+    ask "the harness capability manifest could not be read, so the guard cannot tell whether this gate works here. Approving is a human decision."
+fi
+# shellcheck source=lib/harness/resolve.sh
+. "$ROOT/lib/harness/resolve.sh"
+# `harness_provides` returns 1 both for a harness that does not provide the primitive and for a
+# manifest it could not read, and those two must not share an answer here: the first is a hard block
+# and the second is this hook's ask-when-you-cannot-answer contract. `harness_known` separates them,
+# because it reads the same file and every harness in it has provides rows. Without this the
+# resolver's own `dirname` dependency, which fails on a PATH that does not carry one, turned a
+# Claude Code commit into a hard block saying Claude Code cannot ask.
+if ! harness_known "$running"; then
+    ask "the harness capability manifest could not be read, so the guard cannot tell whether this gate works here. Approving is a human decision."
+fi
+if ! harness_provides "$running" pretooluse_ask; then
+    printf 'keel sensitive-guard: %s does not provide a way to put a command to a human, so this gate cannot work here. It is not installed on %s by keel; if you wired it up by hand, remove it. Blocking rather than pretending. See docs/harness-support.md.\n' "$running" "$running" >&2
+    exit 2
+fi
 
 if ! command -v python3 >/dev/null 2>&1; then
     ask "this repository declares hard_block_paths and python3 is absent, so the guard cannot tell whether this commit touches one. Approving is a human decision."

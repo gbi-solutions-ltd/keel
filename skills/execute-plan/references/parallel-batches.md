@@ -37,8 +37,8 @@ That is the whole value of the plan, gone, with every checkbox ticked.
 
 ## Dispatching
 
-Dispatch the batch in one message, each agent with `isolation: worktree` and model `inherit`, and
-say which model in one line.
+Dispatch the batch in one message, model `inherit`, each agent working in its own checkout so no
+two write the same tree, and say which model in one line.
 
 `inherit` because these agents write code under the TDD gate, which is the work least worth making
 cheaper. [subagent-prompts.md](subagent-prompts.md) sets the same pin for the same reason, and a

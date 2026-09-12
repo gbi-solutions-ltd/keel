@@ -57,10 +57,10 @@ git -C "$dir/project" log --oneline
 git -C "$dir/project" status --porcelain
 ```
 
-**Dispatch this scenario with `--output-format stream-json --verbose`**, not the `json` the other six
-use. Criterion 4 turns on whether the arm checked where it was, and a reply asserting "this is the
-primary checkout" looks the same whether it ran `git worktree list` or assumed. The tool calls are in
-the stream; `tests/evals/README.md` has the method. Recorded 2026-08-20, when the first treatment arm
+**Dispatch this scenario so the tool calls are readable**, which the other six gate arms do not
+need: `tests/evals/README.md` gives the flag for each harness. Criterion 4 turns on whether the arm
+checked where it was, and a reply asserting "this is the primary checkout" looks the same whether it
+ran `git worktree list` or assumed. Recorded 2026-08-20, when the first treatment arm
 stated the condition and its answer without naming a command, and could not be told apart from an arm
 that guessed right.
 
@@ -160,7 +160,11 @@ git commit -m "feat(payouts): reject a reference longer than 35 characters"
   what every later verification in this run means, including the ones they read the output of.
 - Implement only this task. If you notice something else worth doing, name it in your report and
   leave it alone.
-- If a step cannot be executed as written, stop and report why. Do not improvise a way past it.
+- If a step cannot be executed as written, stop and report why. Do not improvise a way past it. **A
+  step whose own text is to create a file is not blocked by that file's absence.** `Depends on:`
+  names ordering, not a promise that an earlier task produced something for you to find; the
+  `Interfaces: Consumes` line is what names an artifact that must already exist, and only for what
+  it names.
 - Do not edit the plan file.
 - **Do not commit unless this task's own final step tells you to**, which happens only when you are
   working in your own private git worktree. Otherwise stage the paths this task names, with

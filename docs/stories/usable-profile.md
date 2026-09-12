@@ -450,7 +450,7 @@ Scenario: permissions are still merged into that file
   Then the keel deny and ask rules are present in .claude/settings.json
 ```
 
-**Notes:** the first scenario asserts existing behaviour (`merge_profile`, `bin/keel:290`). The
+**Notes:** the first scenario asserts existing behaviour (`merge_profile`, `bin/keel#out[k] = v            # human value wins`). The
 second is `FR-11`, the report-only decision: it pins a deliberate non-behaviour, which is the kind
 most easily lost to a later "helpful" change. The third is there so a future fix to the second does
 not quietly disable the permission merge, which is the one thing that path is for.

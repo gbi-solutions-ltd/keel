@@ -36,7 +36,10 @@ Either way, add the checks in step 3. A generic reviewer does not know this proj
 
 ## Step 3: The passes that only we can do
 
-Read [references/rubric.md](references/rubric.md) for the full checklist. The four that a generic
+Run `profile.verify.test` yourself first. `keel:tdd` runs it once at a unit boundary, so review
+is where the suite result is established rather than inherited.
+
+Read [references/rubric.md](references/rubric.md) for the full checklist. The five that a generic
 reviewer cannot run:
 
 1. **Does the diff match the plan?** Anything implemented that no task asked for is unplanned
@@ -48,6 +51,8 @@ reviewer cannot run:
 4. **Does it contradict an accepted decision?** Check wherever this project records them: an ADR
    directory, or a decision log. Not every project uses ADRs, and an empty `decisions/` means
    look elsewhere before concluding there are none.
+5. **Has any test in the diff been proved able to fail?** A case nobody watched go red is
+   unproven. Revert the line it covers, run it, restore it. A suite that cannot fail is a finding.
 
 ## Step 4: Rank, and say what blocks
 
