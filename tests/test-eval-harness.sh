@@ -477,7 +477,7 @@ fi
 # To pin another pair, add a row: file|anchor|expected, the anchor being a line-start phrase and the
 # text running from it to the next blank line.
 tickrule=(
-  "skills/execute-plan/SKILL.md|Tick on output you read.|Tick on output you read. Note any step you did not perform, or whose outcome you did not see: a file that was already on disk when you arrived was not written by you, test or implementation alike. A plan whose checkboxes lie is worse than one with none, because the next person trusts it."
+  "skills/execute-plan/SKILL.md|Tick on output you read.|Tick on output you read. Every step you did not perform or witness, including a file already on disk when you arrived, gets its own note in the plan file now, before reporting back: recording status is not a request you wait on, unlike fixing the underlying code, which is. A plan whose checkboxes lie is worse than one with none, because the next person trusts it."
   "skills/execute-plan/references/subagent-prompts.md|Name separately any step you did not perform|Name separately any step you did not perform, or whose outcome you did not see: a test passing on arrival is not \"watch it fail\". It is not completed, and whoever ticks the box needs to know."
 )
 for row in "${tickrule[@]}"; do

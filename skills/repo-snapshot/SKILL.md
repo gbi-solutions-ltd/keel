@@ -46,7 +46,7 @@ re-deriving what someone already wrote.
 **Delegate even though it costs more.** Files read inline sit in context all session; a subagent's are
 discarded.
 
-Dispatch these subagents concurrently **in one message**, delegation profile `keel-fanout`:
+Dispatch these subagents concurrently **in one message**, delegation profile `keel-fanout`, leading its description:
 
 | Agent | Brief |
 |---|---|
@@ -57,7 +57,7 @@ Dispatch these subagents concurrently **in one message**, delegation profile `ke
 | E. Delivery | Dockerfile, pipeline shape, what gates a deploy, environments, secret handling, IaC, deploy target |
 | F. Docs | README and doc accuracy, ADRs, commits by theme, contributors, untouched areas |
 
-Under roughly 100 tracked files, collapse to three agents (A+B, C+D, E+F).
+Under 100 tracked files, collapse to three agents (A+B, C+D, E+F).
 
 Append to every brief verbatim, filling in the Step 1 exclusions:
 
@@ -76,7 +76,7 @@ carrying a number. Cap at six: where being wrong changes what somebody does.
 | Security or delivery | Read the cited lines yourself |
 | Setup steps | Execute them |
 
-**Check each command actually ran.** An errored tool and one that found nothing both exit
+**Check each command ran.** An errored tool and one that found nothing both exit
 non-zero. Read the output, not the code.
 
 **A claim you could not verify does not reach section 10.** It goes in section 8, marked

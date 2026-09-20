@@ -73,9 +73,10 @@ hand over as the task specifies.
 
 **REQUIRED SUB-SKILL:** `keel:tdd`. The plan's steps assume it.
 
-Tick on output you read. Note any step you did not perform, or whose outcome you did not see: a file
-that was already on disk when you arrived was not written by you, test or implementation alike. A
-plan whose checkboxes lie is worse than one with none, because the next person trusts it.
+Tick on output you read. Every step you did not perform or witness, including a file already on disk
+when you arrived, gets its own note in the plan file now, before reporting back: recording status is not
+a request you wait on, unlike fixing the underlying code, which is. A plan whose checkboxes lie is
+worse than one with none, because the next person trusts it.
 
 ## Step 5: Stop when blocked
 

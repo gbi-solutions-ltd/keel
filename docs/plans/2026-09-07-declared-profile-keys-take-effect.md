@@ -786,7 +786,7 @@ say so rather than adding a sentence back to the schema by hand.
 | `advisory:skills/coding-standards/references/house-defaults.md:31` | `stack.framework` |
 | `advisory:skills/keel/references/tool-choices.md:21` | `stack.also` |
 | `code:bin/keel:1381`, `code:hooks/done-guard:118` | `verify.test` |
-| `code:bin/keel:1380` | `verify.test_one` |
+| `code:bin/keel:1432` | `verify.test_one` |
 | `advisory:skills/tdd/SKILL.md:31` | `verify.test_integration` |
 | `code:bin/keel:1387` | `verify.lint`, `verify.typecheck`, `verify.build` |
 | `code:bin/keel#cmd="$(field "verify.$k"` | `verify.format` |
@@ -812,7 +812,7 @@ say so rather than adding a sentence back to the schema by hand.
 | `code:hooks/sensitive-guard:162` | `hard_block_paths` |
 | `advisory:skills/ship/SKILL.md:60` | `conventions.commit_style` |
 | `code:bin/keel:1640` | `conventions.default_branch` |
-| `code:bin/keel:1648` | `conventions.protect_default_branch` |
+| `code:bin/keel:1817` | `conventions.protect_default_branch` |
 | `code:hooks/session-start:111` | `conventions.response_style` |
 | `code:hooks/session-start:116` | `conventions.explain_level` |
 | `advisory:skills/coding-standards/references/observability.md:19` | `observability.backend` |
@@ -1035,7 +1035,7 @@ and neither repaired comment contains a `bin/keel` line number any more.
 **Reported and not run, deliberately.** The loop at `:1387-1409` runs each command it reads.
 `verify.e2e` needs a running system by its own description and `verify.security` is a scanner that
 reaches the network, so running either in doctor would make the check cost what a deployment costs,
-and `bin/keel:1221-1223` already records that a check nobody can afford to run is one they stop
+and `bin/keel:1268-1270` already records that a check nobody can afford to run is one they stop
 running. Reporting still satisfies the brief's definition of wiring: behaviour differs between two
 values of the key, and a test proves it.
 
@@ -2118,7 +2118,7 @@ whose real file list is discovered by running the suite, not by reading the task
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: `SCHEMA_VERSION=4`, consumed by `cmd_doctor`'s comparison at `bin/keel:1557-1562` and
+- Produces: `SCHEMA_VERSION=4`, consumed by `cmd_doctor`'s comparison at `bin/keel:1609-1614` and
   by the fingerprint rule at `tests/validate-skills.sh:693-701`.
 
 **Added 2026-09-08 after a review returned DEVIATES.** `tests/test-doc-claims.sh` pins

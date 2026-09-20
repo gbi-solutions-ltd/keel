@@ -2642,7 +2642,7 @@ harness_running() {
 }
 ```
 
-Then add the section to `cmd_doctor`, using its existing `good`/`warn` printers (`bin/keel:1324-1326`)
+Then add the section to `cmd_doctor`, using its existing `good`/`warn` printers (`bin/keel:1328-1330`)
 so the output matches every other check rather than inventing a format:
 
 ```bash

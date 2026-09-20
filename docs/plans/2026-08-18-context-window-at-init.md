@@ -641,7 +641,7 @@ which is what makes --force acceptable rather than a defect."
 - Test: `tests/test-keel.sh`
 
 **Interfaces:**
-- Consumes: `$cw`, the profile value doctor already reads at `bin/keel:1267`
+- Consumes: `$cw`, the profile value doctor already reads at `bin/keel:1534`
 - Produces: nothing. Two messages and one schema description change
 
 **Done when:** `tests/test-keel.sh` passes and `tests/run-tests.sh` is green.

@@ -412,7 +412,7 @@ Scenario: nothing missing, nothing said
   Then it prints no install command
 ```
 
-**Notes:** `fix` rather than `build` because the message exists at `bin/keel:1242` and says only
+**Notes:** `fix` rather than `build` because the message exists at `lib/harness/claude.sh:490` and says only
 "recommended plugin not enabled: X. The skill that uses it degrades to an inline fallback", which
 tells the reader what is wrong and not what to do. The pattern to copy is the marketplace nudge at
 `bin/keel:1407`, which already names its command.

@@ -8,7 +8,7 @@ allowed-tools: [Read, Write, Edit, Bash, Grep, Glob, Agent]
 
 ## Overview
 
-Write the document someone will actually need, at the moment they need it.
+Write the document someone will need, at the moment they need it.
 
 **Core principle:** every instruction is executed before it is written down. An untested quickstart
 is the most expensive documentation there is, because it fails at the moment a new joiner has least
@@ -33,7 +33,7 @@ Auditing what the docs already claim, rather than writing them, is
 
 ## Step 2: Generate what can be generated
 
-Prose restating what the code already declares goes stale silently. Prefer the generator, and commit
+Prose restating what the code declares goes stale silently. Prefer the generator, and commit
 its wiring rather than its output pasted in by hand.
 
 | Document | Generated from |
@@ -52,9 +52,9 @@ Most of what a README needs has already been established, and re-deriving it pro
 subtly different account.
 
 Where those do not exist and the code must be read instead, delegate that reading to concurrent
-subagents in one message, delegation profile `keel-fanout`: theirs is discarded, yours sits in
-context all
-session. Findings are leads, so verify anything you state as fact.
+subagents in one message, delegation profile `keel-fanout`, leading its description: theirs is
+discarded, yours sits in context all session. Findings are leads, so verify anything you state as
+fact.
 
 Where something is genuinely unknown, write `Unknown` rather than a plausible guess. A confidently
 wrong setup step costs more than a gap.
@@ -75,7 +75,7 @@ For a runbook, execute the recovery path once. See
 Follow [references/readme-structure.md](references/readme-structure.md) for a README,
 [references/runbook-structure.md](references/runbook-structure.md) for a runbook.
 
-Diagrams are mermaid, always, because they render in the forge and diff as text. Shapes and
+Diagrams are mermaid, because they render in the forge and diff as text. Shapes and
 rendering traps are in
 [../design-architecture/references/mermaid-patterns.md](../design-architecture/references/mermaid-patterns.md).
 

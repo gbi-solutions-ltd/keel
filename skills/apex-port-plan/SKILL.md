@@ -27,8 +27,8 @@ model brief and the screens brief both change with the answer.
 
 ## Step 2: Delegate the reading
 
-Dispatch these subagents **in one message** so they run concurrently, delegation profile `keel-fanout`, and
-say which model in one line. Each is told: cite
+Dispatch these subagents **in one message** so they run concurrently, delegation profile `keel-fanout`,
+leading its description. Each is told: cite
 `path:line` from the export for every claim, mark anything absent as `Unknown` rather than
 inferring it, and never estimate hours.
 

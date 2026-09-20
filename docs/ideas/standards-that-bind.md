@@ -755,3 +755,72 @@ fourteenth non-rule section a visible edit to this rule rather than a silent cha
 **Not decided here:** where the second check sits in the report's fixed section order, and whether
 its findings count into the header's `coverage` figure or a new one. Both are `assessment-report.md`
 questions and belong with the work that implements this.
+
+## Finding, 2026-09-19: rule-level enforcement is a different question from gate-level enforcement
+
+Raised by a separate brief ("plan the work that makes keel enforceable outside the agent"), which
+proposed that every rule in `coding-standards` declare an enforcement level, in the spirit of
+`x-keel-read-by`: (1) impossible to violate, a typed signature; (2) fails the build, a lint or CI
+check; (3) fails review, a line in `review-code`'s rubric; (4) stated only, advisory. This is
+extending that record, per its own instruction, not opening a competing one.
+
+**This is not question 3 (B) again.** Question 3 asks whether `gates.coding_standards` itself is
+consulted at all, and that is answered: ranked third of five options, not built broadly, for the
+reasons above. This finding asks a narrower, orthogonal question: once a rule is written into
+`standards.md`, does anything other than a human re-reading prose ever check that specific rule
+again. A rule can fail this question even while `gates.coding_standards` is wired, and does today
+regardless of whether it is wired at all.
+
+**The audit.** Every rule across `skills/coding-standards/references/*.md` (81 rules by the section
+unit this record already settled: one `##` heading stating a rule, excluding each file's trailing
+`Testing it` / `What review looks for` / `What good looks like` sections), checked against
+`skills/review-code/references/rubric.md` for a rubric line naming the topic, and against `lib/` for
+any typed helper or lint mechanism that makes the rule mechanical.
+
+| Level | Currently (of 81) | Needed (estimate, directional) |
+|---|---|---|
+| 1, impossible to violate | 0 | ~8 |
+| 2, fails the build | 0 for target-project code (1, "Writing," is level 2 inside keel's own repo only) | ~19 |
+| 3, fails review | 33 (41%), all via `rubric.md`, diff-scoped | ~46 |
+| 4, stated only | 48 (59%) | ~8 |
+
+**The resequencing trigger in the parent brief is not met.** It asked: if most rules are level-1/2
+shaped and sitting at level 4, resequence this gap to the top. Only about 8 of 81 (10%) are
+genuinely typed-helper- or lint-shaped (money as a float, `sql.raw` string concatenation, the
+`remediation` field on error logs, deny-by-default route middleware, doc-comment coverage, strict
+type-checking flags, lockfile/audit-scan CI checks, a cache TTL wrapper; this file's own worked
+example, `remediation`, is one of them: `observability.md:104-129`, level 4, needed level 1). The
+larger finding is different: of the 48 rules sitting at level 4, roughly half (~24) are already
+level-3-shaped, diff-checkable judgment calls that `rubric.md` simply never picked up, the same shape
+sections 1, 2, 4b and 4c already prove for money, cache, auth, contracts and PII (`rubric.md:15-18,
+39-43, 84-91, 93-97`). Representative gaps: circuit-breaker states and bulkhead isolation
+(`resilience.md:59-95`), the outbox pattern and scheduled-job lease ownership
+(`async-work.md:12-35,98-99`), revocation windows and separation of duties
+(`authorisation.md:96-124`), deprecation process and API versioning (`api-contracts.md:37-68`),
+cache-stampede handling (`caching.md:95-114`), and retention (`data-protection.md:47-66`), none
+of them named in `rubric.md` today.
+
+**Why this is cheap, unlike question 2's mode.** `rubric.md` is a reference file, and reference
+files are unbounded (`tests/validate-skills.sh:161-162`), unlike the `coding-standards` skill body
+this record already found tight room in (17 words spare to target at time of writing, before the
+assessment mode shipped and used most of it). Widening the rubric to name the ~24 uncovered judgment
+rules costs zero body-word budget and needs no eval arm under ADR-0001, because it changes no skill
+body.
+
+**What is not recommended here.** Building typed helpers or lint configs for the ~8 mechanical-shaped
+rules inside target projects is out of scope for keel itself: keel does not ship code into the
+projects it configures, only scaffolding and prose. The right-sized move is to document the fix each
+mechanical rule implies directly in its reference file (several already do, e.g. `frontend.md:43-44`
+naming "a lint rule banning hex colours"), so a project's own tooling pass, or a future assessment
+check, has something concrete to point at. Building the mechanism itself is a per-project decision,
+not a keel-repository one.
+
+**Recommendation.** Widen `review-code/references/rubric.md` to name the ~24 level-3-shaped,
+currently-uncovered rules identified above, in the same form sections 1, 2, 4b and 4c already use.
+Leave `gates.coding_standards`'s own ranking (question 3) untouched; this finding does not change it.
+Do not build typed helpers or lint rules inside this repository for the ~8 mechanically-shaped rules;
+document the fix each implies in its reference file where not already stated.
+
+**Not decided here:** whether the rubric widening should be gated on diff content the way sections
+4b and 4c already are (e.g. only checked when a diff touches async work or resilience-relevant
+code), or apply unconditionally like sections 1 and 2. Belongs with the work that implements this.

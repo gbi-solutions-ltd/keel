@@ -200,7 +200,7 @@ Scenario: init asks nothing
   Then it completes without prompting
 ```
 
-**Notes:** `keel init` is non-interactive today (`bin/keel:905-906`), and R-01 forbids adding a
+**Notes:** `keel init` is non-interactive today (`bin/keel:806-807`), and R-01 forbids adding a
 prompt. ADR-0004.
 
 ### S-05 Write Codex configuration on a repository that serves Codex

@@ -44,8 +44,8 @@ Ordered by where breaches actually come from, which is not where code review loo
    risk is, and generic tooling does not cover it.
 
 Delegate phases to parallel subagents on a `--full` run, one per phase,
-delegation profile `keel-fanout`, and say
-which model in one line. The reading stays out of the main context, and step 3 verifies every
+delegation profile `keel-fanout`, leading its description. The reading stays out of the main
+context, and step 3 verifies every
 finding before it is written, so nothing ships on the cheaper model's judgement alone.
 
 Brief each on its own phase and nothing else. An agent that can read another's findings starts

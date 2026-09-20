@@ -568,7 +568,7 @@ it becomes true both still say the gates are active.
 prompt, and the answer is a set rather than a switch.** `profile.harnesses` is an array.
 
 The no-prompt part is a constraint rather than a preference: **`keel init` is non-interactive
-today.** `bin/keel:905-906` records that `-y` "is accepted and has no effect", kept so scripts keep
+today.** `bin/keel:806-807` records that `-y` "is accepted and has no effect", kept so scripts keep
 working. Adding a confirmation would make this design the first thing to prompt in `init`, breaking
 every scripted caller including `tests/generate-profile-keys.sh`, which runs `keel init -y` in a
 fixture. R-01 forbids that. Detection is therefore decided from the tree, not from a person.

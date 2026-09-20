@@ -5,7 +5,7 @@
 # honestly rather than silently: doctor reports what it could not check.
 #
 #   keel init [-y] [--team] [--force]   configure this project
-#   keel doctor [--fast]                check this project, non-zero on any problem
+#   keel doctor [--fast] [--json]       check this project, non-zero on any problem
 #                                       --fast: check the verify commands are set, do not run them
 #   keel version
 
@@ -504,6 +504,12 @@ codex"
     printf '%s\n' "$out"
 }
 
+# The verify keys write_profile always writes, in the order it writes them. write_ci reads this
+# same list, deriving its subset by exclusion, rather than hand-typing a second copy: two lists is
+# how a key added, renamed, or removed here gets missed there (docs/standards.md: "One definition
+# per verify command").
+VERIFY_KEYS="test test_one test_integration lint format format_fix typecheck build e2e security"
+
 write_profile() {
     local root="$1" lang rt fw pm kind ui
     # Detect the languages here, in this shell, before anything asks. Every line below reads them
@@ -536,7 +542,7 @@ write_profile() {
       pkg_scripts_load
       printf '  "verify": {\n'
       local first=1 v
-      for k in test test_one test_integration lint format format_fix typecheck build e2e security; do
+      for k in $VERIFY_KEYS; do
           v="$(detect_verify "$k" "$lang")"
           [ $first -eq 0 ] && printf ',\n'; first=0
           if [ -z "$v" ]; then printf '    "%s": null' "$k"
@@ -764,7 +770,7 @@ ignore_local_state() {
     # The harness's own uncommitted config, plus the handoff. Read from the contract rather than
     # named here, so a repository serving a second harness ignores that harness's local file too
     # without this function learning what it is called.
-    for line in $(harness_each harness_config_paths | sed -n 's/^local|//p') ".keel/handoff.md" ".keel/handoff.seen"; do
+    for line in $(harness_each harness_config_paths | sed -n 's/^local|//p') ".keel/handoff.md"; do
         if [ -f .gitignore ] && grep -qxF "$line" .gitignore; then continue; fi
         printf '%s\n' "$line" >> .gitignore
     done
@@ -840,6 +846,13 @@ cmd_init() {
     harness_each harness_write_config "$root"
     harness_each harness_write_local_config "$root"
     ignore_local_state
+    # Only where nothing declares a CI platform yet. deploy.ci is already filled by write_profile,
+    # from .gitlab-ci.yml, a Jenkinsfile, a non-empty .github/workflows/ and the rest, so a project
+    # that made that choice, on any platform, is left alone: the posture merge_profile already takes
+    # toward a human-set value. deploy.ci is also empty when detect_ci found more than one marker and
+    # left the choice ambiguous on purpose, so ci_marker_present is checked too: a project with two
+    # conflicting CI files is a project that made a choice, just not one detect_ci can name.
+    { [ -n "$(json_get .keel/profile.json deploy.ci || true)" ] || ci_marker_present; } || write_ci
 
     say "keel: configured $(basename "$PWD")"
     [ "$FORCE" -eq 1 ] && say "  (--force: detected values overwrote the existing profile)"
@@ -1143,17 +1156,33 @@ P
 
 write_ci() {
     mkdir -p .github/workflows
+    # Fill the cache here, in this shell, so every json_get below, run inside a $( ), inherits it
+    # full instead of each re-parsing the profile on its own. Same shape and same reason as the
+    # json_load call in write_profile's caller. Not redundant.
+    json_load .keel/profile.json || true
+    local lang; lang="$(json_get .keel/profile.json stack.language || true)"
     local test_cmd; test_cmd="$(json_get .keel/profile.json verify.test || true)"
     {
       printf 'name: CI\n\non:\n  push:\n    branches: [main]\n  pull_request:\n\njobs:\n'
       printf '  verify:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n'
-      case "$1" in
-        node)   printf '      - uses: actions/setup-node@v4\n        with:\n          node-version: "20"\n' ;;
-        python) printf '      - uses: actions/setup-python@v5\n        with:\n          python-version: "3.11"\n' ;;
-        go)     printf '      - uses: actions/setup-go@v5\n        with:\n          go-version: "1.22"\n' ;;
+      case "$lang" in
+        javascript|typescript) printf '      - uses: actions/setup-node@v4\n        with:\n          node-version: "20"\n' ;;
+        python)                printf '      - uses: actions/setup-python@v5\n        with:\n          python-version: "3.11"\n' ;;
+        go)                    printf '      - uses: actions/setup-go@v5\n        with:\n          go-version: "1.22"\n' ;;
       esac
       # No continue-on-error. A test step that cannot fail the build is documentation.
       printf '\n      - name: Test\n        run: %s\n' "${test_cmd:-echo 'no test command in .keel/profile.json'}"
+      # Every other verify command that is a real, runnable string: every key in VERIFY_KEYS except
+      # test (already its own step above), test_one (templated with {path} or {name} and there is
+      # nothing in CI to fill the template with), and format_fix (rewrites files rather than checking
+      # them): both excluded on the grounds doctor already uses.
+      local k c
+      for k in $VERIFY_KEYS; do
+          case "$k" in test|test_one|format_fix) continue ;; esac
+          c="$(json_get .keel/profile.json "verify.$k" || true)"
+          [ -n "$c" ] || continue
+          printf '\n      - name: %s\n        run: %s\n' "$k" "$c"
+      done
       printf '\n      - name: Refuse committed key material\n        run: |\n'
       printf '          if git ls-files | grep -qE "\\.(pem|key|pfx|p12|jks)$|^\\.env$"; then\n'
       printf '            echo "::error::key material is tracked in git"; git ls-files | grep -E "\\.(pem|key|pfx|p12|jks)$|^\\.env$"; exit 1\n'
@@ -1203,7 +1232,7 @@ cmd_new() {
     harness_each harness_write_config "$root"
     harness_each harness_write_local_config "$root"
     ignore_local_state
-    write_ci "$stack"
+    write_ci
 
     cat > "$root/NEXT-STEPS.md" <<'N'
 # Next steps
@@ -1238,7 +1267,75 @@ N
 
 # ---------------------------------------------------------------- doctor
 
+# Dispatches to the real checker. --json captures its human-readable stdout (the FAIL/WARN/ok
+# lines already used throughout, and nothing else prints to fd 1 there) and reshapes it into one
+# JSON document, so `doctor --fast` in a fleet script has something a machine can read without a
+# fleet's worth of scraping.
 cmd_doctor() {
+    local a json=0
+    for a in "$@"; do case "$a" in --json) json=1 ;; esac; done
+    if [ "$json" -eq 0 ]; then
+        cmd_doctor_text "$@"
+        return $?
+    fi
+
+    have_python \
+      || { err "keel doctor --json: python3 is required to build this output and was not found"; return 1; }
+
+    local text rc
+    text="$(cmd_doctor_text "$@")"
+    rc=$?
+
+    # Fill the cache here, in this shell, so every json_get below, run inside a $( ), inherits it
+    # full instead of each re-parsing the profile on its own. Same shape and same reason as the
+    # json_load call in write_ci. Not redundant.
+    json_load .keel/profile.json || true
+    local sv kv vt
+    sv="$(json_get .keel/profile.json schema_version 2>/dev/null || true)"
+    kv="$(json_get .keel/profile.json keel_version 2>/dev/null || true)"
+    vt="$(json_get .keel/profile.json verify.test 2>/dev/null || true)"
+
+    python3 - "$sv" "$kv" "$vt" "$text" <<'PY'
+import json, re, sys
+
+schema_version, keel_version, verify_test, text = sys.argv[1:5]
+
+# The profile's harnesses array, verbatim. json_get cannot hand a list over cleanly, so read the
+# file here. Anything but a list of strings (absent, older schema, hand-edited) is reported as [].
+try:
+    h = json.load(open(".keel/profile.json")).get("harnesses")
+    harnesses = h if isinstance(h, list) and all(isinstance(x, str) for x in h) else []
+except Exception:
+    harnesses = []
+
+findings = []
+problems = warnings = 0
+for line in text.splitlines():
+    m = re.match(r'^(FAIL|WARN|ok)\s+(.*)$', line)
+    if not m:
+        continue
+    level_raw, message = m.group(1), m.group(2)
+    level = {"FAIL": "fail", "WARN": "warn", "ok": "ok"}[level_raw]
+    if level == "fail":
+        problems += 1
+    elif level == "warn":
+        warnings += 1
+    findings.append({"level": level, "message": message})
+
+print(json.dumps({
+    "schema_version": int(schema_version) if schema_version.isdigit() else None,
+    "keel_version": keel_version or None,
+    "harnesses": harnesses,
+    "verify_test_null": verify_test == "",
+    "problems": problems,
+    "warnings": warnings,
+    "findings": findings,
+}))
+PY
+    return "$rc"
+}
+
+cmd_doctor_text() {
     local problems=0 warnings=0 fast=0 a
     # --fast checks every field and runs none of them. verify.test here is routinely the whole
     # suite, so the honest check costs what the suite costs, and a check nobody can afford to run
@@ -1322,7 +1419,8 @@ cmd_doctor() {
       && warn "codex is installed on this machine but this repository does not list it in harnesses"
 
     local root; root="$(docs_root)"
-    check_docs_ignored "$root" && good "docs root '$root' is not gitignored" || problems=$((problems+1))
+    check_docs_ignored "$root" && good "docs root '$root' is not gitignored" \
+      || fail "docs root '$root' is ignored by git (see stderr for how to fix)"
     [ -d "$root" ] && good "docs root exists" || fail "docs root '$root' is missing. Run 'keel init'."
 
     # Every document the repository points at has to be one a fresh clone can open.
@@ -1695,8 +1793,8 @@ cmd_scan() {
 GUARD_DIR=".githooks"
 
 guard_hook_body() {
+    printf '#!/usr/bin/env bash\nVERIFY_KEYS="%s"\n' "$VERIFY_KEYS"  # baked in: this file runs later as its own process, with no access back into this shell
     cat <<'HOOK'
-#!/usr/bin/env bash
 # pre-push hook, installed by `keel guard install`.
 #
 # Two refusals. A push to the default branch, because work lands through a pull request. And a push
@@ -1724,11 +1822,90 @@ protect="$(sed -n 's/.*"protect_default_branch": *\([a-z]*\).*/\1/p' .keel/profi
 
 # Only when git is feeding the hook. A push supplies its refs on stdin; run by hand from a terminal
 # there is nothing to read, and a `read` against a tty would hang rather than check anything.
-if [ -n "$protected" ] && [ "$protect" != "false" ] && [ ! -t 0 ]; then
+if [ ! -t 0 ]; then
     blocked=""
-    while read -r _lref _lsha rref _rsha; do
-        [ "$rref" = "refs/heads/$protected" ] && blocked="$protected"
+    loosened=""
+    have_py=0
+    command -v python3 >/dev/null 2>&1 && have_py=1
+    while read -r _lref lsha rref rsha; do
+        if [ -n "$protected" ] && [ "$protect" != "false" ] && [ "$rref" = "refs/heads/$protected" ]; then
+            blocked="$protected"
+        fi
+        # Loosening check: read from the two commits the push is about to move the remote between,
+        # never from the working tree, so an uncommitted edit is not what gets checked. Skipped on a
+        # branch delete (the all-zero local sha) and where python3 is absent, the same posture the
+        # pre-commit hook already takes toward JSON it cannot safely parse with sed.
+        if [ "$have_py" -eq 1 ] && [ "$lsha" != "0000000000000000000000000000000000000000" ]; then
+            # A first push has no remote tip (the all-zero remote sha). Compare against the
+            # remote-tracking default branch instead, so a branch born weaker than main is caught on
+            # its first push and not only on its second. Skipped where that ref is absent too.
+            if [ "$rsha" = "0000000000000000000000000000000000000000" ]; then
+                rsha=""
+                [ -n "$protected" ] && rsha="$(git rev-parse --verify --quiet "refs/remotes/${1:-origin}/$protected" 2>/dev/null || true)"
+            fi
+            old_p=""
+            [ -n "$rsha" ] && old_p="$(git show "$rsha:.keel/profile.json" 2>/dev/null || true)"
+            new_p="$(git show "$lsha:.keel/profile.json" 2>/dev/null || true)"
+            if [ -n "$old_p" ] && [ -z "$new_p" ]; then
+                # The profile itself is gone: every gate and verify command it carried goes with
+                # it, the maximal loosening. There is no new-side JSON document to hand the python
+                # comparator, so this is refused directly rather than compared.
+                loosened="$loosened.keel/profile.json: deleted (present on the remote, gone from this push)
+"
+            elif [ -n "$old_p" ] && [ -n "$new_p" ]; then
+                report="$(python3 - "$old_p" "$new_p" "$VERIFY_KEYS" <<'PY'
+import json, sys
+
+def get(d, path):
+    for k in path.split("."):
+        if not isinstance(d, dict) or k not in d:
+            return None
+        d = d[k]
+    return d
+
+try:
+    old, new, verify_keys = json.loads(sys.argv[1]), json.loads(sys.argv[2]), sys.argv[3].split()
+except Exception:
+    sys.exit(0)
+
+order = {"required": 2, "warn": 1, "off": 0, True: 2, False: 0}
+for gate in ("commit_guard", "done_verified", "security_audit", "coding_standards"):
+    o, n = get(old, "gates." + gate), get(new, "gates." + gate)
+    # A key present in old but not a recognized value in new, absent, null, or an unrecognized
+    # string such as a typo, is a loosening, not just "off" left unread: treat it as the same
+    # weakest value "off" would be, so deleting the key or misspelling its value is caught the
+    # same way setting it to "off" would be. A key not a recognized value in old too is left
+    # alone, an older or incomplete profile schema on the baseline side, not a loosening this
+    # push made, and there is nothing to compare it against anyway.
+    if o in order and n not in order:
+        n = "off"
+    if o in order and n in order and order[n] < order[o]:
+        print("gates.%s: %r -> %r" % (gate, o, n))
+
+# This loosening check excludes only test_one (templated with {path}/{name}, not a runnable bare
+# command) and format_fix (rewrites files rather than checking them), deliberately keeping test in
+# scope, unlike write_ci, which gives test its own separate CI step and so excludes it from this
+# shared list for a different reason: a push weakening verify.test itself is exactly the case this
+# check must catch.
+for key in (k for k in verify_keys if k not in ("test_one", "format_fix")):
+    o, n = get(old, "verify." + key), get(new, "verify." + key)
+    # null or a non-string (true, a number, a list) both mean "no runnable command any more".
+    if o and (not n or not isinstance(n, str)):
+        print("verify.%s: a command -> %r" % (key, n))
+
+o_paths = get(old, "hard_block_paths") or []
+n_paths = get(new, "hard_block_paths") or []
+removed = [p for p in o_paths if p not in n_paths]
+if removed:
+    print("hard_block_paths: dropped %r" % removed)
+PY
+)"
+                [ -n "$report" ] && loosened="$loosened$report
+"
+            fi
+        fi
     done
+
     if [ -n "$blocked" ]; then
         cat >&2 <<MSG
 
@@ -1746,6 +1923,20 @@ then open the pull request: 'gh pr create', or the link git prints on that push.
 To push anyway, deliberately and on the record:  git push --no-verify
 Or, if this project genuinely pushes to its default branch, set
 conventions.protect_default_branch to false in .keel/profile.json.
+MSG
+        exit 1
+    fi
+
+    if [ -n "$loosened" ]; then
+        cat >&2 <<MSG
+
+keel guard: push refused. The profile is weaker on this branch than on the remote.
+
+$loosened
+Each of these lowers a gate, drops a blocked path, or removes a verify command this project was
+relying on. If this is deliberate, say so in the commit and push past it once, on the record:
+
+  git push --no-verify
 MSG
         exit 1
     fi
@@ -1875,6 +2066,35 @@ exit 1
 HOOK
 }
 
+# Appends the keel_version a commit was made under, so a later question ("was this commit made
+# under a standard that would have caught this") is answerable from `git log` rather than by
+# cross-referencing dates by hand. Mechanical, because a trailer someone has to remember to type is
+# a trailer that is missing exactly when it matters. Only keel_version: the model that produced a
+# dispatched change is already visible live in its description, per the 2026-09-19 CHANGELOG entry,
+# and durability for that claim is a separate, unsettled question this hook does not attempt.
+guard_prepare_commit_msg_body() {
+    cat <<'HOOK'
+#!/usr/bin/env bash
+# prepare-commit-msg hook, installed by `keel guard install`.
+# Remove with `keel guard uninstall`.
+set -uo pipefail
+
+msg_file="${1:-}"
+[ -n "$msg_file" ] && [ -f "$msg_file" ] || exit 0
+[ -f .keel/profile.json ] || exit 0
+
+version="$(sed -n 's/.*"keel_version": *"\([^"]*\)".*/\1/p' .keel/profile.json 2>/dev/null | head -1)"
+[ -n "$version" ] || exit 0
+
+# --if-exists doNothing is the duplicate guard: an amend, a reword, or a squash brings the previous
+# message, trailer included, back through this hook. Placed above git's comment block, not after
+# it, which a raw append gets wrong in the editor flow. Never fails the commit: a trailer is worth
+# having and not worth refusing a commit over.
+git interpret-trailers --in-place --if-exists doNothing \
+    --trailer "Keel-Version: $version" "$msg_file" 2>/dev/null || exit 0
+HOOK
+}
+
 cmd_guard() {
     git rev-parse --git-dir >/dev/null 2>&1 || die "not a git repository."
     case "${1:-status}" in
@@ -1882,17 +2102,18 @@ cmd_guard() {
             mkdir -p "$GUARD_DIR"
             guard_hook_body > "$GUARD_DIR/pre-push"
             guard_precommit_body > "$GUARD_DIR/pre-commit"
-            chmod +x "$GUARD_DIR/pre-push" "$GUARD_DIR/pre-commit"
+            guard_prepare_commit_msg_body > "$GUARD_DIR/prepare-commit-msg"
+            chmod +x "$GUARD_DIR/pre-push" "$GUARD_DIR/pre-commit" "$GUARD_DIR/prepare-commit-msg"
             git config core.hooksPath "$GUARD_DIR"
-            say "installed $GUARD_DIR/pre-push and $GUARD_DIR/pre-commit, and set core.hooksPath for this repository only"
+            say "installed $GUARD_DIR/pre-push, $GUARD_DIR/pre-commit, and $GUARD_DIR/prepare-commit-msg, and set core.hooksPath for this repository only"
             say "the commit hook stays inert until gates.commit_guard is 'required' or 'warn'"
             say "commit $GUARD_DIR/ so a teammate gets it by running 'keel guard install' too"
             ;;
         uninstall)
             git config --unset core.hooksPath 2>/dev/null || true
-            rm -f "$GUARD_DIR/pre-push" "$GUARD_DIR/pre-commit"
+            rm -f "$GUARD_DIR/pre-push" "$GUARD_DIR/pre-commit" "$GUARD_DIR/prepare-commit-msg"
             rmdir "$GUARD_DIR" 2>/dev/null || true
-            say "removed the push and commit guards. core.hooksPath is back to git's default"
+            say "removed the push, commit and message guards. core.hooksPath is back to git's default"
             ;;
         status)
             local hp; hp="$(git config core.hooksPath 2>/dev/null || true)"
@@ -1907,6 +2128,11 @@ cmd_guard() {
                       warn)     say "commit guard: reporting only (gates.commit_guard is 'warn')" ;;
                       *)        say "commit guard: installed but off. Set gates.commit_guard to 'required' in .keel/profile.json" ;;
                     esac
+                fi
+                if [ ! -x "$GUARD_DIR/prepare-commit-msg" ]; then
+                    say "message guard: not installed. Re-run 'keel guard install'"
+                else
+                    say "message guard: active. commits get a Keel-Version trailer"
                 fi
             elif [ -n "$hp" ]; then
                 say "push guard: inactive. core.hooksPath points at '$hp', which keel did not set"
@@ -1933,7 +2159,7 @@ case "${1:-}" in
         say "keel <command>"; say ""
         say "  init [-y] [--team]   configure an existing project for keel"
         say "  new <name> [--stack node|python|go|minimal]   create a new project"
-        say "  doctor [--fast]      check this project; non-zero on any problem. --fast checks that the verify commands are set without running them"
+        say "  doctor [--fast] [--json]      check this project; non-zero on any problem. --fast checks that the verify commands are set without running them, or --json for one parseable document instead of the printed lines"
         say "  profile get|set <dotted.path> [value]   read or correct one profile field"
         say "  profile sync         record where this project's documents already are"
         say "  apex-export --app <id>   export an Oracle APEX application for porting"

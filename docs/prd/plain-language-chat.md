@@ -95,7 +95,7 @@ sets the key gets exactly the injection it gets today.
 | FR-13 | `docs/profile-keys.md` must contain a row for `conventions.explain_level`, produced by `tests/generate-profile-keys.sh` rather than written by hand. | confirmed | `tests/test-profile-keys.sh:31-46`, which fails when a declared key has no row |
 | FR-14 | No skill, output style, or artifact template may change what it writes as a result of this work. | confirmed | Requester's narrowing, 2026-08-18; `output-styles/keel-terse.md:11-14` |
 | FR-15 | The `terse` plus `plain` paragraph must omit the pointer sentence, "Say what changed, where it is, and what needs a decision", must keep the four exempted statements of `FR-08` named item by item, and must state that artifacts stay full as well as technical. | confirmed | Requester, 2026-08-18, choosing between three measured wordings. See the note below the table |
-| FR-16 | `keel doctor` must produce no output about `explain_level` beyond the schema version drift message it already prints. | confirmed | Requester, 2026-08-18. `CON-06` and `bin/keel:1404` are the whole mechanism |
+| FR-16 | `keel doctor` must produce no output about `explain_level` beyond the schema version drift message it already prints. | confirmed | Requester, 2026-08-18. `CON-06` and `bin/keel:1614` are the whole mechanism |
 | FR-17 | The `verbose` plus `plain` paragraph must state the plain rule and the four exempted statements of `FR-08`, and must omit the pointer sentence, the same trade `FR-15` makes. | confirmed | Measured 2026-08-18. It is the only candidate satisfying `FR-07`, `FR-08` and `NFR-01` together |
 
 **The wording `FR-07`, `FR-08` and `FR-15` together fix**, measured through the hook on 2026-08-18
@@ -156,7 +156,7 @@ headroom survive.
 | CON-03 | `response_style` stays an enum of exactly two values. | The requester, 2026-08-18 | `docs/ideas/plain-language-chat.md`, variants table |
 | CON-04 | Artifacts stay technical. No PRD, plan, ADR, snapshot, runbook, review or audit changes vocabulary. | The requester, 2026-08-18 | `output-styles/keel-terse.md:11-14` already says the same for length |
 | CON-05 | Output styles and SessionStart context do not reach subagents, which run their own system prompt. Delegated reports stay technical whatever this key says. | Claude Code | Recorded in `docs/ideas/concise-responses.md` |
-| CON-06 | Adding a declared key to the profile schema forces a `SCHEMA_VERSION` bump, and every existing profile then reports drift until `keel init` is re-run. | `tests/validate-skills.sh`, and `bin/keel` doctor | `tests/validate-skills.sh:390, 434-439`; the drift message at `bin/keel:1404` |
+| CON-06 | Adding a declared key to the profile schema forces a `SCHEMA_VERSION` bump, and every existing profile then reports drift until `keel init` is re-run. | `tests/validate-skills.sh`, and `bin/keel` doctor | `tests/validate-skills.sh:390, 434-439`; the drift message at `bin/keel:1614` |
 | CON-07 | Nothing in the injected text may be volatile. A rule whose wording varied per reply, per date or per branch would cost the prompt cache on every request. | `hooks/session-start:4-8` | The comment block that opens the hook |
 
 `CON-06` also settles a question the idea record left undecided: `keel doctor` needs no new code for

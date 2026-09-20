@@ -26,7 +26,7 @@ Where they differ, say in the assessment which one is being ported.
 
 ## Step 2: Name what has no source to port from
 
-Confirm the target stack, then compare it part by part against what exists. Anything with no
+Confirm the target stack, compare it part by part against what exists. Anything with no
 counterpart in the source is **new build, not port**, and is split out or scoped separately.
 
 Observed: "port to NestJS and React" against a service with no UI and `has_ui: false`. The React
@@ -34,14 +34,15 @@ half had nothing to port from and would have been sold as a translation.
 
 ## Step 3: Delegate the reading
 
-Dispatch these subagents in one message, delegation profile `keel-fanout`. Each is told: cite `path:line`, mark anything absent
-as `Unknown` rather than inferring it, and never estimate effort.
+Dispatch these subagents in one message, delegation profile `keel-fanout`, leading its description.
+Each is told: cite `path:line`, mark anything absent as `Unknown` rather than inferring it, and
+never estimate effort.
 
 | Agent | Brief |
 |---|---|
 | A. Contract | Every route, its request and response shape, status codes, media types, headers. Flag oddities callers may depend on: a port that tidies one breaks them |
 | B. Wire format | Anything the far side validates byte by byte: signatures, field order, null handling, encoding. Name where bytes matter rather than values |
-| C. Integrations | Each partner, its auth, how success and failure are actually signalled, and any status semantics that are not the HTTP status |
+| C. Integrations | Each partner, its auth, how success and failure are signalled, and any status semantics that are not the HTTP status |
 | D. Data | Schema, migrations, transactions, and what the database does that the application assumes |
 | E. Runtime | Config, secrets, key material, scheduled work, file handling, and today's deployment |
 | F. Gaps | Test coverage, and everything the snapshot names but does not resolve |

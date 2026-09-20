@@ -96,8 +96,8 @@ provides|claude|transcript_path|vendor:code.claude.com/docs/en/hooks common inpu
 provides|claude|transcript_turn_usage|probe:69 transcripts under ~/.claude/projects, 12269 assistant rows carrying message.usage with all four summed fields|2.1.261|2026-09-05
 provides|claude|transcript_turn_tool_calls|probe:the same 69 transcripts, 6224 message.content[] tool_use blocks, and 270 subagent transcripts whose 31865 rows are all marked isSidechain|2.1.261|2026-09-05
 provides|claude|subagent_transcript_path|vendor:code.claude.com/docs/en/hooks SubagentStop agent_transcript_path|2.1.261|2026-09-05
-provides|claude|permission_rules_command_patterns|probe:bin/keel:582-589 command-pattern rules, held under bypassPermissions in the live session at bin/keel:558-560|2.1.261|2026-09-05
-provides|claude|permission_rules_path_globs|probe:bin/keel:577-581 path-glob rules, held under bypassPermissions in the live session at bin/keel:558-560|2.1.261|2026-09-05
+provides|claude|permission_rules_command_patterns|probe:lib/harness/claude.sh:240-247 command-pattern rules, held under bypassPermissions in the live session at lib/harness/claude.sh:216-219|2.1.261|2026-09-05
+provides|claude|permission_rules_path_globs|probe:lib/harness/claude.sh:235-239 path-glob rules, held under bypassPermissions in the live session at lib/harness/claude.sh:216-219|2.1.261|2026-09-05
 provides|claude|plugin_marketplace|probe:~/.claude/plugins/known_marketplaces.json lists gbi and keel is installed from it|2.1.261|2026-09-05
 provides|claude|validated_word_ceiling|probe:ADR-0001 calibrated the 900 word ceiling against Claude Code's preload, and tests/evals/results.md, at "Both bodies over the 700 word target carry a passing arm at their length", measures the corpus against it with a passing arm per body over the target|2.1.261|2026-09-05
 

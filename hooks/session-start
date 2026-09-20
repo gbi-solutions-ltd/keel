@@ -177,10 +177,22 @@ ROOT="${CLAUDE_PLUGIN_ROOT:-}"
 # `-s` and not `-f`: skills/context-budget step 7 EMPTIES this file rather than deleting it, on
 # purpose, because it is git-ignored and anything durable left in it is lost. Testing for existence
 # sent every later session to read nothing and defeated the one documented way to clear the pointer.
-if [ -s .keel/handoff.md ] && [ .keel/handoff.md -nt .keel/handoff.seen ]; then
+#
+# THE MARKER LIVES OUTSIDE THE TREE, THE SAME WAY context-watch's CACHE DOES. It used to be
+# .keel/handoff.md's sibling .keel/handoff.seen, which is scratch state and was never covered by
+# this repository's own .gitignore, so `git add -A` could sweep it into a commit. Once tracked, a
+# later `git checkout` resets its mtime to now, which can push it newer than a legitimate,
+# not-yet-read handoff and silently swallow the pointer, the exact failure `-nt` above exists to
+# avoid. Keyed on $PWD rather than on the handoff's own path, since two projects sharing a $TMPDIR
+# must not share a marker.
+seen="${TMPDIR:-/tmp}/keel-handoff-seen/${PWD//\//_}"
+if [ -s .keel/handoff.md ] && [ .keel/handoff.md -nt "$seen" ]; then
     CONTEXT="$CONTEXT
 Read .keel/handoff.md first: the previous context was compacted into it."
-    : > .keel/handoff.seen 2>/dev/null || true
+    # Best-effort marker write: mkdir and the touch can each fail (e.g. a read-only checkout), and
+    # `|| true` covering either is the point, never fail the hook over this marker.
+    # shellcheck disable=SC2015
+    mkdir -p "$(dirname "$seen")" 2>/dev/null && : > "$seen" 2>/dev/null || true
 fi
 
 ver=""

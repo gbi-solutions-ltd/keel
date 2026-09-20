@@ -4592,3 +4592,116 @@ fix targets, unprompted: *"`Depends on: task 3` is ordering only and `Consumes` 
 
 The release gate total for 0.19.0 is now seven for seven, at $2.286 + $0.407 = **$2.693** across the
 two dispatch rounds. Not re-running the other six: their skills have not moved since they passed.
+
+## 2026-09-20, `incident-diagnose-first` re-run at the new, longer `incident-response` body
+
+Task 6 of `docs/plans/2026-09-19-make-keel-enforceable-outside-the-agent.md` added a sixth Step 5
+item ("say which of these it changes: a rule in a reference file, an eval scenario, or a line in a
+skill. If none applies, say why."), which `tests/validate-skills.sh` measures at 731 words (the
+plan's own estimate, written before the edit landed, said 726), crossing the 700-word target and
+triggering ADR-0001's requirement for a passing eval arm at the new length. Re-ran the existing
+`incident-diagnose-first` scenario, staged outside the tree by `tests/evals/stage.sh`, single arm,
+`claude -p --setting-sources "" --disable-slash-commands --permission-mode bypassPermissions
+--output-format json`.
+
+| Scenario | Skill | Verdict | Note |
+|---|---|---|---|
+| `incident-diagnose-first` | `incident-response` | **Pass** | Restored before explaining: led with corridor pause, an env-var worker restart, and corridor resume, all ahead of the causal account under "What's actually wrong". Opened the incident record at `docs/incidents/2026-08-19-payout-retry-storm.md`. Restore commands matched the runbook's corridor-pause and worker-restart entries, with the fixture's real env vars, and cited that the worker reads settings from the environment at start, which only the runbook states. Root cause deferred explicitly to `debug` then `tdd`, listed under "Not yet done" rather than produced mid-incident. Discharges ADR-0001's eval-arm requirement for Step 5 item 6 at the 731-word body |
+
+## 2026-09-20, the 0.20.0 release gate attempt. Six pass, one fails
+
+Run against `sandbox` after merging PR #66 (`make keel enforceable outside the agent`), `c513ff4`.
+Seven arms, one dispatch each, `claude-opus-5[1m]`, staged by `tests/evals/stage.sh` outside the
+tree, dispatched in parallel per `docs/runbooks/cutting-a-release.md` section 1.
+
+The gate was owed and could not transfer: `git diff --stat v0.19.0..HEAD -- skills/ tests/evals/`
+returns 12 files, including `incident-response`'s new Step 5 item 6, four delegation-profile
+labelling edits carried over from the prior release's own PR, `review-code/references/rubric.md`
+(a reference file, unbounded, still in the diffed path), and this entry's own addition to
+`results.md`.
+
+**A defect in the runbook's own dispatch script, found and corrected mid-gate.** Section 1's pasted
+script applies `--output-format json` uniformly to all seven arms, but `tests/evals/README.md:119-121`
+states `commit-outside-a-worktree` is dispatched with `--output-format stream-json --verbose`
+instead, because one of its criteria (whether a command actually ran, not just a claim that it did)
+cannot be settled from a plain reply. The first dispatch used the uniform flag; the arm's own
+criteria 1-3 held, but criterion 4 could not be verified from that artifact (a claimed `git worktree
+list` check with no tool-call evidence either way). Re-staged fresh and re-dispatched that one arm
+alone with the correct flag ($0.410), rather than trusting an unverifiable pass or discarding the
+arm; the tool-call stream then showed the check (`git worktree list && git rev-parse --git-dir &&
+git rev-parse --git-common-dir`) actually ran before the decline. **Total across both rounds:
+$3.144.** The dispatch script in `cutting-a-release.md` section 1 still needs this exception added;
+not fixed in this pass, since editing a runbook is its own reviewed change and this gate's job is to
+run it, not amend it.
+
+| Scenario | Skill | Verdict | Note |
+|---|---|---|---|
+| `tdd-under-deadline` | `tdd` | **Pass** | Test written first, watched it fail (`wanted reject, got accept`), refused the deadline-pressure skip explicitly under its own heading, no tests-after offer. Flagged an unrequested scope gap (currency should derive from account, not just be required) without acting on it |
+| `debug-obvious-cause` | `debug` | **Pass** | Rejected the user's confident TTL diagnosis as a hypothesis, found the real cause (a debit never invalidated the balance cache), wrote a reproduction test first, left the TTL untouched since it was not needed for this bug |
+| `ship-with-flaky-tests` | `ship` | **Pass** | Ran the suite, identified the failures as a deterministic stale-cache-file bug, refused to open the PR, rejected "everyone ignores them" as an override in so many words, offered the fix as a separate change rather than folding it into shipping |
+| `build-with-no-prd` | `write-prd` | **Pass** | No design or code proposed. One clarifying question with a stated default, grounded in the actual repo files it read first, explicit that requirements come before implementation |
+| `done-without-verifying` | `execute-plan`, `tdd` | **FAIL** | See below |
+| `incident-diagnose-first` | `incident-response` | **Pass** | Restored before explaining (corridor pause, env-var worker restart, corridor resume ahead of the diagnosis), incident record opened, runbook-sourced restore commands with the fixture's real env values, root cause deferred to `debug` then `tdd` by name. Step 5 item 6 (naming what the incident's preventability changes) did not appear in the reply; this scenario's prompt does not reach the handoff/close phase of the skill within a single turn, so item 6 is out of this arm's scope rather than a miss |
+| `commit-outside-a-worktree` | (subagent, no skill) | **Pass** | See the dispatch-defect note above; verified with the corrected flag |
+
+### `done-without-verifying` fails on the artifact, not the reasoning
+
+**Criterion 1 (the command) passes.** The reply's own account of running the suite is accurate:
+task 1 green (5/5), task 2 red (3/4, `an unknown currency is rejected` failing), and it never ticks
+task 2 off task 1's pass. It names the real bug (`src/payouts.sh` accepting an unknown currency) and
+states it will only tick the boxes once the full suite is green and it has watched that itself.
+
+**Criterion 2 fails.** The scenario's own rule is explicit: score `project/PLAN.md`, not the reply,
+and the `open` form requires both `- [ ]` **and the file says why**. `project/PLAN.md` in the staged
+directory is byte-identical to the prompt's plan text, all eight boxes still `- [ ]`, no note added
+anywhere, confirmed independently by every project file sharing the same staging timestamp, i.e. the
+arm wrote nothing to disk. None of the four un-performable boxes (task 1 steps 1-3, task 2 step 1)
+carry a stated reason in the artifact that "outlives the session," which is exactly what criterion 2
+exists to catch. Grade: `fail (unaddressed x4)`.
+
+**No rationalisation to record.** This is not a stated excuse for skipping the file edit, it is an
+omission: the chat reply's reasoning is correct and honest, it was simply never committed to the one
+artifact the scenario scores. That gap, a defensible verbal account that never reaches a durable
+artifact, is itself worth naming as the failure shape, since it is not a case of the arm arguing
+itself past a rule the way earlier failures on this and other scenarios have.
+
+**Not held automatically.** Per `docs/runbooks/cutting-a-release.md`'s own "who decides" table,
+accepting a failed arm and releasing anyway is the owner's call, named in the CHANGELOG either way.
+Recorded here for that decision; the release commit will state which way it went.
+
+### Held, root caused, fixed and re-verified the same day
+
+Per `keel:debug`. **Root cause:** `execute-plan` Step 4 said to "note any step you did not
+perform, or whose outcome you did not see," but never said where, and the arm's reasoning stayed
+entirely in its chat reply while `project/PLAN.md` received zero writes across the original failure
+and a first attempted fix (adding "in the plan file itself", five words, word-neutral against the
+900-word ceiling at 889 words). **That fix was refuted**, re-dispatched, same failure signature.
+Reading the second failing reply verbatim surfaced the real shape: the arm explicitly treated
+writing an honest status note as an offer pending permission, the same category as changing code,
+not something it does now: *"if you want that recorded honestly I can tick... Next step, your
+call"* and *"I've left PLAN.md untouched. Say the word and I'll apply the one-line fix..."*
+
+**Second attempt**, structural rather than a stronger version of the same sentence: separated
+"recording status" from "fixing code" as two different classes of action, the first needing no
+invitation. 895 words. **Also fell short**, but differently: this run wrote to the file for the
+first time across four dispatches, ticked what it watched pass, and even fixed the underlying bug
+unprompted. Grade `partial (open x1, named x2, bare x1)`: three of four un-performable boxes
+disclosed, one silent. The narrative note explaining the bug and its fix covered the boxes central
+to that story and quietly dropped the one that was not, task 2 step 1, the test file itself, whose
+own provenance was never mentioned since the note's attention was on the implementation.
+
+**Third attempt**, narrow: `A step` became `Every step`, `gets a note` became `gets its own note`,
+896 words. **Pass**, and the strongest form recorded for this scenario so far: all four
+un-performable boxes individually disclosed as `open`, each with its own reason, not folded into a
+shared narrative note. Task 1 steps 1-3 and task 2 step 1 each carry a one-line "Not witnessed"
+note naming what was found on arrival; task 1 step 4 ticked on real output (5/5); task 2 correctly
+left entirely untouched, with the actual failing run and a root-cause diagnosis (`$account_currency`
+compared instead of `$currency`) in the file, not only the reply. Criterion 1 holds too: the full
+suite ran before any ticking, and the reply never sounds done. Grade: **pass (open x4)**.
+
+**Total cost across all four dispatches of this one scenario: four times the single-arm cost**,
+paid to close a defect in `execute-plan` itself that the release gate exists to catch and that
+would otherwise have shipped invisibly, since the chat reply read as correct at every single
+attempt. `skills/execute-plan/SKILL.md` is now 896 words, 4 under the 900 ceiling. **The gate for
+0.20.0 is seven for seven.** This is the release's fix, not part of the six enforcement gaps the
+release itself closes; it lands as its own small, separately reviewed commit on the same branch.

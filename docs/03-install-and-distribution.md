@@ -343,17 +343,22 @@ or leak to, whoever clones or installs the repository. Details and the suppressi
 ```
 keel guard install | status | uninstall
 ```
-Installs two hooks, by writing `.githooks/pre-push` and `.githooks/pre-commit` and setting
+Installs three hooks, by writing `.githooks/pre-push`, `.githooks/pre-commit`, and
+`.githooks/prepare-commit-msg`, and setting
 `core.hooksPath` **for this repository only**. Opt-in, because it changes your git configuration, and
 repo-local because setting `core.hooksPath` globally would silently disable every other repository's
 hooks on the machine. `git push --no-verify` is the deliberate way past it.
 
-The pre-push hook refuses two things. A push carrying anything `keel scan` flags. And a push to
+The pre-push hook refuses three things. A push carrying anything `keel scan` flags. And a push to
 `conventions.default_branch`, because work lands through a pull request, so that branch is written by
 a merge rather than by a push. The branch name is read from the profile and never assumed: with
 neither a profile nor a remote HEAD to read, the hook checks nothing rather than guessing `main`, on
 the reasoning that a refusal naming the wrong branch teaches people to reach for `--no-verify` by
-reflex. A project that genuinely pushes to its default branch sets
+reflex. And a push whose `.keel/profile.json` is weaker, on the branch being pushed, than the one
+already on the remote (or, on a branch's first push, than the remote default branch): a gate moved
+toward `off`, a `verify.*` command that became null or a non-string, or a path dropped from the
+profile's list of blocked paths. `git push --no-verify` is the deliberate way past this one too, the
+same as the other two. A project that genuinely pushes to its default branch sets
 `conventions.protect_default_branch` to `false`.
 
 The pre-commit hook is inert until `gates.commit_guard` says otherwise. `off`, which is what `init`
@@ -362,6 +367,22 @@ above, and a commit gate arriving uninvited with them is how the whole thing get
 `required` runs `verify.format`, `verify.lint` and `verify.typecheck` and refuses the commit on a
 failure; `warn` runs them and lets the commit through. Null and templated commands are skipped, the
 same way `keel doctor` skips them, because neither can be run as written.
+
+## `keel-fleet <repo-path>... | --file <path-list-file>`
+
+Fans out `keel doctor --json --fast` across repositories and prints one tab-separated row per
+repository: `repo`, `keel_version`, `schema_version`, `harnesses` (the profile's list,
+comma-joined, a fact and not a compliance verdict), `verify_test_null`, `problems`, `warnings`.
+Exits non-zero if any repository has a problem or could not be read. It is a second binary the
+plugin adds to `PATH` alongside `keel`, not a `keel` subcommand, and it runs the `keel` sitting
+next to it, falling back to the one on `PATH`, so the login-shell install's single symlink is
+enough.
+
+The prepare-commit-msg hook appends a `Keel-Version: <version>` trailer to every commit message,
+read from `.keel/profile.json`'s `keel_version` field, so which standard a change was made under
+survives into `git log` rather than only being visible live during the session that made it. It
+never duplicates the trailer on `git commit --amend`. Unlike the pre-push and pre-commit hooks,
+`git commit --no-verify` does not skip it, only bypassing `core.hooksPath` skips the trailer.
 
 It refuses and never formats. Both `house-defaults.md` and `coding-standards` require a gate to be a
 check-only command, and a hook that rewrote your files and re-staged them would put content into a

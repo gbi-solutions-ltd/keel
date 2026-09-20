@@ -109,6 +109,7 @@ check_patterns() {
 allowed_executable() {
     case "$1" in
         bin/keel)            return 0 ;;
+        bin/keel-fleet)      return 0 ;;   # a second binary the plugin adds to PATH alongside `bin/keel`, not a `keel` subcommand
         hooks/*)             return 0 ;;
         tests/*.sh)          return 0 ;;   # `*` matches `/` here, so this covers tests/evals/ too
         .githooks/*)         return 0 ;;   # written by `keel guard install`, and scanned like everything else

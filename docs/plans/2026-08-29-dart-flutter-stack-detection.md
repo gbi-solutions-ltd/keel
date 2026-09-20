@@ -108,7 +108,7 @@ exits 0, and `tests/test-doc-claims.sh` prints `5 passed, 0 failed`.
 
 The position is **first in the chain, before the `package.json` block**. It is forced by `FR-19`,
 which requires that a repository detected as `dart` reports `dart` as its primary language:
-`detect_languages`' comment at `lib/detect-stack.sh:303-305` states that the first line is the
+`detect_languages`' comment at `lib/detect-stack.sh:319-321` states that the first line is the
 primary and drives the verify commands, so any later position would hand a Dart project another
 language's test command.
 

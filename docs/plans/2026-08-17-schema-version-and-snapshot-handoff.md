@@ -237,7 +237,7 @@ comparison, `[ "$pv" != "$iv" ]` in doctor, warns on exactly that.
 
 - [x] **Step 3: Write the minimal implementation**
 
-Replace the staleness block in `cmd_doctor`, currently `bin/keel:1203` to `bin/keel:1212`:
+Replace the staleness block in `cmd_doctor`, currently `bin/keel:1594` to `bin/keel:1615`:
 
 ```sh
     if have_python; then

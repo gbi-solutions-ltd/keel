@@ -16,6 +16,14 @@ but the blocker is the headline.
   invalidation deferred to a follow-up is one that covers only the write path someone remembered.
 - If the change adds a cache, does it state the staleness it is accepting, and does its key carry
   everything that changes the value?
+- A cache under load from many concurrent requests for the same key: does it use single flight,
+  serve-stale-while-revalidating, or probabilistic early refresh, or does every concurrent miss hit
+  the source at once? See `caching.md`, "Stampede."
+- A cache with no TTL, or one whose TTL is set in a different file from the code that reads it, or
+  a new cache with no hit-rate metric. See `caching.md`, "Never without a TTL" and "Measure it, or
+  it is not a cache, it is a memory leak."
+- A cache added in place of an index or in place of fixing an N+1, or a cache delete inside a
+  transaction. See `caching.md`, "Database query caching."
 - **Any new outbound call: is there a timeout?** Read the client construction, not the call site.
   This is the highest-yield single question in a review of a service, and the answer is no more often
   than anyone expects.
@@ -27,6 +35,11 @@ but the blocker is the headline.
   the consumer idempotent, given that delivery is at least once? Is there a dead letter path?
 - Time: a timestamp stored without a zone, a duration measured from wall clock readings, or `now()`
   read inside the logic rather than passed in.
+- Time, the other half: a cutoff, expiry, or business-day rule with no zone attached; holidays or
+  business days computed arithmetically or hardcoded; a duration field whose name does not carry
+  its unit; an ordering derived from timestamps produced by two different machines. See
+  `time-and-dates.md`, "A date is not a timestamp", "Business time is not wall clock time", and
+  "Arithmetic that looks right and is not."
 
 ## 2. Security
 
@@ -43,11 +56,32 @@ through:
   than the session.
 - A cache key that omits the principal or the tenant on a value that varies by either. This one
   serves one customer's data to another, so it is blocking on sight.
+- A cached permission set: is it invalidated when a role changes, or left to expire on its own
+  TTL? See `authorisation.md`, "Revocation."
+- A money-movement approval path: can one principal hold both the initiating and approving
+  permission, with no check comparing the two actors? See `authorisation.md`, "Money, and
+  separation of duties."
+- A permission string that appears nowhere in the central enumeration, or 403 for an existing
+  object and 404 for an absent one on the same endpoint, which tells a caller what exists. See
+  `authorisation.md`, "Check permissions, never roles" and "Object-level checks, which is the one
+  everybody misses."
+- Authorisation logic in frontend code with no server-side counterpart. See `authorisation.md`,
+  "Server-side only, and log the decisions."
 - A new endpoint with no rate limit, or a limiter doing a get-then-set against shared state, which
   enforces N times its configured rate across N instances.
+- A limiter keyed on something the caller controls (a header, a query parameter, the leftmost
+  `X-Forwarded-For` entry), or no limit at all on login, password reset, token issue, or anything
+  that sends an email or an SMS. See `rate-limiting.md`, "The key is the identity, and it must not
+  be spoofable" and "Layer the limits, because one number cannot express the requirement."
+- A rejection that is not a 429, a 429 with no `Retry-After`, or an in-process limiter documented
+  as a service-wide one. See `rate-limiting.md`, "What the caller gets back" and "The check must be
+  atomic, or the limit is per-instance."
 - An upstream error message returned to a caller.
 - A check that fails open where it should fail closed.
 - A secret reaching a log, an artifact, or an image.
+- Certificate verification disabled anywhere, in any environment, or an encryption key in the
+  repository or an environment variable with no rotation path. See `data-protection.md`,
+  "Encryption, and being clear which threat each one stops."
 
 ## 3. Tests
 
@@ -88,6 +122,16 @@ The distinguishing test is whether you could fix every caller yourself; if not, 
 - An error code reused for a new meaning, or a message changed where a caller might be parsing it.
 - A new collection endpoint with no pagination and no server-side page cap.
 - A new state-changing endpoint with no idempotency key.
+- A 200 carrying an error body, or a 5xx for a caller's mistake. See `api-contracts.md`, "Errors
+  are part of the contract."
+- A new version added for an additive change, or a third supported version live at once. See
+  `api-contracts.md`, "Versioning."
+- A deprecation with no removal date, no `Deprecation` and `Sunset` headers, or no per-caller
+  measurement of who still calls it. See `api-contracts.md`, "Deprecation is a process with dates,
+  not a note in the docs."
+- A webhook this service sends with an unsigned payload, no timestamp inside the signed bytes, no
+  delivery id, or no way for a receiver to fetch what it missed. See `api-contracts.md`, "Webhooks
+  are an API you provide, with the same rules reversed."
 - A removal with no evidence that nobody is still calling it.
 
 ## 4c. Personal data, where the diff adds or moves any
@@ -95,6 +139,48 @@ The distinguishing test is whether you could fix every caller yourself; if not, 
 - A new personal field with no stated purpose, no classification, and nothing that reads it.
 - Personal data reaching a log, an error reporter, an analytics call, a fixture, or a seed script.
 - A new store, index, or cache holding personal data that the deletion path does not know about.
+- A retention period documented with nothing scheduled to enforce it. See `data-protection.md`,
+  "Retention is a schedule that runs, not a policy document."
+- A support or admin endpoint that exports in bulk under the same permission as a single lookup,
+  or an access to sensitive records that is not logged. See `data-protection.md`, "Access to
+  personal data is authorisation, and it is logged."
+- A new store holding personal data that the subject export path does not know about; the bullet
+  above covers deletion, this one covers the other half. See `data-protection.md`, "Subject rights,
+  built once rather than by hand each time."
+- A new managed service or third-party integration whose region nobody stated, or personal data
+  reaching a new processor with no entry in the processor list. See `data-protection.md`, "Third
+  parties and borders."
+
+## 4d. Resilience and async work, where the diff touches a network call, a queue, a worker, or a scheduled job
+
+Section 1 already covers timeouts, retries, the partner-timeout pending state, and the dead letter
+path. This section catches what section 1 does not; both reference files are in
+`skills/coding-standards/references/`.
+
+- A dependency behind a circuit breaker: does it have all three states, closed, open, and half
+  open, and is half open bounded to a small number of trial calls rather than reopening to full
+  traffic? See `resilience.md`, "Circuit breakers."
+- A `catch` around a network call that returns a default value: a fallback nobody decided on and
+  nothing will alert about. See `resilience.md`, "Circuit breakers", the paragraph "Say what
+  happens when it is open."
+- A slow or failing dependency: is it isolated to its own connection pool or concurrency limit, or
+  does it share one with an unrelated dependency? See `resilience.md`, "Isolate."
+- A liveness probe that touches a dependency, or a readiness check with no timeout of its own. See
+  `resilience.md`, "Health checks that mean something."
+- A message consumer's idempotency: is it a database constraint or natural idempotency, or a
+  check-then-act across two statements, which races with itself under concurrent delivery? See
+  `async-work.md`, "Every consumer is idempotent."
+- A consumer `catch` that acknowledges the message, an unbounded consumer retry, or a dead letter
+  queue with no alert on its depth and age. See `async-work.md`, "Failure handling: retries, then
+  a dead letter queue, never a silent drop."
+- Order assumed across partitions or queues. See `async-work.md`, "Ordering, which you probably do
+  not have."
+- An HTTP call inside a database transaction. See `async-work.md`, "Transaction boundaries, since
+  this is where they matter most."
+- A scheduled job on a service that can run more than one instance: does it take a lease with an
+  expiry, or can two instances run it at once? See `async-work.md`, "Scheduled jobs."
+- A new message schema: does it carry trace context, so a job's trace joins the request that
+  caused it? See `async-work.md`, "Observability."
 
 ## 5. Reuse and simplification
 

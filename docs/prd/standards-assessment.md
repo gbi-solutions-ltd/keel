@@ -323,7 +323,7 @@ nothing for this PRD, because a mode needs no roster entry, and it strengthens C
 `tests/evals/fixtures/` contains a `standards.md` (`find tests/evals/fixtures -name standards.md`
 returns nothing), so unlike the `write-prd` length arm, which reused an existing scenario and fixture
 (`tests/evals/results.md`, "One treatment arm, `write-prd`"), this arm cannot reuse anything.
-Adding a scenario file moves the count claim at `README.md:289`, "8 scenarios exist", which
+Adding a scenario file moves the count claim at `README.md:314`, "8 scenarios exist", which
 `tests/test-doc-claims.sh:49-51` enforces. The arm need not join the release gate; the `write-prd`
 precedent kept the gate unchanged (`tests/evals/results.md`, "`write-prd` at 793 words"). This is Q4.
 

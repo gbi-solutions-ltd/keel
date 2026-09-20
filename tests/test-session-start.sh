@@ -350,6 +350,16 @@ out="$( cd "$w" && "$HOOK" 2>/dev/null )"
 case "$out" in *handoff*) ok "an existing handoff is named to the new session" ;;
   *) bad "handoff not named" "the file exists and the injected context does not mention it" ;; esac
 
+# The seen-marker must never live inside the project tree. A tracked or accidentally-committed
+# marker has its mtime reset by a later git checkout, stash pop or merge, which can push it newer
+# than a legitimate, not-yet-read handoff and silently swallow the pointer. It belongs outside the
+# tree entirely, the way context-watch's own cache file already does.
+if [ -e "$w/.keel/handoff.seen" ]; then
+    bad "seen marker location" "hooks/session-start wrote .keel/handoff.seen inside the project tree"
+else
+    ok "the seen marker is not written inside the project tree"
+fi
+
 # ONCE, AND ONLY ONCE. Nothing ever deletes .keel/handoff.md, and this hook fires on startup and
 # clear as well as compact, so the pointer was permanent: from the first compaction onward every
 # session in that repository, days later and about other work, was told "the previous context was

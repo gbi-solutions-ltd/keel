@@ -7,6 +7,86 @@ versions as each skill is tested against real repositories.
 
 Entries are terse by design; the narrative for each release is in this file's git history and in docs/.
 
+## 0.20.0 - 2026-09-20
+
+- Release gate 2026-09-20 against `a1e7d8b`: **seven treatment arms, all seven pass**, roughly $4.0
+  across five dispatch rounds. `tdd-under-deadline`, `debug-obvious-cause`, `ship-with-flaky-tests`,
+  `build-with-no-prd`, `incident-diagnose-first`, and `commit-outside-a-worktree` passed, the last
+  after a re-dispatch under the correct `--output-format` (a defect in the release runbook's own
+  pasted dispatch script, which applies one flag uniformly though this scenario needs another,
+  found and corrected mid-gate, still owed a fix in the runbook itself). `done-without-verifying`
+  failed on the first dispatch and twice more after two refuted fix attempts, then passed at the
+  strongest grade recorded for it, `open x4`, after the third; see the entry below and
+  `tests/evals/results.md` for the full history. No new rationalisation from the six arms that
+  passed cleanly.
+
+- **`keel doctor --json` gives a machine one parseable document instead of scraped text, and
+  `bin/keel-fleet` fans it out across a list of repositories.** JSON carries `schema_version`,
+  `keel_version`, `harnesses` (the profile's own list, verbatim), `verify_test_null`, `problems`,
+  `warnings`, and a `findings` array, exit code unchanged from text mode. `bin/keel-fleet
+  <repo-path>... | --file <path-list-file>` prints one tab-separated row per repository, refusing a
+  push-report bypass rather than silently dropping a repository whose `--file` list has no trailing
+  newline, and printing the same `(unreadable)` row shape whether a repository is unreachable or its
+  `doctor --json` output is malformed.
+
+- **`write_ci` reaches every non-null `verify.*` command, not only `verify.test`, and `keel init`
+  now writes CI into an existing project that has none.** Previously only `keel new` called it and
+  only the test command reached the generated workflow. `keel init`'s new call is gated on
+  `deploy.ci` being unset, so a project that already declared a platform, any platform, is left
+  alone, and an ambiguous case (more than one CI marker present) is treated the same as declared,
+  not as absent.
+
+- **The pre-push hook refuses a push whose `.keel/profile.json` is weaker than the one already on
+  the remote branch** (or, on a branch's first push, than the remote default branch): a gate moved
+  toward `off`, including to an unrecognised value; a `verify.*` command that became null or a
+  non-string; a blocked path dropped from `hard_block_paths`; or the profile file itself deleted.
+  `git push --no-verify` is the deliberate way past it, the same as the hook's existing
+  default-branch refusal.
+
+- **`incident-response`'s handoff step now asks what a preventable incident changes**: a rule in a
+  reference file, an eval scenario, or a line in a skill, or says why none applies.
+
+- **`review-code`'s rubric names 29 rules the coding-standards audit found it missing**, across
+  caching, time handling, authorisation, rate limiting, data protection, API contracts, and a new
+  section on resilience and async work, each citing the reference file and heading it is drawn
+  from.
+
+- **`execute-plan`'s tick rule left the file untouched when nothing was ticked.** An implementer
+  could reason correctly about which plan steps it had not performed and say so honestly in its
+  reply, while `project/PLAN.md` itself recorded nothing, since the rule said to note an unperformed
+  step but never said the note belongs in the file rather than the conversation, and did not
+  separate recording status (which needs no invitation) from changing code (which does). Found by
+  the release eval gate, fixed after three refuted attempts; `tests/evals/results.md` has the full
+  history.
+
+- **`keel guard install` now also installs a `prepare-commit-msg` hook that appends a
+  `Keel-Version: <version>` trailer to every commit message**, so whether a commit was made under a
+  standard that would have caught a given problem is answerable from `git log` rather than by
+  cross-referencing dates by hand. Unconditional, unlike the commit guard: it runs regardless of
+  `gates.commit_guard` and never fails a commit, only skips the trailer if `.keel/profile.json` or
+  `keel_version` is missing. `--if-exists doNothing` stops an amend or reword from duplicating the
+  trailer. `keel guard status` now reports the message guard alongside the push and commit guards.
+
+- **A dispatched agent's rendered label carried no model, so a person watching a run on a top-tier
+  model could not see that a step of it ran on a cheaper one.** `Agent(<description>)` is the only
+  UI a developer gets for a dispatch; the model was named in skill prose but never in that label. A
+  dispatch's `description` now leads with its delegation profile, `<profile>: <task>`, `inherit`
+  named the same way and never omitted. Landed in all seven delegating skills, `apex-port-plan`,
+  `shape-idea`, `write-plan`, `security-audit`, `repo-snapshot`, `port-assess` and `write-docs`, and
+  in `execute-plan`'s `references/subagent-prompts.md` and `references/parallel-batches.md`, closing
+  the standing departure for the last three. `repo-snapshot` and `port-assess` freed the words at
+  700 exactly; `write-docs` stayed at its already-discharged 756, so no new ADR-0001 eval arm is
+  owed. `README.md`'s restatement of the convention is brought current to ADR-0005's delegation
+  profile vocabulary in the same pass. Confirmed on Claude Code; not checked on Codex.
+  `docs/standards.md`, "A dispatch names its model, and says so".
+
+- **`hooks/session-start` wrote `.keel/handoff.seen` into the project tree, and nothing ignored it.**
+  It showed up in `git status` and could be swept into a commit by `git add -A`; once tracked, a
+  later `git checkout` resets its mtime, which can push it newer than a legitimate, not-yet-read
+  handoff and silently swallow the pointer. The marker now lives under `$TMPDIR`, the same way
+  `context-watch`'s cache already does, keyed on the project's working directory. `ignore_local_state`
+  in `bin/keel` no longer writes a `.gitignore` rule for it, since it never reaches the tree.
+
 ## 0.19.0 - 2026-09-12
 
 - Release gate 2026-09-12 against `166862a`: **seven treatment arms, all seven pass**, $2.693 across
@@ -34,6 +114,37 @@ Entries are terse by design; the narrative for each release is in this file's gi
   where it should, and added the two cases the floor itself was missing: extraction reading nothing
   trips it, 8 documented pairs does not. The count behind the floor is still 10 today, unchanged
   since 2026-09-02, so 8 stays the right number.
+
+- **keel gains a second supported harness, OpenAI Codex CLI, at a lower tier than Claude Code.**
+  Under [`docs/architecture/tiered-multi-harness-support.md`](docs/architecture/tiered-multi-harness-support.md)
+  and ADR-0003, ADR-0004 and ADR-0005, all accepted 2026-09-05. The shape is a capability manifest
+  with one generator and four consumers: a checked-in data file states which primitives each
+  harness provides and which primitives each gate requires, and the hook manifests, `keel init`'s
+  writes, `keel doctor`'s report and the tier table in `docs/harness-support.md` are all derived
+  from it rather than written by hand. The property this buys: no gate is registered, written into
+  a repository, or advertised in a document on a harness that cannot run it. Three of keel's four
+  gates run on Codex, `session-start`, `done-guard` and `context-watch`; `sensitive-guard`'s hard
+  block on sensitive paths does not, because Codex has no way for a hook to put a blocking prompt to
+  a human, and it is reported as absent rather than degraded. `docs/harness-support.md` is
+  generated by `tests/generate-harness-artifacts.sh` and CI fails if its checked-in copy disagrees
+  with the manifest. Installing on Codex is its own step, `docs/03-install-and-distribution.md`
+  "Installing on Codex": Codex reads the same `.claude-plugin/marketplace.json` Claude Code does, a
+  new `.codex-plugin/plugin.json` points its hooks at a generated `hooks/hooks.codex.json`, and
+  Codex runs no hook at all until its plugin's hooks are explicitly trusted, which `keel init` and
+  `keel doctor` both say so on a repository serving Codex.
+
+  **Required release note for the first Tier B release, pasted verbatim per
+  `docs/architecture/tiered-multi-harness-support.md` section 9:**
+
+  Codex support depends on an upstream behaviour that OpenAI has said it will revisit. keel's gates
+  block on Codex only because its hooks run synchronously. Codex's own source carries a TODO stating
+  that with CCA all hooks become executor-scoped and therefore asynchronous, and asynchronous hooks
+  cannot apply control effects. If that lands, two of the three gates keel installs on Codex stop
+  blocking: `sensitive-guard` no longer stops a command, and `done-guard` no longer holds a turn
+  open. Both remain installed, registered and reported as present, and nothing in keel will fail or
+  warn when it happens, because the change is upstream and silent. Until this is resolved, treat
+  Codex gate enforcement as something to re-verify on each Codex upgrade rather than as settled.
+  Claude Code is unaffected.
 
 - **`hooks/done-guard` had never once blocked a turn, and now does.** Four faults, found one behind
   the other, all shipped from the commit that created the gate on 2026-08-16.
@@ -283,7 +394,12 @@ Entries are terse by design; the narrative for each release is in this file's gi
 - Known gaps: resuming from a handoff is still manual; an enabled-but-not-installed plugin looks
   identical to a working one; `plugins.recommended` does not follow a project that changes stack;
   one declared profile key is read by nothing (`gates.coding_standards`), and it says so in its own
-  description and names the record that will decide it.
+  description and names the record that will decide it; `hard_block_paths` is not enforced on Codex
+  at all, today, by design, and a repository serving both harnesses is protected for its Claude Code
+  users and not its Codex ones; ADR-0001's word ceiling is inherited on Codex but not yet validated
+  there, no Codex eval arm has run; this release's gate dispatched seven Claude Code arms and no
+  Codex ones, so no skill's behaviour on Codex is measured yet, only its wiring.
+
 ## 0.18.0 - 2026-09-04
 
 - Release gate 2026-09-04 against `01fdf44`: **six treatment arms, all six pass**, $2.9909, 3m59s

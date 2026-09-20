@@ -135,7 +135,7 @@ and it is the one keel spent a decision on avoiding.
 
 | Option | What it costs | Why not this |
 |---|---|---|
-| Do nothing | Zero | This is the recommendation. keel already dual-writes `AGENTS.md` (`bin/keel:927-928`), so Codex users get Layer 2 today. It is honest, already shipped, and already documented as a deliberate stop (`docs/03-install-and-distribution.md:431-432`) |
+| Do nothing | Zero | This is the recommendation. keel already dual-writes `AGENTS.md` (`bin/keel:927-928`), so Codex users get Layer 2 today. It is honest, already shipped, and already documented as a deliberate stop (`docs/03-install-and-distribution.md:437-438`) |
 | Do it manually | A Codex user clones keel and copies `skills/` into `.agents/skills/` themselves | Actually works, and is worth documenting as an unsupported recipe. It is not "first-class" and makes no guarantee, which is the point: it does not pretend |
 | Buy it | Nothing to buy | No product ports an SOP's enforcement layer between agent harnesses. Not an option |
 | Build something smaller | Ship Layers 2 and 3 on Codex (skills, `AGENTS.md`, the session router, `done-guard`, `context-watch`) and document `sensitive-guard` as absent | **This is the tempting one and it is what the constraint forbids.** keel with three of four gates is not keel at the same level of guarantee; it is keel with the security gate quietly missing on one of its two supported harnesses |

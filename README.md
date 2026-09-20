@@ -39,6 +39,7 @@ keel init                        # existing project: detect the stack, write the
 keel new <name> --stack node     # new project: scaffold, git init, CI, a passing sample test
 keel doctor                      # check either, non-zero on any problem
 keel doctor --fast               # same checks minus executing the verify commands
+keel doctor --json --fast         # machine-readable, for a fleet script to consume
 ```
 
 `init` is idempotent and never overwrites a value you have corrected by hand; detection is a
@@ -218,26 +219,29 @@ analysis would.
 
 ### Which model runs a delegated brief
 
-Several skills fan work out to subagents. Those briefs name the model, so the wide mechanical
-reading does not run on whatever the session happens to be pinned to:
+Several skills fan work out to subagents. Those briefs name a **delegation profile**, a name each
+harness resolves to its own model, so the wide mechanical reading does not run on whatever the
+session happens to be pinned to (ADR-0005):
 
-| Brief | Model | Why |
+| Brief | Delegation profile | Why |
 |---|---|---|
-| `repo-snapshot`, `port-assess`, `apex-port-plan`, `shape-idea`, `write-docs`, `write-plan`, `security-audit` fan-outs | `sonnet` | Wide mechanical reading over many files, with a cited `path:line` for every claim, so the output is checkable |
+| `repo-snapshot`, `port-assess`, `apex-port-plan`, `shape-idea`, `write-docs`, `write-plan`, `security-audit` fan-outs | `keel-fanout` | Wide mechanical reading over many files, with a cited `path:line` for every claim, so the output is checkable |
 | `execute-plan` implementation, both reviews and concurrent batches, and the `write-plan` reviewer | `inherit` | These write code under the TDD gate or judge another agent's verdict. A cheaper model gets less benefit of the doubt, not more |
 
-Every one should announce the model in one line when it delegates, and four of the seven `sonnet`
-fan-outs do: `apex-port-plan`, `write-plan`, `shape-idea` and `security-audit`. `repo-snapshot`,
-`port-assess` and `write-docs` carry the pin without the announcement, which is a departure recorded
-with an end condition under "Departures" in `docs/standards.md`, not the intent. That the pins
-themselves fire was measured on 2026-08-20 and is recorded in `tests/evals/results.md`.
+Every one announces its profile in the dispatch's own `description`, leading it: `Agent(keel-fanout:
+<task>)`, `inherit` labelled the same way and never omitted. That label is what a person watching an
+interactive session actually sees; a spoken sentence used to be the mechanism and four of the seven
+`keel-fanout` fan-outs carried it while three did not, a departure closed 2026-09-19 when the
+mechanism itself moved to the label. Detail in `docs/standards.md`, "A dispatch names its model, and
+says so". That the pins themselves fire was measured on 2026-08-20 and is recorded in
+`tests/evals/results.md`.
 
-`tests/validate-skills.sh` rejects any alias Claude Code does not accept, because a brief sent to a
-model that does not exist is a brief sent to nothing and the failure is silent. Since 2026-08-20 it
-also fails a dispatch that names no model at all, which is the worse case and was the unchecked one:
-`security-audit` had been fanning out one subagent per phase unpinned since it was written. No brief names a
-full model id, which would pin harder and rot faster, and none names `haiku` yet: that waits on one
-measured comparison rather than an assumption.
+`tests/validate-skills.sh` rejects any vendor model alias, because a brief sent to a model that does
+not exist is a brief sent to nothing and the failure is silent. Since 2026-08-20 it also fails a
+dispatch that names no routing at all, which is the worse case and was the unchecked one:
+`security-audit` had been fanning out one subagent per phase unpinned since it was written. No brief
+names a full model id, which would pin harder and rot faster, and none names a `haiku`-tier profile
+yet: that waits on one measured comparison rather than an assumption.
 
 **A session's own model is not part of this and cannot be.** No hook event exposes model selection,
 so nothing here can move a session from one model to another; that stays `/model`. There is no
@@ -284,14 +288,16 @@ Exceptions are explicit. A line ending `supply-chain-scan: allow <reason>` is sk
 honoured suppression prints on every run, and one with no reason is a finding in its own right.
 
 ```
-keel guard install    # pre-push and pre-commit hooks, repo-local, opt-in
+keel guard install    # pre-push, pre-commit, and prepare-commit-msg hooks, repo-local, opt-in
 keel scan             # run it by hand
 ```
 
 The hook refuses a push the scan flags, and a push to `conventions.default_branch`, since work
 lands through a pull request. It reads that branch from the profile rather than assuming `main`, and
 checks nothing when nothing states it. Set `conventions.protect_default_branch` to `false` in a
-project that genuinely pushes to its default branch.
+project that genuinely pushes to its default branch. It also refuses a push whose profile is weaker
+than the one already on the remote branch, naming the gate, verify command, or blocked path that
+loosened.
 
 It writes a `pre-commit` hook in the same place, which does nothing until `gates.commit_guard` is
 set to `required` or `warn` in the profile. When on it runs `verify.format`, `verify.lint` and

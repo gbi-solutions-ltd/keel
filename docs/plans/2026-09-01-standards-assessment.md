@@ -1314,7 +1314,7 @@ Then run the suite and watch it fail:
 
 Run: `tests/run-tests.sh`
 Expected: **FAIL** in `tests/test-doc-claims.sh`, with
-`README says '8 scenarios', the tree says 9`. That is the claim at `README.md:289` going red because
+`README says '8 scenarios', the tree says 9`. That is the claim at `README.md:314` going red because
 a ninth scenario now exists. Watching it fail is what proves the claim is enforced.
 
 Confirm it is that failure and not another:
@@ -1328,7 +1328,7 @@ Expected: the `eval scenario count` claim reports `bad`, exit non-zero, and the 
 `every scenario has a fixture` check at `tests/test-eval-harness.sh:97-106` must **not** be among
 the failures.
 
-Then update `README.md:289`. It currently reads:
+Then update `README.md:314`. It currently reads:
 
 ```
 8 scenarios exist. Six are dispatched at a release gate and score a reply.

@@ -359,7 +359,7 @@ fi
 Name the fixture's two query helpers `queryConcat` and `queryParam` so those greps are exact. The
 counts are the assertion; the helper names exist to make them countable.
 
-Update the scenario count in **both** places: `README.md:289` says "9 scenarios exist", which
+Update the scenario count in **both** places: `README.md:314` says "9 scenarios exist", which
 `tests/test-doc-claims.sh` asserts against the tree, and `tests/evals/README.md` says "Nine
 scenarios exist" spelled as a word, which no check can catch.
 

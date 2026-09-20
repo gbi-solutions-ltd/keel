@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Fans out `keel doctor --json --fast` across repositories and prints one row per repository.
+# Usage: keel-fleet <repo-path>...
+#        keel-fleet --file <path-list-file>   (one repository path per line)
+set -uo pipefail
+
+# The sibling bin/keel first: the documented login-shell install symlinks that one file alone, and
+# a fleet script is what a login shell runs. Falling back to PATH covers a plugin install. Made
+# absolute, because the loop below cds into each repository before calling it.
+KEEL_BIN="$(cd "$(dirname "$0")" && pwd)/keel"
+[ -x "$KEEL_BIN" ] || KEEL_BIN=keel
+
+paths=()
+if [ "${1:-}" = "--file" ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+        [ -n "$line" ] && paths+=("$line")
+    done < "${2:?usage: keel-fleet --file <path-list-file>}"
+else
+    paths=("$@")
+fi
+
+[ "${#paths[@]}" -gt 0 ] || { printf 'usage: keel-fleet <repo-path>...\n       keel-fleet --file <path-list-file>\n' >&2; exit 1; }
+
+status=0
+printf 'repo\tkeel_version\tschema_version\tharnesses\tverify_test_null\tproblems\twarnings\n'
+for p in "${paths[@]}"; do
+    if ! out="$(cd "$p" 2>/dev/null && "$KEEL_BIN" doctor --json --fast 2>/dev/null)" || [ -z "$out" ]; then
+        printf '%s\t(unreadable)\t\t\t\t\t\n' "$p"
+        status=1
+        continue
+    fi
+    if ! printf '%s' "$out" | python3 -c "
+import json, sys
+
+repo = sys.argv[1]
+try:
+    d = json.load(sys.stdin)
+    cells = [str(d.get(k)) for k in ('keel_version', 'schema_version')]
+    cells.append(','.join(d.get('harnesses') or []))
+    cells += [str(d.get(k)) for k in ('verify_test_null', 'problems', 'warnings')]
+    print(repo + '\t' + '\t'.join(cells))
+    sys.exit(0 if d.get('problems') == 0 else 1)
+except Exception:
+    print(repo + '\t(unreadable)\t\t\t\t\t')
+    sys.exit(1)
+" "$p"; then
+        status=1
+    fi
+done
+exit "$status"

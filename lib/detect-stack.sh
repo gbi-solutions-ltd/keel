@@ -212,6 +212,11 @@ detect_js_pm() {
     printf 'npm'
 }
 
+# The file-marker CI platforms detect_ci recognizes, beyond the .github/workflows directory it
+# checks separately. Defined once so a presence check can share it rather than hand-typing a second,
+# driftable copy of the same list.
+CI_MARKER_PAIRS='.gitlab-ci.yml:gitlab-ci .circleci/config.yml:circleci Jenkinsfile:jenkins azure-pipelines.yml:azure-pipelines bitbucket-pipelines.yml:bitbucket-pipelines .drone.yml:drone'
+
 # What runs this project's pipeline. Read the way a lockfile is read: a config committed to the
 # repository is a declaration, its absence is not, and two of them are not two declarations.
 #
@@ -224,13 +229,24 @@ detect_ci() {
                  -print -quit 2>/dev/null)" ]; then
         ci=github-actions; n=$((n + 1))
     fi
-    for pair in '.gitlab-ci.yml:gitlab-ci' '.circleci/config.yml:circleci' 'Jenkinsfile:jenkins' \
-                'azure-pipelines.yml:azure-pipelines' 'bitbucket-pipelines.yml:bitbucket-pipelines' \
-                '.drone.yml:drone'; do
+    for pair in $CI_MARKER_PAIRS; do
         if [ -f "${pair%%:*}" ]; then ci="${pair##*:}"; n=$((n + 1)); fi
     done
     [ "$n" -eq 1 ] && printf '%s' "$ci"
     return 0
+}
+
+# Whether any recognized CI marker exists at all, ambiguous or not. detect_ci prints an empty string
+# both when nothing is found and when more than one marker is found, so a caller that must tell those
+# two cases apart (cmd_init's guard on writing a fresh GitHub Actions workflow) needs this instead.
+ci_marker_present() {
+    [ -n "$(find .github/workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) \
+             -print -quit 2>/dev/null)" ] && return 0
+    local pair
+    for pair in $CI_MARKER_PAIRS; do
+        [ -f "${pair%%:*}" ] && return 0
+    done
+    return 1
 }
 
 # Where it ships to, from the manifests that name a destination.

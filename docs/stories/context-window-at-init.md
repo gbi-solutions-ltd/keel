@@ -336,7 +336,7 @@ Scenario: no documented site still claims a configured value simply wins
   Then each describes the floor, the environment override, and the one million bound
 ```
 
-**Notes:** the four sites are `templates/profile.schema.json:287`, `bin/keel:1269`, `bin/keel:1271`
+**Notes:** the four sites are `templates/profile.schema.json:287`, `bin/keel:1575`, `bin/keel:1271`
 and `lib/context_watch.py:130-140`. All four currently state that an explicit setting wins outright,
 which is why this is `fix`. The second scenario is not redundant: `bin/keel:1271` remains reachable
 for every profile written before S-05.
@@ -404,7 +404,7 @@ Scenario: the window is named when assumed
 ```
 
 **Notes:** a regression guard around S-07, which rewrites both messages. Existing behaviour at
-`bin/keel:1267-1271`.
+`bin/keel:1534-1580`.
 
 ---
 

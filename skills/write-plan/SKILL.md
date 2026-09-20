@@ -41,7 +41,7 @@ List every file to create or modify and what each is responsible for. Decomposit
 get locked in here, and they are much cheaper to change now than inside task 7.
 
 **Where the area to map is larger than you can hold, delegate the reading**: subagents in
-one message, delegation profile `keel-fanout`, each citing `path:line`, said in one line. The predicate is the tree,
+one message, delegation profile `keel-fanout`, leading its description, each citing `path:line`. The predicate is the tree,
 not the mood: more directories than you can list from memory. Under that, read it yourself.
 
 Their findings are leads; the decomposition stays yours. Step 4 forbids naming a function no task
@@ -90,7 +90,7 @@ mechanical, and a dispatch is slower and no more reliable.
 
 **Then dispatch a reviewer.** Those checks compare the plan to itself; none opens the codebase, so a
 plan can pass every one and still be unbuildable. Brief in
-[references/plan-review.md](references/plan-review.md), model `inherit`, said in one line. Fix what
+[references/plan-review.md](references/plan-review.md), model `inherit`, leading its description. Fix what
 it returns, or record why not.
 
 ## Step 6: Hand off

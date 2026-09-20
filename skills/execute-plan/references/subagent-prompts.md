@@ -172,14 +172,13 @@ undoing a commit is the user's call, and it is the one repair this loop must not
 
 ## Which model each prompt goes to
 
-**Dispatch implementation and both reviews with model `inherit`.** These write code under the TDD
-gate and judge whether another agent's verdict is right, which is the work least worth making
-cheaper. The wide reading briefs in `repo-snapshot`, `port-assess`, `apex-port-plan` and
-`shape-idea` go to `sonnet`; these do not.
+**Dispatch implementation and both reviews with model `inherit`, leading its description.** These
+write code under the TDD gate and judge whether another agent's verdict is right, which is the work
+least worth making cheaper. The wide reading briefs in `repo-snapshot`, `port-assess`,
+`apex-port-plan` and `shape-idea` go to delegation profile `keel-fanout`; these do not.
 
-Say which model you dispatched, in one line, whichever it is. A cheaper model that silently handled
-something that mattered is the failure this rule exists to make visible, and it is invisible by
-construction: the output looks like output.
+A cheaper model that silently handled something that mattered is the failure this rule exists to
+make visible, and it is invisible by construction: the output looks like output.
 
 ## What you keep, and what you do not touch
 

@@ -255,7 +255,7 @@ the word, not in what Bernard confirmed on 2026-09-02.
 
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
-| NFR-01 | The body stays at or under ADR-0001's 900 word ceiling. No gate is weakened to fit. | confirmed | Bernard, 2026-09-02, and `docs/standards.md:345-353` |
+| NFR-01 | The body stays at or under ADR-0001's 900 word ceiling. No gate is weakened to fit. | confirmed | Bernard, 2026-09-02, and `docs/standards.md`, "A gate is never weakened so this repository can pass it" |
 | NFR-02 | A body over the 700 target carries a passing eval arm at that length. The proposed shape lands at a measured 795, so this applies. | confirmed | `ADR-0001:52` |
 | NFR-03 | The delegation and doc-claim checks that shipped on 2026-09-02 continue to pass. | inferred | `tests/validate-skills.sh`, `tests/test-doc-claims.sh` |
 | NFR-04 | No mode makes a network request, and audit and seed run offline. | inferred | matches assess, `references/assessment-report.md:5` |

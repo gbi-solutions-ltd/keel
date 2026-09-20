@@ -83,6 +83,8 @@ Service restored is not resolved. In order:
 4. If the design allowed it, `keel:design-architecture` for an ADR.
 5. Add what you learned to the runbook. A symptom that has happened once will happen again, and the
    next person on call should not start where you did.
+6. If the incident was preventable, say which of these it changes: a rule in a reference file, an
+   eval scenario, or a line in a skill. If none applies, say why.
 
 ## Common mistakes
 

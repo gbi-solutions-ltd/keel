@@ -279,7 +279,6 @@ change even when it is a one-line change.
 | Migrations forward-only | Not applicable | No database |
 | Scripts are bash, and `python3` is optional | `keel apex-export` requires `python3` and fails loudly without it | The work is parsing megabytes of JSON out of a database client, intersecting a wanted column list against a live catalog, and writing a file tree. Every bash version of that is a worse version of what the standard library already does. A half working export is worse than none, because the artifact's whole value is that an agent trusts what it reads. `apex_missing_deps` in `lib/apex-export.sh` names what is missing rather than degrading |
 | The managed CLAUDE.md block meets its 450-token target | This repository renders it at about 469 tokens, over the target and under the 700 ceiling | See below. Recorded 2026-08-16, narrowed 2026-08-19 when the template itself came inside the target |
-| A dispatch announces its model in one line | `repo-snapshot`, `port-assess` and `write-docs` name the model at the dispatch site but do not announce it | See below. Recorded 2026-08-20, when a run measured the pin firing and the announcement absent |
 
 The eval gap is temporary and has an end condition, tracked in `CHANGELOG.md`. The `python3`
 departure is permanent and scoped to one command; nothing else in `bin/keel` gained a hard
@@ -306,30 +305,26 @@ to what keel ships, which is why it is not folded into the template work. Until 
 warns here and nowhere that installs keel normally, the 700 ceiling still fails, and the figure is
 re-measured at each release rather than assumed. A block that grows past 700 is not covered.
 
-**Three skills name their dispatch model without announcing it.** The rule in "A dispatch names its
-model" is unconditional and stays that way. `apex-port-plan`, `write-plan`, `shape-idea` and
-`security-audit` carry the clause, four of the seven delegating skills; `repo-snapshot`,
-`port-assess` and `write-docs` do not, which was found on 2026-08-20 by a run that dispatched six
-correctly pinned `sonnet` agents and announced nothing.
+**Closed 2026-09-19. Three skills named their dispatch model without announcing it, historically.**
+The rule in "A dispatch names its model" is unconditional and stays that way. `apex-port-plan`,
+`write-plan`, `shape-idea` and `security-audit` carried the clause, four of the seven delegating
+skills; `repo-snapshot`, `port-assess` and `write-docs` did not, which was found on 2026-08-20 by a
+run that dispatched six correctly pinned `sonnet` agents and announced nothing.
 
-**What blocks each, measured the same day.** `repo-snapshot` is 699 words and `port-assess` is 699,
-one word each under ADR-0001's 700-word target, and the clause costs about eight. `write-docs` is
-738, already over the target and inside the 900 ceiling, so it carries an ADR-0001 obligation to
-have a passing eval arm at its length and adding words re-opens it. The clause was cut from these
-three when the pin was added, on the argument recorded above that the announcement costs nothing.
-It does not.
+**What blocked each, measured 2026-08-20.** `repo-snapshot` was 699 words and `port-assess` 699, one
+word each under ADR-0001's 700-word target, and the clause cost about eight. `write-docs` was 738,
+already over the target and inside the 900 ceiling, so any addition carried an ADR-0001 obligation
+to re-run its eval arm at the new length. The clause was cut from these three when the pin was
+added, on the argument recorded above that the announcement costs nothing. It did not.
 
-**Why it is not closed by the stream.** The eval harness can now read the dispatch model out of
-`--output-format stream-json`, which is why the pin is no longer in doubt. That reaches whoever runs
-an arm and nobody else. A developer in an interactive session sees only what the skill says, so for
-them the announcement is not a redundant signal, it is the only one.
-
-**Its end condition:** this closes when each of the three has the words. For `repo-snapshot` and
-`port-assess` that is a trim of roughly eight words at the next edit of either body, which is small
-enough that it should not wait for its own task. For `write-docs` it is the ADR-0001 arm being re-run
-at whatever length it then is. Until then the three are listed here by name, the count is re-measured
-at each release rather than assumed, and no further skill gains a pin without the clause: a fourth
-name in this row means the departure is growing rather than closing.
+**Closed by the label form, not by the stream.** The eval harness can read the dispatch model out of
+`--output-format stream-json`, which is why the pin was never in doubt; that reaches whoever runs an
+arm and nobody else, so it never discharged this departure. What closed it: the announcement moved
+from a spoken sentence to the dispatch's own `description` (see above), which is at least as cheap
+to say. All three now carry it: `repo-snapshot` and `port-assess` each freed the words at their next
+edit rather than waiting on a task of their own, and `write-docs` stayed at its already-discharged
+756 words by trimming the same count it spent, so its existing eval arm still applies under
+CONTRIBUTING.md's rule that an arm discharges the length it ran at.
 
 **This repository branches and reviews like any other.** Work goes on a branch, lands through a
 pull request, and `ship`'s check 8 applies here with no exception. Every commit on `main` arrives as
@@ -360,11 +355,28 @@ is why the departures table above exists at all rather than being quietly empty.
 
 ## A dispatch names its model, and says so
 
-**Rule:** a skill that dispatches a subagent names the routing at the dispatch site and announces it
-in one line. Wide mechanical reading goes to the delegation profile `keel-fanout`. Anything writing
-code under a gate, or judging another agent's verdict, stays `inherit`.
+**Rule:** a skill that dispatches a subagent names the routing at the dispatch site and leads the
+dispatch's own `description` with it: `<profile>: <task>`, the profile named exactly as the body
+names it. Wide mechanical reading goes to the delegation profile `keel-fanout`. Anything writing
+code under a gate, or judging another agent's verdict, stays `inherit`, labelled the same way and
+never omitted: an unlabelled dispatch is ambiguous between inherited and forgotten, and the reader
+cannot tell which from the transcript alone.
 `tests/validate-skills.sh` fails a dispatch that names no routing at all, since 2026-08-20, and
 since 2026-09-06 fails a body that names a vendor model alias at all.
+
+**The announcement moved from a spoken line to the dispatch's own label on 2026-09-19.** It used to
+mean a sentence in the reply, said once and easy to scroll past. The harness renders a dispatch as
+`Agent(<description>)`, and that label sits beside the call it names for as long as the transcript
+does, which a sentence elsewhere does not: a person watching a run on a top-tier model could not
+otherwise see that one step of it ran on a cheaper one, which is the wrong thing to be invisible for
+a plugin whose whole proposition is that the standard of work is known. Leading the description
+rather than trailing it matters for the same reason a trailing tag would fail: a narrow pane
+truncates the end of a label first, which is exactly when the model name matters most.
+**Confirmed on Claude Code**, where `description` is the exact string the harness renders. **Not
+checked on Codex:** this repository has not probed whether Codex renders a dispatch label at all, so
+nothing is claimed there either way, per ADR-0004. Landed in all seven delegating skills:
+`apex-port-plan`, `shape-idea`, `write-plan`, `security-audit`, `repo-snapshot`, `port-assess` and
+`write-docs`, plus `execute-plan`'s `references/subagent-prompts.md` and `references/parallel-batches.md`.
 
 **The vocabulary changed on 2026-09-06 and the reason is ADR-0005.** It used to be an alias:
 `sonnet` for the fan-outs, `inherit` for judgement. Four of the five accepted words were Anthropic
@@ -395,12 +407,12 @@ is a departure, listed in the departures table with its end condition.
 
 **Where the words came from.** `repo-snapshot` and `port-assess` had one and three words of
 headroom under ADR-0001's 700-word warning, so the dispatch sentences were tightened to fit the pin
-rather than the pin being dropped or the ceiling crossed. The announcement clause survives in full in
-four skills, `apex-port-plan`, `write-plan`, `shape-idea` and `security-audit`, and in
-`skills/execute-plan/references/` in both `subagent-prompts.md` and `parallel-batches.md`.
+rather than the pin being dropped or the ceiling crossed. The announcement clause, in its
+2026-09-19 label form, now appears in all seven delegating skills and in
+`skills/execute-plan/references/subagent-prompts.md` and `parallel-batches.md`.
 **Corrected 2026-08-20:** this paragraph said two skills and did not name them, and the count was
-checkable in one grep. The three without it are `repo-snapshot`, `port-assess` and `write-docs`;
-this section is what they point at.
+checkable in one grep. The three that lacked it, `repo-snapshot`, `port-assess` and `write-docs`,
+are closed above.
 
 **The pin fires, measured 2026-08-20.** A dispatch run under `--output-format stream-json` shows the
 `model` parameter on every `tool_use` block. That day a `repo-snapshot` run on a 189-file tree

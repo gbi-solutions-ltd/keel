@@ -2623,6 +2623,134 @@ n="$( cd "$d" && git rev-list --count HEAD 2>/dev/null || echo 0 )"
 [ "$n" = "1" ] && ok "new makes one initial commit" || bad "new" "expected 1 commit, got $n"
 rm -rf "$parent"
 
+# --- keel doctor --json ---------------------------------------------------------------------
+dj="$(fixture bare)"
+( cd "$dj" && "$KEEL" init -y >/dev/null 2>&1 )
+out="$( cd "$dj" && "$KEEL" doctor --json --fast 2>/dev/null )"
+printf '%s' "$out" | python3 -c "import json,sys; json.load(sys.stdin)" 2>/dev/null \
+  && ok "keel doctor --json prints one parseable JSON document" \
+  || bad "doctor --json" "output did not parse as JSON: $out"
+
+sv="$(printf '%s' "$out" | python3 -c "import json,sys; print(json.load(sys.stdin).get('schema_version'))")"
+[ "$sv" != "None" ] && [ -n "$sv" ] && ok "doctor --json reports schema_version" \
+  || bad "doctor --json" "schema_version missing or null"
+
+nfindings="$(printf '%s' "$out" | python3 -c "import json,sys; print(len(json.load(sys.stdin)['findings']))")"
+[ "$nfindings" -gt 0 ] && ok "doctor --json reports at least one finding" \
+  || bad "doctor --json" "findings array is empty"
+
+# harnesses is the profile's list, verbatim. init on a fixture writes at least one entry.
+hs="$(printf '%s' "$out" | python3 -c "import json,sys; d=json.load(sys.stdin); h=d['harnesses']; print(','.join(h) if isinstance(h, list) else 'NOT-A-LIST')")"
+[ -n "$hs" ] && [ "$hs" != "NOT-A-LIST" ] && ok "doctor --json reports harnesses as a list ($hs)" \
+  || bad "doctor --json" "harnesses missing, empty, or not a list: $hs"
+pf="$(python3 -c "import json; print(','.join(json.load(open('$dj/.keel/profile.json')).get('harnesses', [])))")"
+[ "$hs" = "$pf" ] && ok "doctor --json harnesses matches the profile verbatim" \
+  || bad "doctor --json" "harnesses differs from the profile: json=$hs profile=$pf"
+
+# --fast without --json still behaves exactly as before
+( cd "$dj" && "$KEEL" doctor --fast >/dev/null 2>&1 )
+rc_text=$?
+( cd "$dj" && "$KEEL" doctor --json --fast >/dev/null 2>&1 )
+rc_json=$?
+[ "$rc_text" -eq "$rc_json" ] && ok "doctor --json exits the same as text mode on the same project" \
+  || bad "doctor --json" "exit code differs from text mode: text=$rc_text json=$rc_json"
+rm -rf "$dj"
+
+# --- keel doctor --json without python3 -----------------------------------------------------
+# Simulates python3 being absent: a PATH built from symlinks to everything the real PATH offers
+# except python3 itself, so git, sed, and the rest doctor shells out to still work. Before this
+# fix, the python3 call cmd_doctor makes to build the JSON failed silently to stdout (just a
+# "command not found" on stderr) while still exiting however cmd_doctor_text exited, leaving a
+# fleet script with an empty "JSON" and no explanation.
+dnp="$(fixture bare)"
+( cd "$dnp" && "$KEEL" init -y >/dev/null 2>&1 )
+nopy_dir="$(mktemp -d)"
+oldifs="$IFS"; IFS=':'
+for pd in $PATH; do
+  [ -d "$pd" ] || continue
+  for f in "$pd"/*; do
+    [ -e "$f" ] || continue
+    b="$(basename "$f")"
+    case "$b" in python3|python3.*|python) continue ;; esac
+    [ -e "$nopy_dir/$b" ] || ln -s "$f" "$nopy_dir/$b" 2>/dev/null
+  done
+done
+IFS="$oldifs"
+nopy_stdout="$(mktemp)"
+nopy_err="$( cd "$dnp" && PATH="$nopy_dir" "$KEEL" doctor --json --fast 2>&1 1>"$nopy_stdout" )"
+nopy_rc=$?
+[ "$nopy_rc" -ne 0 ] && ok "doctor --json exits non-zero when python3 is absent" \
+  || bad "doctor --json" "exited 0 with python3 hidden from PATH"
+case "$nopy_err" in *python3*) ok "doctor --json's error names python3 when it is absent" ;;
+  *) bad "doctor --json" "stderr did not mention python3: $nopy_err" ;; esac
+[ -s "$nopy_stdout" ] && bad "doctor --json" "stdout was not empty with python3 hidden: $(cat "$nopy_stdout")" \
+  || ok "doctor --json prints nothing to stdout when python3 is absent, rather than garbage"
+rm -rf "$dnp" "$nopy_dir"; rm -f "$nopy_stdout"
+
+# --- keel doctor --json when the docs root is gitignored -------------------------------------
+# check_docs_ignored's failure branch used to print only to stderr (via err, not fail), so no
+# FAIL line reached stdout for the JSON reshaper even though problems was incremented and the
+# real exit code was nonzero: a --json consumer could see problems: 0 and an empty findings entry
+# for this check while the process exited nonzero. Reuses the "gitignored docs root" setup used
+# against `keel init` above, against `keel doctor --json` instead.
+ddi="$(fixture bare)"
+( cd "$ddi" && "$KEEL" init -y >/dev/null 2>&1 )
+printf 'docs/\n' >> "$ddi/.gitignore"
+dout="$( cd "$ddi" && "$KEEL" doctor --json --fast 2>/dev/null )"
+drc=$?
+dproblems="$(printf '%s' "$dout" | python3 -c "import json,sys; print(json.load(sys.stdin)['problems'])" 2>/dev/null)"
+[ "$drc" -ne 0 ] && [ "${dproblems:-0}" -ge 1 ] \
+  && ok "doctor --json's problems count agrees with a nonzero exit when the docs root is gitignored" \
+  || bad "doctor --json" "exit=$drc problems=$dproblems: the docs-root check's outcome must reach both"
+case "$dout" in *"is ignored by git"*) ok "doctor --json's findings include the gitignored docs root" ;;
+  *) bad "doctor --json" "findings did not mention the gitignored docs root: $dout" ;; esac
+rm -rf "$ddi"
+
+# --- write_ci reaches every verify.* command, and keel init writes it too ------------------------
+w="$(fixture node-ts)"
+( cd "$w" && "$KEEL" init -y >/dev/null 2>&1 )
+[ -f "$w/.github/workflows/ci.yml" ] && ok "init writes a CI workflow when none exists" \
+  || bad "write_ci" "keel init did not write .github/workflows/ci.yml"
+for step in lint build typecheck; do
+    grep -q "name: $step" "$w/.github/workflows/ci.yml" \
+      && ok "generated CI has a $step step" \
+      || bad "write_ci" "no '$step' step in the generated workflow, though verify.$step is set by the node-ts fixture"
+done
+grep -q 'name: e2e\|name: security' "$w/.github/workflows/ci.yml" \
+  && bad "write_ci" "e2e or security step present though both are null on this fixture" \
+  || ok "write_ci adds no step for a null verify command"
+rm -rf "$w"
+
+# init never overwrites a hand-authored workflow
+w2="$(fixture node-ts)"
+mkdir -p "$w2/.github/workflows"
+printf 'name: hand-authored\n' > "$w2/.github/workflows/ci.yml"
+( cd "$w2" && "$KEEL" init -y >/dev/null 2>&1 )
+grep -q 'hand-authored' "$w2/.github/workflows/ci.yml" \
+  && ok "init leaves an existing .github/workflows/ci.yml alone" \
+  || bad "write_ci" "init overwrote a hand-authored CI file"
+rm -rf "$w2"
+
+# and never writes a GitHub workflow into a project that declares another CI platform
+w3="$(fixture node-ts)"
+: > "$w3/.gitlab-ci.yml"
+( cd "$w3" && "$KEEL" init -y >/dev/null 2>&1 )
+[ ! -e "$w3/.github/workflows/ci.yml" ] \
+  && ok "init writes no GitHub workflow where deploy.ci already names a platform" \
+  || bad "write_ci" "init wrote .github/workflows/ci.yml into a project holding .gitlab-ci.yml"
+rm -rf "$w3"
+
+# and never writes one where two CI markers make the platform ambiguous, which detect_ci reports
+# as null too, the same as no marker at all
+w4="$(fixture node-ts)"
+: > "$w4/.gitlab-ci.yml"
+: > "$w4/Jenkinsfile"
+( cd "$w4" && "$KEEL" init -y >/dev/null 2>&1 )
+[ ! -e "$w4/.github/workflows/ci.yml" ] \
+  && ok "init writes no GitHub workflow where two CI markers make the platform ambiguous" \
+  || bad "write_ci" "init wrote .github/workflows/ci.yml into a project holding both .gitlab-ci.yml and Jenkinsfile"
+rm -rf "$w4"
+
 # Refuses to write into a non-empty directory.
 parent="$(mktemp -d)"; mkdir -p "$parent/taken"; echo x > "$parent/taken/file"
 if ( cd "$parent" && "$KEEL" new taken --stack node >/dev/null 2>&1 ); then
@@ -3459,6 +3587,15 @@ d6="$(fixture node-ts)"
   && ok "init git-ignores the handoff file" \
   || bad "handoff" ".keel/handoff.md is not ignored"
 
+# The seen-marker moved out of the tree (hooks/session-start writes it under $TMPDIR now), so it
+# never reaches the working tree and needs no rule of its own. A stray line would just be dead
+# weight, and its reappearance would mean the marker regressed back into the tree.
+if grep -qxF ".keel/handoff.seen" "$d6/.gitignore" 2>/dev/null; then
+    bad "handoff" "init still writes a .gitignore rule for .keel/handoff.seen, which no longer lives in the tree"
+else
+    ok "init does not write a .gitignore rule for the out-of-tree seen marker"
+fi
+
 # Isolated from a developer's global excludes, as above: the repository's own line has to do the job
 # for a teammate who has no such global rule.
 d7="$(fixture node-ts)"
@@ -3642,6 +3779,131 @@ push_to refs/heads/main \
   && ok "protect_default_branch false allows the push" \
   || bad "guard" "the hook refused with protect_default_branch false"
 
+# --- pre-push: refuses a push that loosens the profile -----------------------------------------
+rt="$(fixture bare)"
+( cd "$rt" && "$KEEL" init -y >/dev/null 2>&1 )
+( cd "$rt" && "$KEEL" guard install >/dev/null 2>&1 )
+( cd "$rt" && "$KEEL" profile set conventions.protect_default_branch false >/dev/null 2>&1 )
+# init writes gates.commit_guard as "off" (`bin/keel#"commit_guard": "off"`). Without this line the baseline and the
+# "loosened" commit both hold off, nothing loosens, and the refusal below can never be observed.
+# Setting it to required also arms the pre-commit hook for this fixture's commits, which is harmless:
+# a bare fixture has null verify.format, lint and typecheck, so the hook runs nothing.
+( cd "$rt" && "$KEEL" profile set gates.commit_guard required >/dev/null 2>&1 )
+( cd "$rt" && git add -A && git commit -q -m "baseline, gate required" )
+old_sha="$( cd "$rt" && git rev-parse HEAD )"
+
+( cd "$rt" && "$KEEL" profile set gates.commit_guard off >/dev/null 2>&1 )
+( cd "$rt" && git add -A && git commit -q -m "loosen the commit gate" )
+new_sha="$( cd "$rt" && git rev-parse HEAD )"
+
+out="$(cd "$rt" && printf 'refs/heads/main %s refs/heads/main %s\n' "$new_sha" "$old_sha" \
+       | PATH="$(dirname "$KEEL"):$PATH" .githooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
+rc=$?
+[ "$rc" -ne 0 ] && ok "pre-push refuses a push that loosens gates.commit_guard" \
+  || bad "guard" "pre-push allowed a push that turned gates.commit_guard from required to off"
+case "$out" in
+  *"gates.commit_guard"*) ok "the refusal names the loosened key" ;;
+  *) bad "guard" "refusal message does not name gates.commit_guard. Got: $out" ;;
+esac
+
+# the reverse direction, tightening, is not refused
+( cd "$rt" && "$KEEL" profile set gates.commit_guard required >/dev/null 2>&1 )
+( cd "$rt" && git add -A && git commit -q -m "tighten it back" )
+tight_sha="$( cd "$rt" && git rev-parse HEAD )"
+( cd "$rt" && printf 'refs/heads/main %s refs/heads/main %s\n' "$tight_sha" "$new_sha" \
+    | PATH="$(dirname "$KEEL"):$PATH" .githooks/pre-push origin git@example.invalid:gbi/f.git >/dev/null 2>&1 ) \
+  && ok "pre-push allows a push that tightens a gate" \
+  || bad "guard" "pre-push refused a push that only tightened gates.commit_guard"
+
+# an unrecognized value, not "required", "warn" or "off", such as a typo, must be treated as a
+# loosening too. The pre-commit hook's own case statement (`bin/keel#case "$gate" in`) already
+# treats anything but required/warn as fully off, so this is a real value a profile can hold, not
+# a contrived one, and `keel profile set` writes it as a plain JSON string with no validation of
+# its own.
+( cd "$rt" && "$KEEL" profile set gates.commit_guard disabled >/dev/null 2>&1 )
+( cd "$rt" && git add -A && git commit -q -m "commit_guard set to an unrecognized value" )
+bad_val_sha="$( cd "$rt" && git rev-parse HEAD )"
+out="$(cd "$rt" && printf 'refs/heads/main %s refs/heads/main %s\n' "$bad_val_sha" "$tight_sha" \
+       | PATH="$(dirname "$KEEL"):$PATH" .githooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
+case "$out" in
+  *"gates.commit_guard"*) ok "pre-push refuses gates.commit_guard set to an unrecognized value" ;;
+  *) bad "guard" "gates.commit_guard set to an unrecognized string was not refused. Got: $out" ;;
+esac
+
+# restore a recognized value so the later tests in this fixture, which rely on gates.commit_guard
+# being "required" going into their own comparisons, are not left resting on "disabled".
+( cd "$rt" && "$KEEL" profile set gates.commit_guard required >/dev/null 2>&1 )
+( cd "$rt" && git add -A && git commit -q -m "restore commit_guard to required" )
+
+# a first push (remote sha all zeros) compares against the remote-tracking default branch, so a
+# branch born weaker than main is refused on its first push, not only its second. The fixture has
+# no real remote; a remote-tracking ref pointing at the strong baseline is all the hook reads.
+( cd "$rt" && git update-ref refs/remotes/origin/main "$old_sha" )
+( cd "$rt" && printf 'refs/heads/weak %s refs/heads/weak %s\n' "$new_sha" "0000000000000000000000000000000000000000" \
+    | PATH="$(dirname "$KEEL"):$PATH" .githooks/pre-push origin git@example.invalid:gbi/f.git >/dev/null 2>&1 ) \
+  && bad "guard" "pre-push allowed a first push of a branch whose profile is weaker than origin/main" \
+  || ok "pre-push refuses a first push that is weaker than the remote default branch"
+
+# a verify command replaced by a non-string is a loosening too, not only null. The bare fixture
+# starts with verify.test null, so a string goes in first. `keel profile set` writes the literal
+# `true` as a JSON boolean, not the string (`bin/keel#raw == "true":  val = True`), which is the shape the idea document names.
+( cd "$rt" && "$KEEL" profile set verify.test "npm test" >/dev/null 2>&1 )
+( cd "$rt" && git add -A && git commit -q -m "verify.test is a command" )
+str_sha="$( cd "$rt" && git rev-parse HEAD )"
+( cd "$rt" && "$KEEL" profile set verify.test true >/dev/null 2>&1 )
+( cd "$rt" && git add -A && git commit -q -m "verify.test is now JSON true" )
+bool_sha="$( cd "$rt" && git rev-parse HEAD )"
+out="$(cd "$rt" && printf 'refs/heads/main %s refs/heads/main %s\n' "$bool_sha" "$str_sha" \
+       | PATH="$(dirname "$KEEL"):$PATH" .githooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
+case "$out" in
+  *"verify.test"*) ok "pre-push refuses verify.test becoming a non-string" ;;
+  *) bad "guard" "verify.test turned from a string into true and the push was not refused. Got: $out" ;;
+esac
+
+# verify.security is one of the keys the original comparator left out entirely (only test, lint,
+# format, typecheck, build were checked), so a real command going null there sailed through unrefused.
+( cd "$rt" && "$KEEL" profile set verify.security "npm audit" >/dev/null 2>&1 )
+( cd "$rt" && git add -A && git commit -q -m "verify.security is a command" )
+sec_str_sha="$( cd "$rt" && git rev-parse HEAD )"
+( cd "$rt" && "$KEEL" profile set verify.security null >/dev/null 2>&1 )
+( cd "$rt" && git add -A && git commit -q -m "verify.security is now null" )
+sec_null_sha="$( cd "$rt" && git rev-parse HEAD )"
+out="$(cd "$rt" && printf 'refs/heads/main %s refs/heads/main %s\n' "$sec_null_sha" "$sec_str_sha" \
+       | PATH="$(dirname "$KEEL"):$PATH" .githooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
+case "$out" in
+  *"verify.security"*) ok "pre-push refuses verify.security going from a command to null" ;;
+  *) bad "guard" "verify.security turned null and the push was not refused. Got: $out" ;;
+esac
+
+# removing a gate key outright, not just setting it to "off", is the same loosening by another
+# route, and the comparator must not need the key to survive in order to notice it went missing.
+python3 - "$rt" <<'PY'
+import json,sys,pathlib
+p=pathlib.Path(sys.argv[1])/".keel/profile.json"; d=json.loads(p.read_text())
+del d["gates"]["commit_guard"]
+p.write_text(json.dumps(d,indent=2)+"\n")
+PY
+( cd "$rt" && git add -A && git commit -q -m "remove gates.commit_guard entirely" )
+gate_del_sha="$( cd "$rt" && git rev-parse HEAD )"
+out="$(cd "$rt" && printf 'refs/heads/main %s refs/heads/main %s\n' "$gate_del_sha" "$sec_null_sha" \
+       | PATH="$(dirname "$KEEL"):$PATH" .githooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
+case "$out" in
+  *"gates.commit_guard"*) ok "pre-push refuses a push that removes gates.commit_guard entirely" ;;
+  *) bad "guard" "removing gates.commit_guard was not refused. Got: $out" ;;
+esac
+
+# deleting .keel/profile.json entirely is the maximal loosening, every gate and verify check at
+# once, and there is no new-side JSON document for the python comparator to be handed at all.
+( cd "$rt" && git rm -q .keel/profile.json && git commit -q -m "delete the profile" )
+del_sha="$( cd "$rt" && git rev-parse HEAD )"
+out="$(cd "$rt" && printf 'refs/heads/main %s refs/heads/main %s\n' "$del_sha" "$gate_del_sha" \
+       | PATH="$(dirname "$KEEL"):$PATH" .githooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
+case "$out" in
+  *"profile.json"*"deleted"*) ok "pre-push refuses a push that deletes .keel/profile.json" ;;
+  *) bad "guard" "deleting .keel/profile.json was not refused. Got: $out" ;;
+esac
+rm -rf "$rt"
+
 # The hook body lives inside a quoted heredoc, so the repo's own lint reads it as a string and never
 # parses it. Linting the generated file is the only way that code gets checked at all.
 if command -v shellcheck >/dev/null 2>&1; then
@@ -3734,6 +3996,51 @@ fi
 [ ! -e "$c/.githooks/pre-commit" ] && ok "guard uninstall removes the pre-commit hook too" \
   || bad "commit guard" "the pre-commit hook survived uninstall"
 rm -rf "$c"
+
+# --- guard install: prepare-commit-msg appends Keel-Version -----------------------------------
+tv="$(fixture bare)"
+( cd "$tv" && "$KEEL" init -y >/dev/null 2>&1 )
+( cd "$tv" && "$KEEL" guard install >/dev/null 2>&1 )
+[ -x "$tv/.githooks/prepare-commit-msg" ] && ok "guard install writes an executable prepare-commit-msg hook" \
+  || bad "guard" "no executable .githooks/prepare-commit-msg"
+
+( cd "$tv" && "$KEEL" guard status 2>&1 | grep -qi "message guard" ) \
+  && ok "guard status reports the message guard as well as the push and commit guards" \
+  || bad "guard" "status said nothing about the message guard"
+
+( cd "$tv" && git add -A && git commit -q -m "a real commit" )
+msg="$( cd "$tv" && git log -1 --format=%B )"
+kv="$(sed -n 's/.*"keel_version": *"\([^"]*\)".*/\1/p' "$tv/.keel/profile.json" | head -1)"
+case "$msg" in
+  *"Keel-Version: $kv"*) ok "commit message carries the Keel-Version trailer" ;;
+  *) bad "guard" "commit message has no 'Keel-Version: $kv' trailer. Got: $msg" ;;
+esac
+
+# amending does not duplicate the trailer. --no-edit, not -m: with -m git hands the hook a fresh
+# message that has no trailer in it yet, so the duplicate guard is never reached and the assertion
+# would pass against a hook with no guard at all. --no-edit feeds the previous message, trailer
+# included, back through prepare-commit-msg, which is the case the guard exists for.
+( cd "$tv" && git commit -q --amend --no-edit )
+msg2="$( cd "$tv" && git log -1 --format=%B )"
+count="$(printf '%s\n' "$msg2" | grep -c '^Keel-Version:')"
+[ "$count" -eq 1 ] && ok "amending a commit does not duplicate the Keel-Version trailer" \
+  || bad "guard" "expected exactly one Keel-Version trailer after amend, found $count"
+
+# The hook body lives inside a quoted heredoc, so the repo's own lint reads it as a string and
+# never parses it. Linting the generated file, the same pattern the existing pre-push and
+# pre-commit shellcheck tests use, is the only way this code gets checked at all.
+if command -v shellcheck >/dev/null 2>&1; then
+    shellcheck -s bash "$tv/.githooks/prepare-commit-msg" >/dev/null 2>&1 \
+      && ok "the generated prepare-commit-msg hook is shellcheck clean" \
+      || bad "guard" "shellcheck flagged prepare-commit-msg: $(shellcheck -s bash "$tv/.githooks/prepare-commit-msg" 2>&1 | head -3)"
+else
+    printf '  SKIP  shellcheck is absent, so the generated prepare-commit-msg hook was not linted\n'
+fi
+
+( cd "$tv" && "$KEEL" guard uninstall >/dev/null 2>&1 )
+[ ! -e "$tv/.githooks/prepare-commit-msg" ] && ok "guard uninstall removes the prepare-commit-msg hook too" \
+  || bad "guard" "prepare-commit-msg survived uninstall"
+rm -rf "$tv"
 
 # ---- the two version numbers ----------------------------------------------
 # VERSION drives the CLI and the value recorded in every project's profile. The version in
