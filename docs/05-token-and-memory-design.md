@@ -1,6 +1,6 @@
 # Token Budget, Prompt Caching, and Memory
 
-Requirement 14, and the one most likely to be quietly violated by the other thirteen. A
+The founding requirement most likely to be quietly violated by the other thirteen. A
 methodology that costs three times as many tokens per task is a methodology people turn off.
 
 ## How prompt caching actually constrains the design
@@ -10,7 +10,7 @@ are identical to last time. One changed character invalidates everything after i
 
 The always-loaded prefix in a Claude Code session is roughly:
 
-```
+```text
 system prompt  ->  tool definitions  ->  skill descriptions  ->  CLAUDE.md  ->  hook injections  ->  conversation
                                          [ we control from here on ]
 ```
@@ -29,7 +29,7 @@ on upgrade, so it goes at the top. Project-specific notes people edit weekly go 
 ### Concretely, what this forbids
 
 | Tempting | Why not | Do instead |
-|----------|---------|------------|
+| ---------- | --------- | ------------ |
 | Inject `git status` or the branch name at session start | Changes constantly, kills the cache | Let a skill run `git status` when it needs it |
 | Inject "last session you were working on X" | Changes every session | Write it to `docs/keel/` and let a skill read it on demand |
 | Inject the full skill list with descriptions | Already in the prefix via the skill mechanism, duplicating it doubles the cost | Inject a 250-word router pointer only |
@@ -39,7 +39,7 @@ on upgrade, so it goes at the top. Project-specific notes people edit weekly go 
 ## Budget
 
 | Layer | Target | Hard ceiling | Enforced by |
-|-------|--------|--------------|-------------|
+| ------- | -------- | -------------- | ------------- |
 | CLAUDE.md managed block | 450 tokens | 700 | `keel doctor` |
 | CLAUDE.md project section | 500 tokens | 1,200 | `context-budget` warns |
 | SessionStart hook injection | 250 tokens | 400 | `tests/validate-skills.sh`, which also requires it to name every skill |
@@ -69,25 +69,18 @@ the model may not have loaded when it builds the dispatch. `repo-snapshot`'s six
 verbatim brief suffix is 175 words on its own. That is now an explanation of why bodies differ, not
 a second budget line.
 
-Total always-loaded keel cost, measured 2026-08-19: **1,891 tokens** at 24 skills, being 1,066 for
-the descriptions, 469 for the CLAUDE.md block as this repository renders it, and 356 for the
-SessionStart injection.
-
-**Re-measured 2026-08-30 at 25 skills: 1,941 tokens**, being 1,121 for the descriptions, 469
-unchanged, and 351 for the injection. The descriptions grew by one skill and the injection shrank,
-because adding `design-database` to the router needed 17 characters against the 1 it had spare and
-four phrases were trimmed to pay for it. The net is 50 tokens for a skill, which is what the
-mechanism below is meant to cost.
-
-**Re-measured 2026-09-02: 1,945 tokens**, being 1,121 and 469 unchanged and 355 for the injection.
-The injection grew by 4 because the hook now prints the version of the plugin copy the session
-loaded, which is the only way a session can know it: `CLAUDE_PLUGIN_ROOT` reaches a plugin's own
-hooks and not `keel` on `PATH`, and on a developer machine those are routinely different copies. A
-cached 0.16.1 served this repository's sessions for twelve days while it developed 0.17.0, and
-nothing could say so. Four tokens is what that costs, forever, in every request. The injection
-was 300 until the brevity rule was made the default later the same day; see below. For comparison,
-superpowers injects its entire `using-superpowers` skill body at session start, which is around 900
-tokens on its own, and gstack's tier-4 preamble runs into several thousand.
+Total always-loaded keel cost is **1,945 tokens at 25 skills** (measured 2026-09-02): 1,121 for the
+descriptions, 469 for the CLAUDE.md block as this repository renders it, and 355 for the
+SessionStart injection. It moved from 1,891 at 24 skills (2026-08-19) as skills were added and the
+injection grew: `design-database` joining the router cost the descriptions 17 characters against
+the 1 it had spare, paid for by trimming four phrases elsewhere, netting about 50 tokens for a
+skill, which is what the mechanism below is meant to cost. The injection separately grew 4 tokens
+when the hook started printing the version of the plugin copy the session loaded, the only way a
+session can tell a cached 0.16.1 from a 0.17.0 it has already moved to: `CLAUDE_PLUGIN_ROOT`
+reaches a plugin's own hooks and not `keel` on `PATH`, and on a developer machine those are
+routinely different copies. For comparison, superpowers injects its entire `using-superpowers`
+skill body at session start, which is around 900 tokens on its own, and gstack's tier-4 preamble
+runs into several thousand.
 
 **One line is over target and under ceiling, which is a decision rather than an oversight.** The
 injection is at 356 tokens against a 250 target, because it names every skill, the count grew, and it
@@ -160,7 +153,7 @@ rule already forbids.
 
 The mechanism that makes 25 skills cost what 25 descriptions cost.
 
-```
+```text
 Always loaded         ->  24 descriptions (~1,066 tokens, ceiling 1,320)
 On invocation         ->  one SKILL.md body (~500 tokens)
 On explicit need      ->  that skill's references/*.md (500 to 3,000 tokens)
@@ -199,7 +192,7 @@ measured. The money reading of it is measured and false at that size.
 Skills that must delegate:
 
 | Skill | What it delegates |
-|-------|-------------------|
+| ------- | ------------------- |
 | `repo-snapshot` | One `Explore` agent per area, in parallel. Returns findings, not file contents |
 | `execute-plan` (delegated mode) | One agent per task. Implementation noise never enters the main thread |
 | `security-audit --full` | One agent per phase |
@@ -214,7 +207,7 @@ delegate judgement.
 `docs/keel/` is the memory. It is on disk, committed, human-readable, and loaded on demand.
 Nothing is auto-injected.
 
-```
+```text
 docs/keel/
   snapshot.md            # what this repo is. Regenerated quarterly or on major change
   standards.md           # conventions. Read by coding-standards and review-code
@@ -250,7 +243,7 @@ whoever picks it up next.
 `hooks/context-watch` measures it instead. Registered on three events:
 
 | Event | What it does |
-|---|---|
+| --- | --- |
 | `UserPromptSubmit` | Silent below 70%. Between 70 and 85, one short warning naming the number. Past 85, the stop instruction |
 | `PreToolUse` | Nothing below 85%. Past it, denies tool calls until a handoff is written |
 | `PreCompact` | Writes a mechanical handoff before the session's own memory is rewritten |
@@ -258,7 +251,7 @@ whoever picks it up next.
 **Occupancy is read, not estimated.** Claude Code's transcript records the usage the API reported for
 each request, so the last main-thread assistant turn gives the answer directly:
 
-```
+```text
 input_tokens + cache_creation_input_tokens + cache_read_input_tokens + output_tokens
 ```
 
@@ -337,7 +330,7 @@ not two. Every form also carries the loaded plugin's version since 2026-09-02. M
 against `VERSION` 0.17.0:
 
 | `response_style` | `explain_level` | Injected | Chars | Tokens |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | `terse` | `technical` | the brevity paragraph | 1,279 | 355 |
 | `terse` | `plain` | brevity and define-on-first-use | 1,278 | 355 |
 | `verbose` | `technical` | nothing | 1,077 | 299 |

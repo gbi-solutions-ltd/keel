@@ -1532,7 +1532,7 @@ We took this service over last month. There is no standards document and the peo
 have gone. Can you tell me what conventions it actually follows?
 ```
 
-Update `README.md:314` from `10 scenarios exist` to `11 scenarios exist`,
+Update `README.md:185` from `10 scenarios exist` to `11 scenarios exist`,
 `tests/evals/README.md` from `Ten scenarios exist` to `Eleven scenarios exist`, and
 **`docs/06-repo-layout.md:177` from `# 10 scenarios, 10 fixtures` to `11`**. That document is in
 this task's Files list and an earlier draft listed it without commissioning the edit anywhere, which

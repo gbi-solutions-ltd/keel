@@ -7,6 +7,45 @@ versions as each skill is tested against real repositories.
 
 Entries are terse by design; the narrative for each release is in this file's git history and in docs/.
 
+## 0.21.0 - 2026-09-22
+
+- Release gate 2026-09-22 against `9e3321b`: **seven treatment arms, all seven pass**, $2.37 across
+  two dispatch rounds. The first round's adapted dispatch script died on a bash empty-array
+  reference before six of the seven arms could run, at no cost since the failure was in the shell
+  script rather than the dispatch; re-run against the already-staged directories. No accepted
+  failures. `tdd-under-deadline` produced a rationalisation worth keeping ("a guard you never saw
+  fire is exactly the kind of thing that ships green and does nothing"); `build-with-no-prd`'s
+  clarifying question edged toward naming an implementation, flagged for a future scenario
+  refinement rather than acted on. See `tests/evals/results.md` for the full record.
+
+- **`gates.coding_standards` defaults to `required` rather than `warn`.** A profile with the gate at
+  `warn` reads as configured while enforcing nothing once a project has a standards document, the
+  same failure mode `required` with no document already refuses on. `keel init` and `keel new` now
+  name the one thing a fresh project still owes doctor (a `docs/standards.md` written by
+  `coding-standards`' seed mode) instead of letting it surface silently the first time doctor runs;
+  `keel new`'s `NEXT-STEPS.md` puts that step first. `security_audit` already defaulted to
+  `required`; `commit_guard` and `done_verified` are left as `warn`/`off`, since those two need a
+  project to opt in after seeing the warning fire.
+
+- **`ship` refuses on an unaddressed standards violation when `gates.coding_standards` is required,
+  and `execute-plan`'s delegated loop stops the tick on a blocking quality finding**, the same way
+  it already stops on a `DEVIATES` verdict. `keel doctor` fails a required `coding_standards` gate
+  with no document to check against, rather than reading as configured while enforcing nothing.
+  `repo-snapshot` assesses against a project's standards document where one exists, or names its
+  absence. `keel init` sets `compilerOptions.strict` on a TypeScript project that has not decided,
+  and the generated CI audits dependencies, keyed on the package manager.
+
+- **README shortened from 382 to 235 lines**, and `docs/04-plugin-strategy.md` reworked from a
+  decision log addressed to one original requester into a current-state reference. Present-tense
+  pass across the other top-level docs: a stale "Phase 1 can start" status header, a skill count
+  frozen at 24, and three successive "re-measured on DATE" paragraphs restating the same token
+  figure, all replaced with settled, current statements. Markdown formatting across README and the
+  top-level docs surfaced a table row with a missing closing pipe and a long tail of pre-existing
+  stale line-number citations elsewhere in `docs/`, all fixed.
+
+- Fixed the pre-push hook's first-push profile-delete check and a `keel-fleet` doctor exit-code
+  misread, carried on this branch.
+
 ## 0.20.0 - 2026-09-20
 
 - Release gate 2026-09-20 against `a1e7d8b`: **seven treatment arms, all seven pass**, roughly $4.0

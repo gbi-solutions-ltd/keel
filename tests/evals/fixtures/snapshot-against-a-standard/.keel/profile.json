@@ -1,0 +1,8 @@
+{
+  "project": { "name": "payouts", "kind": "cli", "description": "Settles agent payouts from a ledger file" },
+  "stack": { "language": "bash", "runtime": "bash", "package_manager": "none", "has_ui": false },
+  "verify": { "test": "tests/run-tests.sh", "lint": null, "build": null },
+  "gates": { "coding_standards": "required" },
+  "docs_root": "docs",
+  "artifacts": { "prd": null, "stories": null, "architecture": null }
+}

@@ -24,13 +24,13 @@ Remedy classes:
 | # | Location | The claim | Class |
 |---|---|---|---|
 | 1 | `README.md:16` | "That is the whole install." Describes Claude Code's plugin and PATH mechanism as the install | **N** + W |
-| 2 | `README.md:87` | The `keel terse` output style, "selectable in `/config`". No Codex counterpart was found; `bin/keel` never references `output-styles/` | **W** |
+| 2 | `README.md:82-84` | The `keel terse` output style, "selectable in `/config`". No Codex counterpart was found; `bin/keel` never references `output-styles/` | **W** |
 | 3 | `README.md`, the paragraph opening "Bypassing prompts is bounded" | The headline safety claim: `deny` and `ask` rules in `.claude/settings.json` "both kinds still apply under `bypassPermissions`" | **W**, highest value in the list |
 | 4 | `docs/01-architecture.md:22-23` | Layer 1 as "hooks in `.claude/settings.json`" | **W**, done this turn |
 | 5 | `docs/01-architecture.md:165` | "Where a rule is genuinely non-negotiable, we put it in a hook" | **W**, done this turn |
 | 6 | `docs/01-architecture.md:167-172` | The enforcement table. Every row names a Claude Code mechanism | **W**, table gains a harness column. Not yet done |
-| 7 | `docs/07-open-decisions.md:176-178` | Decision 3: `security-audit` on a sensitive diff "should be hard blocked at the hook level" | **A** |
-| 8 | `docs/07-open-decisions.md:196-199` | "`ask` is the only decision in the hook protocol the model cannot satisfy for itself... and it survives `bypassPermissions`" | **A** |
+| 7 | `docs/07-open-decisions.md:173-175` | Decision 3: `security-audit` on a sensitive diff "should be hard blocked at the hook level" | **A** |
+| 8 | `docs/07-open-decisions.md:206-210` | "`ask` is the only decision in the hook protocol the model cannot satisfy for itself... and it survives `bypassPermissions`" | **A** |
 | 9 | `docs/03-install-and-distribution.md` | The install code block: `/plugin marketplace add`, `/plugin install`, "installs 25 skills, the SessionStart hooks, and bin/keel on the Bash tool's PATH" | **N** |
 | 10 | `docs/03-install-and-distribution.md:30` | "writes `.claude/settings.json` with recommended plugins and hooks" | **W** |
 | 11 | `docs/03-install-and-distribution.md:175-181` | `CLAUDE_PLUGIN_ROOT` "is set only for hooks a plugin itself defines", plus thirteen other `CLAUDE_*` variables | **W**, and this is where the Codex compatibility fact belongs: Codex sets `CLAUDE_PLUGIN_ROOT` too (`codex-rs/hooks/src/engine/discovery.rs:266-269`), so this passage is now actively misleading rather than merely partial |
@@ -39,13 +39,13 @@ Remedy classes:
 | 14 | `docs/02-skill-catalog.md:65` | Requirement 5 satisfied by "`security-audit` + `security-guidance` plugin hooks + `ship` gate" | **W** |
 | 15 | `docs/02-skill-catalog.md:383` | `security-audit`'s plugin calls: `security-guidance` hooks and the built-in `/security-review` | **W**, and it moves with "Step 5: Plugin and gate" in `skills/security-audit/SKILL.md` or `tests/validate-skills.sh:390-463` fails |
 | 16 | `docs/02-skill-catalog.md:536` | `context-budget` "Reads: `CLAUDE.md`, `.claude/settings.json`, `.keel/`, skill sizes" | **W** |
-| 17 | `docs/02-skill-catalog.md:544` | `context-budget`'s plugin call to `claude-md-management` | **W** |
+| 17 | `docs/02-skill-catalog.md:568` | `context-budget`'s plugin call to `claude-md-management` | **W** |
 | 18 | `docs/04-plugin-strategy.md:11` | `security-guidance` as "Install, required... Hook-based, so it runs without being asked" | **A**, and see the note below: the whole document is Claude-marketplace-shaped |
 
 ## Three things the count of eighteen hides
 
 **1. A nineteenth location, and it is the one already owed.**
-`docs/03-install-and-distribution.md:427-432` is the portability paragraph that says "The skills
+`docs/03-install-and-distribution.md:475` is the portability paragraph that says "The skills
 themselves stay Claude-only for now; porting them is a later decision, not a Phase 1 one." That
 sentence is not false today; it becomes false the moment this design ships, and it was already
 carrying an unpaid follow-up from the idea record. It is class **N** and it is the natural home for

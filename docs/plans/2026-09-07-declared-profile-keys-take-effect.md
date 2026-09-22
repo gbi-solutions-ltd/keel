@@ -62,7 +62,7 @@ Twenty-two keys, one verdict each. `harnesses` is stated for every `gates.*` key
 five descriptions and cannot become one: its body is 695 words against ADR-0001's 700 target, five
 words of headroom, and `CONTRIBUTING.md` requires a passing eval arm at any length over 700.
 `deploy.target`, `.ci` and `.envs` are detected by `keel init` and proposed by a snapshot
-(`skills/repo-snapshot/references/section-templates.md:249-250`); `.registry` and
+(`skills/repo-snapshot/references/section-templates.md:257-258`); `.registry` and
 `.secrets_manager` exist so a pipeline and a runbook agree on one value, which is a person's job by
 construction. All five become human-read and their descriptions stop naming `setup-deployment`.
 **The alternative, rejected:** a `cmd_doctor` warning when `deploy.ci` is null and a CI config
@@ -396,7 +396,7 @@ Add the two 2026-08-18 plans to the Files list.
 **Why a declared reader and not a matcher.** The brief asked for a dotted-path rule and named its
 hard problem. The rule was prototyped against the tree on 2026-09-07 and does not work in either
 direction. It flags 25 of 61 leaves, and 7 of the 25 are genuinely read: `artifacts.stories`,
-`.architecture`, `.decisions` and `.plans` through the map iteration at `bin/keel:1341-1350`,
+`.architecture`, `.decisions` and `.plans` through the map iteration at `bin/keel:1345-1354`,
 `gates.context_warn_pct` and `.context_stop_pct` through `lib/context_watch.py:497-508`, and
 `conventions.default_branch` through the sed at `bin/keel:1640`. That is 28% false positives,
 against `docs/standards.md:79` calling the too-strict failure the unrecoverable one and
@@ -777,15 +777,15 @@ say so rather than adding a sentence back to the schema by hand.
 | Value | Keys |
 |---|---|
 | `code:bin/keel:465` | `harnesses` |
-| `code:bin/keel:1517` | `schema_version` |
+| `code:bin/keel:1522` | `schema_version` |
 | `code:bin/keel:1516` | `keel_version` |
-| `code:bin/keel:1331` | `project.kind` |
+| `code:bin/keel:1335` | `project.kind` |
 | `advisory:skills/keel/references/tool-choices.md:20` | `stack.language` |
 | `code:bin/keel:853` | `stack.package_manager` |
-| `code:bin/keel:1418`, `advisory:skills/coding-standards/references/house-defaults.md:31` | `stack.has_ui` |
+| `code:bin/keel:1632`, `advisory:skills/coding-standards/references/house-defaults.md:31` | `stack.has_ui` |
 | `advisory:skills/coding-standards/references/house-defaults.md:31` | `stack.framework` |
 | `advisory:skills/keel/references/tool-choices.md:21` | `stack.also` |
-| `code:bin/keel:1381`, `code:hooks/done-guard:118` | `verify.test` |
+| `code:bin/keel:1397`, `code:hooks/done-guard:118` | `verify.test` |
 | `code:bin/keel:1432` | `verify.test_one` |
 | `advisory:skills/tdd/SKILL.md:31` | `verify.test_integration` |
 | `code:bin/keel:1387` | `verify.lint`, `verify.typecheck`, `verify.build` |
@@ -803,14 +803,14 @@ say so rather than adding a sentence back to the schema by hand.
 | `unread:this plan's verdict row 9` | `observability.log_shipping` |
 | `unread:docs/ideas/standards-that-bind.md:506` | `gates.coding_standards` |
 | `code:bin/keel:1346` | `artifacts.snapshot`, `artifacts.prd`, `artifacts.stories`, `artifacts.architecture`, `artifacts.decisions`, `artifacts.plans` |
-| `code:bin/keel:1826` | `gates.commit_guard` |
+| `code:bin/keel:2198` | `gates.commit_guard` |
 | `code:hooks/done-guard:114` | `gates.done_verified` |
 | `code:lib/context_watch.py:570` | `gates.context_watch` |
 | `code:lib/context_watch.py:591` | `gates.context_window` |
 | `code:lib/context_watch.py:507` | `gates.context_warn_pct` |
 | `code:lib/context_watch.py:508` | `gates.context_stop_pct` |
 | `code:hooks/sensitive-guard:162` | `hard_block_paths` |
-| `advisory:skills/ship/SKILL.md:60` | `conventions.commit_style` |
+| `advisory:skills/ship/SKILL.md:62` | `conventions.commit_style` |
 | `code:bin/keel:1640` | `conventions.default_branch` |
 | `code:bin/keel:1817` | `conventions.protect_default_branch` |
 | `code:hooks/session-start:111` | `conventions.response_style` |
@@ -2765,4 +2765,4 @@ this change is how a released version's record gets rewritten.
 
 The `artifacts.*` write-side gap is out of scope and recorded in the idea record: `write-plan`,
 `design-architecture` and `write-user-stories` check the map before reading and hardcode the default
-path when writing. It would pass the checker, because `bin/keel:1341-1350` reads the map.
+path when writing. It would pass the checker, because `bin/keel:1345-1354` reads the map.

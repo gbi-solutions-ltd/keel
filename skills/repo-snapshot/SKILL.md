@@ -65,6 +65,11 @@ Append to every brief verbatim, filling in the Step 1 exclusions:
 > every claim. Cap your answer at 400 words. If something is absent, say `absent`; never infer
 > it from naming. Flag anything that contradicts the README.
 
+Where `<docs_root>/standards.md` exists, **REQUIRED SUB-SKILL:** `keel:coding-standards` in
+assess mode once the agents return, whoever wrote the document; its report's findings go to
+section 8 and its remedies to section 10. Where it does not exist, section 8 says so as a gap and
+section 10 names `coding-standards`.
+
 ## Step 3: Verify what will drive action
 
 **Subagent findings are leads, not facts.** Before writing, verify anything reaching section 10 or

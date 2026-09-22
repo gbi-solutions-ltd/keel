@@ -139,8 +139,9 @@ become true again halfway through a run that started clean. Stop and ask what to
 there: committing, stashing and discarding are all reasonable and all the user's call. See
 [preconditions.md](preconditions.md).
 
-After both passes: tick the checkboxes in the plan file, **then commit**, with the paths and the
-message the task's hand-over step names, then dispatch the next.
+After both passes, with pass one at COMPLIES and pass two carrying nothing `blocking`: tick the
+checkboxes in the plan file, **then commit**, with the paths and the message the task's hand-over
+step names, then dispatch the next.
 
 **You commit, not the implementer.** The implementer stages and stops, unless its task's final step
 says otherwise, which only a batched task's does. This is the order the skill
@@ -169,6 +170,14 @@ reviewer just rejected reads it as the starting point and builds on it, which is
 verdict turns into two entangled problems instead of one corrected task. If the work was committed
 anyway, by an implementer that ignored its rules or a plan written before them, say so and stop:
 undoing a commit is the user's call, and it is the one repair this loop must not make silently.
+
+**A `blocking` finding from the quality review is handled exactly as a DEVIATES verdict is**, and
+for the same reason: the tick is the gate, and a finding acted on only after the commit is a
+comment on history. Do not tick, do not commit. Discard the attempt and re-dispatch the task to a
+fresh subagent with the finding attached, as above. `should fix` and `consider` findings do not
+stop the tick; they go in the Step 6 report beside the task they came from. The one way past a
+`blocking` finding without a fix is the user accepting it by name, and that acceptance is written
+into the plan file beside the task before its box is ticked.
 
 ## Which model each prompt goes to
 

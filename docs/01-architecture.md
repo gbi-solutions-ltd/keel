@@ -1,7 +1,7 @@
 # Architecture
 
 | | |
-|---|---|
+| --- | --- |
 | Extended by | [`architecture/tiered-multi-harness-support.md`](architecture/tiered-multi-harness-support.md), ADR-0003, ADR-0004, ADR-0005 |
 
 **Layer 1 below describes Claude Code.** Which gates a harness actually delivers is stated in one
@@ -12,7 +12,7 @@ here saying which harnesses have a gate; `tests/test-harness-claims.sh` will fai
 
 Three layers, each with a different lifetime and a different token cost.
 
-```
+```text
 Layer 3  SKILLS          25 skill bodies, loaded on demand, ~690 words each
          (in the plugin)  Cost: ~40 tokens each for the description line, body only when invoked
 
@@ -98,7 +98,7 @@ Every skill's output is the next skill's input. This is what makes the pipeline 
 after a `/clear` and what keeps token use flat as a project grows.
 
 | Skill | Reads | Writes |
-|-------|-------|--------|
+| ------- | ------- | -------- |
 | `repo-snapshot` | the codebase | `<docs_root>/snapshot.md` |
 | `write-prd` | snapshot, or a conversation | `<docs_root>/prd/<slug>.md` |
 | `write-user-stories` | PRD | `<docs_root>/stories/<slug>.md` |
@@ -118,7 +118,7 @@ Every path above is written `<docs_root>` because it resolves from `profile.docs
 default is `docs/keel`. Three notations, one per audience, and mixing them is the mistake:
 
 | Where | Notation | Resolved by |
-|---|---|---|
+| --- | --- | --- |
 | Skills and this documentation | `<docs_root>/prd/<slug>.md` | The model, reading `profile.docs_root` at invocation |
 | Templates that `keel init` renders | `{{DOCS_ROOT}}/prd/<slug>.md` | `keel init`, by substitution |
 | `profile.docs_root` itself, and prose naming the default | `docs/keel` | Nothing. It is the literal value |
@@ -158,6 +158,29 @@ skill burns tokens rediscovering how to run tests, and each one guesses differen
 `keel init` generates this by detection and asks about what it cannot detect. `keel doctor`
 verifies every command in `verify` actually runs.
 
+## Which model runs a delegated brief
+
+Several skills fan work out to subagents. Those briefs name a **delegation profile**, a name each
+harness resolves to its own model, so the wide mechanical reading does not run on whatever the
+session happens to be pinned to (ADR-0005):
+
+| Brief | Delegation profile | Why |
+| --- | --- | --- |
+| `repo-snapshot`, `port-assess`, `apex-port-plan`, `shape-idea`, `write-docs`, `write-plan`, `security-audit` fan-outs | `keel-fanout` | Wide mechanical reading over many files, with a cited `path:line` for every claim, so the output is checkable |
+| `execute-plan` implementation, both reviews and concurrent batches, and the `write-plan` reviewer | `inherit` | These write code under the TDD gate or judge another agent's verdict. A cheaper model gets less benefit of the doubt, not more |
+
+Every dispatch announces its profile in the brief's own `description`, leading it:
+`Agent(keel-fanout: <task>)`, `inherit` labelled the same way and never omitted. `docs/standards.md`
+has the full rule, "A dispatch names its model, and says so". `tests/validate-skills.sh` rejects any
+vendor model alias in a brief, and fails a dispatch that names no routing at all, because a brief
+sent to a model that does not exist is a brief sent to nothing and the failure is silent.
+
+**A session's own model is not part of this and cannot be.** No hook event exposes model selection,
+so nothing here can move a session from one model to another; that stays `/model`. There is no
+complexity router either: routing pays on work that is long and mechanical, not on work that is
+simple, so a router keyed on guessed complexity is wrong in the direction nobody notices. The
+reasoning is in [`docs/ideas/model-routing.md`](ideas/model-routing.md).
+
 ## Enforcement: hooks, not pleading
 
 Skills are instructions and a model under pressure negotiates with instructions. superpowers
@@ -169,10 +192,10 @@ the capability manifest and is the authority; this column is prose and can go st
 it names harnesses rather than restating what each gate does.
 
 | Rule | Mechanism | Why | Carried on |
-|------|-----------|-----|------------|
+| ------ | ----------- | ----- | ------------ |
 | Session knows keel exists | `SessionStart` hook injecting the router pointer | Model cannot skip what it never sees | Claude Code and Codex |
 | Edits get a security pattern check | `security-guidance` plugin `PostToolUse` hook | Runs on every edit, no invocation needed | Claude Code only, it is a Claude Code plugin |
-| Diff gets an LLM security review before the turn ends | `security-guidance` plugin `Stop` hook | This is requirement 5's "automatic audits before code ships" | Claude Code only, same reason |
+| Diff gets an LLM security review before the turn ends | `security-guidance` plugin `Stop` hook | An automatic audit before code ships, not one somebody has to remember to ask for | Claude Code only, same reason |
 | Format, lint and typecheck pass before a commit | optional `keel guard` `pre-commit` git hook, off until `gates.commit_guard` turns it on | See open decision 4, it can be slow | Either, it is a git hook and not a harness one |
 
 Everything else stays in skills, where judgement belongs.
@@ -203,7 +226,8 @@ Hard rules, from superpowers' skill-authoring guidance and validated by their te
 
 - `description` states **when to use**, never **what it does**. A description that
   summarises the workflow becomes a shortcut the model takes instead of reading the body.
-- Body under 500 words. Heavy reference goes in a sibling file, linked by relative path.
+- Body targets 700 words, ceiling 900 (ADR-0001). Heavy reference goes in a sibling file, linked
+  by relative path.
 - Never use `@file` links. They force-load and burn context before it is needed.
 - Cross-reference other skills by name with an explicit marker: `**REQUIRED SUB-SKILL:** keel:tdd`.
 

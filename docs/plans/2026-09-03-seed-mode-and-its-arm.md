@@ -1058,7 +1058,7 @@ That file is never staged.
 
 Then the three scenario counts, all in this same edit:
 
-- `README.md:314`, `11 scenarios exist` to `12 scenarios exist`.
+- `README.md:185`, `11 scenarios exist` to `12 scenarios exist`.
 - `tests/evals/README.md`, `Eleven scenarios exist` to `Twelve scenarios exist`.
 - `docs/06-repo-layout.md:177`, `# 11 scenarios, 11 fixtures` to `# 12 scenarios, 12 fixtures`.
 

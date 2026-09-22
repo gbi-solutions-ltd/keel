@@ -43,7 +43,7 @@ cheapest failure mode and miss the expensive one. Every citation defect found on
 `package_manager` where it is at `:13`, `bin/keel:1868` for defaults that are at `:430`. A reader who
 opens one loses thirty seconds and finds the thing two lines up. Meanwhile the worst factual error in
 either document, sonnet's claim that `bin/keel` holds **six** subcommands where the dispatch table at
-`bin/keel:1845-1852` holds **eight**, carried **no `path:line` at all**, so a citation-accuracy check
+`bin/keel:1872-1879` holds **eight**, carried **no `path:line` at all**, so a citation-accuracy check
 of any design would have scored that document clean on it. The failure that actually propagates into
 a PRD is an uncited confident sentence, and this instrument is blind to exactly those.
 
@@ -94,7 +94,7 @@ gap is coverage, and coverage is the tier-1-shaped half of the problem.
 | The scoped guarantee is not fully delivered either | 2026-08-20: **each** arm carried exactly one defective citation inside section 10 (haiku `.gitignore:9-11`, real carve-out at `:20`; sonnet `tests/run-tests.sh:31`, real line `:34`) | This is the finding worth acting on. Step 3 verification is the skill's own promise and it leaks |
 | Defect counts overstate independent errors | Sonnet's 4 out-of-range citations are one wrong mental offset for the end of a 1,864-line file, spent across one table | Any future measurement should count root causes as well as citations, or a single slip reads as a systemic rate |
 | A document holds only 59 to 77 citations | Measured, both arms | The population is too small for sampling to work. This is the decisive constraint |
-| **The citation rule is the skill's own, not a README overclaim** | `skills/repo-snapshot/SKILL.md:13` states it as the core principle; `:64-65` puts it verbatim into every subagent brief; `skills/repo-snapshot/references/section-templates.md:12-13` says "There is no third option" | Stated three times inside the skill. `README.md:202` is a fourth statement, not the origin. So this is **an unenforced rule, not an unstated one**, which is a stronger finding: the repo already decided, and never checked |
+| **The citation rule is the skill's own, not a README overclaim** | `skills/repo-snapshot/SKILL.md:13` states it as the core principle; `:64-65` puts it verbatim into every subagent brief; `skills/repo-snapshot/references/section-templates.md:12-13` says "There is no third option" | Stated three times inside the skill. `docs/01-architecture.md:169` is a fourth statement, not the origin. So this is **an unenforced rule, not an unstated one**, which is a stronger finding: the repo already decided, and never checked |
 | Nothing anywhere enforces it | No test, validator or hook reads a snapshot. `tests/validate-skills.sh` validates skill bodies, never their output | The rule has not been checked once since it was written |
 | **The expensive error landed in an uncited claim** | Sonnet's "six subcommands" sits in section 10's `Also noted` paragraph, which carries no `path:line` anywhere in it | An uncited claim is invisible to tiers 1, 2 and 3 alike, because all three begin from a citation. This is the gap |
 
@@ -251,5 +251,5 @@ beside `validate-skills.sh` or under `bin/`. Whether the snapshot document shoul
 citation reliability to its reader. Whether any of this ever becomes an eval pass criterion, which is
 deferred by instruction until question 1 is answered. What `repo-snapshot`'s Step 3 should do about
 its own leak, which is a change to a skill body and belongs to whoever takes that decision. Whether
-`README.md:202` should stop describing the fan-out output as "checkable" while nothing checks it,
+`docs/01-architecture.md:169` should stop describing the fan-out output as "checkable" while nothing checks it,
 which is a claim about the repository rather than about this idea.

@@ -34,6 +34,16 @@ fixture() {
     printf '%s' "$dir"
 }
 
+# gates.coding_standards defaults to required (bin/keel#gates.coding_standards is a promise about a
+# document), so a fixture that never runs coding-standards fails doctor on that alone. Cases that are
+# not about coding_standards itself call this right after `init -y` so their own assertion is not
+# confounded by a second, unrelated FAIL; the dedicated required/warn/off coverage lives in the
+# "gates.coding_standards" case below and never calls this.
+seed_standards() {   # seed_standards <fixture-dir>
+    mkdir -p "$1/docs/keel"
+    printf '# Standards\n\nSeeded for the test fixture.\n' > "$1/docs/keel/standards.md"
+}
+
 fixture_build() {   # fixture_build <stack> <dir>
     local stack="$1" dir="$2"
     mkdir -p "$dir"
@@ -2229,6 +2239,7 @@ rm -rf "$d"
 
 d="$(fixture node-ts)"
 ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+seed_standards "$d"
 
 # FR-16: doctor says nothing about explain_level. The schema drift message is the whole mechanism
 # for getting the key into an existing project, and a nudge for an optional preference key would
@@ -2320,6 +2331,7 @@ rm -rf "$d"
 # them. Only a key keel itself removed can be named, and only a list of those can name a remedy.
 rk="$(fixture node-ts)"
 ( cd "$rk" && "$KEEL" init -y >/dev/null 2>&1 )
+seed_standards "$rk"
 python3 - "$rk" <<'PY_RETIRED'
 import json, pathlib, sys
 p = pathlib.Path(sys.argv[1]) / ".keel/profile.json"
@@ -2452,6 +2464,7 @@ rm -rf "$we"
 d="$(fixture node-ts)"
 printf '{"name":"f"}\n' > "$d/package.json"; rm -f "$d/tsconfig.json"
 out="$( cd "$d" && "$KEEL" init -y 2>&1 )"
+seed_standards "$d"
 case "$out" in *verify.test_one*) ok "the init note names verify.test_one, not just verify.test" ;;
   *) bad "no tests" "the init note never mentioned verify.test_one" ;; esac
 out="$( cd "$d" && "$KEEL" doctor 2>&1 )"; rc=$?
@@ -2539,6 +2552,7 @@ d="$(fixture node-ts)"
   git add README.md >/dev/null 2>&1 && git commit -q -m init
   "$KEEL" init -y >/dev/null 2>&1 )
 runnable_verify "$d"
+seed_standards "$d"
 
 out="$( cd "$d" && "$KEEL" doctor 2>&1 || true )"
 case "$out" in *WARN*NOTES.md*) ok "an uncommitted referenced document warns rather than fails" ;;
@@ -2595,8 +2609,11 @@ else ok "doctor fails when there is no profile"; fi
 rm -rf "$d"
 
 # ---- keel new -------------------------------------------------------------
-# The property that matters: a freshly created project passes its own doctor. If it does not, the
-# greenfield path hands someone a project that is already broken.
+# The property that matters: a freshly created project's only doctor problem is the one action item
+# it was told about (write docs/standards.md, NEXT-STEPS.md step 1), and once that is done, doctor is
+# clean. gates.coding_standards defaults to required and `new` cannot write the document itself: that
+# needs the coding-standards skill's own judgement about which house references apply, which `new`,
+# a plain shell script, does not have.
 
 parent="$(mktemp -d)"
 ( cd "$parent" && "$KEEL" new svc-node --stack node >/dev/null 2>&1 )
@@ -2609,9 +2626,18 @@ d="$parent/svc-node"
 ( cd "$d" && git rev-parse --git-dir >/dev/null 2>&1 ) && ok "new initialises git" || bad "new" "not a repo"
 [ -f "$d/.github/workflows/ci.yml" ] && ok "new writes a CI workflow" || bad "new" "no CI"
 
-# The whole point: the generated verify commands must actually run.
-if ( cd "$d" && "$KEEL" doctor >/dev/null 2>&1 ); then ok "a new project passes keel doctor"
-else bad "new" "doctor fails on a freshly created project"; fi
+out="$( cd "$d" && "$KEEL" doctor 2>&1 )"
+case "$out" in
+  *"gates.coding_standards is required"*"standards.md does not exist"*) ok "a new project names the one thing it still owes doctor" ;;
+  *) bad "new" "doctor's only complaint on a fresh project should be the missing standards.md, got: $out" ;;
+esac
+[ "$(printf '%s\n' "$out" | grep -c '^FAIL')" -eq 1 ] && ok "and that is the only FAIL a fresh project has" \
+  || bad "new" "doctor found more than the one named problem: $out"
+
+# The whole point: once the named prerequisite is met, the generated verify commands actually run.
+seed_standards "$d"
+if ( cd "$d" && "$KEEL" doctor >/dev/null 2>&1 ); then ok "a new project passes keel doctor once standards.md exists"
+else bad "new" "doctor still fails on a freshly created project with standards.md in place"; fi
 
 # And the sample test must genuinely pass, not just exist.
 tc="$(prof_of "$d" verify.test)"
@@ -2706,6 +2732,86 @@ case "$dout" in *"is ignored by git"*) ok "doctor --json's findings include the 
   *) bad "doctor --json" "findings did not mention the gitignored docs root: $dout" ;; esac
 rm -rf "$ddi"
 
+# ---- gates.coding_standards: required needs a document to check against ---------------------
+# A required gate with no <docs_root>/standards.md enforces nothing and reads as configured, which
+# is the one state doctor has to name. FR-10, docs/prd/coding-standards-enforcement.md.
+cs="$(fixture node-ts)"
+( cd "$cs" && "$KEEL" init -y >/dev/null 2>&1 )
+( cd "$cs" && "$KEEL" profile set gates.coding_standards required >/dev/null 2>&1 )
+out="$( cd "$cs" && "$KEEL" doctor --fast 2>&1 )"
+case "$out" in
+  *"FAIL"*"standards.md does not exist"*) ok "doctor fails a required gate with no standards document" ;;
+  *) bad "coding_standards" "no FAIL naming the missing standards document. Got: $out" ;;
+esac
+mkdir -p "$cs/docs/keel" && printf '# Standards\n' > "$cs/docs/keel/standards.md"
+out="$( cd "$cs" && "$KEEL" doctor --fast 2>&1 )"
+case "$out" in
+  *"standards.md exists"*) ok "doctor reports ok once the document exists" ;;
+  *) bad "coding_standards" "no ok line for the present document. Got: $out" ;;
+esac
+rm -f "$cs/docs/keel/standards.md"
+( cd "$cs" && "$KEEL" profile set gates.coding_standards warn >/dev/null 2>&1 )
+out="$( cd "$cs" && "$KEEL" doctor --fast 2>&1 )"
+case "$out" in
+  *"standards.md does not exist"*) bad "coding_standards" "warn must not fail on a missing document. Got: $out" ;;
+  *) ok "a warn gate does not fail on a missing standards document" ;;
+esac
+( cd "$cs" && "$KEEL" profile set gates.coding_standards off >/dev/null 2>&1 )
+out="$( cd "$cs" && "$KEEL" doctor --fast 2>&1 )"
+case "$out" in
+  *"standards.md does not exist"*) bad "coding_standards" "off must not fail on a missing document. Got: $out" ;;
+  *) ok "an off gate does not fail on a missing standards document" ;;
+esac
+rm -rf "$cs"
+
+# ---- init sets strict type checking where the project has not decided --------------------------
+# house-defaults.md, "Types and tooling": strict type checking on. The compiler can hold this one,
+# so init sets it where tsconfig.json is silent and leaves any value the project chose, either way.
+# FR-05, FR-07, NFR-01, docs/prd/coding-standards-enforcement.md.
+ts="$(fixture node-ts)"                      # this fixture's tsconfig.json is `{}`
+( cd "$ts" && "$KEEL" init -y >/dev/null 2>&1 )
+strict="$(python3 -c "import json;print(json.load(open('$ts/tsconfig.json')).get('compilerOptions',{}).get('strict'))")"
+[ "$strict" = "True" ] && ok "init sets compilerOptions.strict on a tsconfig that does not decide it" \
+  || bad "tsconfig" "compilerOptions.strict is '$strict' after init, want True"
+before="$(cat "$ts/tsconfig.json")"
+( cd "$ts" && "$KEEL" init -y >/dev/null 2>&1 )
+[ "$(cat "$ts/tsconfig.json")" = "$before" ] && ok "re-running init leaves a tsconfig it already set byte identical" \
+  || bad "tsconfig" "second init changed tsconfig.json"
+rm -rf "$ts"
+
+ts2="$(fixture node-ts)"
+printf '{ "compilerOptions": { "strict": false, "target": "es2022" } }\n' > "$ts2/tsconfig.json"
+( cd "$ts2" && "$KEEL" init -y >/dev/null 2>&1 )
+strict="$(python3 -c "import json;print(json.load(open('$ts2/tsconfig.json'))['compilerOptions']['strict'])")"
+[ "$strict" = "False" ] && ok "a strict the project set to false is left alone" \
+  || bad "tsconfig" "init overrode a deliberate strict: false"
+rm -rf "$ts2"
+
+ts2b="$(fixture node-ts)"
+printf '{ "compilerOptions": { "strict": false } }\n' > "$ts2b/tsconfig.base.json"
+printf '{ "extends": "./tsconfig.base.json" }\n' > "$ts2b/tsconfig.json"
+( cd "$ts2b" && "$KEEL" init -y >/dev/null 2>&1 )
+strict="$(python3 -c "import json;print(json.load(open('$ts2b/tsconfig.json')).get('compilerOptions',{}).get('strict'))")"
+[ "$strict" = "None" ] && ok "a tsconfig that extends another config is left alone" \
+  || bad "tsconfig" "init set compilerOptions.strict on a tsconfig with extends, overriding the base config's own strict: false"
+rm -rf "$ts2b"
+
+ts3="$(fixture node-ts)"
+printf '{\n  // a comment makes this JSONC, which json.load rejects\n  "compilerOptions": {}\n}\n' > "$ts3/tsconfig.json"
+before="$(cat "$ts3/tsconfig.json")"
+out="$( cd "$ts3" && "$KEEL" init -y 2>&1 )"
+[ "$(cat "$ts3/tsconfig.json")" = "$before" ] && ok "a tsconfig init cannot parse is left byte identical" \
+  || bad "tsconfig" "init rewrote a tsconfig it could not parse"
+case "$out" in *"could not be parsed"*) ok "init says when it left tsconfig.json alone" ;;
+  *) bad "tsconfig" "no message about the unparsed tsconfig. Got: $out" ;; esac
+rm -rf "$ts3"
+
+py="$(fixture python)"
+( cd "$py" && "$KEEL" init -y >/dev/null 2>&1 )
+[ ! -e "$py/tsconfig.json" ] && ok "a non-TypeScript project gets no tsconfig.json" \
+  || bad "tsconfig" "init created tsconfig.json in a python project"
+rm -rf "$py"
+
 # --- write_ci reaches every verify.* command, and keel init writes it too ------------------------
 w="$(fixture node-ts)"
 ( cd "$w" && "$KEEL" init -y >/dev/null 2>&1 )
@@ -2751,6 +2857,69 @@ w4="$(fixture node-ts)"
   || bad "write_ci" "init wrote .github/workflows/ci.yml into a project holding both .gitlab-ci.yml and Jenkinsfile"
 rm -rf "$w4"
 
+# ---- the generated CI audits dependencies, keyed on the package manager ----------------------
+# house-defaults.md, "Dependencies": an advisory scan runs in CI and fails the build on a high
+# severity finding. Keyed on the manager, because `npm audit` in a pnpm project fails for the
+# wrong reason; pip-audit is pointed at requirements.txt where one exists, because a bare runner
+# has nothing installed for it to read. FR-06, FR-07, NFR-01, docs/prd/coding-standards-enforcement.md.
+a="$(fixture node-ts)"                       # no lockfile: npm by definition
+( cd "$a" && "$KEEL" init -y >/dev/null 2>&1 )
+grep -q 'run: npm audit --audit-level=high' "$a/.github/workflows/ci.yml" \
+  && ok "an npm project's CI audits with npm audit" \
+  || bad "write_ci" "no npm audit step: $(grep 'run:' "$a/.github/workflows/ci.yml" | tr '\n' ' ')"
+rm -rf "$a"
+
+a2="$(fixture node-ts)"; : > "$a2/pnpm-lock.yaml"
+( cd "$a2" && "$KEEL" init -y >/dev/null 2>&1 )
+grep -q 'run: pnpm audit --audit-level high' "$a2/.github/workflows/ci.yml" \
+  && ok "a pnpm project's CI audits with pnpm audit" || bad "write_ci" "no pnpm audit step"
+grep -q 'npm audit --audit-level=high' "$a2/.github/workflows/ci.yml" \
+  && bad "write_ci" "npm audit written into a pnpm project" || ok "a pnpm project's CI never runs npm audit"
+rm -rf "$a2"
+
+a3="$(fixture node-ts)"; : > "$a3/yarn.lock"
+( cd "$a3" && "$KEEL" init -y >/dev/null 2>&1 )
+grep -q 'run: yarn npm audit --severity high' "$a3/.github/workflows/ci.yml" \
+  && ok "a yarn project's CI audits with yarn npm audit" || bad "write_ci" "no yarn audit step"
+rm -rf "$a3"
+
+a4="$(fixture python)"; printf 'requests==2.32.3\n' > "$a4/requirements.txt"
+( cd "$a4" && "$KEEL" init -y >/dev/null 2>&1 )
+grep -q 'run: pip install pip-audit && pip-audit -r requirements.txt' "$a4/.github/workflows/ci.yml" \
+  && ok "a pip project with requirements.txt audits that file" || bad "write_ci" "no pip-audit -r step"
+rm -rf "$a4"
+
+a5="$(fixture python)"
+( cd "$a5" && "$KEEL" init -y >/dev/null 2>&1 )
+grep -q 'run: pip install pip-audit && pip-audit$' "$a5/.github/workflows/ci.yml" \
+  && ok "a pip project with no requirements.txt audits the environment" || bad "write_ci" "no plain pip-audit step"
+rm -rf "$a5"
+
+a6="$(fixture python)"; : > "$a6/poetry.lock"
+out="$( cd "$a6" && "$KEEL" init -y 2>&1 )"
+grep -q 'name: Audit dependencies' "$a6/.github/workflows/ci.yml" \
+  && bad "write_ci" "an audit step was written for poetry, which has no mapping" \
+  || ok "a package manager with no audit mapping gets no step"
+case "$out" in *"no dependency audit step"*"poetry"*) ok "init says why no audit step was written" ;;
+  *) bad "write_ci" "init did not say the audit step was skipped. Got: $out" ;; esac
+rm -rf "$a6"
+
+a8="$(fixture go)"
+out="$( cd "$a8" && "$KEEL" init -y 2>&1 )"
+case "$out" in *"no dependency audit step"*) bad "write_ci" "a go project was told about an audit mapping that was never for it" ;;
+  *) ok "the missing-audit note is silent outside the ecosystems the mapping covers" ;; esac
+rm -rf "$a8"
+
+# re-running init does not touch a workflow it already wrote, so the step cannot duplicate
+a7="$(fixture node-ts)"
+( cd "$a7" && "$KEEL" init -y >/dev/null 2>&1 )
+before="$(cat "$a7/.github/workflows/ci.yml")"
+( cd "$a7" && "$KEEL" init -y >/dev/null 2>&1 )
+[ "$(cat "$a7/.github/workflows/ci.yml")" = "$before" ] \
+  && ok "a second init leaves the generated workflow, audit step included, byte identical" \
+  || bad "write_ci" "second init changed the generated workflow"
+rm -rf "$a7"
+
 # Refuses to write into a non-empty directory.
 parent="$(mktemp -d)"; mkdir -p "$parent/taken"; echo x > "$parent/taken/file"
 if ( cd "$parent" && "$KEEL" new taken --stack node >/dev/null 2>&1 ); then
@@ -2763,7 +2932,8 @@ parent="$(mktemp -d)"
 ( cd "$parent" && "$KEEL" new svc-py --stack python >/dev/null 2>&1 )
 got="$(prof_of "$parent/svc-py" stack.language)"
 [ "$got" = "python" ] && ok "new supports the python stack" || bad "new python" "got '$got'"
-if ( cd "$parent/svc-py" && "$KEEL" doctor >/dev/null 2>&1 ); then ok "a new python project passes doctor"
+seed_standards "$parent/svc-py"
+if ( cd "$parent/svc-py" && "$KEEL" doctor >/dev/null 2>&1 ); then ok "a new python project passes doctor once standards.md exists"
 else bad "new python" "doctor fails"; fi
 rm -rf "$parent"
 
@@ -2777,6 +2947,7 @@ printf '# Requirements\n' > "$d/requirements.md"
 ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
 got="$(prof_of "$d" project.kind)"
 [ "$got" = "docs" ] && ok "a repo with no source is detected as kind docs" || bad "pre-code" "kind is '$got', want 'docs'"
+seed_standards "$d"
 if ( cd "$d" && "$KEEL" doctor >/dev/null 2>&1 ); then ok "doctor passes on a pre-code repo"
 else bad "pre-code" "doctor fails on a documents-only repo, which it can never satisfy"; fi
 rm -rf "$d"
@@ -2791,6 +2962,7 @@ rm -rf "$d"
 # The artifact map: init seeds it, and doctor validates any path that is set.
 d="$(fixture node-ts)"
 ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+seed_standards "$d"
 if python3 -c "import json,sys;d=json.load(open('$d/.keel/profile.json'));sys.exit(0 if 'artifacts' in d else 1)"; then
   ok "init seeds an artifacts map"; else bad "artifacts" "no artifacts key in the profile"; fi
 
@@ -2835,6 +3007,7 @@ p=pathlib.Path(sys.argv[1])/".keel/profile.json"; d=json.loads(p.read_text())
 d["verify"]={k:("true" if k in ("test","test_one") else None) for k in d["verify"]}
 p.write_text(json.dumps(d,indent=2)+"\n")
 PY
+seed_standards "$d"
 
 # An absent marketplace warns and must not fail, which is the CI case.
 if ( cd "$d" && CLAUDE_CONFIG_DIR="$d/empty-config" HOME="$d/empty-home" "$KEEL" doctor >/dev/null 2>&1 ); then
@@ -2967,6 +3140,7 @@ p=pathlib.Path(sys.argv[1])/".keel/profile.json"; d=json.loads(p.read_text())
 d["verify"]={k:("true" if k in ("test","test_one") else None) for k in d["verify"]}
 p.write_text(json.dumps(d,indent=2)+"\n")
 PY
+seed_standards "$d"
 # feature-dev ships a competing pipeline that writes to none of the artifact chain.
 python3 - "$d" <<'PY'
 import json,sys,pathlib
@@ -2981,14 +3155,18 @@ case "$out" in *feature-dev*) ok "doctor warns when feature-dev is enabled along
 if ( cd "$d" && "$KEEL" doctor >/dev/null 2>&1 ); then ok "feature-dev warns without failing"
 else bad "doctor plugins" "feature-dev made doctor fail; it is advisory"; fi
 
-# A missing recommended plugin is named, not silently ignored.
+# A missing recommended plugin is named, not silently ignored. Isolated from the developer
+# machine's own global settings file (`plugin_report` in `lib/harness/claude.sh` reads it
+# unconditionally, alongside CLAUDE_CONFIG_DIR, so a user scope that already has
+# security-guidance enabled, which this machine's does, masks the project-scope removal below and
+# the check never fires): same isolation the marketplace checks above already use.
 python3 - "$d" <<'PY'
 import json,sys,pathlib
 p=pathlib.Path(sys.argv[1])/".claude/settings.json"; d=json.loads(p.read_text())
 d["enabledPlugins"]={k:v for k,v in d["enabledPlugins"].items() if "security-guidance" not in k and "feature-dev" not in k}
 p.write_text(json.dumps(d,indent=2)+"\n")
 PY
-out="$( cd "$d" && "$KEEL" doctor 2>&1 )"
+out="$( cd "$d" && CLAUDE_CONFIG_DIR="$d/empty-config" HOME="$d/empty-home" "$KEEL" doctor 2>&1 )"
 case "$out" in *security-guidance*) ok "doctor names a missing recommended plugin" ;;
   *) bad "doctor plugins" "silent about a missing recommended plugin" ;; esac
 
@@ -3111,6 +3289,7 @@ rm -rf "$d"
 # meant counting them by hand to say "no problems and one warning", which is the tell.
 d="$(mktemp -d)"
 ( cd "$d" && git init -q -b main . && "$KEEL" init -y >/dev/null 2>&1 )
+seed_standards "$d"
 out="$( cd "$d" && "$KEEL" doctor 2>&1 || true )"
 warns="$(printf '%s\n' "$out" | grep -c '^WARN')"
 [ "$warns" -gt 0 ] || bad "doctor summary" "fixture produced no warnings, so this proves nothing"
@@ -3902,6 +4081,24 @@ case "$out" in
   *"profile.json"*"deleted"*) ok "pre-push refuses a push that deletes .keel/profile.json" ;;
   *) bad "guard" "deleting .keel/profile.json was not refused. Got: $out" ;;
 esac
+
+# the first push of a brand-new branch must catch a deleted profile too, not only a second push to
+# a branch the remote already has. Resolving the remote comparison point on a first push (all-zero
+# remote sha) needs default_branch from the profile, and the hook read that from the working tree
+# of the branch being pushed, which is exactly the file this push deletes: the fallback silently
+# never ran and the deletion went unrefused. `git checkout` the new branch for real, unlike the
+# other cases above, which never diverge from main and so never exercise this: default_branch has
+# to come from a working tree that genuinely lacks the profile, the way a real push would leave it.
+( cd "$rt" && git checkout -q -b brand-new "$gate_del_sha" )
+( cd "$rt" && git update-ref refs/remotes/origin/main "$gate_del_sha" )
+( cd "$rt" && git rm -q .keel/profile.json && git commit -q -m "first push of a new branch, profile gone" )
+new_branch_sha="$( cd "$rt" && git rev-parse HEAD )"
+out="$(cd "$rt" && printf 'refs/heads/brand-new %s refs/heads/brand-new %s\n' "$new_branch_sha" "0000000000000000000000000000000000000000" \
+       | PATH="$(dirname "$KEEL"):$PATH" .githooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
+case "$out" in
+  *"profile.json"*"deleted"*) ok "pre-push refuses a first push of a new branch that deletes the profile" ;;
+  *) bad "guard" "first push of a new branch deleting the profile was not refused. Got: $out" ;;
+esac
 rm -rf "$rt"
 
 # The hook body lives inside a quoted heredoc, so the repo's own lint reads it as a string and never
@@ -3980,9 +4177,14 @@ before="$( cd "$c" && git status --porcelain )"
   && ok "the hook skips null and templated commands and allows the commit" \
   || bad "commit guard" "the hook ran a null or templated command"
 
-( cd "$c" && "$KEEL" guard status 2>&1 | grep -qi "commit guard" ) \
+# Intermittent, not yet root caused: this assertion has failed a handful of times in a full suite
+# run and never once standalone or in a fixture built fresh for just this case, which rules out the
+# assertion and the command it checks. Carries its own evidence on failure rather than a bare "it
+# said nothing", so the next occurrence is diagnosable instead of needing to be caught live again.
+gs_out="$( cd "$c" && "$KEEL" guard status 2>&1 )"
+printf '%s\n' "$gs_out" | grep -qi "commit guard" \
   && ok "guard status reports the commit guard as well as the push guard" \
-  || bad "commit guard" "status said nothing about the commit guard"
+  || bad "commit guard" "status said nothing about the commit guard. Got: [$gs_out] core.hooksPath=[$( cd "$c" && git config core.hooksPath 2>/dev/null )] fixture=[$c]"
 
 if command -v shellcheck >/dev/null 2>&1; then
     shellcheck -s bash "$c/.githooks/pre-commit" >/dev/null 2>&1 \

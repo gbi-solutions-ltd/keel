@@ -661,7 +661,7 @@ got="$(detect_in "$d" 'detect_stack')"
 
 **(b) The end-to-end assertion omits the one field its own comment defends.** `lang_profile`'s new
 arm argues specifically for runtime `dart` over `flutter`, and the profile check does not read
-`stack.runtime`. The PL/SQL end-to-end at `tests/test-keel.sh:443-450` pins both. Replace the three
+`stack.runtime`. The PL/SQL end-to-end at `tests/test-keel.sh:838-845` pins both. Replace the three
 `read`s with four:
 
 ```bash
@@ -1574,7 +1574,7 @@ keel already asserts `verify.e2e` is `null` for Dart, so without this it says th
 and recommends a browser e2e tool in the same run.
 
 **keel's own strategy document already says the right thing**, and the code disagrees with it:
-`docs/04-plugin-strategy.md:18` scopes `playwright` to "Only where there are **browser flows** worth
+`docs/04-plugin-strategy.md:28` scopes `playwright` to "Only where there are **browser flows** worth
 testing". `has_ui` is a different predicate. `apex` satisfies both, because APEX pages really are
 browser-rendered; Flutter is the first UI to reach that line that is not a browser at all. **This
 fixes the code to match the documented rule rather than inventing a new one.**

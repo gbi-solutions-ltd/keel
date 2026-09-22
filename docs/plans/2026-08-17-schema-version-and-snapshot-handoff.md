@@ -202,7 +202,7 @@ said `profile is current with keel <VERSION>`, which asserts a release fact the 
 established, and this whole change exists to stop conflating those two.
 
 The substring `configured by keel` moves from the warning to the informational line and keeps its
-wording, so the existing assertion at `tests/test-keel.sh:1508` still matches. Retitle that case:
+wording, so the existing assertion at `tests/test-keel.sh:3606` still matches. Retitle that case:
 it no longer tests staleness, it tests that doctor reports which keel configured the project.
 
 - [x] **Step 1: Write the failing test**
@@ -237,7 +237,7 @@ comparison, `[ "$pv" != "$iv" ]` in doctor, warns on exactly that.
 
 - [x] **Step 3: Write the minimal implementation**
 
-Replace the staleness block in `cmd_doctor`, currently `bin/keel:1594` to `bin/keel:1615`:
+Replace the staleness block in `cmd_doctor`, currently `bin/keel:1720` to `bin/keel:1748`:
 
 ```sh
     if have_python; then

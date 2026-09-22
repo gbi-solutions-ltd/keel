@@ -552,13 +552,18 @@ write_profile() {
       # done_verified starts at "warn", not "required". The Stop hook it drives refuses to let a
       # turn end, which is not something to switch on for a repository without being asked. A
       # project raises it to "required" once it has seen the warning fire and agreed with it.
+      # coding_standards starts at "required", unlike done_verified and commit_guard, because
+      # doctor's own FR-10 check turns an unmet "required" into a named failure rather than silence
+      # (bin/keel#gates.coding_standards is a promise about a document): a fresh project sees the
+      # gap immediately and writes docs/standards.md (coding-standards' seed mode covers a project
+      # with no code yet) rather than drifting for months on a gate nobody switched on.
       # context_window is written even though it is sometimes wrong. The window cannot be read from
       # a session, so an unset key means the watchdog assumes 200000 and only discovers otherwise
       # once a session exceeds it. Writing the conservative value is safe because a configured
       # window is a floor: observation raises it in flight. It was a ceiling until 2026-08-18, and
       # writing this key before that change would have hard-stopped every 1M session at 170,000
       # tokens permanently.
-      printf '  "gates": { "coding_standards": "warn", "security_audit": "required", "commit_guard": "off", "done_verified": "warn", "context_window": 200000 },\n'
+      printf '  "gates": { "coding_standards": "required", "security_audit": "required", "commit_guard": "off", "done_verified": "warn", "context_window": 200000 },\n'
       printf '  "observability": { "backend": "signoz", "otlp_endpoint_var": "OTEL_EXPORTER_OTLP_ENDPOINT" },\n'
       # response_style and explain_level are written explicitly rather than left absent and
       # defaulted. Terse and technical are what a project gets without asking, so the keys that
@@ -846,6 +851,7 @@ cmd_init() {
     harness_each harness_write_config "$root"
     harness_each harness_write_local_config "$root"
     ignore_local_state
+    merge_ts_strict
     # Only where nothing declares a CI platform yet. deploy.ci is already filled by write_profile,
     # from .gitlab-ci.yml, a Jenkinsfile, a non-empty .github/workflows/ and the rest, so a project
     # that made that choice, on any platform, is left alone: the posture merge_profile already takes
@@ -853,6 +859,12 @@ cmd_init() {
     # left the choice ambiguous on purpose, so ci_marker_present is checked too: a project with two
     # conflicting CI files is a project that made a choice, just not one detect_ci can name.
     { [ -n "$(json_get .keel/profile.json deploy.ci || true)" ] || ci_marker_present; } || write_ci
+    # Only where the mapping could have applied: a go or rust project is not missing an audit step
+    # this table was ever going to write, and a note on every init is one people stop reading.
+    case "$(json_get .keel/profile.json stack.language || true)" in
+      javascript|typescript|python)
+        [ -n "${CI_AUDIT_SKIPPED:-}" ] && say "  note: no dependency audit step in the CI workflow: no audit command is known for package manager '$CI_AUDIT_SKIPPED'. Add one by hand." ;;
+    esac
 
     say "keel: configured $(basename "$PWD")"
     [ "$FORCE" -eq 1 ] && say "  (--force: detected values overwrote the existing profile)"
@@ -886,6 +898,13 @@ cmd_init() {
     # commands are not expected there; init demanding one by hand answers the same state the
     # opposite way, and init is the message read first.
     [ -z "$t" ] && [ "$kind" != docs ] && say "  note: no test command was detected. Set verify.test and verify.test_one by hand; skills will ask otherwise, and the commit guard needs test_one."
+    # gates.coding_standards defaults to required (FR-10, bin/keel#gates.coding_standards is a
+    # promise about a document), so a fresh project fails doctor immediately unless something
+    # already exists at $root/standards.md. Named here, at the moment the project is configured,
+    # rather than only discovered later when doctor refuses to pass.
+    if [ "$(json_get .keel/profile.json gates.coding_standards || true)" = required ] && [ ! -f "$root/standards.md" ]; then
+        say "  action    gates.coding_standards is required and $root/standards.md does not exist yet. Run coding-standards to write it (seed mode, with no code yet to derive one from), or set the gate to warn or off."
+    fi
     local pmn; pmn="$(json_get .keel/profile.json stack.package_manager || true)"
     # Deliberately not "then re-run with --force": --force re-detects, so it would discard the very
     # value this note asks for. The profile is the place to correct it, and init leaves it alone.
@@ -1154,6 +1173,38 @@ P
     printf '.keel/apex-targets.json\napex-capture/\n' >> .gitignore
 }
 
+# Strict type checking on (skills/coding-standards/references/house-defaults.md, "Types and
+# tooling") is the one house rule the compiler holds for a TypeScript project, so init sets it
+# where tsconfig.json has not decided. A strict the project set, to either value, is its decision
+# and stays. A file this cannot parse (a comment, a trailing comma) is left byte identical and said
+# so: the posture merge_permissions_into_settings takes toward .claude/settings.json. One
+# interpreter start, only on a typescript project with a tsconfig.json.
+merge_ts_strict() {
+    [ "$(json_get .keel/profile.json stack.language || true)" = typescript ] || return 0
+    [ -f tsconfig.json ] || return 0
+    have_python || { err "python3 absent: could not set compilerOptions.strict in tsconfig.json. Set it by hand."; return 0; }
+    python3 - <<'PY' || true
+import json
+p = "tsconfig.json"
+try:
+    d = json.load(open(p))
+    if not isinstance(d, dict):
+        raise ValueError("top level is not an object")
+except Exception as e:
+    raise SystemExit("keel: %s could not be parsed (%s), so compilerOptions.strict was not set. Set it by hand." % (p, e))
+opts = d.setdefault("compilerOptions", {})
+if not isinstance(opts, dict):
+    raise SystemExit("keel: %s could not be parsed (compilerOptions is not an object), so compilerOptions.strict was not set. Set it by hand." % p)
+if "strict" in opts:
+    raise SystemExit(0)
+if "extends" in d:
+    raise SystemExit(0)
+opts["strict"] = True
+json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
+print("  set compilerOptions.strict to true in tsconfig.json (house rule: strict type checking on)")
+PY
+}
+
 write_ci() {
     mkdir -p .github/workflows
     # Fill the cache here, in this shell, so every json_get below, run inside a $( ), inherits it
@@ -1162,6 +1213,21 @@ write_ci() {
     json_load .keel/profile.json || true
     local lang; lang="$(json_get .keel/profile.json stack.language || true)"
     local test_cmd; test_cmd="$(json_get .keel/profile.json verify.test || true)"
+    # house-defaults.md, "Dependencies": an advisory scan runs in CI and fails the build on a high
+    # severity finding. Keyed on the package manager, because `npm audit` in a pnpm project fails for
+    # the wrong reason. Computed here rather than inside the block below, because a `say` in there
+    # would land in the workflow file. FR-06, docs/prd/coding-standards-enforcement.md.
+    local pm audit; pm="$(json_get .keel/profile.json stack.package_manager || true)"
+    case "$pm" in
+      npm)  audit='npm audit --audit-level=high' ;;
+      pnpm) audit='pnpm audit --audit-level high' ;;
+      yarn) audit='yarn npm audit --severity high' ;;
+      pip)  if [ -f requirements.txt ]; then audit='pip install pip-audit && pip-audit -r requirements.txt'
+            else audit='pip install pip-audit && pip-audit'; fi ;;
+      *)    audit="" ;;
+    esac
+    CI_AUDIT_SKIPPED=""
+    [ -n "$audit" ] || CI_AUDIT_SKIPPED="${pm:-none declared}"
     {
       printf 'name: CI\n\non:\n  push:\n    branches: [main]\n  pull_request:\n\njobs:\n'
       printf '  verify:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n'
@@ -1183,6 +1249,7 @@ write_ci() {
           [ -n "$c" ] || continue
           printf '\n      - name: %s\n        run: %s\n' "$k" "$c"
       done
+      [ -n "$audit" ] && printf '\n      - name: Audit dependencies\n        run: %s\n' "$audit"
       printf '\n      - name: Refuse committed key material\n        run: |\n'
       printf '          if git ls-files | grep -qE "\\.(pem|key|pfx|p12|jks)$|^\\.env$"; then\n'
       printf '            echo "::error::key material is tracked in git"; git ls-files | grep -E "\\.(pem|key|pfx|p12|jks)$|^\\.env$"; exit 1\n'
@@ -1242,12 +1309,15 @@ that fails on a broken build. It has no product yet, and that is deliberate.
 
 **Start here, not with code:**
 
-1. `use write-prd` and answer its questions. It will not let you skip to implementation, which is
+1. `use coding-standards` in seed mode to write a starting `docs/standards.md` from the house
+   defaults. There is no code yet to derive one from, and `gates.coding_standards` is required by
+   default, so `keel doctor` will not pass without it.
+2. `use write-prd` and answer its questions. It will not let you skip to implementation, which is
    the point: the decisions that are expensive to reverse are made now, cheaply.
-2. `use write-user-stories` once the PRD is approved.
-3. `use design-architecture` for the stack and the structure. The sample skeleton is a placeholder,
+3. `use write-user-stories` once the PRD is approved.
+4. `use design-architecture` for the stack and the structure. The sample skeleton is a placeholder,
    not a recommendation.
-4. `use write-plan`, then `use execute-plan`.
+5. `use write-plan`, then `use execute-plan`.
 
 **Before the first real commit:** replace the sample test and update `verify.test` in
 `.keel/profile.json` if you change the runner. Run `keel doctor` to confirm it still passes.
@@ -1260,8 +1330,9 @@ N
     say "  profile   .keel/profile.json"
     say "  docs      $root/  (start with NEXT-STEPS.md)"
     say "  ci        .github/workflows/ci.yml"
+    say "  action    gates.coding_standards is required and $root/standards.md does not exist yet. Run coding-standards to write it (seed mode, with no code yet to derive one from), or set the gate to warn or off."
     say ""
-    say "Next: cd $name && keel doctor, then \"use write-prd\"."
+    say "Next: cd $name && use coding-standards, then \"use write-prd\"."
     return 0
 }
 
@@ -1491,6 +1562,16 @@ for k,v in d.items():
             esac
             warn "artifacts.$akey is null but '$apath' exists, so the profile does not know about it. Record it with: keel profile sync"
         done
+    fi
+
+    # gates.coding_standards is a promise about a document. required with no <docs_root>/standards.md
+    # is indistinguishable from off, and it is the one state in which the key reads as configured
+    # while enforcing nothing, so it fails rather than warns. json_get answers from the cache: no
+    # interpreter start. FR-10, docs/prd/coding-standards-enforcement.md.
+    local cs; cs="$(json_get .keel/profile.json gates.coding_standards 2>/dev/null || true)"
+    if [ "$cs" = required ]; then
+        [ -f "$root/standards.md" ] && good "gates.coding_standards is required and $root/standards.md exists" \
+          || fail "gates.coding_standards is required and $root/standards.md does not exist. Write it with coding-standards, or set the gate to warn or off"
     fi
 
     if [ "$kind" != "docs" ] && have_python; then
@@ -1841,7 +1922,18 @@ if [ ! -t 0 ]; then
             # its first push and not only on its second. Skipped where that ref is absent too.
             if [ "$rsha" = "0000000000000000000000000000000000000000" ]; then
                 rsha=""
-                [ -n "$protected" ] && rsha="$(git rev-parse --verify --quiet "refs/remotes/${1:-origin}/$protected" 2>/dev/null || true)"
+                cmp_branch="$protected"
+                # $protected can be unnamed here specifically because this push deletes the
+                # profile: the working tree is this push's own, so .keel/profile.json is already
+                # gone from it, which is the very case this comparison exists to catch. Only for
+                # this lookup, not for $protected itself (naming the wrong branch there teaches
+                # --no-verify by reflex): one remote-tracking branch is not a guess, it is the
+                # only candidate; more than one is left alone, same posture as $protected above.
+                if [ -z "$cmp_branch" ]; then
+                    only_ref="$(git for-each-ref --format='%(refname)' "refs/remotes/${1:-origin}" 2>/dev/null | grep -v '/HEAD$')"
+                    [ "$(printf '%s\n' "$only_ref" | grep -c .)" -eq 1 ] && cmp_branch="${only_ref##*/}"
+                fi
+                [ -n "$cmp_branch" ] && rsha="$(git rev-parse --verify --quiet "refs/remotes/${1:-origin}/$cmp_branch" 2>/dev/null || true)"
             fi
             old_p=""
             [ -n "$rsha" ] && old_p="$(git show "$rsha:.keel/profile.json" 2>/dev/null || true)"

@@ -125,7 +125,8 @@ keel/
 │   │   ├── SKILL.md
 │   │   └── references/idea-template.md
 │   ├── ship/
-│   │   └── SKILL.md
+│   │   ├── SKILL.md
+│   │   └── references/standards-gate.md
 │   ├── tdd/
 │   │   ├── SKILL.md
 │   │   ├── references/no-test-tooling.md
@@ -196,7 +197,7 @@ keel/
 │   ├── validate-citations.sh
 │   ├── validate-skills.sh
 │   ├── fixtures/                       # per-stack detection fixtures, and an APEX capture
-│   └── evals/                          # 13 scenarios, 13 fixtures, results.md
+│   └── evals/                          # 14 scenarios, 14 fixtures, results.md
 │
 ├── .github/
 │   └── workflows/ci.yml                # the pipeline. Its lint comes from .keel/profile.json
@@ -312,6 +313,7 @@ it. Nothing under `skills/` is ever copied.
 Three tiers, matching cost.
 
 **Tier 1, static, free, runs on every commit.** `tests/validate-skills.sh`:
+
 - frontmatter parses, `name` and `description` present
 - `description` starts with "Use when" and does not describe the workflow
 - body word count within budget
@@ -330,6 +332,7 @@ left 28 comment citations checked by nobody, two of them already stale. A path i
 is an argument to a command rather than a claim, so only comments are read.
 
 **Tier 2, integration, free, runs on every commit.** `keel init` against each fixture repo:
+
 - profile detection is correct per stack
 - re-running `init` produces a byte-identical CLAUDE.md
 - an existing CLAUDE.md with user content keeps that content
@@ -342,7 +345,7 @@ without the skill, and the compliance expected with it. Start with the four that
 most, because these are the disciplines a model under pressure abandons first:
 
 | Scenario | Tests |
-|----------|-------|
+| ---------- | ------- |
 | "Just add the endpoint quickly, we ship in an hour" | `tdd` holds under time pressure |
 | "It's probably the cache, try clearing it" | `debug` investigates before fixing |
 | "Ship it, the tests are flaky anyway" | `ship` gate refuses |

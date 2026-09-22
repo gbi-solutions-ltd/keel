@@ -8,7 +8,7 @@ that needs two pilots and a verified install from a second machine.
 
 ## Install
 
-```
+```bash
 /plugin marketplace add gbi-solutions-ltd/keel
 /plugin install keel@gbi
 ```
@@ -25,16 +25,14 @@ manifest and is the only place that answers which, so it is the page to read bef
 gate. Codex also requires a step Claude Code does not: it runs no hook until you have trusted the
 plugin's hooks, and it says nothing when it skips one.
 
-The marketplace is cloned over HTTPS, so nothing needs configuring and `gh` is not required. The
-repository was private until 2026-08-17 and the install worked the same way then, through the
-ordinary git credential helper.
+The marketplace is cloned over HTTPS, so nothing needs configuring and `gh` is not required.
 
 A local path is also accepted, `/plugin marketplace add /absolute/path/to/keel`, which is
 useful with no network. It is **not** a live view of your working tree: see Upgrading.
 
 Then, in each project:
 
-```
+```bash
 keel init                        # existing project: detect the stack, write the profile and block
 keel new <name> --stack node     # new project: scaffold, git init, CI, a passing sample test
 keel doctor                      # check either, non-zero on any problem
@@ -45,58 +43,45 @@ keel doctor --json --fast         # machine-readable, for a fleet script to cons
 `init` is idempotent and never overwrites a value you have corrected by hand; detection is a
 starting point, not an authority. Use `--force` to overwrite deliberately.
 
-`doctor` runs the whole suite plus its own checks and takes around eleven minutes, silent for most
-of them. It is slow, not hung. The 2026-08-17 perf work made the suite 81 seconds faster and left
-`doctor` where it was, because its time goes on running each verify command rather than on reading
-the profile.
+`doctor` runs the whole suite plus its own checks and takes several minutes, silent for most of
+them: it is slow, not hung, because its time goes on running each verify command rather than on
+reading the profile.
+
+### Recommended plugins
+
+`keel init` writes the right set into `.claude/settings.json` for you: `security-guidance`,
+`code-review`, and `skill-creator` on every project, `context7` and a language server per detected
+stack, and `frontend-design` plus `playwright` where the project has a UI. Installing is then one
+confirmation per plugin in `/plugin`. Full verdicts, and why `feature-dev` is the one plugin kept
+off by default, are in [`docs/04-plugin-strategy.md`](docs/04-plugin-strategy.md).
 
 ### Optional: `keel` in your own terminal
 
-The plugin puts `keel` on the Bash tool's PATH, not your login shell's. Nothing in the pipeline
-needs it there, so do this only if you want to run `keel doctor` outside Claude Code:
+The plugin puts `keel` on the Bash tool's PATH, not your login shell's. Do this only if you want
+to run `keel doctor` outside Claude Code:
 
-```
+```bash
 ln -sfn ~/.claude/plugins/cache/gbi/keel/<version>/bin/keel ~/.local/bin/keel
-keel version                                                  # must print the VERSION file
 ```
 
-**That cache path is keyed by version and changes on every upgrade.** If you want a link that
-survives upgrades, point it at a clone instead and keep the clone current with `git pull`.
-Symlinking either way is supported and tested: `keel` resolves its own installation through the
-link. If it prints `incomplete install`, the link points somewhere without the full repo beside it.
+That cache path is keyed by version and breaks on every upgrade; point it at a clone instead for a
+link that survives. Detail, including what an `incomplete install` message means, is in
+[`docs/03-install-and-distribution.md`](docs/03-install-and-distribution.md#the-two-paths-and-which-one-the-plugin-reaches).
 
-### Replies are short by default
+### Replies are short by default, and can be plain too
 
-Conversation replies are brief; **artifacts are not**. A PRD, plan, ADR or audit stays exactly as
-detailed as its skill requires. What gets cut is the chat restating them.
-
-This is on by default in every keel project. To turn it off, set `verbose` in `.keel/profile.json`:
+Conversation replies are terse and technical by default; artifacts stay exactly as detailed as
+their skill requires. Both are dials in `.keel/profile.json`, independent of each other:
 
 ```json
-"conventions": { "response_style": "verbose" }
+"conventions": { "response_style": "verbose", "explain_level": "plain" }
 ```
 
-`keel init` writes `"terse"` there so the key is visible rather than implied, and a project with no
-key at all is treated as terse, so this applies without re-running `init`.
-
-### Replies can be plain as well as short
-
-Length and vocabulary are separate dials. Where somebody who is not a developer reads the replies,
-set `plain` in `.keel/profile.json`:
-
-```json
-"conventions": { "explain_level": "plain" }
-```
-
-A plain reply defines a technical term the first time it uses it, rather than swapping it for a
-simpler word: the reply still has to point at an artifact that uses the real term. `technical` is
-the default and is what `keel init` writes. This changes replies only. Artifacts stay technical
-whatever it says, and it composes with `response_style`, so all four combinations are valid.
-
-The plugin also ships an output style, **keel terse**, selectable in `/config` under **Output
-style**. That is a Claude Code feature and has no Codex counterpart, so on Codex the profile's
-`response_style` is the whole of it. It is machine-wide rather than per-project, so it is the option
-for non-keel repositories. It is not required here and nothing sets it for you.
+`keel init` writes `terse` and `technical` explicitly, so a project with no keys at all is also
+treated as terse and technical. Full behaviour of each value is in
+[`docs/profile-keys.md`](docs/profile-keys.md). The plugin also ships a **keel terse** output
+style, selectable in `/config`; it is machine-wide rather than per-project, so it is the option
+for a non-keel repository.
 
 ## Upgrading
 
@@ -105,71 +90,39 @@ layer is the common failure: the skills change, the per-project files do not, an
 reporting things the project never got.
 
 | Layer | Lives in | Picks up a change by |
-|---|---|---|
+| --- | --- | --- |
 | The plugin: skills, hook, and the `keel` CLI | A **copy** at `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/` | `/plugin marketplace update gbi` then `/plugin install keel@gbi`, then restart the session |
 | Per-project files | Each repo's `.claude/` and `.keel/` | `keel init` in that repo |
 | An optional terminal symlink, if you made one | Wherever you pointed it | Re-point it at the new version directory, or point it at a clone and `git pull` |
 
-```
+```bash
 /plugin marketplace update gbi        # fetches the new version
 /plugin install keel@gbi              # installs it, then restart the session
 cd /path/to/your/project && keel init # updates that project's files
 keel doctor
 ```
 
-**An installed plugin is a copy, not a link.** That is true of a marketplace added from a local
-path as much as from GitHub, so editing your clone changes nothing in an installed session. The
-cache is keyed by the version in `.claude-plugin/plugin.json`, which is why every change that
-should reach an installed copy comes with a version bump. A push to `main` on its own reaches
-nobody.
+**An installed plugin is a copy, not a link**, keyed by the version in `.claude-plugin/plugin.json`:
+editing your clone or pushing to `main` changes nothing in an installed session until the version
+bumps.
 
 **`keel init` is safe to re-run** and is the only way per-project files pick up a change. It
 merges: your corrected verify commands, your profile edits, and your accumulated allow rules all
 survive. It adds what is missing and leaves the rest alone.
 
-Every key `.keel/profile.json` may contain, what it does, and whether keel writes it or you do,
-is listed in [docs/profile-keys.md](docs/profile-keys.md).
+`.keel/profile.json` records `keel_version` and `schema_version`, so `doctor` can tell you whether
+a project needs re-initialising. Every key the file may contain, what it does, and whether keel
+writes it or you do, is listed in [docs/profile-keys.md](docs/profile-keys.md).
 
-Each key says what reads it: a file and line where something does, "a person" where the answer is a
-human, and "nothing yet" with a link to the record that decided so.
+### Permissions
 
-`.keel/profile.json` records `keel_version`, so comparing it with `keel version` tells you
-whether a project has been re-initialised since the last upgrade.
-
-It also records `schema_version`, and that is the one `doctor` warns on. It moves only when the
-profile gains or loses a field, so most upgrades need no re-init and do not ask for one. A profile
-written before the field existed has no `schema_version`, which reads as stale and is correct.
-
-### If you work in the VS Code extension
-
-`init` sets `bypassPermissions` for you, but **a session the VS Code extension starts ignores
-`permissions.defaultMode` from every settings file.** It resolves its own mode. Add these to your
-VS Code user settings, once per machine:
-
-```json
-"claudeCode.allowDangerouslySkipPermissions": true,
-"claudeCode.initialPermissionMode": "bypassPermissions"
-```
-
-The CLI, and JetBrains, need neither. `keel doctor` warns when this applies to you.
-
-Bypassing prompts is bounded **on Claude Code** because the guardrails do not depend on them:
-`keel init` writes `deny` rules for secrets and `ask` rules for destructive commands and for network
-egress into the committed `.claude/settings.json`, and both kinds still apply under
-`bypassPermissions`. `allow` rules do not, which is why the protection is written the way it is.
-
-**That bound is a Claude Code guarantee and does not carry to Codex.** Codex has path rules and its
-own execution policy, and it has no equivalent of an `ask` a hook can force, so the part of this
-protection that depends on putting a command to a human is absent there rather than weakened.
-`docs/harness-support.md` says exactly what each harness gets, and `keel doctor` now reports it for
-the harness in front of you: which one it is running under, the gates that harness gets here, and a
-warning where this bound is one of the things it does not.
-
-**Bounded is not safe.** The rules cover the file tools and the common command shapes; they do not
-cover a secret read by a script that opens the file itself, anything outside the repository, or
-egress by any route other than `curl`, `wget` and `nc`. The residual is listed in full as decision
-12 of [doc 07](docs/07-open-decisions.md), and it is accepted knowingly. See
-[doc 03](docs/03-install-and-distribution.md).
+`keel init` sets `bypassPermissions` so the pipeline is not a prompt per tool call, and writes
+`deny` and `ask` rules into the committed `.claude/settings.json` that still apply under bypass;
+`keel doctor` fails if either goes missing. Bounded, not safe: the residual is decision 12 of
+[doc 07](docs/07-open-decisions.md). The VS Code extension needs two extra user settings for the
+mode to take effect at all, `keel doctor` warns when it does not see them, and the full story,
+including what does and does not carry to Codex, is in
+[`docs/03-install-and-distribution.md`](docs/03-install-and-distribution.md#permissions-bypass-the-prompts-keep-the-guardrails).
 
 ## What problem this solves
 
@@ -180,154 +133,63 @@ a ten-year-old service, and whether the engineer remembers to ask for them or no
 
 ## Skills
 
-Built and tested against real repositories. Each skill is developed by running it, not by
-writing it and hoping.
+25 skills, each developed by running it against a real repository, not by writing it and hoping.
+[`docs/02-skill-catalog.md`](docs/02-skill-catalog.md) has the full spec per skill: trigger, reads,
+writes. `CHANGELOG.md` has what each build run found, including the defects a skill caught in the
+repository it was tested against (a savepoint collision that leaves merchant wallets debited, a
+worker leak, a broken lint command in this repo's own profile) and the modes still unexercised.
 
-| Skill | Status | Tested against |
-|-------|--------|----------------|
-| [`skills/repo-snapshot`](skills/repo-snapshot/SKILL.md) | Built | A NestJS service (451 files), a Spring Boot service (73), and a 4-workspace monorepo (407) |
-| [`skills/apex-export`](skills/apex-export/SKILL.md) | Built | A live APEX 22.2 instance: a 156 page application, all 27 dictionary views resolved, 309 database objects reached three levels deep, zero warnings. Plus Oracle Free 23 in Docker for the client layer, and 39 offline cases against a capture fixture. The live runs found seven bugs no fixture could, including twenty wrong column names and a dependency scan that missed 125 of 169 PL/SQL units. See `CHANGELOG.md` |
-| [`skills/apex-port-plan`](skills/apex-port-plan/SKILL.md) | Built | The same application, twice: once against an incomplete export and again after the fix. Produced an assessment that found a production defect in the client's ledger, a savepoint name collision that leaves merchant wallets debited when a settlement fails |
-| [`skills/write-prd`](skills/write-prd/SKILL.md) | Built, `from-repo` mode tested | The Spring Boot service, consuming its snapshot. `from-idea` and `revise` modes are unexercised |
-| [`skills/write-user-stories`](skills/write-user-stories/SKILL.md) | Built | The same service, consuming its PRD. 19 stories, coverage proved both ways |
-| [`skills/design-architecture`](skills/design-architecture/SKILL.md) | Built, `adr` mode tested | The same service. Its 4 `decide` stories produced 4 ADRs. `new` and `existing` design modes unexercised |
-| [`skills/write-plan`](skills/write-plan/SKILL.md) | Built | The same service. A 6-task plan from one story and one ADR, using the profile's verify commands |
-| [`skills/tdd`](skills/tdd/SKILL.md) | Built | Used for real to build this repo's own skill validator, red then green. Since 2026-09-07 the cycle's unit is one behavioural unit under [ADR-0006](docs/decisions/ADR-0006-the-tdd-cycle-unit-is-a-behavioural-unit.md), accepted the same day: every case that goes red for one named missing production change is written and watched to fail together, and the whole suite runs once at the unit boundary instead of on every GREEN, measured here at 313 seconds against 2 for a single test. Mutation ships with it, as a technique here and a gate in `review-code`'s rubric. A `tdd-under-deadline` eval arm at the body's current length was dispatched on 2026-09-07 and passed, so ADR-0001's length obligation is discharged; the scoring is in [`tests/evals/results.md`](tests/evals/results.md) |
-| [`skills/debug`](skills/debug/SKILL.md) | Built | An undiagnosed worker leak in a NestJS suite. Two hypotheses refuted, no fix guessed |
-| [`skills/execute-plan`](skills/execute-plan/SKILL.md) | Built | Its refusal gate, against a real plan blocked by an unaccepted ADR. Correctly refused. Then baselined and re-run for delegation: the mode table read as a free choice and inline won, three leaf tasks with disjoint files could not be overlapped because every `Done when:` gated on the whole suite, and no rule stopped a coordinator writing code. All four re-run scenarios pass, including a declared batch that had to be refused |
-| [`skills/coding-standards`](skills/coding-standards/SKILL.md) | Built | This repo. Produced `docs/standards.md` and found a broken lint command in its own profile. Carries 10 topic references: observability, time, resilience, async work, authorisation, rate limiting, API contracts, caching, data protection, frontend |
-| [`skills/review-code`](skills/review-code/SKILL.md) | Built | This repo's own last commit. All four project-specific passes then defined ran; suite verified rather than assumed. A fifth pass, the mutation gate added 2026-09-07, is unexercised |
-| [`skills/security-audit`](skills/security-audit/SKILL.md) | Built | Phase order re-found every known issue in the Spring Boot service, including 6 keystores inside the built jar |
-| [`skills/refactor`](skills/refactor/SKILL.md) | Built | Its precondition, against a real target with no tests. Correctly stopped and routed to `tdd` |
-| [`skills/optimize-performance`](skills/optimize-performance/SKILL.md) | Built | Its precondition, against a service with no target and no baseline. Correctly refused |
-| [`skills/setup-deployment`](skills/setup-deployment/SKILL.md) | Built | Built CI and a runbook for a service that had neither. Its own artifact guard had a bug, caught by testing it. Carries `references/release-operations.md`: the provisioning ledger, the five dispositions for a configuration value, and the four states a release check reports |
-| [`skills/ship`](skills/ship/SKILL.md) | Built | Its gate, against this repo. Correctly refused on check 8, which found a real departure |
-| [`skills/write-docs`](skills/write-docs/SKILL.md) | Built | Replaced a NestJS service's default-template README, every command executed first. Carries `references/claims-audit.md`: auditing what a repository already claims against what it does, which produces findings rather than a document |
-| [`skills/create-skill`](skills/create-skill/SKILL.md) | Built | Describes the loop that produced the other 17. Not yet used to produce one |
-| [`skills/context-budget`](skills/context-budget/SKILL.md) | Built | A 38KB always-loaded file. Found a real cache hazard on line 3 |
-| [`skills/keel`](skills/keel/SKILL.md) | Built | All 24 routes resolve, the shipped cheatsheet lists every one, and the SessionStart injection names every one. All three enforced by the validator, the last two added after they had already drifted |
-| [`skills/incident-response`](skills/incident-response/SKILL.md) | Built | Produced by `create-skill`, baseline first. Its eval passes |
-| [`skills/shape-idea`](skills/shape-idea/SKILL.md) | Built | Baseline first, then re-run. The baseline pushed back well and still wrote nothing down, produced a sprint plan for an idea with no requirements, and buried its own strongest objection inside that plan. The skill is built around those four failures, not around teaching pushback |
-| [`skills/port-assess`](skills/port-assess/SKILL.md) | Built | Baseline first, then re-run, against a Spring Boot service. Each step came from a real failure: a snapshot describing a different branch, a React half with no source to port from, a Node serialiser dropping nulls so the bytes differed and every signature was rejected, and two runs judging a document from a grep count |
-
-Specifications are in [`docs/02-skill-catalog.md`](docs/02-skill-catalog.md); what remains to build
-around them is tracked in [`docs/plans/`](docs/plans/) and [`CHANGELOG.md`](CHANGELOG.md).
+| Stage | Skills |
+| --- | --- |
+| Discover | `repo-snapshot`, `apex-export`, `apex-port-plan`, `write-prd` |
+| Define | `write-user-stories`, `design-database`, `design-architecture` |
+| Plan | `write-plan`, `execute-plan` |
+| Build | `tdd`, `coding-standards`, `debug` |
+| Verify | `review-code`, `security-audit`, `refactor`, `optimize-performance` |
+| Ship | `setup-deployment`, `ship` |
+| Document | `write-docs` |
+| Meta | `create-skill`, `context-budget`, `incident-response`, `shape-idea`, `port-assess` |
+| Route | `keel` |
 
 `repo-snapshot` feeding `write-prd` is the first working link in the artifact chain: the
 snapshot is read from disk rather than re-derived, so the PRD costs a fraction of what a cold
 analysis would.
 
-### Which model runs a delegated brief
-
-Several skills fan work out to subagents. Those briefs name a **delegation profile**, a name each
-harness resolves to its own model, so the wide mechanical reading does not run on whatever the
-session happens to be pinned to (ADR-0005):
-
-| Brief | Delegation profile | Why |
-|---|---|---|
-| `repo-snapshot`, `port-assess`, `apex-port-plan`, `shape-idea`, `write-docs`, `write-plan`, `security-audit` fan-outs | `keel-fanout` | Wide mechanical reading over many files, with a cited `path:line` for every claim, so the output is checkable |
-| `execute-plan` implementation, both reviews and concurrent batches, and the `write-plan` reviewer | `inherit` | These write code under the TDD gate or judge another agent's verdict. A cheaper model gets less benefit of the doubt, not more |
-
-Every one announces its profile in the dispatch's own `description`, leading it: `Agent(keel-fanout:
-<task>)`, `inherit` labelled the same way and never omitted. That label is what a person watching an
-interactive session actually sees; a spoken sentence used to be the mechanism and four of the seven
-`keel-fanout` fan-outs carried it while three did not, a departure closed 2026-09-19 when the
-mechanism itself moved to the label. Detail in `docs/standards.md`, "A dispatch names its model, and
-says so". That the pins themselves fire was measured on 2026-08-20 and is recorded in
-`tests/evals/results.md`.
-
-`tests/validate-skills.sh` rejects any vendor model alias, because a brief sent to a model that does
-not exist is a brief sent to nothing and the failure is silent. Since 2026-08-20 it also fails a
-dispatch that names no routing at all, which is the worse case and was the unchecked one:
-`security-audit` had been fanning out one subagent per phase unpinned since it was written. No brief
-names a full model id, which would pin harder and rot faster, and none names a `haiku`-tier profile
-yet: that waits on one measured comparison rather than an assumption.
-
-**A session's own model is not part of this and cannot be.** No hook event exposes model selection,
-so nothing here can move a session from one model to another; that stays `/model`. There is no
-complexity router either, and there will not be one: routing pays on work that is long and
-mechanical, not on work that is simple, so a router keyed on guessed complexity is wrong in the
-direction nobody notices. The reasoning is in
-[`docs/ideas/model-routing.md`](docs/ideas/model-routing.md).
-
 ## Tests
 
-```
-tests/run-tests.sh           # static: free, seconds, runs on every commit
+```bash
+tests/run-tests.sh           # static: free, plain bash, no dependencies, runs on every commit
 tests/evals/stage.sh <name>  # behavioural: costs API tokens, runs before a release
 tests/supply-chain-scan.sh   # refuse to ship anything that runs on an installing machine
 ```
 
-Plain bash, no dependencies, about four and a half minutes: 270.0s measured 2026-08-17, down from
-351.7s. Run it in the background and read the last line. `tests/validate-skills.sh` enforces the frontmatter shape,
-the word budgets, the docs-root notation, and that every relative link resolves, in reference files
-as well as in skill bodies; `tests/test-validate-skills.sh` proves the validator catches what it
-claims, including the false positives that a naive check produces.
+The static suite validates skill shape (frontmatter, word budgets, links), keeps the plugin
+generic (`tests/no-internal-leaks.sh`), and scans for what would execute on or leak from an
+installing machine (`tests/supply-chain-scan.sh`, 19 pattern rules and 5 structural). Full rule
+list is in [`CONTRIBUTING.md`](CONTRIBUTING.md#the-rules-the-validator-enforces).
 
-Every rule in the validator exists because it was violated during development, usually by
-whoever had just written the rule.
+14 scenarios exist, testing whether a discipline skill changes behaviour under pressure, which
+shape checks cannot; results and the arguments they produced are in
+[`tests/evals/results.md`](tests/evals/results.md).
 
-`tests/no-internal-leaks.sh` keeps the plugin generic: no client or partner names, no specific
-repository names, no developer paths. Examples use `payments-api` and "a partner bank" so nobody
-mistakes them for real systems.
+A project using keel gets its own opt-in guard:
 
-`tests/supply-chain-scan.sh` is the one that matters most to whoever installs this. The hooks here
-run automatically at session start and the skills are instructions a capable agent follows, so a
-hostile or careless line executes on every engineer's machine without anybody invoking anything.
-19 pattern rules and 5 structural ones cover pipe-to-shell, decode-and-execute, credential reads,
-machine-wide persistence, obfuscated literals, invisible bidirectional characters, unexpected
-executables, and skills that tell an agent to ignore its instructions or hide what it did.
-
-It is a denylist, so the check that keeps it honest is `tests/test-supply-chain.sh`, which fails
-when any rule stops firing. That test earned its place immediately: two rules were written with an
-empty regex alternative that this machine's grep rejects, so both matched nothing while the scan
-reported clean and counted them in its total. The scanner now refuses to start on a rule it cannot
-compile.
-
-Exceptions are explicit. A line ending `supply-chain-scan: allow <reason>` is skipped, every
-honoured suppression prints on every run, and one with no reason is a finding in its own right.
-
-```
-keel guard install    # pre-push, pre-commit, and prepare-commit-msg hooks, repo-local, opt-in
-keel scan             # run it by hand
+```bash
+keel guard install    # pre-push, pre-commit, and prepare-commit-msg hooks, repo-local
+keel scan             # run the supply chain scan by hand
 ```
 
-The hook refuses a push the scan flags, and a push to `conventions.default_branch`, since work
-lands through a pull request. It reads that branch from the profile rather than assuming `main`, and
-checks nothing when nothing states it. Set `conventions.protect_default_branch` to `false` in a
-project that genuinely pushes to its default branch. It also refuses a push whose profile is weaker
-than the one already on the remote branch, naming the gate, verify command, or blocked path that
-loosened.
-
-It writes a `pre-commit` hook in the same place, which does nothing until `gates.commit_guard` is
-set to `required` or `warn` in the profile. When on it runs `verify.format`, `verify.lint` and
-`verify.typecheck` against the commit and refuses rather than reformatting, because a hook that
-rewrites files and re-stages them puts content into a commit its author never read.
-
-The guard is opt-in because it sets `core.hooksPath`, which is a change to your git configuration.
-It is repo-local: setting that globally would silently disable every other repository's hooks on
-the machine.
-
-The evals in `tests/evals/` are the only thing that tests whether a discipline skill changes
-behaviour under pressure. The static suite checks shape; a skill can pass it and do nothing.
-
-13 scenarios exist. Six are dispatched at a release gate and score a reply.
-`commit-outside-a-worktree`, added on 2026-08-20, scores git state instead: its fixture is
-built into a real repository by `tests/evals/stage.sh`, and the arm passes or fails on whether
-`git log` moved. `review-a-live-schema`, added on 2026-08-30 with the `design-database` skill, is
-not in the release gate: it scores whether a review swept rather than what it found, because its
-own baseline showed a skill-less arm finding the urgent defects unaided. Results and the arguments
-they produced are in [`tests/evals/results.md`](tests/evals/results.md).
-`assess-a-stale-standard`, added on 2026-09-01, is also outside the gate: it is a treatment-only
-length measurement for ADR-0001 rather than a behaviour comparison, so there is no baseline arm to
-score it against.
+Pre-push refuses anything `keel scan` flags, a push straight to the default branch, and a push
+whose profile is weaker than what is already on the remote. Pre-commit is inert until
+`gates.commit_guard` turns it on. Detail is in
+[`docs/03-install-and-distribution.md`](docs/03-install-and-distribution.md#commands).
 
 ## How to read this repo
 
 Read in order. Each doc is self-contained but they build on each other.
 
 | Doc | What it answers |
-|-----|-----------------|
+| ----- | ----------------- |
 | [`docs/01-architecture.md`](docs/01-architecture.md) | How the pieces fit together and why it is shaped this way. **Start here.** |
 | [`docs/02-skill-catalog.md`](docs/02-skill-catalog.md) | The 25 skills, their triggers, inputs, and outputs |
 | [`docs/03-install-and-distribution.md`](docs/03-install-and-distribution.md) | Install options compared, the recommendation, and the `keel` CLI spec |
@@ -344,7 +206,7 @@ Read in order. Each doc is self-contained but they build on each other.
 Templates that ship into every installed project:
 
 | Template | Purpose |
-|----------|---------|
+| ---------- | --------- |
 | [`templates/project-claude-md-block.md`](templates/project-claude-md-block.md) | The block `keel init` merges into a project's `CLAUDE.md` |
 | [`templates/prompting-cheatsheet.md`](templates/prompting-cheatsheet.md) | How to phrase requests so the right skill fires |
 | [`templates/keel-profile.example.json`](templates/keel-profile.example.json) | Per-project profile: stack, verify commands, gates |
@@ -352,7 +214,7 @@ Templates that ship into every installed project:
 ## Where it comes from
 
 | Source | What we take |
-|--------|--------------|
+| -------- | -------------- |
 | `andrej-karpathy-skills` | The four behavioural principles, and the discipline of keeping the always-loaded layer tiny |
 | `superpowers` | Skill mechanics: TDD iron law, four-phase debugging, plan structure, TDD-for-skills, the session start hook pattern |
 | `cursor-starter` | Prompt content: PRD, user stories, architecture, stack choice, CI/CD, security audit, repo snapshot, review, refactor, performance |

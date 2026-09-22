@@ -1821,7 +1821,7 @@ gives the 18 locations with line numbers and remedy classes **W** word change, *
 **N** new section. Three of its notes change what the work is rather than adding to it, and each is
 the reason a mechanical pass over the 18 would be wrong:
 
-- **A nineteenth location.** `docs/03-install-and-distribution.md:427-432` says "The skills
+- **A nineteenth location.** `docs/03-install-and-distribution.md:475` says "The skills
   themselves stay Claude-only for now". It is true today and false the moment this ships. Class N,
   and it is the natural home for the Tier B install path.
 - **`docs/04-plugin-strategy.md` is Claude-shaped across all 221 lines**, not at line 11. Rewrite the
@@ -1883,7 +1883,7 @@ touch, say so and leave it unstaged.
 >    tagging this check's own header says destroys it, so lines inside a fence are skipped and a
 >    fixture pins that a fenced line is skipped where an unfenced one is not. **`docs/06` needed no
 >    edit at all** once the scan stopped being wrong about it.
-> 4. **`README.md:332` was a false positive and was reworded, not tagged.** It is a credit table
+> 4. **`README.md:233` was a false positive and was reworded, not tagged.** It is a credit table
 >    line reading "session-start hook pattern", crediting a pattern borrowed from another project.
 >    Tagging it would assert a gate claim the sentence is not making.
 > 5. **`tests/validate-skills.sh` needed the same treatment `tests/supply-chain-scan.sh` needed in
@@ -2642,7 +2642,7 @@ harness_running() {
 }
 ```
 
-Then add the section to `cmd_doctor`, using its existing `good`/`warn` printers (`bin/keel:1328-1330`)
+Then add the section to `cmd_doctor`, using its existing `good`/`warn` printers (`bin/keel:1332-1334`)
 so the output matches every other check rather than inventing a format:
 
 ```bash

@@ -167,7 +167,7 @@ repository, and which `commit-outside-a-worktree` is scored on.
 
 ## Running all of them before a release
 
-Thirteen scenarios exist; 7 scenarios are dispatched at the release gate, listed in
+Fourteen scenarios exist; 7 scenarios are dispatched at the release gate, listed in
 `tests/evals/gate-scenarios`, one dispatch each. That file is the set: the runbook's
 dispatch script reads it rather than carrying its own copy, and `tests/test-eval-harness.sh`
 fails the build if this sentence, the runbook or the file disagree. Record the result

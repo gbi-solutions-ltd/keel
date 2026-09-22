@@ -31,7 +31,7 @@ thinner than even the pipeline the project that ships it actually relies on.
 
 ## The delta
 
-| Ship requirement (`skills/ship/SKILL.md:20-30`) | CI (`write_ci`) enforces? | Evidence |
+| Ship requirement (`skills/ship/SKILL.md:20-32`) | CI (`write_ci`) enforces? | Evidence |
 |---|---|---|
 | 1. Tests pass | Partial. Generated CI runs `verify.test`, but only protects a merge if branch protection requires the check | `bin/keel:1146,1156` |
 | 2. New code has new tests | No | No such step exists |
@@ -45,7 +45,7 @@ thinner than even the pipeline the project that ships it actually relies on.
 ## Two things this is not
 
 **Not a call to CI-enforce review, docs, or plan state.** Decision 3
-(`docs/07-open-decisions.md:166-239`) already establishes the house posture: a skill's compliance
+(`docs/07-open-decisions.md:163-236`) already establishes the house posture: a skill's compliance
 is unwitnessable from outside the model's own turn unless the check is external and mechanical. A
 review having happened, docs being current, and plan checkboxes being ticked are judgment calls,
 not commands with exit codes. Proposing to CI-enforce them contradicts that reasoning rather than

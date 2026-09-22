@@ -352,7 +352,7 @@ is the defect. Deleting a claim costs no words at all.
 | `gates.coding_standards` is inert in code | `templates/profile.schema.json:254`; `docs/profile-keys.md:45`; a repo-wide grep finds it only in the schema, generated docs, an example file, this repo's own profile, a `printf` template in `bin/keel:430`, and eval prose. No hook, skill, lib or CLI path reads it | Claim B is true |
 | One gate *is* read by a skill | `skills/security-audit/SKILL.md:23`: "Read `.keel/profile.json` for `gates.security_audit` and any `hard_block_paths`", 7 words | "A gate the skills read" is a shape that already exists and costs 7 words per site |
 | keel says this about itself in its release notes | `CHANGELOG.md:306`: "seven declared profile keys are read by nothing (`gates.tdd`, `gates.coding_standards`, `gates.review`, ...)" | The gap is admitted, not hidden. Nothing here is news to keel |
-| `ship` has no standards item | `skills/ship/SKILL.md:16-30`, eight items, none naming standards; items 5 and 6 are prose with no command behind them | Claim B is true |
+| `ship` has no standards item | `skills/ship/SKILL.md:16-32`, eight items, none naming standards; items 5 and 6 are prose with no command behind them | Claim B is true |
 | Two documents claim an enforcement that does not exist | `docs/02-skill-catalog.md:69` "Coding standards enforcement"; `:382` says `refactor` reads `standards.md` | The false claim is fixable for free and is arguably the whole of B |
 | Hooks cannot decide this | `hooks/done-guard:127` works by substring-matching the configured test command in a `Bash` call; `hooks/done-guard:34-36` says outright "It cannot see the exit code, and does not pretend to" | There is no observable event whose presence proves standards were followed. A hook is not available for B |
 | A model acted on the inert gate unprompted | `tests/evals/results.md`: "arm 2 read the key out of the profile itself and used it to set severity" | See question 5 |
@@ -511,7 +511,7 @@ direction. Ranked third rather than higher because it is still a sentence, and b
 reading that key out of the profile and setting severity by it, unprompted, without being told to.
 
 **4. A ninth `ship` checklist item.** About 17 words, the average of items 1 to 8
-(`skills/ship/SKILL.md:20-30`, 135 words over 8 items). It fires only when the user says ship, and it
+(`skills/ship/SKILL.md:20-32`, 135 words over 8 items). It fires only when the user says ship, and it
 would join items 5 and 6 as prose with no command behind it, in a list whose working items name a
 command from the profile. It also crosses `ship` from 695 to about 712 and buys an eval arm.
 
@@ -520,7 +520,7 @@ is a substring match over a `Bash` tool call (`hooks/done-guard:127`), and the f
 "cannot see the exit code, and does not pretend to" (`:34-36`). "Did this edit follow the
 conventions" has no equivalent observable. The only hook-shaped check available is that
 `standards.md` exists when `gates.coding_standards` is `required`, and that belongs in `keel doctor`,
-whose `fail`/`warn`/`good` idiom (`bin/keel:1318-1320`) makes it about four lines of bash and zero
+whose `fail`/`warn`/`good` idiom (`bin/keel:1323-1325`) makes it about four lines of bash and zero
 skill words. Worth doing on its own merits; it is not enforcement.
 
 **6. A sentence in each coding skill. Ranked last and partly unaffordable.** See question 4.
@@ -706,11 +706,20 @@ than deleted, so the decision keeps its trace.
    in `docs/02-skill-catalog.md` rather than in a skill body.
 
 Still undecided: whether `refactor` and `debug` should read the standards doc at all, since neither
-was ever exercised (`tests/evals/results.md`, "mention standards nowhere"); whether the other four
-"read by nothing" gate descriptions in `templates/profile.schema.json` should be reworded, which
-`tests/evals/results.md` explicitly leaves open on the grounds that "one run against two
-keys is not the evidence for rewriting five"; and whether `keel doctor` should warn when
-`gates.coding_standards` is `required` and no `standards.md` exists.
+was ever exercised (`tests/evals/results.md`, "mention standards nowhere"); and whether the other
+four "read by nothing" gate descriptions in `templates/profile.schema.json` should be reworded,
+which `tests/evals/results.md` explicitly leaves open on the grounds that "one run against two
+keys is not the evidence for rewriting five".
+
+~~Whether `keel doctor` should warn when `gates.coding_standards` is `required` and no
+`standards.md` exists.~~ **Answered 2026-09-21: fail, not warn**, at `docs/prd/coding-standards-enforcement.md`
+FR-10. Part of a wider answer to section 3's ranked item 3 (`gates.coding_standards`, a read gate)
+and item 5 (a hook, "not available" beyond what a linter itself expresses): that PRD wires the gate
+into `keel:ship`'s refusal (FR-01 through FR-03) and ships mechanical config for two of the eight rules
+section "Finding, 2026-09-19" named (FR-05, FR-06), raised by Bernard asking directly whether
+coding standards could be made "difficult to violate," and to have `repo-snapshot` surface a
+standards gap during onboarding (FR-08 and FR-09), which section "Finding, 2026-09-19" and Problem A
+above did not connect to Problem B. Not yet approved; see that document's Open questions.
 
 ## Decision, 2026-09-02: check 1 keeps its ten, house defaults get their own check
 

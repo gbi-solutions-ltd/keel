@@ -54,7 +54,7 @@ tree rather than on git state.
 `bin/keel` defaults `docs_root` to `docs/keel`, not `docs`, and every reference staged into the arm
 leaves `<docs_root>` an unexpanded placeholder, so an arm with no profile has to invent a root and
 only `docs/` scores a pass. The profile mirrors `debug-obvious-cause`'s minimal shape and carries no
-`gates` key, which would be a hint. All eight other fixtures that ship a profile set `docs` too.
+`gates` key, which would be a hint. All eleven other fixtures that ship a profile set `docs` too.
 
 Nothing binds a port, so L-01 of `docs/audits/2026-09-02-security.md` does not gain a second
 instance.
@@ -209,6 +209,13 @@ them corrected the rows below.
 | Sample | of 6: rules 2 and 3 observed, 1 and 4 drifting, 6 near-fully observed. Rule 5 is broken in commit 1 itself, so the document was false about it the day it was written, which the 2026-09-01 arm found and this fixture had not predicted |
 | Departures | D-1 tracked, D-2 kept-basis-holds (`docs/decisions/` holds the ADR it names, which is what makes that category reachable), D-3 needs-an-ADR. **D-4 claims closed and is not**: it says the runtime is pinned, and `bash` with no version is not a pin. `unclassifiable` is zero |
 | History | `setup.sh` builds it. Commit 1 is the derivation point, commit 2 adds the document and both breaches |
+
+## `snapshot-against-a-standard`
+
+`assess-a-stale-standard`'s fixture, copied whole, `setup.sh` included. The scenario injects
+`repo-snapshot` rather than `coding-standards`, and what it measures is whether the snapshot reaches
+for the assessment at all when a `docs/standards.md` is there to assess against. The seeded rows
+above are the ones the snapshot's section 8 has to carry.
 
 ## `seed-a-greenfield-mobile-app`
 

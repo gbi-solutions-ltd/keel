@@ -286,8 +286,12 @@
             "warn",
             "off"
           ],
-          "description": "Whether a change must follow the conventions in the project's standards document. No skill, hook or CLI path is written to read it, so nothing in keel enforces it, and an agent reading the profile acts on it anyway: an eval arm was measured doing exactly that, which is what the observed: marker cites. Declared so the intent has somewhere to live until something enforces it, and docs/ideas/standards-that-bind.md already ranks that wiring.",
-          "x-keel-read-by": "observed:tests/evals/results.md#read by nothing and acted on anyway"
+          "description": "Whether a change must follow the conventions in the project's standards document. Read by ship at its gate item 5, through skills/ship/references/standards-gate.md, advisorily: required refuses the ship while a review-code finding that cites a coding-standards reference file is unaddressed, warn reports it and continues, off adds no check. A profile with no key reads as off. An eval arm was also measured acting on this key unprompted, which is what the observed: marker cites. Read by keel doctor, which fails a required project with no `<docs_root>/standards.md` to check against.",
+          "x-keel-read-by": [
+            "advisory:skills/ship/references/standards-gate.md#gates.coding_standards",
+            "code:bin/keel#cs=\"$(json_get .keel/profile.json gates.coding_standards",
+            "observed:tests/evals/results.md#read by nothing and acted on anyway"
+          ]
         },
         "security_audit": {
           "enum": [
@@ -358,7 +362,7 @@
         "commit_style": {
           "type": "string",
           "description": "The commit message convention this repository follows. conventional means the type(scope): subject form, and skills write messages in it. Set it to none where the repository has no convention, rather than having keel impose one.",
-          "x-keel-read-by": "advisory:skills/ship/SKILL.md:60"
+          "x-keel-read-by": "advisory:skills/ship/SKILL.md#profile.conventions.commit_style"
         },
         "default_branch": {
           "type": "string",

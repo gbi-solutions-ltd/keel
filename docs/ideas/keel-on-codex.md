@@ -278,7 +278,7 @@ decision.
 |---|---|---|
 | **Do nothing beyond today's `AGENTS.md`** | "keel installs on Claude Code. Its principles and verify commands travel to any agent that reads `AGENTS.md`, including Codex." Every current sentence stays true | Nothing on Codex beyond prose. No skills, no gates |
 | **Skills-only on Codex** | "25 skills, installable on Claude Code and Codex" | Any gate, on Codex. Layer 1 would be absent and the README would have to say so in the same breath as the install line |
-| **Skills plus a hook adapter** | The router, the done gate and the context watchdog all hold. "Three of four gates" | **The hard block.** `docs/07-open-decisions.md:176-178` and `196-199`, `README.md`'s paragraph opening "Bypassing prompts is bounded" and `docs/profile-keys.md:56` would each need a per-harness asterisk, which the governing constraint forbids |
+| **Skills plus a hook adapter** | The router, the done gate and the context watchdog all hold. "Three of four gates" | **The hard block.** `docs/07-open-decisions.md:173-175` and `196-199`, `README.md`'s paragraph opening "Bypassing prompts is bounded" and `docs/profile-keys.md:56` would each need a per-harness asterisk, which the governing constraint forbids |
 | **An explicit documented no** | Everything keel claims today, unchanged, plus one honest paragraph naming Codex, naming the exact missing primitive, and naming the issue that would change the answer | That keel runs on Codex |
 
 **Cost 1: the test matrix.** The static suite is 13 files and **848 assertions, 0 failing** (run
@@ -311,12 +311,12 @@ In runs, not adjectives:
 
 **Cost 2: the claims audit.** Under "same guarantees or not supported", **18 sentences become
 false**, 7 need an asterisk, and 3 stay true while misleading. The false ones cluster:
-`README.md:16` ("That is the whole install"), `README.md:87-89` (the output style in `/config`),
+`README.md:16` ("That is the whole install"), `README.md:82-84` (the output style in `/config`),
 `README.md`'s "Bypassing prompts is bounded" paragraph (deny and ask rules surviving
 `bypassPermissions`, the headline safety claim);
 `docs/01-architecture.md` and `:152` and `:156-159` (Layer 1 as "enforced by the runtime not
 the model", and "where a rule is genuinely non-negotiable, we put it in a hook");
-`docs/07-open-decisions.md:176-178` and `:196-199` (the hard block, and `ask` as "the only decision
+`docs/07-open-decisions.md:173-175` and `:196-199` (the hard block, and `ask` as "the only decision
 in the hook protocol the model cannot satisfy for itself");
 the install block of `docs/03-install-and-distribution.md`, `:30`, `:175-181`;
 `docs/profile-keys.md:51` and `:56`; `docs/02-skill-catalog.md:65`, `:383`, `:536`, `:544`; and
@@ -327,7 +327,7 @@ Five places need a new section rather than a word change: `docs/03-install-and-d
 `docs/07-open-decisions.md` decisions 3 and 12, `docs/05-token-and-memory-design.md`, and README's
 Install and Upgrading sections.
 
-`docs/03-install-and-distribution.md:427-432` is confirmed exactly as the requester described it,
+`docs/03-install-and-distribution.md:475` is confirmed exactly as the requester described it,
 and is the sentence to keep true rather than work around:
 
 > The skills themselves stay Claude-only for now; porting them is a later decision, not a Phase 1
@@ -364,7 +364,7 @@ supported", that is a no, and it should be written down as one in
 `docs/03-install-and-distribution.md` beside the portability section that already anticipated it,
 naming the missing primitive so the next person does not re-derive this.
 
-What happens next is that nothing is built, and `docs/03-install-and-distribution.md:427-432` gains
+What happens next is that nothing is built, and `docs/03-install-and-distribution.md:475` gains
 a paragraph naming Codex, `permissionDecision: "ask"`, and `openai/codex#28437`. Separately and
 regardless of this decision, `hooks/sensitive-guard:13` should be repaired to cite `bin/keel:558`.
 

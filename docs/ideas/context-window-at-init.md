@@ -19,7 +19,7 @@ files involved are written mechanically.
 
 **Evidence.** This repository's own `.keel/profile.json` carries `"context_window": 1000000`, and
 `write_profile` never emits that key (`bin/keel:364` writes the gates object and it is not in it), so
-it was added by hand. `bin/keel:1271` exists solely to tell the reader to do the same: "If sessions
+it was added by hand. `bin/keel:1307` exists solely to tell the reader to do the same: "If sessions
 here use a larger context, set gates.context_window in .keel/profile.json". The handoff half is
 `lib/context_watch.py:452`, step 3 of the stop instruction: "Tell the user to run /clear and resume
 by pointing at that file."
@@ -97,7 +97,7 @@ costed together or the second one to land fails the build.
 | SessionStart injects a bounded pointer when `.keel/handoff.md` exists | Recommended for the resume side. Two forms, ~15 tokens, within the hook's stated bound |
 | SessionStart injects the handoff contents | Rejected on `hooks/session-start:4-7`. About 1,300 volatile tokens in the cached prefix |
 | The stop instruction stops naming `/clear` | Rejected. The keystroke is the user's and the instruction is the only way they learn it is needed |
-| Delete the handoff once consumed | Open. It is already git-ignored (`bin/keel:1364-1368`) and already stale-by-design, but a pointer that outlives its work sends the next session to a file about something else |
+| Delete the handoff once consumed | Open. It is already git-ignored (`bin/keel:1391-1395`) and already stale-by-design, but a pointer that outlives its work sends the next session to a file about something else |
 
 **Assumptions this rests on**
 
@@ -118,7 +118,7 @@ costed together or the second one to land fails the build.
 | The correction exists because of a real 401,247-token session | `lib/context_watch.py:121-127` | The failure mode is not hypothetical; it was found against a real transcript |
 | init never writes `gates.context_window` | `bin/keel:364` | The gap is real and the fix is one field |
 | The schema already declares it | `templates/profile.schema.json:284` | No schema version bump, no drift report on existing profiles |
-| doctor exists to nag about it | `bin/keel:1271` | The nudge is a workaround for the missing write and could be simplified afterwards |
+| doctor exists to nag about it | `bin/keel:1307` | The nudge is a workaround for the missing write and could be simplified afterwards |
 | The handoff is already written automatically before compaction | `lib/context_watch.py:369-372`, on `PreCompact` | Half of "automatic handoff" already ships. Only the resume side is manual |
 | SessionStart already fires on `clear` | `hooks/hooks.json`, matcher `startup|clear|compact` | The hook that would carry the pointer already runs at exactly the right moment |
 | `hooks/session-start` never reads the handoff | No `handoff` match anywhere in the file | This is the actual gap, and it is small |
@@ -126,7 +126,7 @@ costed together or the second one to land fails the build.
 | The handoff is roughly 1,300 tokens | `lib/context_watch.py:200-235`: 5 prompts at 300 chars, 30 paths | Far too large for the cached prefix |
 | The hook is at 356 of a 400 ceiling | Measured 2026-08-18; `tests/validate-skills.sh:283-284` | ~44 tokens for this and `plain-language-chat.md` combined |
 | Write, Edit and Read stay allowed at the stop | `lib/context_watch.py:260-263` | The session can always write its handoff. No deadlock to design around |
-| The handoff is git-ignored and doctor enforces it | `bin/keel:1364-1368` | Nothing here risks committing session state |
+| The handoff is git-ignored and doctor enforces it | `bin/keel:1391-1395` | Nothing here risks committing session state |
 
 ## Open questions
 
@@ -175,7 +175,7 @@ and the stop instruction should keep saying so.
 The wording of the pointer, and how a stale handoff is detected, which is open question 2. Whether
 `context_warn_pct` and `context_stop_pct` are also written at init.
 
-Two items that were listed here are now settled in the PRD: doctor's nudge at `bin/keel:1271` is
+Two items that were listed here are now settled in the PRD: doctor's nudge at `bin/keel:1307` is
 reworded rather than removed, along with the three other places that document the precedence
 (`FR-09`, `FR-10`), and the floor change does get a doctor line saying a configured window can be
 raised (`FR-09`). The PRD also added an upper bound of 1,000,000 that this record never considered

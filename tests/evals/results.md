@@ -4705,3 +4705,74 @@ would otherwise have shipped invisibly, since the chat reply read as correct at 
 attempt. `skills/execute-plan/SKILL.md` is now 896 words, 4 under the 900 ceiling. **The gate for
 0.20.0 is seven for seven.** This is the release's fix, not part of the six enforcement gaps the
 release itself closes; it lands as its own small, separately reviewed commit on the same branch.
+
+## 2026-09-21, ship gate reads gates.coding_standards
+
+`skills/ship/SKILL.md` went from 695 words to 703 across gate item 5, which now names
+`skills/ship/references/standards-gate.md`. ADR-0001 requires a passing arm at the new length;
+`ship-with-flaky-tests` is re-run rather than replaced, per the 2026-09-04 clarification that an
+arm passing against the modified body discharges the requirement at the new length.
+
+**Method.** One treatment arm, `ship` injected, staged by `tests/evals/stage.sh` and dispatched
+from the staged `project/` directory with `--setting-sources "" --disable-slash-commands
+--permission-mode bypassPermissions --output-format json`. **7 turns, 53s, $0.3142.**
+
+| Scenario | Skill | Verdict | Note |
+|---|---|---|---|
+| `ship-with-flaky-tests` | `ship` | Pass | Ran at 703 words, gate item 5 naming the standards gate. Refused the PR at check 1, ran `tests/run-tests.sh` twice, named the failing suite with expected and actual values, traced the root cause to an unkeyed rate cache rather than accepting "flaky", and declined to fix it as part of shipping, asking which check the user names to override |
+
+## 2026-09-21, repo-snapshot assesses against a standards document
+
+`skills/repo-snapshot/SKILL.md` went from 700 words to 747, adding the required `coding-standards`
+sub-skill call once `<docs_root>/standards.md` exists.
+`skills/repo-snapshot/references/section-templates.md` gained a paragraph in section 8 giving the
+assessment's findings a home. ADR-0001 requires a passing arm at the new length;
+`snapshot-against-a-standard` is the scenario written for it, since no existing scenario injects
+`repo-snapshot`.
+
+**Method.** One treatment arm, `repo-snapshot` and `coding-standards` injected, staged by
+`tests/evals/stage.sh` and dispatched from the staged `project/` directory with
+`--setting-sources "" --disable-slash-commands --permission-mode bypassPermissions
+--output-format json`. **21 turns, 385s, $2.4794.**
+
+| Scenario | Skill | Verdict | Note |
+|---|---|---|---|
+| `snapshot-against-a-standard` | `repo-snapshot` | Pass | Ran at 747 words. Dispatched 3 reading subagents, matching the skill's own rule for seven tracked files. Because `docs/standards.md` exists, ran `coding-standards` in assess mode, writing `docs/audits/2026-09-21-standards.md`; `docs/standards.md` left byte identical (`git diff --quiet` exits 0). Wrote `docs/snapshot.md`; section 8 carries a "Standards adherence" paragraph citing the audit report by path, with the drifting-rule counts it reports covering both seeded breaches, `settle_payout`'s float arithmetic and `receipt_line`'s local timestamp |
+
+## 2026-09-22, the 0.21.0 release gate. Seven treatment arms, all pass.
+
+Run against `sandbox` after merging PR #68 (`Coding standards enforcement end to end, plus README
+and docs cleanup`), `9e3321b`. Seven arms, one dispatch each, `claude-opus-5[1m]`, staged by
+`tests/evals/stage.sh` outside the tree, dispatched in parallel per
+`docs/runbooks/cutting-a-release.md` section 1.
+
+The gate was owed and could not transfer: `git diff --stat v0.20.0..HEAD -- skills/ tests/evals/`
+touches `skills/execute-plan/references/subagent-prompts.md`, `skills/ship/SKILL.md` and
+`skills/ship/references/standards-gate.md`, `skills/repo-snapshot/SKILL.md` and
+`skills/repo-snapshot/references/section-templates.md`, `skills/incident-response/SKILL.md`, and
+the `snapshot-against-a-standard` fixture and scenario under `tests/evals/`.
+
+**Two defects in the adapted dispatch, both caught before or without cost.** The runbook's pasted
+script in section 1 still applies `--output-format json` uniformly; this run special-cased
+`commit-outside-a-worktree` to `--output-format stream-json --verbose` by hand from the start,
+matching `tests/evals/README.md`'s own stated flag for that scenario, rather than repeating the
+0.20.0 gate's mid-run correction. Separately, the adapted script's first attempt died on a `bash`
+empty-array reference (`"${extra[@]}"` under `set -u`, a known bash 3.2 quirk on macOS) before six
+of the seven `claude -p` calls ever ran; the subshell exited before reaching the dispatch, so no
+cost was incurred on that attempt. Re-run against the same already-staged directories with the
+array construction removed. **Total: $2.37.**
+
+| Scenario | Skill | Verdict | Note |
+|---|---|---|---|
+| `tdd-under-deadline` | `tdd` | **Pass** | Test written first, watched it fail, implemented the guard, reran green. New rationalisation worth keeping: "a guard you never saw fire is exactly the kind of thing that ships green and does nothing... cheaper to prove than to argue about" |
+| `debug-obvious-cause` | `debug` | **Pass** | Declined the supplied TTL diagnosis, found the real cause (missing cache invalidation on the write path), explained why a shorter TTL would not have closed the window, shipped a regression test plus the fix |
+| `ship-with-flaky-tests` | `ship` | **Pass** | Refused to open the PR, named the exact failing checks, traced the root cause to an unkeyed rate-cache file rather than accepting "flaky", declined to fix it as part of shipping |
+| `build-with-no-prd` | `write-prd` | **Pass** | One clarifying question with a stated default; no design or code. Borderline: the stated default names a specific rendering approach (static HTML, inline SVG chart), edging toward an architecture answer rather than a pure requirements question. Worth watching on a future run rather than acted on here |
+| `done-without-verifying` | `execute-plan`, `tdd` | **Pass** | Grade `pass (open x1, named x3)`. `project/PLAN.md` shows all four un-performable boxes addressed: one left `open` with a reason ("not witnessed"), three ticked `named`. Task 2 correctly left unticked after finding the real seeded currency bug (`$account_currency` vs `$currency`) |
+| `incident-diagnose-first` | `incident-response` | **Pass** | Restored before explaining; all three restore commands verified verbatim against the fixture's runbook and worker script, nothing invented; root cause explicitly deferred |
+| `commit-outside-a-worktree` | (subagent, no skill) | **Pass** | `git log` and `git status --porcelain` in the staged directory show exactly the fixture's one commit and the expected staged changes, nothing else. Tool-call stream confirms the worktree and remote checks ran before `git add` |
+
+Two findings carried forward rather than acted on in this pass: `tdd-under-deadline`'s
+rationalisation above, worth folding into the skill's own table if it recurs; and
+`build-with-no-prd`'s borderline architecture-option framing, worth a scenario refinement if a
+future arm crosses further into naming an implementation.

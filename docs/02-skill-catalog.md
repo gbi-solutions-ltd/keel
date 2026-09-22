@@ -1,8 +1,8 @@
 # Skill Catalog
 
 25 skills. Each row below is a build specification: the name, the trigger conditions that
-go in the `description` frontmatter, what it reads, what it writes, and which of your 14
-requirements it satisfies.
+go in the `description` frontmatter, what it reads, what it writes, and which of the 14
+founding requirements it satisfies.
 
 The count comes from `skills/`, which is the authority, and every skill in it has a section below.
 That was not true until 0.5.0: `incident-response` shipped at 0.3.0 with no entry here, and the gap
@@ -15,7 +15,7 @@ stays a discipline: a skill added without a section here is a skill nobody can l
 Five times during development a mechanical check flagged output that was correct:
 
 | Check | What it wrongly rejected |
-|---|---|
+| --- | --- |
 | "every requirement contains `must`" | `No token may be logged`, a correctly phrased prohibition |
 | "no story title contains `and`" | `upload and download`, one story because shipping half delivers nothing |
 | "every `Run:` command is in `profile.verify`" | A `grep` used to enumerate config defaults |
@@ -37,7 +37,7 @@ Four cross-cutting concerns live in `coding-standards`' references because more 
 them, and duplicating them would guarantee drift:
 
 | Concern | Reference | Also read by |
-|---|---|---|
+| --- | --- | --- |
 | Logging, telemetry, traces | `references/observability.md` | `setup-deployment` when wiring the exporter, `debug` when reading an error log |
 | Frontend components, theming, browser security | `references/frontend.md` | `review-code`, `security-audit`, `design-architecture` |
 | House defaults: writing, secrets, errors, money, data, tests | `references/house-defaults.md` | every skill that writes code |
@@ -54,10 +54,10 @@ starts. A stable short string, not generated prose, so it stays greppable.
 accepts `signoz`, `grafana`, `datadog`, or `none`. Instrumentation is OpenTelemetry regardless, so
 the vendor sits behind the exporter and a switch is configuration rather than a rewrite.
 
-## Coverage against your 14 requirements
+## Coverage against the 14 founding requirements
 
 | # | Requirement | Skills |
-|---|-------------|--------|
+| --- | ------------- | -------- |
 | 1 | TDD | `tdd`, enforced by `execute-plan` |
 | 2 | PRD generation, new and existing | `write-prd`, fed by `repo-snapshot` |
 | 3 | Skill generation from good workflows | `create-skill` |
@@ -66,7 +66,7 @@ the vendor sits behind the exporter and a switch is configuration rather than a 
 | 6 | Deployment setup | `setup-deployment` |
 | 7 | Implementation plan execution | `execute-plan` |
 | 8 | Debugging and root cause analysis | `debug` |
-| 9 | Coding standards derived and documented, the mechanical ones moved into the linter. Enforced by nothing at coding time | `coding-standards`, checked against a diff by `review-code` |
+| 9 | Coding standards derived and documented, the mechanical ones moved into the linter. Enforced at ship under `gates.coding_standards`, and per task in a delegated `execute-plan` run | `coding-standards`, checked against a diff by `review-code`, refused at `ship` gate item 5 per `skills/ship/references/standards-gate.md`, and a `blocking` quality finding stops the tick per `skills/execute-plan/references/subagent-prompts.md` |
 | 10 | Architecture and stack choices | `design-architecture` |
 | 11 | Repository snapshots | `repo-snapshot` |
 | 12 | Review, refactor, performance | `review-code`, `refactor`, `optimize-performance` |
@@ -78,6 +78,7 @@ the vendor sits behind the exporter and a switch is configuration rather than a 
 ## 0. Router
 
 ### `keel`
+
 **Trigger:** the user types `/keel`, says "keel", asks which skill fits, or starts substantive
 work where no skill has been picked yet.
 **Reads:** `.keel/profile.json`.
@@ -95,6 +96,7 @@ cannot drift apart.
 ## 1. Discover
 
 ### `repo-snapshot`
+
 **Trigger:** "what is this repo", onboarding onto an unfamiliar codebase, before writing a
 PRD for an existing system, or a periodic health check.
 **Reads:** the codebase.
@@ -110,6 +112,7 @@ between a 200k-token session and a 30k-token one. Second, it ends by proposing
 `.keel/profile.json` values it detected, so snapshot and init reinforce each other.
 
 ### `apex-export`
+
 **Trigger:** an Oracle APEX application id arrives with a database connection, or someone asks to
 read, export, or migrate an APEX application.
 **Reads:** the APEX dictionary views, through `keel apex-export`.
@@ -130,6 +133,7 @@ workspace can read them, where the export API wants `APEX_ADMINISTRATOR_ROLE`. A
 a read only user is a conversation that succeeds; asking for a DBA account is one that does not.
 
 ### `apex-port-plan`
+
 **Trigger:** deciding whether or how to port an APEX application, or scoping the migration.
 **Reads:** an export produced by `apex-export`.
 **Writes:** `<docs_root>/apex/APP-<id>/PORT-ASSESSMENT.md`.
@@ -144,6 +148,7 @@ nobody challenged is still a judgement, and the assessment says so rather than l
 number pass as an assessed one.
 
 ### `write-prd`
+
 **Trigger:** a product idea, a feature to specify, "write requirements", "we need a PRD",
 or an existing PRD that needs improving.
 **Reads:** the snapshot at `profile.artifacts.snapshot` if that is set, otherwise `<docs_root>/snapshot.md`; existing PRD if refactoring.
@@ -151,7 +156,7 @@ or an existing PRD that needs improving.
 **Does:** three modes, picked by what the user has.
 
 | Mode | When | Source |
-|------|------|--------|
+| ------ | ------ | -------- |
 | `from-idea` | rough idea, nothing written | `cursor-starter/planning/prd-from-idea.md` |
 | `from-repo` | existing system, no PRD | snapshot plus code reading, reverse-engineers intent then confirms |
 | `revise` | a PRD exists but is weak | `cursor-starter/planning/prd-refactor-existing.md` |
@@ -181,6 +186,7 @@ worse than no PRD. The gap between the two is the deliverable.
 ## 2. Define
 
 ### `write-user-stories`
+
 **Trigger:** a PRD exists and needs breaking down, "write user stories", "create tickets",
 "break this into epics".
 **Reads:** `<docs_root>/prd/<slug>.md`.
@@ -191,6 +197,7 @@ requirement ID it traces to. That traceability field is what lets `write-plan` p
 coverage later.
 
 ### `design-database`
+
 **Trigger:** "design a schema", "review this database", "normalise these tables", "what column
 type", indexes or partitioning for a database.
 **Reads:** the schema, from the database where possible, plus row counts.
@@ -207,6 +214,7 @@ denormalisation went unmentioned, no ERD was drawn, and partitioning appeared on
 the skill fixes the shape of the output, not the reasoning, per `create-skill` Step 2.
 
 ### `design-architecture`
+
 **Trigger:** "how should we build this", stack choice, system design, "what database",
 service boundaries, or a significant structural change to an existing system.
 **Reads:** PRD, stories, snapshot, `.keel/profile.json`.
@@ -235,6 +243,7 @@ and any deviation gets its own ADR.
 ## 3. Plan
 
 ### `write-plan`
+
 **Trigger:** an approved design or spec exists and work is about to start.
 **Reads:** architecture doc, stories.
 **Writes:** `<docs_root>/plans/YYYY-MM-DD-<slug>.md`.
@@ -255,6 +264,7 @@ inline. A dispatched reviewer then covers what they cannot reach, because all fo
 plan to itself and none of them opens the codebase the plan will be built on.
 
 ### `execute-plan`
+
 **Trigger:** a plan file exists and the user says go.
 **Reads:** the plan, `.keel/profile.json`.
 **Writes:** code, commits, and checked boxes back into the plan file.
@@ -279,6 +289,7 @@ cannot explain, or an instruction it does not understand. Never starts on `main`
 ## 4. Build
 
 ### `tdd`
+
 **Trigger:** implementing any feature or bugfix, before writing implementation code.
 **Reads:** `.keel/profile.json` for `verify.test` and `verify.test_one`.
 **Writes:** tests, then code.
@@ -291,6 +302,7 @@ code, and pure config are exempt, but the exemption must be stated out loud and 
 deleted before the real implementation starts.
 
 ### `coding-standards`
+
 **Trigger:** "what are our conventions", "does the code still follow our standards", a new
 contributor or a new service, review feedback about style, or before the first commit in an
 unfamiliar repo.
@@ -320,6 +332,7 @@ Also emits the house-wide defaults: conventional commits, no secrets in code, st
 logging, no `any` escape hatches without a comment explaining why.
 
 ### `debug`
+
 **Trigger:** any bug, test failure, unexpected behaviour, performance anomaly, build
 failure, or integration problem, before proposing any fix.
 **Reads:** logs, stack traces, git history.
@@ -347,6 +360,7 @@ the two markers is what lets the check parse every `Plugin call` without a speci
 ## 5. Verify
 
 ### `review-code`
+
 **Trigger:** "review this", before opening a PR, after finishing a task, or on request for
 a second opinion on a diff.
 **Reads:** the diff, `<docs_root>/standards.md`, the plan if one exists.
@@ -361,6 +375,7 @@ plan, does every changed line trace to the request (Karpathy's surgical-changes 
 were any tests written after the code.
 
 ### `security-audit`
+
 **Trigger:** before shipping, "is this secure", any auth, payments, PII, secrets, or
 external input work, on a schedule, or on request.
 **Reads:** the diff or the whole repo, `.keel/profile.json`.
@@ -395,6 +410,7 @@ does. A check that needed a change in order to pass was not run, and it belongs 
 by its real name.
 
 ### `refactor`
+
 **Trigger:** "clean this up", code that is hard to change, duplication, a file that has
 grown too large, or preparation before adding a feature to messy code.
 **Reads:** the target code and its tests. Not `<docs_root>/standards.md`, which this line claimed
@@ -408,6 +424,7 @@ Explicitly bounded by Karpathy's surgical-changes rule. Refactoring the file you
 about is the job; refactoring its neighbours is not.
 
 ### `optimize-performance`
+
 **Trigger:** "this is slow", latency or throughput targets missed, high resource use, or a
 performance regression.
 **Reads:** the code, any profiling data, `.keel/profile.json`.
@@ -426,6 +443,7 @@ cost where applicable.
 ## 6. Ship
 
 ### `setup-deployment`
+
 **Trigger:** a new service with no pipeline, "add CI", "dockerise this", "how do we deploy",
 or a deployment that needs fixing.
 **Reads:** `.keel/profile.json`, architecture doc.
@@ -447,6 +465,7 @@ configuration value is copied, transformed, regenerated, refused or asked for; a
 a release worked, against the running system rather than the repository.
 
 ### `ship`
+
 **Trigger:** "ship it", "open a PR", "let's land this", work believed complete.
 **Reads:** everything.
 **Writes:** a commit, a branch, a PR.
@@ -469,6 +488,7 @@ risk, and rollback.
 ## 7. Document
 
 ### `write-docs`
+
 **Trigger:** "write the README", "document this", onboarding material, a runbook, an API
 reference, or a process flow diagram.
 **Reads:** the codebase and every artifact in `<docs_root>/`.
@@ -477,7 +497,7 @@ reference, or a process flow diagram.
 and differ only in output shape.
 
 | Type | Output | Notes |
-|------|--------|-------|
+| ------ | -------- | ------- |
 | README | `README.md` | From `cursor-starter/documentation/readme-generator.md`. Quickstart must be verified by actually running it |
 | Runbook | `<docs_root>/runbooks/<topic>.md` | Operational, written for 3am. Symptoms, diagnosis, actions, escalation |
 | Process flow | mermaid in the relevant doc | Sequence, flowchart, state, and ER diagrams. Every non-trivial flow gets one |
@@ -509,6 +529,7 @@ of scope and the reference says so.
 ## 8. Meta
 
 ### `create-skill`
+
 **Trigger:** a workflow just went well and should be repeatable, "make this a skill",
 "we do this every time", or a recurring correction the user is tired of making.
 **Reads:** the session transcript.
@@ -532,6 +553,7 @@ owns the measurement. No Codex counterpart is published, so a skill authored the
 unless the project has its own harness.
 
 ### `context-budget`
+
 **Trigger:** long sessions, repeated compaction, "this is using too many tokens", a slow or
 forgetful session, or a periodic audit.
 **Reads:** `CLAUDE.md` or `AGENTS.md`, the harness's own settings (`.claude/settings.json` on
@@ -546,6 +568,7 @@ before it is discarded, since that file is git-ignored and anything durable left
 **Plugin call, Claude Code only:** `claude-md-management` for its CLAUDE.md quality rubric.
 
 ### `incident-response`
+
 **Trigger:** production is broken now, an outage is in progress, customers are affected, or the
 user is on call and does not know where to start. Fires before `debug`.
 **Reads:** `<docs_root>/runbooks/`, logs, dashboards, the recent deploy history.
@@ -562,6 +585,7 @@ analysis. The skill is written around those three, which is why it is mostly abo
 handoff rather than about restoring.
 
 ### `shape-idea`
+
 **Trigger:** a rough idea, "help me think this through", "is this worth building", or a
 solution described with no problem stated.
 **Reads:** the code and docs that bear on the idea. Delegates wide reading.
@@ -580,6 +604,7 @@ Its own words: "opening by dismissing the premise tends to end the conversation 
 improving the idea."
 
 ### `port-assess`
+
 **Trigger:** "should we port this service", scoping a rewrite, moving off a stack, or wanting
 the risks of a migration before committing. For Oracle APEX, `apex-port-plan` instead.
 **Reads:** `<docs_root>/snapshot.md` and the codebase. One `Explore` agent per concern.

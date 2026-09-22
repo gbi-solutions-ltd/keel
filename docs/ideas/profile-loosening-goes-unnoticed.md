@@ -27,7 +27,7 @@ from a terminal, outside any Claude Code or Codex session.**
    loosening moves (`hard_block_paths` shrinking, a `gates.*` value moving toward `off`, a
    `verify.*` command becoming null or a non-string) is a natural, cheap extension of a hook that
    already parses the inputs it needs.
-2. **`keel doctor`** (`bin/keel:1241`) runs inside a session or CI, after the fact. It can warn, not
+2. **`keel doctor`** (`bin/keel:1268`) runs inside a session or CI, after the fact. It can warn, not
    block, and today has no git-diff-based check against `.keel/profile.json` anywhere (confirmed:
    no `git diff`/`git show` against that path exists in `bin/keel` or `lib/`). Advisory only.
 3. **Claude Code hooks** (`session-start`, `done-guard`, `sensitive-guard`, `context-watch`) only
@@ -60,7 +60,7 @@ authority fix, and it lives partly outside this codebase.
 1. Which loosening moves belong on the allow-list, and should it be a fixed table in `bin/keel` or
    itself a small declarative block (so it can be shared with `doctor --json`)?
 2. Should the pre-push refusal be a hard block or a `warn`-then-`required` escalation, consistent
-   with the house posture in Decision 3 (`docs/07-open-decisions.md:166-239`, "enforced with escape
+   with the house posture in Decision 3 (`docs/07-open-decisions.md:163-236`, "enforced with escape
    hatches")?
 3. Does `keel guard install` need to become a stronger recommendation (e.g. checked by `doctor`) now
    that it is the one mechanism doing real work here?

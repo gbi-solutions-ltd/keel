@@ -39,7 +39,7 @@ writes it.
 
 **What that costs today.** `write_profile` emits the gates object at `bin/keel:364` and
 `context_window` is not among its eight keys, so no profile has it unless a human added one. This
-repository's own profile carries `"context_window": 1000000`, added by hand.  `bin/keel:1271` exists
+repository's own profile carries `"context_window": 1000000`, added by hand.  `bin/keel:1307` exists
 purely to tell the next reader to do the same: "If sessions here use a larger context, set
 gates.context_window in .keel/profile.json". The residual error, recorded in the code, is that a 1M
 session below 200,000 tokens is assumed to be in a full 200,000 window and warned early.
@@ -124,7 +124,7 @@ prevent, found against a real 2.4MB transcript holding 401,247 tokens.
 Not applicable: this is `from-idea` mode. The section exists for `from-repo`, where the job is
 separating what the code does from what it must do.
 
-One note that would otherwise belong here: `bin/keel:1271`'s nudge is not a requirement, it is a
+One note that would otherwise belong here: `bin/keel:1307`'s nudge is not a requirement, it is a
 workaround for FR-04 being absent. Whether it is reworded once FR-04 lands is Q1.
 
 ## 9. Success metrics
@@ -160,7 +160,7 @@ follow this batch of work, which orders it but does not date it.
 | Injecting the handoff's contents anywhere | About 1,300 tokens of the most volatile file keel writes, into a prefix that `hooks/session-start:4-7` requires to be byte-identical forever |
 | Automating `/clear` | CON-04 |
 | Writing `context_warn_pct` or `context_stop_pct` at init | Both are already documented and both have working defaults. Adding them is a separate argument about whether init writes optional keys generally |
-| Removing `bin/keel:1271` | The message stays, for every profile that predates FR-04. Its wording is now in scope as part of FR-10 |
+| Removing `bin/keel:1307` | The message stays, for every profile that predates FR-04. Its wording is now in scope as part of FR-10 |
 | Documenting `gates.context_window` for users | Genuinely needed, and it is `docs/ideas/profile-key-documentation.md`'s job. Doing it here would put one key in a second place |
 
 ## 12. Assumptions
@@ -180,7 +180,7 @@ follow this batch of work, which orders it but does not date it.
 
 | # | Question | Needs | Blocks |
 |---|---|---|---|
-| Q1 | ~~Once FR-04 lands, is `bin/keel:1271`'s nudge reworded, kept as-is for older profiles, or removed?~~ **Answered 2026-08-18: reworded, and so is every other place that documents the precedence.** Now `FR-09` and `FR-10` | Answered | Was: nothing |
+| Q1 | ~~Once FR-04 lands, is `bin/keel:1307`'s nudge reworded, kept as-is for older profiles, or removed?~~ **Answered 2026-08-18: reworded, and so is every other place that documents the precedence.** Now `FR-09` and `FR-10` | Answered | Was: nothing |
 | Q2 | ~~Does a configured window need an upper sanity bound, so a typo of `200000000` cannot silence the watchdog entirely?~~ **Answered 2026-08-18: yes, bounded by the largest window that exists, which is 1,000,000.** Now `FR-11` to `FR-13`, `CON-06` | Answered | Was: nothing |
 | Q5 | ~~Does the FR-11 bound apply to `KEEL_CONTEXT_WINDOW`, or to the profile key only?~~ **Answered 2026-08-18: both.** Flagged in the approval request and approved as written. `A8` stands as the reasoning; `S-02`'s second scenario is where it is now asserted | Answered | Was: `FR-02`, `FR-11` |
 | Q3 | How is a stale handoff detected, so a session-start pointer cannot send a new session to last week's work? | Bernard | The follow-up PRD for piece three. Not this one |

@@ -24,7 +24,11 @@ fi
 status=0
 printf 'repo\tkeel_version\tschema_version\tharnesses\tverify_test_null\tproblems\twarnings\n'
 for p in "${paths[@]}"; do
-    if ! out="$(cd "$p" 2>/dev/null && "$KEEL_BIN" doctor --json --fast 2>/dev/null)" || [ -z "$out" ]; then
+    # Not `! out="$(...)"`: that tests the subshell's exit status, which is `doctor`'s own exit
+    # code, non-zero on any problem by design and not a sign the output could not be produced.
+    # Empty output is the only thing that means unreadable here; a parse failure is caught below.
+    out="$(cd "$p" 2>/dev/null && "$KEEL_BIN" doctor --json --fast 2>/dev/null)"
+    if [ -z "$out" ]; then
         printf '%s\t(unreadable)\t\t\t\t\t\n' "$p"
         status=1
         continue

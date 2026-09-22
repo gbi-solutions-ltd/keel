@@ -6,7 +6,6 @@ router skill's routing table, so the two cannot drift.
 <!-- `keel init` substitutes docs from profile.docs_root, default "docs/keel".
      Do not hardcode a docs path in this file; `keel doctor` fails on a literal one. -->
 
-
 ## The short version
 
 You do not need to memorise skill names. Say what you want in plain language and the
@@ -18,7 +17,7 @@ If nothing fires and you expected it to, say `/keel` and describe the task.
 ## Trigger map
 
 | Say something like | Fires | Produces |
-|---|---|---|
+| --- | --- | --- |
 | "what is this repo", "help me understand this codebase", "onboard me" | `repo-snapshot` | `docs/snapshot.md` |
 | "export APEX app 100", "read this Oracle APEX application" | `apex-export` | `docs/apex/APP-<id>/` |
 | "should we port this APEX app", "scope the APEX migration" | `apex-port-plan` | `docs/apex/APP-<id>/PORT-ASSESSMENT.md` |
@@ -79,7 +78,7 @@ A session carrying three unrelated tasks is slower, more expensive, and more con
 ## Prompts that do not work well
 
 | Don't | Why | Instead |
-|---|---|---|
+| --- | --- | --- |
 | "make it better" | No success criterion, so nothing can verify completion | Name the property: faster, smaller, testable, clearer |
 | Pasting a large file into chat | It is already on disk and it now sits in context forever | Give the path |
 | "fix all the issues" after a long review | Bundles unrelated changes into one unreviewable diff | Fix them in batches, commit between |
@@ -93,7 +92,7 @@ The gates exist to stop expensive mistakes, not to block you. Each has a stated 
 and using it is a normal thing to do.
 
 | Gate | How to pass it deliberately |
-|---|---|
+| --- | --- |
 | PRD required before building | "Skip the PRD, this is a one-line config change" |
 | Test before code | "Throwaway spike, no tests, I will delete this branch" |
 | Security audit before ship | "Docs-only change, skip the audit" |
@@ -106,7 +105,7 @@ Two gates are hooks rather than skills, so they are not passed by saying somethi
 have switches instead.
 
 | Gate | How to pass it deliberately |
-|---|---|
+| --- | --- |
 | The context pause at 85% | Write the handoff it asks for, which lifts the block. To turn it off for a shell, `KEEL_CONTEXT_WATCH=off`. For the project, `gates.context_watch: false` in `.keel/profile.json`. To move the thresholds, `gates.context_warn_pct` and `gates.context_stop_pct` |
 | The pre-push supply chain scan | `git push --no-verify` for one push. For a line the scan is wrong about, append `supply-chain-scan: allow <reason>` to it; the suppression prints on every run afterwards. `keel guard uninstall` removes the hook |
 

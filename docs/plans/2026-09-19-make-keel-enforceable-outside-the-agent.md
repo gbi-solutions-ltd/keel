@@ -171,7 +171,7 @@ witnessed directly in this session; what was witnessed is two independent subage
 against the diff as it stood (spec-compliance: COMPLIES; code-quality: no blocking findings, two
 should-fix, one consider, see below), plus this session's own run of `tests/test-keel.sh`.
 
-Add near the existing `keel new` CI coverage (around `tests/test-keel.sh:2610`, which checks that
+Add near the existing `keel new` CI coverage (around `tests/test-keel.sh:2627`, which checks that
 `.github/workflows/ci.yml` is written), a fixture-based check that the generator reaches every
 non-null `verify.*` command, and a second check that `keel init` on an existing project without a
 CI file writes one:
@@ -379,15 +379,15 @@ task can make.
 
 **Files:**
 - Modify: `bin/keel` (new `guard_prepare_commit_msg_body` function beside
-  `guard_precommit_body` at `bin/keel:1797`; `cmd_guard`'s `install`/`uninstall` cases at
-  `bin/keel:2093-2109`)
+  `guard_precommit_body` at `bin/keel:1802`; `cmd_guard`'s `install`/`uninstall` cases at
+  `bin/keel:2109-2125`)
 - Modify: `README.md` (line 290, "pre-push and pre-commit hooks")
 - Modify: `docs/03-install-and-distribution.md` (line 346, "Installs two hooks")
 - Test: `tests/test-keel.sh`
 
 **Interfaces:**
 - Consumes: nothing new. Reads `.keel/profile.json`'s `keel_version` field with `sed`, the same
-  technique the pre-push hook already uses for `default_branch` (`bin/keel:1715`), because this
+  technique the pre-push hook already uses for `default_branch` (`bin/keel:1883`), because this
   hook needs exactly one scalar field and the pre-commit hook's own comment explains why `python3`
   is reserved for cases needing more than one. Writes the trailer with `git interpret-trailers
   --in-place` (git 2.13 and later), which is what `git commit --trailer` itself uses: it puts the
@@ -454,7 +454,7 @@ write this file yet.
 
 - [x] **Step 3: Write the minimal implementation**
 
-Add a new function beside `guard_precommit_body` (`bin/keel:1797`, before `cmd_guard`):
+Add a new function beside `guard_precommit_body` (`bin/keel:1802`, before `cmd_guard`):
 
 ```bash
 # Appends the keel_version a commit was made under, so a later question ("was this commit made
@@ -487,7 +487,7 @@ HOOK
 }
 ```
 
-In `cmd_guard`, `install`) case (`bin/keel:1881-1889`), add the new hook alongside the existing two:
+In `cmd_guard`, `install`) case (`bin/keel:2138-2146`), add the new hook alongside the existing two:
 
 ```bash
         install)
@@ -516,11 +516,11 @@ Expected: PASS.
 
 - [x] **Step 5: Update the two documents that describe `keel guard install` by name**
 
-`README.md:290` says `keel guard install    # pre-push and pre-commit hooks, repo-local, opt-in`.
+`README.md:192` says `keel guard install    # pre-push and pre-commit hooks, repo-local, opt-in`.
 Change to `keel guard install    # pre-push, pre-commit, and prepare-commit-msg hooks, repo-local,
 opt-in`.
 
-`docs/03-install-and-distribution.md:346` says `Installs two hooks, by writing
+`docs/03-install-and-distribution.md:351` says `Installs two hooks, by writing
 `.githooks/pre-push` and `.githooks/pre-commit` and setting`. Change to `Installs three hooks, by
 writing `.githooks/pre-push`, `.githooks/pre-commit`, and `.githooks/prepare-commit-msg`, and
 setting`. Immediately after the existing pre-commit paragraph (ends `...because neither can be run
@@ -626,7 +626,7 @@ session is the check that would falsify this conclusion if wrong.
 
 - [x] **Step 1: Write the failing test**
 
-Add beside the existing pre-push tests (near `tests/test-keel.sh:3588`, which already fakes a push
+Add beside the existing pre-push tests (near `tests/test-keel.sh:3907`, which already fakes a push
 by piping ref lines into the hook):
 
 ```bash
@@ -918,14 +918,14 @@ value this plan cannot source from the tree. See open question 5.
 **Idea:** `docs/ideas/fleet-view-for-doctor.md`
 
 **Files:**
-- Modify: `bin/keel` (`cmd_doctor` at `bin/keel:1241-1674`, renamed to `cmd_doctor_text` with a
+- Modify: `bin/keel` (`cmd_doctor` at `bin/keel:1268-1701`, renamed to `cmd_doctor_text` with a
   thin `cmd_doctor` wrapper in front of it; the two usage lines at `bin/keel:8` and `bin/keel:2154`)
 - Modify: `README.md` (the `keel doctor --fast` usage line, near line 41)
 - Test: `tests/test-keel.sh`
 
 **Interfaces:**
 - Consumes: `cmd_doctor_text`'s existing `FAIL  `, `WARN  `, and `ok    ` line prefixes
-  (`bin/keel:1249-1251`), unchanged, as the parse grammar for JSON mode. Also `json_get` for
+  (`bin/keel:1253-1255`), unchanged, as the parse grammar for JSON mode. Also `json_get` for
   `schema_version`, `keel_version`, and `verify.test`.
 - Produces: `keel doctor --json`, a JSON object on stdout: `{"schema_version", "keel_version",
   "harnesses", "verify_test_null", "problems", "warnings", "findings": [{"level", "message"}, ...]}`.
@@ -990,7 +990,7 @@ on the same text. Not `unknown flag`: `cmd_doctor` ignores flags it does not kno
 
 - [x] **Step 3: Write the minimal implementation**
 
-Rename `cmd_doctor` (`bin/keel:1241`) to `cmd_doctor_text`, leaving its entire body unchanged (this
+Rename `cmd_doctor` (`bin/keel:1268`) to `cmd_doctor_text`, leaving its entire body unchanged (this
 is a pure rename: every `fail()`/`warn()`/`good()` call, every check, every early `return`, stays
 exactly as it is, so the existing text-mode behaviour and its test coverage are untouched). Add a
 new, thin `cmd_doctor` above it:
@@ -1058,7 +1058,7 @@ PY
 }
 ```
 
-Update the dispatch table entry at `bin/keel:1985` from `doctor) shift; cmd_doctor "$@" ;;` to the
+Update the dispatch table entry at `bin/keel:2228` from `doctor) shift; cmd_doctor "$@" ;;` to the
 same line unchanged (it already calls `cmd_doctor`, which now dispatches correctly). Two usage
 lines name `doctor [--fast]` and both need the new flag: the top-of-file usage comment at
 `bin/keel:8` (`#   keel doctor [--fast]                check this project, non-zero on any

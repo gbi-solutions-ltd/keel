@@ -1,22 +1,19 @@
 # Open Decisions
 
-Twelve calls. Each has my recommendation and the reasoning.
+Twelve calls, each with the recommendation taken and the reasoning behind it.
 
-**Status as of 2026-08-20: eleven resolved, one partly.** Decisions 1 to 9 were resolved on
-2026-08-11; decision 10 is `PARTLY RESOLVED` and says what remains; decisions 11 and 12 were
-resolved on 2026-08-17 and 2026-08-20.
-
-Earlier status: decisions 1 through 5 were resolved before the build began. **Phase 1 is fully
-unblocked and can start.** Decisions 6 through 9 are needed at the phase noted on each.
+**12 of 12 resolved, two with a named part still open:** decision 10's optimisation (writing
+`outputStyle` directly instead of through the per-request prefix) and decision 12's residual
+(listed in full under that decision) are both tracked rather than closed silently.
 
 | # | Decision | Status |
-|---|---|---|
+| --- | --- | --- |
 | 1 | Distribution model | **Resolved:** plugin plus thin bootstrap |
 | 2 | Where keel lives | **Resolved:** `gbi-solutions-ltd/keel`, GitHub, private |
 | 3 | Gate strength | **Resolved:** enforced with escape hatches, payments hard block |
 | 4 | Commit guard hook | **Resolved:** off by default, fast subset when on |
 | 5 | Superpowers | **Resolved:** full replacement, uninstall at Phase 3 |
-| 6 | Skill granularity | **Resolved:** 19, confirmed by building them. **Superseded 2026-08-13:** 24, see the note under decision 6 |
+| 6 | Skill granularity | **Resolved:** 19, confirmed by building them. **Superseded, most recently at 25**, see the note under decision 6 |
 | 7 | Artifact location | **Resolved:** `docs/keel/`, configurable via `profile.docs_root` |
 | 8 | FeatureDev | **Resolved:** excluded |
 | 9 | Ownership | **Resolved:** Bernard or `gfsekamanya` reviews, monthly release, evals before the pilot |
@@ -168,7 +165,7 @@ and the rest of what publishing actually requires, are in `docs/runbooks/going-p
 Three postures, and the answer changes what Phase 1 builds:
 
 | Posture | Behaviour | Fits |
-|---|---|---|
+| --- | --- | --- |
 | **Advisory** | Skills suggest, the model can proceed regardless | Teams that resent process |
 | **Enforced with escape hatches** | Skills refuse, the user can override by saying so explicitly, and the override is recorded | Most teams |
 | **Hard blocked** | Hooks physically prevent the action, no override in-session | Regulated or high-blast-radius work |
@@ -364,6 +361,11 @@ descriptions sum at 1,320 tokens in `tests/validate-skills.sh`, which is 30 skil
 44-token mean, so the count reaching the number this decision named is now a failing build. The
 check's own message says the remedy is fewer skills, because "how short can a description be" is the
 answer this decision already rejected.
+
+**The count is now 25, descriptions summing to about 1,130 tokens** (`tests/validate-skills.sh`'s
+own measured total), against the 1,320 token cap the previous note set. Recorded here for the same
+append-only reason as the count above: `tests/run-tests.sh` is the check that cannot drift, this
+line can.
 
 ---
 
@@ -606,9 +608,9 @@ secrets, pem, id_rsa" suggests, because they also close the common Bash shapes. 
 still large, and it is a **machine-level** residual rather than a repository-level one:
 
 | Not reached | Why |
-|---|---|
+| --- | --- |
 | **Any file read through a subprocess** | Vendor documentation is explicit that Read and Edit deny rules cover the file tools and recognised Bash file commands, and "don't apply to arbitrary subprocesses that read or write files indirectly, like a Python or Node script that opens files itself". `bin/keel:565-568` already says the same of `sh -c`, `xargs`, `env` and here-docs |
-| **Anything outside the repository** | Every `Read` rule is `./`-scoped, so a cloud CLI's credentials file under the home directory matches none of them. The `id_rsa` Bash rule reaches a key outside the tree only by the shape of the string, incidentally
+| **Anything outside the repository** | Every `Read` rule is `./`-scoped, so a cloud CLI's credentials file under the home directory matches none of them. The `id_rsa` Bash rule reaches a key outside the tree only by the shape of the string, incidentally |
 | **Network egress** | No rule covers `curl`, `wget` or `nc`. Whatever a session can read, it can send. The vendor's own hardening guidance names denying these as the way to close it |
 | **Destructive filesystem work** | `rm` and `rmdir` are circuit-broken on critical paths in every mode, which is why no rule duplicates that. `rm -rf src/` is not a critical path and nothing here prompts for it |
 | **Arbitrary code from dependencies** | `npm install`, `pip install` and equivalents run vendor code unprompted |
@@ -617,7 +619,7 @@ still large, and it is a **machine-level** residual rather than a repository-lev
 ### Options
 
 | Option | Cost | Why not this |
-|---|---|---|
+| --- | --- | --- |
 | **Keep it, and record the argument** | Nothing | **Chosen.** See below |
 | Stop writing `defaultMode`, print one line telling the engineer how to set it | Every engineer does manual setup before the tooling is usable | Buys a moment of explicit consent and then lands on the same posture, because everyone pastes the line. The consent is real but small, and `init` already announces the mode |
 | Write a weaker default and let them opt up | Same manual step, plus a period where skills prompt on every subagent dispatch | A default everyone immediately overrides is theatre. It also makes the first run of every skill look broken |
@@ -628,7 +630,7 @@ workflow keel exists to deliver. What makes it defensible is that the instrument
 mode are the ones the guardrails are written in, which is now checked twice from independent
 sources, and that `keel init` announces what it did:
 
-```
+```bash
   mode      .claude/settings.local.json: bypassPermissions, not committed
 ```
 

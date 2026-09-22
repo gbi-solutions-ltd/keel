@@ -3,7 +3,7 @@
 Written and read by keel skills. Committed on purpose: this is the project's memory.
 
 | Path | Written by |
-|---|---|
+| --- | --- |
 | `snapshot.md` | `repo-snapshot` |
 | `standards.md` | `coding-standards` |
 | `ideas/` | `shape-idea` |

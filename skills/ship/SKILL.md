@@ -23,7 +23,9 @@ Work down. Report the first failure and stop; do not run the rest and bury it.
 3. **Lint, format, and typecheck pass**, for each that is not `null` in the profile.
 4. **`security-audit --diff` is clean**, or its findings are explicitly accepted by the user. On a
    `hard_block_paths` match, not overridable in conversation.
-5. **`review-code` has run** and nothing blocking remains.
+5. **`review-code` has run**, nothing blocking remains, and, under `gates.coding_standards`, no
+   standards violation remains unaddressed:
+   [references/standards-gate.md](references/standards-gate.md).
 6. **Docs updated** where behaviour changed, and written as current state rather than as a record
    of the review. A behaviour change with stale docs is a future bug report.
 7. **The plan's checkboxes are ticked**, or the remainder is explicitly deferred and said out loud.

@@ -16,13 +16,13 @@ answers that today; someone would have to run `doctor` six times and read six sc
 
 ## What it costs
 
-**Evidence.** `cmd_doctor` (`bin/keel:1241`, ~430 lines) is entirely printf-driven: three closures
-`fail()`/`warn()`/`good()` (`bin/keel:1249-1251`) print a line immediately and only increment
+**Evidence.** `cmd_doctor` (`bin/keel:1268`, ~430 lines) is entirely printf-driven: three closures
+`fail()`/`warn()`/`good()` (`bin/keel:1253-1255`) print a line immediately and only increment
 counters; nothing accumulates findings as data. Every check funnels through these three, including
 the harness-plugin sections via `harness_section`, which itself reads lines already tagged
 `fail|`/`warn|`/`ok|`. That consistent grammar is the exploit: a `--json` mode does not need every
 call site touched. The cheapest approach captures `cmd_doctor`'s stdout, strips the interstitial
-progress lines (e.g. `bin/keel:1510`, "verify.%s: running: ..."), and parses the remaining lines
+progress lines (e.g. `bin/keel:1579`, "verify.%s: running: ..."), and parses the remaining lines
 into a JSON array, adding the fields the fleet script actually needs (`schema_version`,
 `keel_version`, `verify.test` nullness) as their own top-level keys rather than re-parsed prose,
 since those are already read via `json_get` (`bin/keel:1403-1404,1567-1568`).

@@ -94,6 +94,33 @@ esac
   || bad "keel-fleet" "expected nonzero exit for malformed doctor output, got 0"
 rm -rf "$stub_dir"
 
+# a repository doctor finds real problems in is not a repository that could not be read: `keel
+# doctor` exits nonzero on any problem, by design (see `keel doctor --help`), and that exit code is
+# not a signal the JSON could not be produced or parsed. Regression test: it was treated as one,
+# which meant almost every real repository (anything with so much as a stale keel_version) reported
+# as (unreadable) even though its doctor output was perfectly valid JSON.
+c="$(mktemp -d)"; ( cd "$c" && "$KEEL" new proj --stack minimal >/dev/null 2>&1 )
+repo_c="$c/proj"
+python3 - "$repo_c/.claude/settings.json" <<'PY'
+import json, sys
+p = sys.argv[1]
+d = json.load(open(p))
+d["permissions"]["deny"] = d["permissions"]["deny"][1:]
+json.dump(d, open(p, "w"))
+PY
+out="$("$FLEET" "$repo_c" 2>&1)"; rc=$?
+row="$(printf '%s\n' "$out" | awk -F'\t' -v r="$repo_c" '$1 == r')"
+case "$row" in
+  *"(unreadable)"*) bad "keel-fleet" "a repo with a real doctor problem (not a read failure) reported unreadable: $row" ;;
+  *) ok "fleet reports a real row for a repo doctor found problems in, not (unreadable)" ;;
+esac
+problems_col="$(printf '%s' "$row" | awk -F'\t' '{ print $6 }')"
+[ "${problems_col:-0}" -gt 0 ] 2>/dev/null && ok "fleet's problems column reflects the real count ($problems_col)" \
+  || bad "keel-fleet" "expected a positive problems count, row: $row"
+[ "$rc" -ne 0 ] && ok "fleet still exits nonzero when a repo has real problems" \
+  || bad "keel-fleet" "expected nonzero exit for a repo with real problems, got 0"
+rm -rf "$c"
+
 rm -rf "$a" "$b"
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

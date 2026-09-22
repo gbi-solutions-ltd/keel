@@ -11,19 +11,18 @@
 > Where keel's own behaviour depends on one of these plugins, that dependence is Claude Code only
 > and is marked as such in `docs/02-skill-catalog.md`.
 
-All nine plugins you named exist in the official Anthropic marketplace, which is already
-registered on this machine (`claude-plugins-official`). Currently only `superpowers@6.2.0`
-is installed. Everything below is available immediately.
+Every plugin named below is in the official Anthropic marketplace, `claude-plugins-official`,
+which is registered by default and needs no separate setup.
 
 ## Verdicts
 
 | Plugin | Marketplace id | Verdict | Why |
-|--------|---------------|---------|-----|
+| -------- | --------------- | --------- | ----- |
 | Security Guidance | `security-guidance` | **Install, required** | The single highest-value one. Hook-based, so it runs without being asked |
 | Code Review | `code-review` | **Install, required** | Multi-agent review with confidence scoring, better than one inline pass |
 | Skill Creator | `skill-creator` | **Install, required** | Real eval and benchmark scripts. We should not rebuild this |
 | Context7 | `context7` (external) | **Install, recommended** | Current library docs. Prevents recommending APIs that no longer exist |
-| CLAUDE.md Management | `claude-md-management` | **Install, recommended** | Directly serves requirement 14 |
+| CLAUDE.md Management | `claude-md-management` | **Install, recommended** | Keeps a project's `CLAUDE.md` accurate and sized as the project changes, which `context-budget` delegates to |
 | Language server | one per language, see below | **Install per stack** | Real diagnostics beat grep. Largest accuracy gain on refactors |
 | Frontend Design | `frontend-design` | **Conditional** | Only where there is a UI |
 | Playwright | `playwright` (external) | **Conditional** | Only where there are browser flows worth testing |
@@ -36,7 +35,7 @@ checked against `claude-plugins-official`; a language absent from this table get
 is the honest answer rather than a plausible id that fails to resolve.
 
 | Language | Plugin |
-|---|---|
+| --- | --- |
 | TypeScript, JavaScript | `typescript-lsp` |
 | Python | `pyright-lsp` |
 | Go | `gopls-lsp` |
@@ -95,12 +94,11 @@ Three properties this gives us:
 ## Wiring map
 
 Every row here names a plugin the skill's own body names, and
-`tests/validate-skills.sh` fails when one does not. The table is therefore a claim about the tree
-rather than an intention, which it was not until 2026-09-02: six of its ten rows were false, four of
-them since the table was written.
+`tests/validate-skills.sh` fails when one does not. The table is a claim about the tree, checked on
+every run, not a statement of intent.
 
 | keel skill | Plugin it calls | What it delegates |
-|-----------------|-----------------|-------------------|
+| ----------------- | ----------------- | ------------------- |
 | `review-code` | `code-review` | The correctness pass |
 | `security-audit` | `security-guidance`, plus built-in `/security-review` | Diff-level vulnerability detection |
 | `create-skill` | `skill-creator` | Eval harness, variance benchmarking, packaging |
@@ -108,30 +106,29 @@ them since the table was written.
 | `design-architecture` | `context7` | Current library versions and API surface |
 | `write-docs` | `frontend-design` | UI component documentation, where a UI exists |
 
-**Four rows were removed on 2026-09-02 rather than wired**, and the reasons differ enough to be
-worth keeping.
+**Two combinations were considered and rejected rather than wired**, and the reasons differ enough
+to be worth stating.
 
-`coding-standards` to `context7`, for "current lint and framework conventions", contradicted the
-skill it was attached to. Step 1 is "Derive, do not impose. The conventions that matter are the ones
-already in use, not the ones you would choose", and the first row of its Common mistakes table is
-"Importing a generic style guide, instead: derive from the code". Calling a documentation service
-for current conventions is importing a generic style guide with a citation attached. That the body
-had 24 words of headroom was the weaker objection and not the reason.
+`coding-standards` calling `context7` for "current lint and framework conventions" would contradict
+the skill it was attached to. Step 1 is "Derive, do not impose. The conventions that matter are the
+ones already in use, not the ones you would choose", and the first row of its Common mistakes table
+is "Importing a generic style guide, instead: derive from the code". Calling a documentation service
+for current conventions is importing a generic style guide with a citation attached.
 
-`execute-plan` to `playwright`, for browser verification, is unpayable rather than wrong: the body
-is 884 words against ADR-0001's 900 ceiling and the shortest honest conditional is about 20. This is
-also the skill where a wrong instruction is most expensive, so it is not a place to shave a sentence
-from elsewhere.
+`execute-plan` calling `playwright` for browser verification is unpayable rather than wrong: the
+body sits close to the limit ADR-0001 sets, and the shortest honest conditional would still cost
+several sentences. This is also the skill where a wrong instruction is most expensive, so it is not
+a place to shave a sentence from elsewhere.
 
 ## Capabilities, which are not delegations
 
-`debug` and `refactor` carried rows naming a "stack LSP" for diagnostics, go-to-definition and safe
-renames. A language server is not a plugin a skill can call. `typescript-lsp`'s own README describes
-a server installed with `npm install -g typescript-language-server`, and the plugin ships no skill,
-no command and no MCP server: there is nothing named for a body to invoke, and no fallback sentence
-to write, because the capability either changes what the runtime can do or it does not.
+A language server is not a plugin a skill can call, so `debug` and `refactor` do not appear in the
+wiring map for their language-server use. `typescript-lsp`'s own README describes a server installed
+with `npm install -g typescript-language-server`, and the plugin ships no skill, no command and no
+MCP server: there is nothing named for a body to invoke, and no fallback sentence to write, because
+the capability either changes what the runtime can do or it does not.
 
-So it is stated where it belongs, in `docs/02-skill-catalog.md` under `debug`, in the conditional
+This is stated where it belongs, in `docs/02-skill-catalog.md` under `debug`, in the conditional
 form that survives contact with the truth: "when a language server plugin is installed, use its
 diagnostics and find-references rather than grep". That is guidance about tool choice, not a
 delegation, and it is deliberately outside the table the validator parses, because a checker that
@@ -169,21 +166,18 @@ declaration and resolves fine, because the marketplace is known at user level; `
 different. Adding the marketplace is a one-time per-machine step, and both `keel doctor` and the
 nudge hook name the command when it is missing.
 
-## What about superpowers
+## If superpowers is also installed
 
-You already have it installed. Once keel exists there is meaningful overlap:
-`tdd`, `debug`, `write-plan`, `execute-plan`, and `create-skill` are all adapted from it.
+There is meaningful overlap: `tdd`, `debug`, `write-plan`, `execute-plan`, and `create-skill` are
+all adapted from it (credited in `SOURCES.md`, since superpowers is MIT licensed).
 
 Running both means two `SessionStart` injections and two competing methodologies, and
-superpowers' `using-superpowers` skill instructs the model to invoke superpowers skills
-before any response, which will fight our router.
+superpowers' `using-superpowers` skill instructs the model to invoke superpowers skills before any
+response, which fights keel's own router.
 
-**Recommendation: uninstall superpowers once keel Phase 3 lands.** We keep the parts
-that are good, we drop the parts that do not fit the house, and we stop paying for two bootstraps.
-Until then, keep it, since it is currently doing useful work.
-
-Credit where due: superpowers is MIT licensed and our adapted skills should say so in a
-`SOURCES.md` at the repo root.
+**Recommendation: uninstall superpowers once a project is fully on keel.** Keel keeps the parts
+that are good, drops the parts that do not fit the house, and a project should not pay for two
+bootstraps at once.
 
 ## Boundaries, and why they are reported rather than enforced
 
@@ -217,12 +211,12 @@ What `keel init` does write is one line of precedence into the managed CLAUDE.md
 with both loaded has an answer rather than picking arbitrarily. Naming the winner is cheap. Removing
 the loser is not ours to do.
 
-## Plugins worth a look that you did not name
+## Other plugins worth a look
 
-Skimmed from the same marketplace, only the ones that would actually earn their place:
+From the same marketplace, only the ones that would actually earn their place:
 
 | Plugin | Why it might matter to the house |
-|--------|---------------------------|
+| -------- | --------------------------- |
 | `pr-review-toolkit` | Broader than `code-review`, worth comparing in the pilot |
 | `code-simplifier` | Directly serves the Simplicity First principle |
 | `hookify` | Turns repeated corrections into hooks, complements `create-skill` |

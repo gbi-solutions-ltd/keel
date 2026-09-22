@@ -604,7 +604,7 @@ Stage exactly those paths and stop. **Do not commit.**
 
 **Interfaces:**
 - Consumes: `dir_has_file` from task 1, `docs_root()`, and `cmd_doctor`'s local `root` already set
-  at `bin/keel:1276`.
+  at `bin/keel:1288`.
 - Produces: nothing other tasks consume.
 
 **Depends on:** task 1
@@ -665,7 +665,7 @@ them, since they are what a later broadening of the loop would break.
 - [x] **Step 3: Write the minimal implementation**
 
 In `cmd_doctor`, immediately after the existing artifacts loop's closing `fi` (after
-`bin/keel:1343`):
+`bin/keel:1527`):
 
 ```bash
     # The other half of the map: a key that is null while its default is sitting there. The profile
@@ -750,7 +750,7 @@ Expected: `FAIL  help: the profile line in --help does not name sync`.
 
 - [x] **Step 3: Write the minimal implementation**
 
-At `bin/keel:1881`:
+At `bin/keel:2174`:
 
 ```bash
         say "  profile get|set|sync <dotted.path> [value]   read or correct one profile field, or record where this project's documents are"

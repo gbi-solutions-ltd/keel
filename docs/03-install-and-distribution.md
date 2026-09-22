@@ -3,7 +3,7 @@
 ## The options, compared
 
 | Option | How it works | Upgrade story | Repo footprint | Verdict |
-|--------|--------------|---------------|----------------|---------|
+| -------- | -------------- | --------------- | ---------------- | --------- |
 | **A. Vendored copy** | A script copies skills into each repo's `.claude/skills/` | Re-run the script in every repo, then a PR each | Large, ~20 files that show up in every diff | Rejected. Version drift within a month |
 | **B. Git submodule** | `.claude/keel` as a submodule | `git submodule update`, per repo | Small, but submodules are a support burden and break shallow clones and most CI defaults | Rejected |
 | **C. npm or pip package** | `npx keel init` | Version bump per repo | Small | Rejected. Forces a Node or Python dependency onto every repo, including the Go and PHP ones |
@@ -14,7 +14,7 @@
 
 **keel is a git repo that is both a Claude Code plugin and its own marketplace.**
 
-```
+```text
 Machine level (once per engineer)
   /plugin marketplace add gbi-solutions-ltd/keel
   /plugin install keel@gbi
@@ -54,7 +54,7 @@ in this section has a check behind it rather than a recollection.
 
 So the symlink is a documented optional step, for the login shell only:
 
-```
+```bash
 ln -sfn ~/.claude/plugins/cache/gbi/keel/<version>/bin/keel ~/.local/bin/keel
 ```
 
@@ -74,7 +74,7 @@ pin it, including the loud failure.
 
 `/plugin marketplace add` accepts an absolute local path as well as a GitHub repo:
 
-```
+```bash
 /plugin marketplace add /absolute/path/to/keel
 ```
 
@@ -97,7 +97,7 @@ nobody wants an agent taking unattended.
 Two rule kinds survive `bypassPermissions`, and one does not:
 
 | Kind | Under bypass | Used for |
-|---|---|---|
+| --- | --- | --- |
 | `deny` | Still blocks | What is never legitimate. Reading `.env`, keys, `secrets/**` |
 | `ask` | Still prompts | Destructive but sometimes right. Force push, `reset --hard`, `terraform destroy`, `kubectl delete`. Since 0.16.1 also egress: `curl`, `wget`, `nc` |
 | `allow` | **No effect** | Nothing. Everything is already approved |
@@ -113,7 +113,7 @@ subcommands, so `git clean -fd && touch x` prompts for the whole thing.
 **The mode and the guardrails live in different files, deliberately.**
 
 | File | Contains | Committed |
-|---|---|---|
+| --- | --- | --- |
 | `.claude/settings.json` | `deny` and `ask` rules, plugins, the nudge hook | Yes |
 | `.claude/settings.local.json` | `permissions.defaultMode` | **No**, and `keel init` adds it to `.gitignore` |
 
@@ -207,9 +207,10 @@ tool. The CLI only writes it.
 
 ### Commands
 
-```
+```bash
 keel init [--team] [--force]
 ```
+
 Detects the stack, generates `.keel/profile.json`, merges the CLAUDE.md block, writes
 `.claude/settings.json`, scaffolds `docs/keel/`. `--team` also stages what it wrote, including
 `.gitignore`; making the commit is left to you.
@@ -218,7 +219,7 @@ Idempotent: safe to re-run, and re-running picks up new keel defaults.
 Detection matrix:
 
 | Signal | Inferred |
-|--------|----------|
+| -------- | ---------- |
 | `pubspec.yaml` | Dart, `flutter test` for a Flutter project or `dart test` for a plain package that declares `package:test`, either one only where `test/` holds a file ending `_test.dart` for it to run, the analyzer and `dart format`, and no language server plugin, because the catalogue has none for it. `flutter` as the framework where the manifest declares the Flutter SDK, which also sets `has_ui` |
 | `package.json` with `typescript` dep | TypeScript, plus `typescript-lsp` |
 | `package.json` scripts | `verify.test`, `verify.lint`, `verify.build` read directly from `scripts` |
@@ -241,10 +242,12 @@ Detection matrix:
 Anything it cannot detect, it asks about interactively, and each question has a sensible
 default so `keel init -y` works in CI.
 
-```
+```bash
 keel doctor
 ```
+
 The verification command. Checks that:
+
 - every command in `profile.verify` actually runs and exits 0 (each is timed, printed as it
   starts, and capped at 900s where a `timeout` binary exists; `--fast` skips executing them
   and only validates the fields, for when the suite itself is the slow part)
@@ -332,17 +335,19 @@ neutralises `core.excludesFile` and reads the repository's own rules alone. The 
 that property for longer than the shipped check enforced it, which is the more useful lesson: a test
 that isolates a condition the product does not is a test passing for its own reasons.
 
-```
+```bash
 keel scan
 ```
+
 Runs the supply chain scan over this tree: tracked files plus anything untracked that git is not
 ignoring. Non-zero on any finding. 19 pattern rules and 5 structural, covering what would execute on,
 or leak to, whoever clones or installs the repository. Details and the suppression mechanism are in
 `tests/supply-chain-scan.sh` and the README.
 
-```
+```bash
 keel guard install | status | uninstall
 ```
+
 Installs three hooks, by writing `.githooks/pre-push`, `.githooks/pre-commit`, and
 `.githooks/prepare-commit-msg`, and setting
 `core.hooksPath` **for this repository only**. Opt-in, because it changes your git configuration, and
@@ -393,11 +398,12 @@ The full test suite is not here, and neither is `verify.test_one`: the hook has 
 test path from a changed file, and an expensive commit produces fewer, larger commits. See open
 decision 4.
 
-```
+```bash
 keel profile get <dotted.path>
 keel profile set <dotted.path> <value>
 keel profile sync
 ```
+
 Reads and writes one field of `.keel/profile.json`. `init` writes the profile once and then defends
 every human value in it, which is right for a re-init and wrong for a fact that has changed since, so
 this is how a project records that it grew a user interface without hand-editing JSON. `true`, `false`
@@ -415,9 +421,10 @@ defaults to one file per slug, so a repository with five PRDs has no single path
 hold. `keel doctor` warns when a fillable key is null and its documents are there, which is how
 anyone finds out the command exists.
 
-```
+```bash
 keel new <name> [--stack node|python|go|minimal]
 ```
+
 Greenfield scaffolding. Creates the directory, initialises git, lays down the keel layer, a CI
 workflow that fails on a broken build, and a sample test that passes.
 
@@ -426,10 +433,13 @@ within two releases and would be a recommendation nobody asked for. `design-arch
 stack, after `write-prd` establishes what is being built. The sample source file exists so the
 project has somewhere for its first real test to go, and it says so in a comment.
 
-**The property that matters: a freshly created project passes its own `keel doctor`.** That is
-tested. It means the sample test must run with nothing installed, so node uses `node --test`, python
-uses `unittest`, and the minimal stack uses a shell script. Where detection would infer a command
-whose tool is absent, `new` states the command instead, because it knows what it generated.
+**The property that matters: doctor's only complaint on a fresh project is the one thing `new`
+told it about, and nothing else.** That is tested. `gates.coding_standards` defaults to required
+and `new` cannot write `docs/standards.md` itself, so doctor names that gap and `NEXT-STEPS.md`
+puts writing it first. Past that, the sample test must run with nothing installed, so node uses
+`node --test`, python uses `unittest`, and the minimal stack uses a shell script. Where detection
+would infer a command whose tool is absent, `new` states the command instead, because it knows
+what it generated.
 
 `docs/keel/NEXT-STEPS.md` points at `write-prd` rather than at code, since the whole point of a
 greenfield start is that the expensive decisions are still cheap.
@@ -445,6 +455,7 @@ The single most fragile part of any tool like this. The mechanism:
 ```
 
 Rules:
+
 - Content between the markers is owned by keel and replaced wholesale on upgrade.
 - Content outside the markers is owned by the project and never touched.
 - Missing markers mean a fresh append, never a rewrite.

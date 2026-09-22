@@ -525,15 +525,28 @@ fi
 rm -rf "$dir"
 
 # 27. A scenario whose injected skill has no references gets neither the directory nor the line, so
-# an arm is never pointed at something that is not there. ship has no references/ directory.
-dir="$(tests/evals/stage.sh ship-with-flaky-tests 2>/dev/null)"; staged+=("$dir")
-if [ ! -e "$dir/skills" ] && ! /usr/bin/grep -q '\.\./skills/' "$dir/prompt.md"; then
-    ok "a skill with no references stages none and is announced none"
-else
+# an arm is never pointed at something that is not there. No shipped scenario injects a
+# reference-less skill, so the case writes a probe against refactor, which has none, and the trap
+# removes it with the rest of selftest_paths.
+probe="tests/evals/scenarios/zz-no-references-probe.md"
+probe_fixture="tests/evals/fixtures/zz-no-references-probe"
+selftest_paths+=("$probe" "$probe_fixture")
+if [ -d skills/refactor/references ]; then
     bad "a skill with no references stages none and is announced none" \
-        "a skills/ directory or a reference line appeared for ship"
+        "refactor has grown a references/ directory; this probe needs a skill that has none"
+else
+    mkdir -p "$probe_fixture"
+    printf '# probe\n\nInject: refactor\n\n## Prompt\n\nprobe\n' > "$probe"
+    dir="$(tests/evals/stage.sh zz-no-references-probe 2>/dev/null)"; staged+=("$dir")
+    if [ ! -e "$dir/skills" ] && ! /usr/bin/grep -q '\.\./skills/' "$dir/prompt.md"; then
+        ok "a skill with no references stages none and is announced none"
+    else
+        bad "a skill with no references stages none and is announced none" \
+            "a skills/ directory or a reference line appeared for refactor"
+    fi
+    rm -rf "$dir"
 fi
-rm -rf "$dir"
+rm -f "$probe"; rm -rf "$probe_fixture"
 
 # 28. author-a-standard's fixture keeps its two deliberate splits. The scenario scores whether the
 # arm records the minority as the rule on the SQL split, so an edit that flattens it would leave the

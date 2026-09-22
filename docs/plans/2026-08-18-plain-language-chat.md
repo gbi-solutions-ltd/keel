@@ -775,7 +775,7 @@ absence, so it passes on the day it is written and earns its keep the day somebo
 Record that in the tick note rather than claiming a failure you did not see.
 
 To confirm it can fail, add a `warn "conventions.explain_level is unset"` line **inside
-`cmd_doctor`**, at `bin/keel:1175` just above the `[ -f .keel/profile.json ]` guard, run doctor
+`cmd_doctor`**, at `bin/keel:1187` just above the `[ -f .keel/profile.json ]` guard, run doctor
 against an initialised fixture, watch the case report `doctor named explain_level`, then restore
 `bin/keel` and confirm `git diff --stat bin/keel` is empty. Do not commit that line.
 

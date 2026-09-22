@@ -385,7 +385,7 @@ justification, not from anywhere else.
    which may be retried, from a deterministic one, which may not: retrying a build error, a rejected
    request or a failed migration unchanged is superstition, because the same input produces the same
    result.
-   - *Justification class: keel practice.* `skills/ship/SKILL.md:34-35`: "Say which check failed,
+   - *Justification class: keel practice.* `skills/ship/SKILL.md:36-37`: "Say which check failed,
      show the output, and stop. Do not fix it as part of shipping: a gate that repairs its own
      failures is not a gate, and the fix belongs in its own reviewed change." Same shape, applied to
      provisioning: a process that repairs its own failures destroys the evidence of what happened.

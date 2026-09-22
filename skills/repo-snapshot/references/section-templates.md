@@ -164,6 +164,12 @@ Dependency health belongs here: count of outdated majors, anything unmaintained,
 with a known advisory. Do not attempt a security audit; that is `security-audit`. Note what
 you noticed and move on.
 
+**Standards adherence belongs here too.** Where `<docs_root>/standards.md` exists, the assess
+report at `<docs_root>/audits/YYYY-MM-DD-standards.md` supplies this part: its coverage figure and
+each departure it found, cited to that report rather than restated from your own reading. Where no
+document exists, one line: `No standards document; nothing to assess against`, and section 10
+names `coding-standards` as the fix.
+
 ## 9. Health metrics
 
 Use this rubric. Every value is `measured`, `estimated`, or `unmeasured`, and the word
@@ -224,8 +230,10 @@ deliberately does not do either job and a document that omits them reads as a cl
 
 - `security-audit --full`, whose own scope line names this exact moment: a new engagement. Section 8
   records what you noticed in passing; it is not an audit and must not be presented as one.
-- `coding-standards`, to establish what this repository's conventions are, and where they are not
-  written down anywhere.
+- `coding-standards`, where `<docs_root>/standards.md` does not exist yet, to establish what this
+  repository's conventions are, and where they are not written down anywhere. Where it does exist,
+  Step 2 already ran it in assess mode: section 10 carries that report's remedies instead of naming
+  the skill again.
 
 Then close the document with one line naming what this snapshot did not check, in the same place
 every time, so a reader who skips to the end still sees it. `security-audit` already carries this

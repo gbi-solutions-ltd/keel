@@ -84,7 +84,9 @@ Service restored is not resolved. In order:
 5. Add what you learned to the runbook. A symptom that has happened once will happen again, and the
    next person on call should not start where you did.
 6. If the incident was preventable, say which of these it changes: a rule in a reference file, an
-   eval scenario, or a line in a skill. If none applies, say why.
+   eval scenario, or a line in a skill. Those three belong to this plugin's own repository; a
+   project that owns none of them names its project-level equivalent instead (a runbook, per item
+   5) or says why nothing applies.
 
 ## Common mistakes
 
