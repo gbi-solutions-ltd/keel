@@ -116,7 +116,7 @@ matter.
 | Task 2, `json_get`, per init | 6 → 2 | 4 | 0.18 s |
 | Task 2, `json_get`, per doctor | 13 → 2 | 11 | 0.49 s |
 
-Neither cache reaches one spawn. `docs_root` is called at `bin/keel:701` and `bin/keel:1056`
+Neither cache reaches one spawn. `docs_root` is called at `bin/keel:708` and `bin/keel:1063`
 before the profile is primed and inside a `$( )`, so it always pays its own interpreter start; the
 priming call pays a second. Two is the floor without restructuring `docs_root`, which is not worth
 it for one spawn.

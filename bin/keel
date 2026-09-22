@@ -250,8 +250,12 @@ DEFAULT_DOCS_ROOT="docs/keel"
 
 # Asked once, at startup. The answer cannot change while this process runs, and the lookup was
 # forked about twenty times a run for a constant. The function stays so no call site changes.
+#
+# Actually runs the interpreter rather than checking PATH: Windows' App Execution Alias puts a
+# python3.exe on PATH even when Python is not installed, which prints a not-found message and
+# exits 49. `command -v` would call that present.
 HAVE_PYTHON=0
-command -v python3 >/dev/null 2>&1 && HAVE_PYTHON=1
+python3 -c 'pass' >/dev/null 2>&1 && HAVE_PYTHON=1
 have_python() { [ "$HAVE_PYTHON" -eq 1 ]; }
 
 # What bounds a verify command in doctor, when the machine has anything to bound it with. macOS
@@ -285,7 +289,10 @@ json_load() {  # json_load <file>
     # No apostrophe anywhere below. bash 3.2 does not treat a quoted heredoc body as literal when
     # the heredoc is inside a $( ), so one ' opens a quote that swallows the rest of this file and
     # the parse error is reported hundreds of lines away. shellcheck does not see it.
-    JSON_CACHE="$(python3 - "$1" <<'PY' 2>/dev/null
+    # tr -d '\r' because Windows' text-mode stdout adds \r before \n on every printed line, which
+    # `read -r` below does not strip, and a cached value carrying a trailing CR breaks exact-string
+    # comparisons everywhere the cache is read.
+    JSON_CACHE="$(python3 - "$1" <<'PY' 2>/dev/null | tr -d '\r'
 import json, sys
 
 def render(v):
@@ -1436,8 +1443,21 @@ cmd_doctor_text() {
 
     [ -f .keel/profile.json ] || { fail "no .keel/profile.json. Run 'keel init'."; return 1; }
     if have_python; then
-        python3 -c "import json;json.load(open('.keel/profile.json'))" 2>/dev/null \
-          && good "profile parses" || { fail "profile is not valid JSON"; return 1; }
+        local profile_err
+        profile_err="$(python3 -c "import json;json.load(open('.keel/profile.json'))" 2>&1 >/dev/null)"
+        if [ -z "$profile_err" ]; then
+            good "profile parses"
+        else
+            # have_python already proved python3 runs, so a failure here is either the JSON itself
+            # (json.load raises json.decoder.JSONDecodeError) or something else python3 hit trying
+            # to read it. Folding both into "not valid JSON" sent people to edit a file that was
+            # fine.
+            case "$profile_err" in
+              *JSONDecodeError*) fail "profile is not valid JSON: $profile_err" ;;
+              *) fail "python3 could not check the profile: $profile_err" ;;
+            esac
+            return 1
+        fi
     else
         warn "python3 absent: cannot validate the profile or read its fields"
     fi
@@ -1539,7 +1559,7 @@ d=json.load(open('.keel/profile.json')).get('artifacts',{})
 for k,v in d.items():
     if k.startswith('_') or not v: continue
     print(f'{k}={v}')
-" 2>/dev/null)
+" 2>/dev/null | tr -d '\r')
     fi
 
     # The other half of the map: a key that is null while its default is sitting there. The profile
@@ -1907,7 +1927,10 @@ if [ ! -t 0 ]; then
     blocked=""
     loosened=""
     have_py=0
-    command -v python3 >/dev/null 2>&1 && have_py=1
+    # python3 -c 'pass' rather than command -v: Windows' App Execution Alias puts a python3.exe on
+    # PATH that prints a not-found message and exits 49 without running anything, and command -v
+    # would call that present.
+    python3 -c 'pass' >/dev/null 2>&1 && have_py=1
     while read -r _lref lsha rref rsha; do
         if [ -n "$protected" ] && [ "$protect" != "false" ] && [ "$rref" = "refs/heads/$protected" ]; then
             blocked="$protected"
@@ -2106,7 +2129,10 @@ PY
 }
 
 [ -f .keel/profile.json ] || exit 0
-if ! command -v python3 >/dev/null 2>&1; then
+# python3 -c 'pass' rather than command -v: Windows' App Execution Alias puts a python3.exe on
+# PATH that prints a not-found message and exits 49 without running anything, and command -v would
+# call that present.
+if ! python3 -c 'pass' >/dev/null 2>&1; then
     printf 'keel guard: python3 is absent, so nothing was checked. Commit allowed.\n' >&2
     exit 0
 fi

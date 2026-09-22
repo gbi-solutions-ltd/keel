@@ -9,7 +9,7 @@
 # Session state written by the context watchdog. It is stale the moment work resumes, and inside a
 # committed tree the next `git add -A` sweeps it into a commit. Anything durable in it is promoted to
 # an ADR or docs/07-open-decisions.md before it is discarded. `git add -f` covers sharing one.
-.keel/handoff.md
+.keel/handoff.*
 
 # Node, once bin/ and tests/ arrive
 node_modules/

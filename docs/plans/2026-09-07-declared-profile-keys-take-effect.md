@@ -396,7 +396,7 @@ Add the two 2026-08-18 plans to the Files list.
 **Why a declared reader and not a matcher.** The brief asked for a dotted-path rule and named its
 hard problem. The rule was prototyped against the tree on 2026-09-07 and does not work in either
 direction. It flags 25 of 61 leaves, and 7 of the 25 are genuinely read: `artifacts.stories`,
-`.architecture`, `.decisions` and `.plans` through the map iteration at `bin/keel:1345-1354`,
+`.architecture`, `.decisions` and `.plans` through the map iteration at `bin/keel:1352-1361`,
 `gates.context_warn_pct` and `.context_stop_pct` through `lib/context_watch.py:497-508`, and
 `conventions.default_branch` through the sed at `bin/keel:1640`. That is 28% false positives,
 against `docs/standards.md:79` calling the too-strict failure the unrecoverable one and
@@ -778,11 +778,11 @@ say so rather than adding a sentence back to the schema by hand.
 |---|---|
 | `code:bin/keel:465` | `harnesses` |
 | `code:bin/keel:1522` | `schema_version` |
-| `code:bin/keel:1516` | `keel_version` |
-| `code:bin/keel:1335` | `project.kind` |
+| `code:bin/keel:1536` | `keel_version` |
+| `code:bin/keel:1342` | `project.kind` |
 | `advisory:skills/keel/references/tool-choices.md:20` | `stack.language` |
 | `code:bin/keel:853` | `stack.package_manager` |
-| `code:bin/keel:1632`, `advisory:skills/coding-standards/references/house-defaults.md:31` | `stack.has_ui` |
+| `code:bin/keel:1652`, `advisory:skills/coding-standards/references/house-defaults.md:31` | `stack.has_ui` |
 | `advisory:skills/coding-standards/references/house-defaults.md:31` | `stack.framework` |
 | `advisory:skills/keel/references/tool-choices.md:21` | `stack.also` |
 | `code:bin/keel:1397`, `code:hooks/done-guard:118` | `verify.test` |
@@ -2758,11 +2758,11 @@ None blocks execution. Five are recorded because a decision made silently gets r
 `SCHEMA_VERSION` moves in task 6 and only there, as the retirement requires. `keel_version` is not
 touched: this repository's own `.keel/profile.json` says `0.15.0` against a `VERSION` of `0.18.0`
 and `schema_version 2` against `SCHEMA_VERSION=3`, and both are staleness in a hand-written
-dogfood file that `bin/keel:1534`'s doctor warning already reports. `bin/keel` is authoritative for
+dogfood file that `bin/keel:1554`'s doctor warning already reports. `bin/keel` is authoritative for
 the schema, which `tests/validate-skills.sh:693-701` proves by passing today against the line for 3
 at `:86`. Fixing the repository's own profile is one `keel init` and its own task; landing it inside
 this change is how a released version's record gets rewritten.
 
 The `artifacts.*` write-side gap is out of scope and recorded in the idea record: `write-plan`,
 `design-architecture` and `write-user-stories` check the map before reading and hardcode the default
-path when writing. It would pass the checker, because `bin/keel:1345-1354` reads the map.
+path when writing. It would pass the checker, because `bin/keel:1352-1361` reads the map.

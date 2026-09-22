@@ -2642,7 +2642,7 @@ harness_running() {
 }
 ```
 
-Then add the section to `cmd_doctor`, using its existing `good`/`warn` printers (`bin/keel:1332-1334`)
+Then add the section to `cmd_doctor`, using its existing `good`/`warn` printers (`bin/keel:1339-1341`)
 so the output matches every other check rather than inventing a format:
 
 ```bash
@@ -3976,7 +3976,7 @@ correct.** Fixed in place:
 | Task 4 step 2 mutated a tracked file while `MAX_JOBS=4` jobs read it | `tests/run-tests.sh:65` | task 4 |
 | A one-line tag lookback fails any claim that wraps | the support page's own paragraph | task 5 |
 | Task 7's committed baseline contradicts the suite's stated policy | `tests/test-keel.sh:1-3` | task 7 |
-| `cmd_doctor` would call functions that exist for one harness only | `bin/keel:1316` | task 7, sixth contract function |
+| `cmd_doctor` would call functions that exist for one harness only | `bin/keel:1323` | task 7, sixth contract function |
 
 ### Not fixed, with reasons
 

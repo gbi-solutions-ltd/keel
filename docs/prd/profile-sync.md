@@ -146,7 +146,7 @@ true, but only two of them are fillable today.
 - **Any change to what a skill writes or where.** `sync` records; it never moves a document.
 - **Running `sync` automatically from `keel init`.** A fresh `init` has no documents to find, so it
   would fill nothing on the one occasion it ran.
-- **Reporting a mapped path that has gone stale.** Doctor already fails on it, `bin/keel:1335`.
+- **Reporting a mapped path that has gone stale.** Doctor already fails on it, `bin/keel:1342`.
 
 ## 12. Assumptions
 

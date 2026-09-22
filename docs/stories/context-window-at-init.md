@@ -404,7 +404,7 @@ Scenario: the window is named when assumed
 ```
 
 **Notes:** a regression guard around S-07, which rewrites both messages. Existing behaviour at
-`bin/keel:1534-1580`.
+`bin/keel:1554-1600`.
 
 ---
 

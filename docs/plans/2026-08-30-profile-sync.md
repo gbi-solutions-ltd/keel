@@ -604,7 +604,7 @@ Stage exactly those paths and stop. **Do not commit.**
 
 **Interfaces:**
 - Consumes: `dir_has_file` from task 1, `docs_root()`, and `cmd_doctor`'s local `root` already set
-  at `bin/keel:1288`.
+  at `bin/keel:1295`.
 - Produces: nothing other tasks consume.
 
 **Depends on:** task 1

@@ -2713,6 +2713,75 @@ case "$nopy_err" in *python3*) ok "doctor --json's error names python3 when it i
   || ok "doctor --json prints nothing to stdout when python3 is absent, rather than garbage"
 rm -rf "$dnp" "$nopy_dir"; rm -f "$nopy_stdout"
 
+# --- have_python: a Windows Store python3 alias must read as absent, not present ---------------
+# Windows' App Execution Alias puts a python3.exe on PATH even when Python is not installed: it
+# prints a not-found message and exits 49 without doing anything. `command -v python3` only checks
+# that the name resolves on PATH, not that it runs, so it reported this shim as present and every
+# check gated on have_python believed python3 worked. Distinct from the doctor --json case above,
+# which is a python3 truly absent from PATH; this one is present and broken.
+hpd="$(fixture bare)"
+( cd "$hpd" && "$KEEL" init -y >/dev/null 2>&1 )
+storeshim="$(mktemp -d)"
+cat > "$storeshim/python3" <<'SHIM'
+#!/bin/sh
+printf 'Python was not found; run without arguments to install from the Microsoft Store.\n'
+exit 49
+SHIM
+chmod +x "$storeshim/python3"
+hp_out="$( cd "$hpd" && PATH="$storeshim:$PATH" "$KEEL" doctor --fast 2>&1 )"
+case "$hp_out" in
+  *"profile is not valid JSON"*) bad "have_python" "doctor treated the Store alias as a working python3, reporting 'profile is not valid JSON' instead of 'python3 absent'. Got: $hp_out" ;;
+  *"python3 absent"*) ok "have_python reads a Store-alias python3 (runs, prints not-found, exits 49) as absent" ;;
+  *) bad "have_python" "doctor reported neither outcome. Got: $hp_out" ;;
+esac
+rm -rf "$hpd" "$storeshim"
+
+# --- doctor's profile-parse check distinguishes "python3 did not run" from "invalid JSON" ------
+# Before this fix, any nonzero exit from the `import json` check was folded into "profile is not
+# valid JSON", even when the profile parses fine and python3 failed for an unrelated reason. The
+# stub below passes have_python's own probe (`python3 -c pass` exits 0) but fails this specific
+# check with a message that names no JSON error, simulating any interpreter failure that is not
+# the profile being invalid.
+dpd="$(fixture bare)"
+( cd "$dpd" && "$KEEL" init -y >/dev/null 2>&1 )
+dualshim="$(mktemp -d)"
+cat > "$dualshim/python3" <<'SHIM'
+#!/bin/sh
+if [ "$1" = "-c" ] && [ "$2" = "pass" ]; then
+    exit 0
+fi
+printf 'boom: unrelated interpreter failure\n' >&2
+exit 3
+SHIM
+chmod +x "$dualshim/python3"
+dp_out="$( cd "$dpd" && PATH="$dualshim:$PATH" "$KEEL" doctor --fast 2>&1 )"
+case "$dp_out" in
+  *"profile is not valid JSON"*) bad "doctor profile-parse" "a non-JSON interpreter failure was reported as 'profile is not valid JSON'. Got: $dp_out" ;;
+  *"boom: unrelated interpreter failure"*) ok "doctor's profile-parse check surfaces python3's own stderr instead of assuming invalid JSON" ;;
+  *) bad "doctor profile-parse" "the failure was silently swallowed instead of naming what python3 said. Got: $dp_out" ;;
+esac
+rm -rf "$dpd" "$dualshim"
+
+# --- json_load strips a CRLF-emitting python3's trailing \r before caching ---------------------
+# Windows' text-mode stdout adds \r before \n on every printed line. `read -r` does not strip it,
+# so a cached value carried an invisible trailing CR that broke exact-string comparisons downstream.
+crd="$(fixture bare)"
+( cd "$crd" && "$KEEL" init -y >/dev/null 2>&1 )
+crlfdir="$(mktemp -d)"
+real_python="$(command -v python3)"
+cat > "$crlfdir/python3" <<CRLF
+#!/usr/bin/env bash
+"$real_python" "\$@" | awk '{printf "%s\r\n", \$0}'
+exit "\${PIPESTATUS[0]}"
+CRLF
+chmod +x "$crlfdir/python3"
+crlf_got="$( cd "$crd" && PATH="$crlfdir:$PATH" "$KEEL" profile get project.kind 2>/dev/null )"
+case "$crlf_got" in
+  *$'\r') bad "json_load" "profile get returned a trailing CR: [$crlf_got]" ;;
+  *) ok "json_load strips a CRLF-emitting python3's trailing CR before caching" ;;
+esac
+rm -rf "$crd" "$crlfdir"
+
 # --- keel doctor --json when the docs root is gitignored -------------------------------------
 # check_docs_ignored's failure branch used to print only to stderr (via err, not fail), so no
 # FAIL line reached stdout for the JSON reshaper even though problems was incremented and the
@@ -2988,6 +3057,37 @@ PY
 if ( cd "$d" && "$KEEL" doctor >/dev/null 2>&1 ); then ok "doctor passes once the mapped path exists"
 else bad "artifacts" "doctor still fails with a valid mapped path"; fi
 rm -rf "$d"
+
+# --- doctor's artifact-path check strips a CRLF-emitting python3's trailing \r -----------------
+# The artifacts loop compares a path read from python3's stdout against the filesystem with
+# [ -e ]. A real file's path carries no CR, so a value read verbatim off Windows' CRLF stdout
+# compared as absent even though the file is right there.
+crfd="$(fixture node-ts)"
+( cd "$crfd" && "$KEEL" init -y >/dev/null 2>&1 )
+seed_standards "$crfd"
+python3 - "$crfd" <<'PY'
+import json, sys, pathlib
+p = pathlib.Path(sys.argv[1]) / ".keel/profile.json"
+d = json.loads(p.read_text())
+d["artifacts"]["prd"] = "docs/PROD-CRLF-requirements.md"
+d["verify"] = {k: ("true" if k in ("test", "test_one", "lint") else None) for k in d["verify"]}
+p.write_text(json.dumps(d, indent=2) + "\n")
+PY
+mkdir -p "$crfd/docs" && printf '# PRD\n' > "$crfd/docs/PROD-CRLF-requirements.md"
+crlfdir2="$(mktemp -d)"
+real_python2="$(command -v python3)"
+cat > "$crlfdir2/python3" <<CRLF2
+#!/usr/bin/env bash
+"$real_python2" "\$@" | awk '{printf "%s\r\n", \$0}'
+exit "\${PIPESTATUS[0]}"
+CRLF2
+chmod +x "$crlfdir2/python3"
+crlf2_out="$( cd "$crfd" && PATH="$crlfdir2:$PATH" "$KEEL" doctor 2>&1 )"
+case "$crlf2_out" in
+  *"artifacts.prd points at"*"does not exist"*) bad "artifacts CRLF" "a real file compared as missing because its path carried a trailing CR. Got: $crlf2_out" ;;
+  *) ok "the artifacts path check strips a CRLF-emitting python3's trailing CR before comparing" ;;
+esac
+rm -rf "$crfd" "$crlfdir2"
 
 # ---- the marketplace check is advisory, and never mentions gh --------------
 # This replaced a check on gh. Doctor used to report that gh was needed to install from the
@@ -4101,6 +4201,35 @@ case "$out" in
 esac
 rm -rf "$rt"
 
+# --- pre-push: a Windows Store python3 alias must not be read as a loosening report -------------
+# have_py here (bin/keel#guard_hook_body) used `command -v python3` too: the shim looked present,
+# so the loosening comparator actually ran it, and its not-found message came back as $report,
+# non-empty, read as though the profile had loosened. Nothing about this profile moved.
+storeshim2="$(mktemp -d)"
+cat > "$storeshim2/python3" <<'SHIM'
+#!/bin/sh
+printf 'Python was not found; run without arguments to install from the Microsoft Store.\n'
+exit 49
+SHIM
+chmod +x "$storeshim2/python3"
+
+pp="$(fixture bare)"
+( cd "$pp" && "$KEEL" init -y >/dev/null 2>&1 )
+( cd "$pp" && "$KEEL" guard install >/dev/null 2>&1 )
+( cd "$pp" && "$KEEL" profile set conventions.protect_default_branch false >/dev/null 2>&1 )
+( cd "$pp" && git add -A && git commit -q -m "baseline" )
+old_sha2="$( cd "$pp" && git rev-parse HEAD )"
+( cd "$pp" && "$KEEL" profile set project.description "unchanged gates, unrelated edit" >/dev/null 2>&1 )
+( cd "$pp" && git add -A && git commit -q -m "unrelated edit, nothing loosened" )
+new_sha2="$( cd "$pp" && git rev-parse HEAD )"
+pp_out="$(cd "$pp" && printf 'refs/heads/main %s refs/heads/main %s\n' "$new_sha2" "$old_sha2" \
+   | PATH="$storeshim2:$(dirname "$KEEL"):$PATH" .githooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
+pp_rc=$?
+[ "$pp_rc" -eq 0 ] \
+  && ok "pre-push does not mistake a Store-alias python3's not-found message for a loosening report" \
+  || bad "guard" "pre-push refused a push that loosened nothing, with a Store-alias python3 on PATH. Got: $pp_out"
+rm -rf "$pp" "$storeshim2"
+
 # The hook body lives inside a quoted heredoc, so the repo's own lint reads it as a string and never
 # parses it. Linting the generated file is the only way that code gets checked at all.
 if command -v shellcheck >/dev/null 2>&1; then
@@ -4193,6 +4322,30 @@ if command -v shellcheck >/dev/null 2>&1; then
 else
     printf '  SKIP  shellcheck is absent, so the generated pre-commit hook was not linted\n'
 fi
+
+# --- pre-commit: a Windows Store python3 alias must be treated as absent, not present -----------
+# `if ! command -v python3` (bin/keel#guard_precommit_body) only checked PATH, so the shim passed
+# it, and the gate value read back from `field()` was the shim's not-found message instead of
+# "required", which fell through the hook's own case statement to the catch-all "not a value the
+# hook knows about, exit 0" with no explanation printed. A required gate went unchecked silently.
+storeshim3="$(mktemp -d)"
+cat > "$storeshim3/python3" <<'SHIM'
+#!/bin/sh
+printf 'Python was not found; run without arguments to install from the Microsoft Store.\n'
+exit 49
+SHIM
+chmod +x "$storeshim3/python3"
+
+pc="$(fixture bare)"
+( cd "$pc" && "$KEEL" init -y >/dev/null 2>&1 )
+( cd "$pc" && "$KEEL" guard install >/dev/null 2>&1 )
+( cd "$pc" && "$KEEL" profile set gates.commit_guard required >/dev/null 2>&1 )
+pc_out="$( cd "$pc" && PATH="$storeshim3:$PATH" .githooks/pre-commit 2>&1 )"
+case "$pc_out" in
+  *"python3 is absent"*) ok "the pre-commit guard reports python3 as absent for a Store-alias shim, rather than silently skipping" ;;
+  *) bad "commit guard" "a required gate went unchecked with no explanation printed. Got: $pc_out" ;;
+esac
+rm -rf "$pc" "$storeshim3"
 
 ( cd "$c" && "$KEEL" guard uninstall >/dev/null 2>&1 )
 [ ! -e "$c/.githooks/pre-commit" ] && ok "guard uninstall removes the pre-commit hook too" \
