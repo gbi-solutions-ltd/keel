@@ -36,7 +36,7 @@ Twenty-two keys, one verdict each. `harnesses` is stated for every `gates.*` key
 | # | Key | Verdict | Mechanism | Harnesses | Reason |
 |---|---|---|---|---|---|
 | 1 | `gates.tdd` | **retire** | n/a | n/a | The only wiring ever proposed, `docs/plans/2026-09-06-tdd-cycle-unit-and-mutation.md:419-420`, defined `required` as "the tiers apply with the strict list binding". It was tiering's carrier and fell with it. See the ADR-0007 finding below |
-| 2 | `gates.coding_standards` | **wire, advisory. Not built here** | The `=== PROJECT STANDARDS ===` block at `skills/execute-plan/references/subagent-prompts.md:29` | both, advisory | `docs/ideas/standards-that-bind.md:488-510` already ranks this, third of six, behind two zero-body-word mechanisms. Task 6 leaves the key in the schema and marks it `unread:` pointing at that record. Building it here would open a competing record |
+| 2 | `gates.coding_standards` | **wire, advisory. Not built here** | The `=== PROJECT STANDARDS ===` block at `skills/execute-plan/references/subagent-prompts.md:29` | both, advisory | `docs/ideas/standards-that-bind.md#in the skills that can afford one` already ranks this, third of six, behind two zero-body-word mechanisms. Task 6 leaves the key in the schema and marks it `unread:` pointing at that record. Building it here would open a competing record |
 | 3 | `gates.review` | **retire** | n/a | n/a | `skills/ship/SKILL.md` names no `gates.*` key and its step 5, "`review-code` has run and nothing blocking remains", is unconditional. A key whose only possible effect is to weaken a gate the skill runs anyway is a key whose `off` value is a lie |
 | 4 | `gates.observability` | **retire** | n/a | n/a | No mechanism is proposed anywhere in the tree, and the census found no reader, no named reader and no idea record |
 | 5 | `gates.docs_updated` | **retire** | n/a | n/a | Same as `gates.review`. `skills/ship/SKILL.md` step 6 is unconditional |
@@ -62,7 +62,7 @@ Twenty-two keys, one verdict each. `harnesses` is stated for every `gates.*` key
 five descriptions and cannot become one: its body is 695 words against ADR-0001's 700 target, five
 words of headroom, and `CONTRIBUTING.md` requires a passing eval arm at any length over 700.
 `deploy.target`, `.ci` and `.envs` are detected by `keel init` and proposed by a snapshot
-(`skills/repo-snapshot/references/section-templates.md:257-258`); `.registry` and
+(`skills/repo-snapshot/references/section-templates.md:255-256`); `.registry` and
 `.secrets_manager` exist so a pipeline and a runbook agree on one value, which is a person's job by
 construction. All five become human-read and their descriptions stop naming `setup-deployment`.
 **The alternative, rejected:** a `cmd_doctor` warning when `deploy.ci` is null and a CI config
@@ -147,8 +147,9 @@ must still obey them.
   `verify.format`, `verify.typecheck` and `verify.build` are `null` in this project.
 - Never start on `main`. This work is on `profile-keys-take-effect-or-say-they-do-not`, off `sandbox`.
 - **Never hand-edit `docs/profile-keys.md`.** It is generated. Change the schema and run
-  `tests/generate-profile-keys.sh > docs/profile-keys.md`. `tests/validate-skills.sh:612-640`
-  fails when the two disagree and names that command.
+  `tests/generate-profile-keys.sh > docs/profile-keys.md`.
+  `tests/validate-skills.sh#docs/profile-keys.md disagrees with templates/profile.schema.json` fails
+  when the two disagree and names that command.
 - **A field-set change bumps `SCHEMA_VERSION` in `bin/keel` and adds a line to
   `schema_fingerprint_for` in `tests/validate-skills.sh:82-88`, in the same commit.** Never edit an
   existing line: `tests/validate-skills.sh:699` says why, and it is a released version's record.
@@ -251,7 +252,7 @@ Eleven deletions, and every one is a clause claiming a reader that does not exis
 against `bin/`, `lib/`, `hooks/`, `skills/`, `agents/`, `templates/` and `output-styles/` on
 2026-09-07 under all six read shapes, including a parent-map read such as
 `skills/coding-standards/references/seed.md:19` reading the whole `stack` map and
-`skills/setup-deployment/SKILL.md:30` reading the whole `profile.verify` map. None of them resolves
+`skills/setup-deployment/SKILL.md` line 30 at `bda1acc` reading the whole `profile.verify` map. None of them resolves
 any of these eleven leaves to a decision.
 
 `gates.security_audit`'s clause goes because nothing branches on the value, so `warn` does not
@@ -396,15 +397,16 @@ Add the two 2026-08-18 plans to the Files list.
 **Why a declared reader and not a matcher.** The brief asked for a dotted-path rule and named its
 hard problem. The rule was prototyped against the tree on 2026-09-07 and does not work in either
 direction. It flags 25 of 61 leaves, and 7 of the 25 are genuinely read: `artifacts.stories`,
-`.architecture`, `.decisions` and `.plans` through the map iteration at `bin/keel:1352-1361`,
-`gates.context_warn_pct` and `.context_stop_pct` through `lib/context_watch.py:497-508`, and
-`conventions.default_branch` through the sed at `bin/keel:1640`. That is 28% false positives,
-against `docs/standards.md:79` calling the too-strict failure the unrecoverable one and
-`tests/validate-citations.sh:20-25` recording a rule thrown away at 70%. It also under-reports:
-`gates.done_verified`'s real read is `(prof.get("gates") or {}).get("done_verified")` at
-`hooks/done-guard:114`, and the dotted string appears in that file only in comments and refusal text
-at `:25`, `:72` and `:111`. Falling back to bare leaf names passes everything, because `name` occurs
-337 times in this tree, `test` 484 and `review` 146, so all 22 dead keys would pass.
+`.architecture`, `.decisions` and `.plans` through the map iteration at
+`bin/keel#.get('artifacts',{})`, `gates.context_warn_pct` and `.context_stop_pct` through
+`lib/context_watch.py:497-508`, and `conventions.default_branch` through the sed at `bin/keel:1640`.
+That is 28% false positives, against `docs/standards.md:79` calling the too-strict failure the
+unrecoverable one and `tests/validate-citations.sh:20-25` recording a rule thrown away at 70%. It
+also under-reports: `gates.done_verified`'s real read is
+`(prof.get("gates") or {}).get("done_verified")` at `hooks/done-guard:114`, and the dotted string
+appears in that file only in comments and refusal text at `:25`, `:72` and `:111`. Falling back to
+bare leaf names passes everything, because `name` occurs 337 times in this tree, `test` 484 and
+`review` 146, so all 22 dead keys would pass.
 
 So the mechanism is a declared marker, which the brief called "a worse mechanism and an honest one".
 The citation check is what gives it teeth: it is modelled on `lib/harness/capabilities`, whose own
@@ -433,12 +435,12 @@ Add to `tests/test-validate-skills.sh`, after the existing `profile_keys_fixture
 2026-09-07 and have moved since with ordinary additions to the file).
 
 **Use `check_reports`, never `run`.** `run` asserts on the exit code, and
-`tests/test-validate-skills.sh:785-788` records why that cannot isolate a schema rule: "Declaring a
-schema in a fixture also activates the fingerprint rule, which reads SCHEMA_VERSION from a bin/keel
-a small fixture has no reason to carry, so the validator exits 1 whatever the reference says."
+`tests/test-validate-skills.sh#Exit code cannot isolate this rule` records why: "Declaring a schema
+in a fixture also activates the fingerprint rule, which reads SCHEMA_VERSION from a bin/keel a
+small fixture has no reason to carry, so the validator exits 1 whatever the reference says."
 Verified still true on 2026-09-07: a fixture carrying only `templates/profile.schema.json` exits 1
 on the fingerprint rule alone, so every `run` case here would assert nothing. `check_reports` is at
-`:790` and takes `<name> <yes|no> <needle> <mutate-fn>`.
+`tests/test-validate-skills.sh#check_reports() {` and takes `<name> <yes|no> <needle> <mutate-fn>`.
 
 ```bash
 # ---- every declared profile key says what reads it ------------------------
@@ -528,9 +530,9 @@ check_reports "code: naming a markdown file is reported" yes \
   "Prose nothing asserts is advisory" m_readby_advisory_code
 
 # THE FLOOR. A schema with no properties yields no keys, so the rule checks nothing and would pass
-# everything. Copied from the tool-table floor at tests/validate-skills.sh:592, pinned at
-# tests/test-validate-skills.sh:425, and deliberately NOT from the delegation floor at
-# tests/validate-skills.sh:475, which is pinned in neither direction.
+# everything. Copied from the tool-table floor at `tests/validate-skills.sh#rule rather than break it. Found in review, before it happened.`, pinned at
+# `tests/test-validate-skills.sh#a tool rule that reads no languages is rejected`, and deliberately NOT from the delegation floor at
+# `tests/validate-skills.sh#Ten pairs on 2026-09-02`, which is pinned in neither direction.
 m_readby_no_keys() {
     local root="$1"
     mkdir -p "$root/templates" "$root/docs"
@@ -779,16 +781,16 @@ say so rather than adding a sentence back to the schema by hand.
 | `code:bin/keel:465` | `harnesses` |
 | `code:bin/keel:1522` | `schema_version` |
 | `code:bin/keel:1536` | `keel_version` |
-| `code:bin/keel:1342` | `project.kind` |
-| `advisory:skills/keel/references/tool-choices.md:20` | `stack.language` |
+| `code:bin/keel#echo service` | `project.kind` |
+| `advisory:skills/keel/references/tool-choices.md:21` | `stack.language` |
 | `code:bin/keel:853` | `stack.package_manager` |
-| `code:bin/keel:1652`, `advisory:skills/coding-standards/references/house-defaults.md:31` | `stack.has_ui` |
-| `advisory:skills/coding-standards/references/house-defaults.md:31` | `stack.framework` |
-| `advisory:skills/keel/references/tool-choices.md:21` | `stack.also` |
-| `code:bin/keel:1397`, `code:hooks/done-guard:118` | `verify.test` |
-| `code:bin/keel:1432` | `verify.test_one` |
+| `code:bin/keel:1652`, `advisory:skills/coding-standards/references/house-defaults.md:30` | `stack.has_ui` |
+| `advisory:skills/coding-standards/references/house-defaults.md:30` | `stack.framework` |
+| `advisory:skills/keel/references/tool-choices.md:22` | `stack.also` |
+| `code:bin/keel#t0="$(json_get .keel/profile.json verify.test`, `code:hooks/done-guard:118` | `verify.test` |
+| `code:bin/keel#t1="$(json_get .keel/profile.json verify.test_one` | `verify.test_one` |
 | `advisory:skills/tdd/SKILL.md:31` | `verify.test_integration` |
-| `code:bin/keel:1387` | `verify.lint`, `verify.typecheck`, `verify.build` |
+| `code:bin/keel#local c; c="$(json_get .keel/profile.json "verify.$k"` | `verify.lint`, `verify.typecheck`, `verify.build` |
 | `code:bin/keel#cmd="$(field "verify.$k"` | `verify.format` |
 | `code:bin/keel#fix="$(field verify.format_fix` | `verify.format_fix` |
 | `unread:this plan's verdict row 15` | `verify.e2e` |
@@ -801,16 +803,16 @@ say so rather than adding a sentence back to the schema by hand.
 | `unread:this plan's verdict row 5` | `gates.docs_updated` |
 | `unread:this plan's verdict row 7` | `conventions.working_branch` |
 | `unread:this plan's verdict row 9` | `observability.log_shipping` |
-| `unread:docs/ideas/standards-that-bind.md:506` | `gates.coding_standards` |
+| `unread:docs/ideas/standards-that-bind.md#in the skills that can afford one` | `gates.coding_standards` |
 | `code:bin/keel:1346` | `artifacts.snapshot`, `artifacts.prd`, `artifacts.stories`, `artifacts.architecture`, `artifacts.decisions`, `artifacts.plans` |
-| `code:bin/keel:2198` | `gates.commit_guard` |
+| `code:bin/keel#local cg; cg="$(json_get .keel/profile.json gates.commit_guard 2>/dev/null` | `gates.commit_guard` |
 | `code:hooks/done-guard:114` | `gates.done_verified` |
 | `code:lib/context_watch.py:570` | `gates.context_watch` |
 | `code:lib/context_watch.py:591` | `gates.context_window` |
 | `code:lib/context_watch.py:507` | `gates.context_warn_pct` |
 | `code:lib/context_watch.py:508` | `gates.context_stop_pct` |
 | `code:hooks/sensitive-guard:162` | `hard_block_paths` |
-| `advisory:skills/ship/SKILL.md:62` | `conventions.commit_style` |
+| `advisory:skills/ship/SKILL.md#profile.conventions.commit_style` | `conventions.commit_style` |
 | `code:bin/keel:1640` | `conventions.default_branch` |
 | `code:bin/keel:1817` | `conventions.protect_default_branch` |
 | `code:hooks/session-start:111` | `conventions.response_style` |
@@ -1193,8 +1195,9 @@ The exact line number depends on where the loop lands. Read it out of the file a
 write the number you see.
 
 **Then re-point every `x-keel-read-by` citation below the insertion, and this is not optional.**
-The loop adds about seven lines at `bin/keel:1410`, so every `code:bin/keel:<n>` marker with
-`n > 1410` now names content seven lines above where it sat. Eight are affected:
+The loop adds about seven lines at
+`bin/keel#local dc; dc="$(json_get .keel/profile.json verify.e2e`, so every `code:bin/keel:<n>`
+marker with `n > 1410` now names content seven lines above where it sat. Eight are affected:
 `stack.has_ui` (1418), `keel_version` (1516), `schema_version` (1517),
 `conventions.default_branch` (1640), `conventions.protect_default_branch` (1648),
 `verify.format` (1767), `verify.format_fix` (1788), `gates.commit_guard` (1826).
@@ -2031,8 +2034,8 @@ replaced by:
 **The arithmetic, counted rather than estimated.** The plugin clause is 32 words and its
 replacement 15, so 17 leave. The gate clause is 24 words and its replacement 39, so 15 arrive. Net
 2 words out, and the body goes from 690 to **688**, under the 700 target, so it owes no arm.
-Measured on 2026-09-07 with the validator's own `body_of` at `tests/validate-skills.sh:97`. An
-earlier draft of the replacement ran to 56 words and would have landed the body at 705, over the
+Measured on 2026-09-07 with the validator's own `body_of` at `tests/validate-skills.sh#body_of() {`.
+An earlier draft of the replacement ran to 56 words and would have landed the body at 705, over the
 target and owing an arm; that is why the sentence is this length and not longer. If a rewrite here
 grows it again, the words come out of the same step and nowhere else.
 
@@ -2119,7 +2122,7 @@ whose real file list is discovered by running the suite, not by reading the task
 **Interfaces:**
 - Consumes: nothing.
 - Produces: `SCHEMA_VERSION=4`, consumed by `cmd_doctor`'s comparison at `bin/keel:1609-1614` and
-  by the fingerprint rule at `tests/validate-skills.sh:693-701`.
+  by the fingerprint rule at `tests/validate-skills.sh#schema_got="$(python3`.
 
 **Added 2026-09-08 after a review returned DEVIATES.** `tests/test-doc-claims.sh` pins
 `SCHEMA_VERSION` to 3 and goes red on the bump. The first attempt left it red and called it out of
@@ -2173,7 +2176,7 @@ Add to `tests/test-keel.sh`:
 # Six keys were retired because nothing could honour them, and init must stop writing the five it
 # writes. A profile that still carries them is not broken; it is stale, and doctor's version
 # comparison says so. What this pins is init writing a key the schema no longer declares, which is
-# the silent half: tests/validate-skills.sh:656-662 records that the fingerprint checks the schema
+# the silent half: `tests/validate-skills.sh#It fingerprints the schema document, which is not the same thing as what` records that the fingerprint checks the schema
 # document and not what write_profile emits, so nothing else compares the two.
 #
 # READ THE SUBTREE, NOT THE FILE. A bare grep for "observability" matches the top-level
@@ -2255,8 +2258,8 @@ line of a comment; the two `printf` lines are `:532` and `:533`. Checked on 2026
 
 Missing the second line is the failure this task exists to prevent, one layer down: init would keep
 writing a key the schema no longer declares, and the fingerprint would not notice, because
-`tests/validate-skills.sh:656-662` records that it hashes the schema document and not what
-`write_profile` emits.
+`tests/validate-skills.sh#It fingerprints the schema document` records that it hashes the schema
+document and not what `write_profile` emits.
 
 In `tests/validate-skills.sh`, add a line to `schema_fingerprint_for` beside the others, leaving
 1, 2 and 3 untouched:
@@ -2641,10 +2644,10 @@ None blocks execution. Five are recorded because a decision made silently gets r
    this repository's own measured evidence says otherwise: `tests/evals/results.md` records an arm
    at "`gates.coding_standards`, read by nothing and acted on anyway", an agent reading the key out
    of the profile and setting severity by it without being told to, and
-   `docs/ideas/standards-that-bind.md:506-510` builds on that observation. `unread:` is the closest
-   honest value available and it is not true. A fifth value, or an `observed:<path>:<line>` reading
-   of `advisory:`, would let it be said. Not built here because it changes the grammar every key
-   uses, and `standards-that-bind` owns that key's fate.
+   `docs/ideas/standards-that-bind.md#in the skills that can afford one` builds on that observation.
+   `unread:` is the closest honest value available and it is not true. A fifth value, or an
+   `observed:<path>:<line>` reading of `advisory:`, would let it be said. Not built here because it
+   changes the grammar every key uses, and `standards-that-bind` owns that key's fate.
 0a. **The grammar has no phrase form, so ten markers cite a line number that can never go red.**
    The ten `unread:` markers point at their own row in the verdict table above. Those rows are 22
    contiguous non-blank lines, so an insertion above them retargets a citation onto a neighbouring
@@ -2654,11 +2657,12 @@ None blocks execution. Five are recorded because a decision made silently gets r
    is that `unread:<path>:<line>` has no phrase form to offer, while
    `tests/validate-citations.sh` prescribes exactly that remedy for prose. Worth an
    `unread:<path>#<heading>` form, and not built here.
-0b. **Nothing says whether a marker lists every reader or one.** `verify.lint` cites `bin/keel:1387`
-   and `docs/standards.md` records `.github/workflows/ci.yml` reading `verify.lint` with `jq`, a
-   second real reader the marker omits. Harmless today because one true citation is enough to prove
-   the key is live, and expensive to make exhaustive. Decide it before anyone relies on the marker
-   as a census rather than as evidence.
+0b. **Nothing says whether a marker lists every reader or one.** `verify.lint` cites
+   `bin/keel#local c; c="$(json_get .keel/profile.json "verify.$k"` and `docs/standards.md` records
+   `.github/workflows/ci.yml` reading `verify.lint` with `jq`, a second real reader the marker
+   omits. Harmless today because one true citation is enough to prove the key is live, and
+   expensive to make exhaustive. Decide it before anyone relies on the marker as a census rather
+   than as evidence.
 
 0c. **A false citation is red or green depending on how many lines someone inserted above it.**
    Measured on this branch, not argued. Task 3's first attempt inserted 41 lines into
@@ -2759,10 +2763,10 @@ None blocks execution. Five are recorded because a decision made silently gets r
 touched: this repository's own `.keel/profile.json` says `0.15.0` against a `VERSION` of `0.18.0`
 and `schema_version 2` against `SCHEMA_VERSION=3`, and both are staleness in a hand-written
 dogfood file that `bin/keel:1554`'s doctor warning already reports. `bin/keel` is authoritative for
-the schema, which `tests/validate-skills.sh:693-701` proves by passing today against the line for 3
-at `:86`. Fixing the repository's own profile is one `keel init` and its own task; landing it inside
-this change is how a released version's record gets rewritten.
+the schema, which `tests/validate-skills.sh#schema_got="$(python3` proves by passing today against
+the line for 3 at `:86`. Fixing the repository's own profile is one `keel init` and its own task;
+landing it inside this change is how a released version's record gets rewritten.
 
 The `artifacts.*` write-side gap is out of scope and recorded in the idea record: `write-plan`,
 `design-architecture` and `write-user-stories` check the map before reading and hardcode the default
-path when writing. It would pass the checker, because `bin/keel:1352-1361` reads the map.
+path when writing. It would pass the checker, because `bin/keel#.get('artifacts',{})` reads the map.

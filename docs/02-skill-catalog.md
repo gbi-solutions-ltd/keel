@@ -83,7 +83,7 @@ the vendor sits behind the exporter and a switch is configuration rather than a 
 work where no skill has been picked yet.
 **Reads:** `.keel/profile.json`.
 **Writes:** nothing.
-**Does:** routes to one skill and stops. This is the only skill whose body is a table of
+**Does:** routes to one skill and follows it. This is the only skill whose body is a table of
 "if the request looks like X, invoke Y". Kept under 200 words because the `SessionStart`
 hook injects a compressed version of it into every session.
 
@@ -152,7 +152,7 @@ number pass as an assessed one.
 **Trigger:** a product idea, a feature to specify, "write requirements", "we need a PRD",
 or an existing PRD that needs improving.
 **Reads:** the snapshot at `profile.artifacts.snapshot` if that is set, otherwise `<docs_root>/snapshot.md`; existing PRD if refactoring.
-**Writes:** `<docs_root>/prd/<slug>.md`.
+**Writes:** `<docs_root>/prd/<slug>.md`; in `revise`, the existing PRD in place.
 **Does:** three modes, picked by what the user has.
 
 | Mode | When | Source |
@@ -164,9 +164,9 @@ or an existing PRD that needs improving.
 The third mode is `revise`, not `refactor`, so the mode name cannot be confused with the
 `refactor` skill.
 
-All three run the questionnaire first, one question per message, following the
-`brainstorming` pattern from superpowers. The hard gate: no design or code until the user
-has approved the PRD in writing.
+All three run the questionnaire first, one question per message, following the `brainstorming`
+pattern from superpowers. The hard gate: no design or code until the user has approved the PRD in
+writing; a single feature or bug routed to `tdd` or `debug` goes there instead.
 
 Sections: executive summary, problem statement, vision and goals, users and personas,
 functional requirements, non-functional requirements, technical constraints, UX
@@ -190,7 +190,7 @@ worse than no PRD. The gap between the two is the deliverable.
 **Trigger:** a PRD exists and needs breaking down, "write user stories", "create tickets",
 "break this into epics".
 **Reads:** `<docs_root>/prd/<slug>.md`.
-**Writes:** `<docs_root>/stories/<slug>.md`.
+**Writes:** `profile.artifacts.stories` if that is set, added to in place, otherwise `<docs_root>/stories/<slug>.md`.
 **Does:** epics, then features, then tasks. Every story carries: the `As a / I want / So that`
 statement, Gherkin acceptance criteria, a size estimate, dependencies, and the PRD
 requirement ID it traces to. That traceability field is what lets `write-plan` prove
@@ -201,10 +201,10 @@ coverage later.
 **Trigger:** "design a schema", "review this database", "normalise these tables", "what column
 type", indexes or partitioning for a database.
 **Reads:** the schema, from the database where possible, plus row counts.
-**Writes:** a schema review whose sections are all filled, handed to `write-docs` to publish.
+**Writes:** a schema review whose sections are all filled.
 **Does:** owns schema design and review of an existing database, and hands off everything that
 already has an owner: engine choice to `design-architecture`, query latency to
-`optimize-performance`, the document to `write-docs`, the ERD to `mermaid-patterns.md`.
+`optimize-performance`, the ERD to `mermaid-patterns.md`.
 
 Its content is a required-sections template rather than review technique, and the reason is
 measured. A `create-skill` Step 1 baseline on 2026-08-19, recorded in `tests/evals/results.md`,
@@ -246,14 +246,15 @@ and any deviation gets its own ADR.
 
 **Trigger:** an approved design or spec exists and work is about to start.
 **Reads:** architecture doc, stories.
-**Writes:** `<docs_root>/plans/YYYY-MM-DD-<slug>.md`.
+**Writes:** `profile.artifacts.plans` if that is set, otherwise `<docs_root>/plans/`, as `YYYY-MM-DD-<slug>.md`.
 **Does:** superpowers' `writing-plans`, near-verbatim, because it is the best version of
 this that exists. Bite-sized steps of 2 to 5 minutes. Exact file paths. Real code in the
 plan, never "add error handling here". Each task carries a `Consumes` and `Produces`
 interface block so a task executed in isolation knows the signatures its neighbours use.
 
-Every task follows the TDD five-step shape: write the failing test, run it and watch it
-fail, write minimal code, run it and watch it pass, commit.
+Every task follows the TDD five-step shape: write the failing test, run it and watch it fail, write
+minimal code, run it and watch it pass, then run the suite and hand over; only a task in a declared
+concurrent batch commits for itself, in its own worktree.
 
 Each task also carries a `Depends on:` line, which is what lets `execute-plan` overlap work;
 a plan may declare a batch of tasks as concurrent when the template's five conditions hold.
@@ -279,10 +280,11 @@ plan to itself and none of them opens the codebase the plan will be built on.
 - **Inline:** executes tasks in the current session with a checkpoint after each. Right for
   small plans and when the user wants to watch, and taken by naming it and why, not by drifting.
 
-Stops and asks rather than guessing when it hits a blocker, a failing verification it
-cannot explain, or an instruction it does not understand. Never starts on `main`.
+Stops and asks rather than guessing when it hits a blocker, a failing verification it cannot
+explain, or an instruction it does not understand. Never starts on the default branch without
+consent.
 
-**REQUIRED SUB-SKILL:** `tdd` for every task, `debug` on any failure.
+**REQUIRED SUB-SKILL:** `tdd` for every task, `debug` through Phase 3 for a failure the task caused.
 
 ---
 
@@ -333,8 +335,8 @@ logging, no `any` escape hatches without a comment explaining why.
 
 ### `debug`
 
-**Trigger:** any bug, test failure, unexpected behaviour, performance anomaly, build
-failure, or integration problem, before proposing any fix.
+**Trigger:** any bug, test failure, unexpected behaviour, build failure, or integration problem,
+before proposing any fix.
 **Reads:** logs, stack traces, git history.
 **Writes:** a failing test that reproduces the bug, then the fix.
 **Does:** superpowers' four-phase `systematic-debugging`. Root cause investigation, pattern
@@ -466,7 +468,7 @@ a release worked, against the running system rather than the repository.
 
 ### `ship`
 
-**Trigger:** "ship it", "open a PR", "let's land this", work believed complete.
+**Trigger:** "ship it", "open a PR", "push it for review", work believed complete.
 **Reads:** everything.
 **Writes:** a commit, a branch, a PR.
 **Does:** a gate, not a convenience. It runs the checklist and refuses to open a PR while
@@ -474,7 +476,9 @@ anything is red.
 
 1. All tests pass, and new code has new tests
 2. Lint, format, and typecheck clean
-3. `security-audit --diff` clean, or findings explicitly accepted by the user
+3. `security-audit --diff` per `gates.security_audit`: `required` blocks, `warn` asks, `off` skips,
+   except on a hard-block path, and a diff changing either key is gated by the default branch's
+   values
 4. `review-code` run and blocking findings resolved
 5. Docs updated when behaviour changed
 6. Plan checkboxes all ticked, or the remainder explicitly deferred

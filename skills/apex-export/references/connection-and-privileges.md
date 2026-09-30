@@ -2,7 +2,7 @@
 
 ## The user to ask for
 
-A read only database user, mapped to the workspace that owns the application.
+The user from Step 2 of the skill: read only, mapped to the workspace that owns the application.
 
 That last clause is the one people miss. `APEX_APPLICATION_PAGES` and its siblings filter on the
 workspaces the connecting schema is associated with. A user with `SELECT ANY DICTIONARY` and no
@@ -90,8 +90,8 @@ Do not trust that list over the export's own output. The manifest records what w
 database.
 
 Two uses. A capture from a customer site can be re-rendered locally when the rendering is wrong,
-without asking for access again. And a capture is what `tests/test-apex-export.sh` runs against,
-which is why the renderer is pure and lives in a separate file from the connection handling.
+without asking for access again. And a capture can be re-rendered as often as needed with no
+database, so a rendering fix can be checked against the same input.
 
 A capture contains the application's SQL and PL/SQL verbatim, before redaction. Treat it as
 sensitive: it is the one artifact here that has not been through the credential scrubber.

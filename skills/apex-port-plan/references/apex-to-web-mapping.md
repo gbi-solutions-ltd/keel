@@ -25,7 +25,7 @@ being chosen for licence reasons, because that is a commercial decision and not 
 | APEX | Replacement | Note |
 |---|---|---|
 | Page | Route | One APEX page is often two routes: a list and a detail |
-| Region with a SQL source | A data fetch plus a component | The SQL in `regions/*.sql` is the query, verbatim |
+| Region with a SQL source | A data fetch plus a component | The SQL in `regions/*.sql`, or inline in `page.md` when it is one short line, is the query, verbatim |
 | Page item `P20_X` | A form field plus its state | The `&P20_X.` and `:P20_X` references across the export show where it is read |
 | Application item | Session or global state | Check `shared/app_items/` for its protection level first |
 | Computation | Derived value, computed where it is used | Most disappear |
@@ -71,8 +71,9 @@ see which other pages mention it.
 **Declarative session state protection.** Page access protection, item protection levels, and URL
 checksums are APEX preventing parameter tampering for you. The new application has no equivalent
 switch, and the replacement is authorization enforced at the data layer on every request, not URL
-signing. A page listed as `Arguments Must Have Checksum` in the inventory is a page whose ids were
-never trustworthy from the URL, and that assumption has to be rebuilt deliberately.
+signing. A page whose `page.md` gives page access protection as `Arguments Must Have Checksum` is a
+page whose ids were never trustworthy from the URL, and that assumption has to be rebuilt
+deliberately.
 
 ## Two things the export cannot tell you
 

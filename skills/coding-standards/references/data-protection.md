@@ -1,9 +1,9 @@
 # Data protection
 
-Read this wherever personal data is stored, which for a payments system is everywhere. The existing
-rules on secrets and log redaction in `house-defaults.md` and `observability.md` cover one control out
-of a lifecycle: they stop personal data reaching a log. They say nothing about how long it is kept,
-who can reach it, whether it is encrypted where it sits, or how it is deleted.
+Read this wherever personal data is stored. The existing rules on secrets and log redaction in
+`house-defaults.md` and `observability.md` cover one control out of a lifecycle: they stop personal
+data reaching a log. They say nothing about how long it is kept, who can reach it, whether it is
+encrypted where it sits, or how it is deleted.
 
 This is a set of engineering defaults, not legal advice. Data protection law varies by market and by
 which regulator has an interest in a given account, so where a rule below and a written obligation

@@ -69,7 +69,7 @@
         "language": {
           "type": "string",
           "description": "The primary language, which drives the verify commands and the conventions a skill applies. Read from a declared manifest such as package.json or go.mod for every language except plsql, which has no manifest format and is inferred from the shape of the tree instead: no other manifest present, .sql and .plsql dominant, and an Oracle-exclusive token in one of them. unknown means nothing was detected, and a skill asks rather than guessing.",
-          "x-keel-read-by": "advisory:skills/keel/references/tool-choices.md:20"
+          "x-keel-read-by": "advisory:skills/keel/references/tool-choices.md#which every keel project already has"
         },
         "runtime": {
           "type": "string",
@@ -79,7 +79,7 @@
         "framework": {
           "type": "string",
           "description": "The application framework in use, such as nextjs, laravel or spring. none means the project uses its language's standard library and no framework, which is a real answer and not a gap.",
-          "x-keel-read-by": "advisory:skills/coding-standards/references/house-defaults.md:31"
+          "x-keel-read-by": "advisory:skills/coding-standards/references/house-defaults.md#profile.stack.framework"
         },
         "package_manager": {
           "type": "string",
@@ -92,7 +92,7 @@
             "type": "string"
           },
           "description": "Every other language detected in this repository. The primary in `language` drives the verify commands; these get a language server each.",
-          "x-keel-read-by": "advisory:skills/keel/references/tool-choices.md:21"
+          "x-keel-read-by": "advisory:skills/keel/references/tool-choices.md#Where a repository is multi-stack"
         },
         "datastores": {
           "type": "array",
@@ -107,7 +107,7 @@
           "description": "When true, the project has a user interface of some kind. It is read by three callers that each ask a different question of it, so each gates on it plus what it needs: the frontend standard applies when this is true and stack.framework is not flutter, because that reference is about the browser. See skills/coding-standards/references/frontend.md.",
           "x-keel-read-by": [
             "code:bin/keel#if have_python && [ \"$(json_get .keel/profile.json stack.has_ui",
-            "advisory:skills/coding-standards/references/house-defaults.md:31"
+            "advisory:skills/coding-standards/references/house-defaults.md#profile.stack.has_ui"
           ]
         }
       }
@@ -169,8 +169,11 @@
             "string",
             "null"
           ],
-          "description": "The writing counterpart of format. Never run by a gate: it is what a refusal names as the remedy, so the person committing runs it and reads what it changed.",
-          "x-keel-read-by": "code:bin/keel#fix=\"$(field verify.format_fix"
+          "description": "The writing counterpart of format. Never run by a gate, except ship's formatting exception on the files a diff touches: it is what a refusal names as the remedy, so the person committing runs it and reads what it changed.",
+          "x-keel-read-by": [
+            "code:bin/keel#fix=\"$(field verify.format_fix",
+            "advisory:skills/ship/SKILL.md#verify.format_fix"
+          ]
         },
         "typecheck": {
           "type": [
@@ -194,15 +197,15 @@
             "null"
           ],
           "description": "The command that runs end-to-end tests against a running system. Read by `keel doctor`, which names it and deliberately does not run it: it needs a running system that doctor has no way to provide.",
-          "x-keel-read-by": "code:bin/keel#local dc; dc=\"$(json_get .keel/profile.json \"verify.$k\""
+          "x-keel-read-by": "code:bin/keel#local dc; dc=\"$(json_get .keel/profile.json verify.e2e"
         },
         "security": {
           "type": [
             "string",
             "null"
           ],
-          "description": "The command that runs a security scanner, such as a dependency audit. null where the project has none, and `keel init` never detects one, so null is the ordinary value rather than a gap. Read by `keel doctor`, which names it and does not run it: it reaches the network. security-audit does its own reading either way.",
-          "x-keel-read-by": "code:bin/keel#local dc; dc=\"$(json_get .keel/profile.json \"verify.$k\""
+          "description": "The command that runs a security scanner, such as a dependency audit. keel init detects one from a single npm, pnpm or yarn 2+ lockfile, and null is the ordinary value elsewhere. Run by full `keel doctor`, which then reaches the network; `keel doctor --fast` only checks that it is set. security-audit does its own reading either way. To keep a different audit, or a no-op, set it to that command: keel init keeps any value that is not null, and detects one again where it is null.",
+          "x-keel-read-by": "code:bin/keel#for k in test lint typecheck build security; do"
         }
       }
     },
@@ -299,8 +302,11 @@
             "warn",
             "off"
           ],
-          "description": "Whether security-audit must run before a change ships. ship itself runs the audit and refuses on anything red unconditionally, whatever this says; the key instead decides the verdict the audit's own report states: required says any finding blocks shipping, warn says the findings are the user's call to accept, off skips the audit outright. Read by `skills/security-audit/SKILL.md`, advisorily: it is prose the model follows, not a hook that asserts it, and it applies on both harnesses because skill bodies do.",
-          "x-keel-read-by": "advisory:skills/security-audit/SKILL.md:81"
+          "description": "Whether security-audit runs before a change ships, and what its findings do. required says any finding blocks shipping unless the user names an override for it; warn reports the findings and leaves accepting them to the user; off skips the audit before a ship, except on a diff touching a hard-block path, and the report says so; an audit the user asks for runs anyway. A match on a hard-block path is never overridable in conversation, whatever this says. A diff that changes this key or the hard-block paths is gated by the default branch's values. Read by `skills/security-audit/SKILL.md` and by ship's gate item 4, advisorily: it is prose the model follows, not a hook that asserts it, and it applies on both harnesses because skill bodies do.",
+          "x-keel-read-by": [
+            "advisory:skills/security-audit/SKILL.md#gates.security_audit",
+            "advisory:skills/ship/SKILL.md#gates.security_audit"
+          ]
         },
         "commit_guard": {
           "enum": [
@@ -366,13 +372,13 @@
         },
         "default_branch": {
           "type": "string",
-          "description": "The repository's default branch, which is frequently not the checked-out one. Skills refuse to implement here and repo-snapshot compares HEAD against it.",
+          "description": "The repository's default branch, which is frequently not the checked-out one. Skills refuse to implement here, repo-snapshot compares HEAD against it, and the CI workflow keel init generates runs on pushes to it.",
           "x-keel-read-by": "code:bin/keel#protected=\"$(sed -n 's/.*\"default_branch\": *\"\\([^\"]*\\)\".*/\\1/p' .keel/profile.json 2>/dev/null"
         },
         "protect_default_branch": {
           "type": "boolean",
           "default": true,
-          "description": "false lets the push guard allow a push straight to default_branch. Read by the pre-push hook from `keel guard install`, which otherwise refuses one, since work lands through a pull request. `git push --no-verify` is the one-off escape hatch.",
+          "description": "false lets the push guard allow a push straight to default_branch. Read by the pre-push hook from `keel guard install`, which otherwise refuses one, since work lands through a pull request. `git push --no-verify` is the one-off escape hatch. keel doctor warns when this is not false and the guard is not installed.",
           "x-keel-read-by": "code:bin/keel#protect=\"$(sed -n 's/.*\"protect_default_branch\": *\\([a-z]*\\).*/\\1/p' .keel/profile.json 2>/dev/null"
         },
         "response_style": {
@@ -392,6 +398,12 @@
           "default": "technical",
           "description": "technical assumes the vocabulary of the thing being described; plain has chat replies define a technical term the first time they use it. It changes replies only: artifacts stay technical whatever this says, and the SessionStart hook picks its injected paragraph from this key and response_style together. Absent is treated as technical.",
           "x-keel-read-by": "code:hooks/session-start:116"
+        },
+        "no_attribution_footers": {
+          "type": "boolean",
+          "default": false,
+          "description": "true means this repository's commit messages carry a title and a body only. The prepare-commit-msg hook `keel guard install` writes then adds no Keel-Version trailer. Set by hand; keel init does not write it.",
+          "x-keel-read-by": "code:bin/keel#footers=\"$(sed -n"
         }
       }
     },

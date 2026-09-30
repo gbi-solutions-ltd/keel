@@ -35,7 +35,7 @@ TTL by data class, as a starting point rather than a rule:
 |---|---|---|
 | Reference data (countries, currencies, fee tables) | Hours | Cheap, and a version segment in the key beats a long TTL you have to wait out |
 | Configuration and feature flags | Seconds to a minute | Long enough to matter, short enough that a rollback takes effect before someone escalates |
-| Authorisation decisions and permission sets | Seconds, and invalidated on change | See `authorization.md`. A revoked permission that stays cached is an access control failure with a timestamp on it |
+| Authorisation decisions and permission sets | Seconds, and invalidated on change | See `authorisation.md`. A revoked permission that stays cached is an access control failure with a timestamp on it |
 | Expensive aggregates and reports | Minutes, stated in the UI | "As of 14:32" costs one line and removes the entire class of "the numbers are wrong" tickets |
 | Balances, ledger positions, anything that moves money | Do not cache | Or cache with mandatory invalidation on every write path, and treat a missed invalidation as a defect of the same severity as a wrong posting |
 

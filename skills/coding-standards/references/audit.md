@@ -1,8 +1,7 @@
 # Audit mode
 
 Derive what a repository already does, and report it. **An audit is a derivation and not an agreed
-standard**, and it says so in its own header. Nothing else is written, and no file that was read is
-edited.
+standard**, and it says so in its own header.
 
 Run Step 1 and Step 2 of `SKILL.md`: sample at least ten files across different areas, and split
 what a tool can check from what needs judgement. **Step 2's `Goes to` column is author's, not
@@ -21,11 +20,9 @@ loses a report.
    from the ones that were skipped.
 3. **The conventions found**, one per entry, each with the rule, a `path:line` that shows it, the
    count of conforming against total sites, and which of Step 2's two piles it fell in.
-4. **The splits**, where the tree contradicts itself. **Step 1's counting rule decides these: the
-   majority is the convention, except where the majority pattern is the defect**, and there the
-   report records the minority as the rule and says why, because writing the majority down would
-   sanction it. Give the conforming-to-total ratio on every split, so a reader can see the split was
-   counted rather than judged.
+4. **The splits**, where the tree contradicts itself. **Step 1's counting rule decides these,
+   including its exception where the majority pattern is the defect.** Give the conforming-to-total
+   ratio on every split, so a reader can see the split was counted rather than judged.
 5. **What has no convention.** Areas where the code is genuinely inconsistent with no defensible
    reading. Naming them is the honest output, not a gap in the audit.
 6. **Not covered**, explicit.

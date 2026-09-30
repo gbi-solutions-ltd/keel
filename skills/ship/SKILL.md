@@ -1,6 +1,6 @@
 ---
 name: ship
-description: Use when work is believed complete and the user wants to ship it, open a pull request, land a change, or push and deploy.
+description: Use when work is believed complete and the user wants to ship it, open a pull request, or push it for review.
 allowed-tools: [Read, Write, Edit, Bash, Grep, Glob]
 ---
 
@@ -21,14 +21,21 @@ Work down. Report the first failure and stop; do not run the rest and bury it.
 2. **New code has new tests.** A diff adding behaviour with no test added is incomplete, not
    finished.
 3. **Lint, format, and typecheck pass**, for each that is not `null` in the profile.
-4. **`security-audit --diff` is clean**, or its findings are explicitly accepted by the user. On a
-   `hard_block_paths` match, not overridable in conversation.
+4. **`security-audit --diff` per `gates.security_audit`**: `required`, findings block and only a
+   named override per finding passes; `warn`, findings are reported and the user decides; `off`, the
+   report says `skipped (gate off)`, unless the diff touches a `hard_block_paths` path. On a
+   `hard_block_paths` match, under any value, findings block and are not overridable in
+   conversation. Read both keys from the default branch where the diff changes either.
 5. **`review-code` has run**, nothing blocking remains, and, under `gates.coding_standards`, no
    standards violation remains unaddressed:
    [references/standards-gate.md](references/standards-gate.md).
 6. **Docs updated** where behaviour changed, and written as current state rather than as a record
    of the review. A behaviour change with stale docs is a future bug report.
-7. **The plan's checkboxes are ticked**, or the remainder is explicitly deferred and said out loud.
+7. **`keel plan status <plan>` prints `next: none` and exits 0**, and the report names each
+   deferred or not-applicable step with its reason. Exit 1 fails the gate.
+   Where `keel` is not installed or not on PATH, or reports the plan unaddressable, read the
+   plan by hand instead: every checkbox is ticked, or the remainder is explicitly deferred and
+   said out loud.
 8. **Not on the default branch**, and the branch name follows the project convention.
 
 ## When something is red
@@ -36,8 +43,9 @@ Work down. Report the first failure and stop; do not run the rest and bury it.
 Say which check failed, show the output, and stop. Do not fix it as part of shipping: a gate that
 repairs its own failures is not a gate, and the fix belongs in its own reviewed change.
 
-The exception is a mechanical formatting fix from a `--fix` command, which is safe and does not
-change behaviour. Say that you ran it.
+The exception is a mechanical formatting fix from `profile.verify.format_fix`, run only on files the
+diff already touches (passed as paths; if the command cannot take them, do not run it) and committed
+on its own, which is safe and does not change behaviour. Say that you ran it.
 
 ## "They are flaky"
 
@@ -84,9 +92,4 @@ Report the PR URL, what the gate checked, and anything accepted rather than fixe
 
 | Mistake | Instead |
 |---|---|
-| Trusting a previous green run | Run the tests now |
-| Fixing failures as part of shipping | Stop. The fix is its own change |
-| "Ship it anyway" accepted as an override | Ask which check, and record it |
-| A PR body assembled from commit subjects | Write it from the plan and the diff |
-| An attribution footer | Title and body only |
-| Shipping with unticked plan boxes | Tick them, or defer them out loud |
+| Shipping with unticked plan boxes | Stop. Finish the step in its own change, or defer it with its reason |

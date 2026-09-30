@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-09-19, "plan the work that makes keel enforceable outside the agent" |
-| Status | shaped |
+| Status | built via docs/plans/2026-09-19-make-keel-enforceable-outside-the-agent.md. Status corrected 2026-09-25 by docs/snapshot.md |
 | Recommendation | Add `keel doctor --json`, then a small fan-out script over it. Judge this by whether it serves the gateways, not by elegance |
-| Next | `write-plan`, as one increment of the outside-the-agent plan |
+| Next | Reporting profile loosening through `doctor --json`, deferred by that plan's open question 1 until the comparison duplicated in the pre-push hook costs real maintenance |
 
 ## The problem
 
@@ -22,10 +22,13 @@ counters; nothing accumulates findings as data. Every check funnels through thes
 the harness-plugin sections via `harness_section`, which itself reads lines already tagged
 `fail|`/`warn|`/`ok|`. That consistent grammar is the exploit: a `--json` mode does not need every
 call site touched. The cheapest approach captures `cmd_doctor`'s stdout, strips the interstitial
-progress lines (e.g. `bin/keel:1579`, "verify.%s: running: ..."), and parses the remaining lines
-into a JSON array, adding the fields the fleet script actually needs (`schema_version`,
-`keel_version`, `verify.test` nullness) as their own top-level keys rather than re-parsed prose,
-since those are already read via `json_get` (`bin/keel:1403-1404,1567-1568`).
+progress lines (e.g. `bin/keel#printf '..... verify.%s: running: %s\n'`, "verify.%s: running: ..."),
+and parses the remaining lines into a JSON array, adding the fields the fleet script actually needs
+(`schema_version`, `keel_version`, `verify.test` nullness) as their own top-level keys rather than
+re-parsed prose, since those are already read via `json_get`
+(`bin/keel#t0="$(json_get .keel/profile.json verify.test`,
+`bin/keel#pv="$(json_get .keel/profile.json keel_version`,
+`bin/keel#        sv="$(json_get .keel/profile.json schema_version`).
 
 Estimated medium, ~100-180 LOC given this repository's comment density, plus a `--json`
 flag alongside the existing `--fast` (`bin/keel:1246`) and test coverage in `tests/test-keel.sh`.

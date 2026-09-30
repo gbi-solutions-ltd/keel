@@ -5,10 +5,10 @@ The structure of `<docs_root>/port/<service>-assessment.md`.
 **Why this is not shared with `apex-port-plan`.** It was, for one release, on the reasoning that two
 templates drift. A run against a real Spring Boot service showed that was the wrong trade: the APEX
 template is APEX-shaped throughout, in twenty-one places, and names `INDEX.md`, `xref.tsv`, page
-ids, PL/SQL packages, build options and `REDACTIONS.md`. The agent following it rewrote four sections
-and ignored its output path, then said so. A shared template that every user has to rewrite is not
-shared, it is a detour. The two now cross-reference instead: read the other one before changing the
-rules section here, because those rules genuinely are common.
+ids, PL/SQL packages, build options and `REDACTIONS.md`. The agent following it rewrote four
+sections and ignored its output path, then said so. A shared template that every user has to rewrite
+is not shared, it is a detour. Each names the rules it shares with the other: read the other one
+before changing the rules section here, because those rules genuinely are common.
 
 ```markdown
 # Port assessment: <service> to <target stack>
@@ -18,7 +18,7 @@ rules section here, because those rules genuinely are common.
 | Source assessed | branch, commit, and date. Not "the repo" |
 | Target | The stack as named by the requester |
 | Recommendation | One line |
-| Confidence | Per section, in section 9 |
+| Confidence | Per section, in section 10 |
 
 ## 1. Which codebase this describes
 
@@ -65,8 +65,7 @@ Everything the far side validates byte by byte, and whether the target reproduce
 | Property | Source behaviour | Target default | Same bytes? | How known |
 |---|---|---|---|---|
 
-A property that matters and was not executed is `inferred`, and says so in the row. Do not describe
-an experiment you did not run.
+Do not describe an experiment you did not run.
 
 ## 6. Contract oddities a correct-looking port will break
 
@@ -94,18 +93,14 @@ be sold as if it does.
 
 ## 9. Inputs read, and inputs not read
 
-**The completeness ledger, and it is not optional.** One row per input the snapshot, the agents, or
-a finding named. This exists because two separate runs judged a document's contents from its name or
-a grep count and only admitted it afterwards, unprompted.
+**The completeness ledger from the skill's Step 5 sweep, and it is not optional.**
 
 | Input | Read? | If not, why, and what that costs this assessment |
 |---|---|---|
 
-A grep count is not reading a file. Neither is reading its first twelve lines.
-
 ## 10. Confidence
 
-Per section: verified, mostly verified, inferential, or estimated. A reader deciding whether to take
+Per section: verified, mostly verified, inferred, or estimated. A reader deciding whether to take
 this to a client needs to know which parts survive being challenged.
 ```
 
@@ -115,12 +110,12 @@ this to a client needs to know which parts survive being challenged.
 where ranking helps, and name the driver. Nobody can size this work without knowing the team, and a
 number in a document like this becomes a quote in somebody else's slide.
 
-Be honest that bands read as effort anyway. Say what the bands are relative to.
+Be honest that a ranking reads as effort anyway. Say what each ranking is relative to.
 
 **Every claim carries `verified`, `inferred`, or `estimated`.** The distinction is the document's
 whole value: a reader who cannot tell them apart has to re-derive everything or trust all of it.
 
 **Cite `path:line` or mark `Unknown`.** Never a recollection of how services like this usually work.
 
-**The same rules apply to `apex-port-plan`'s template.** Read the other one before changing them
-here, so the part that genuinely is common stays common.
+**`apex-port-plan`'s template shares the no-hours and cite-a-source rules.** Read it before changing
+them here, so the part that genuinely is common stays common.

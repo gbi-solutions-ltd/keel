@@ -7,6 +7,155 @@ versions as each skill is tested against real repositories.
 
 Entries are terse by design; the narrative for each release is in this file's git history and in docs/.
 
+## 0.22.0 - 2026-09-30
+
+- Release gate 2026-09-30 against `1139527`: **seven treatment arms, all seven pass**, $1.40 in one
+  round. `ship-with-flaky-tests` passed again at 751 words after L-01's fix below, with
+  `audit-under-a-warn-gate` at 840. No accepted failures and no new rationalisation. See
+  `tests/evals/results.md`.
+
+- `coding-standards` and its references take the skill review's findings F-013 to F-045
+  (`docs/audits/2026-09-29-skill-review.md`): author mode is named for a request to set up linting
+  or formatting, and assess names any check that ran with no corpus. The profile schema cites the
+  frontend row of `house-defaults.md` by phrase.
+- `repo-snapshot`, `shape-idea` and their references take the skill review's findings F-170 to
+  F-179 and F-230 to F-239 (`docs/audits/2026-09-29-skill-review.md`).
+- `write-prd`'s approval gate covers a product surface; a single feature or bug routed to `tdd` or
+  `debug` does not enter it (F-338). `write-prd`, `write-user-stories` and their references take
+  the skill review's findings F-306 to F-337 (`docs/audits/2026-09-29-skill-review.md`).
+- `design-database`'s description names reviewing an existing schema and proposing its
+  remediation (F-083). `design-architecture`, `design-database` and their references take the skill
+  review's findings F-071 to F-094 (`docs/audits/2026-09-29-skill-review.md`).
+- `write-plan` stops and names `write-user-stories` when no stories exist, rather than invoking it
+  (F-340), and its description no longer claims "how to build something", which is
+  `design-architecture`'s (F-285). The plan template's batch rules give the worktree reason (F-344).
+  `write-plan` and its references take the skill review's findings F-285 to F-305.
+- `execute-plan` sends a task's own failure to `debug` through Phase 3 only, so a delegated
+  coordinator still writes no production code, and a red already in `tdd`'s start record is
+  recorded rather than debugged (F-343); `docs/02-skill-catalog.md` says the same. `execute-plan`
+  and its references take the skill review's findings F-095 to F-118, and F-346, which scopes
+  `parallel-batches.md`'s shared-tree reason to a shared tree.
+- `debug`'s credential check prints `SET`, `EMPTY` or `UNSET` and never the value (F-069), and its
+  description drops "performance anomaly", which no step handles (F-062). `optimize-performance`
+  sends a behaviour change through `tdd` before the code changes (F-142). `tdd`, `debug`,
+  `refactor`, `optimize-performance` and their references take the skill review's findings.
+- `ship`'s gate item 4 follows `gates.security_audit`: `required` blocks on any finding without a
+  named override, `warn` leaves the findings to the user, and `off` records the audit as skipped,
+  except on a diff touching `hard_block_paths`, which is audited under any value; a directly
+  requested audit runs under `off`. `security-audit`, `docs/02-skill-catalog.md` and
+  `docs/profile-keys.md` state the same, and no longer say ship refuses whatever the key says
+  (F-200, F-339). `ship`'s formatting exception is limited to `verify.format_fix` on files the diff
+  touches, committed on its own (F-341), and its description no longer claims to land or deploy a
+  change (F-240). The prompting guide's escape for the audit is now a named acceptance per finding.
+- `setup-deployment` executes the rollback before writing the runbook (F-342), and its pipeline
+  patterns log a credential's presence as `SET`, `EMPTY` or `UNSET` without printing it (F-345).
+  `review-code`, `incident-response`, `setup-deployment` and their references take the skill
+  review's findings F-119 to F-127, F-180 to F-194 and F-213 to F-229.
+- `write-docs` and its references take the skill review's findings F-262 to F-284
+  (`docs/audits/2026-09-29-skill-review.md`).
+- The `keel` router sends "fix bug Z" to `debug`, not `tdd` (F-130), and so do `docs/prompting.md`
+  and the installed cheatsheet. `keel`, `context-budget`, `create-skill` and their references take
+  the skill review's findings F-046 to F-061 and F-128 to F-138. The profile schema cites
+  `tool-choices.md` by phrase.
+- `apex-export`, `apex-port-plan`, `port-assess` and their references take the skill review's
+  findings F-001 to F-012 and F-148 to F-163 (`docs/audits/2026-09-29-skill-review.md`).
+- `ship` and `security-audit` read `gates.security_audit` and `hard_block_paths` from the default
+  branch when the diff changes either, so a change cannot switch off its own audit.
+- `security-audit`'s reply opens with the gate's verdict, so under `warn` it says the gate does not
+  block before recommending, and assess mode's reply names its five checks in the report's order.
+- `tdd` no longer tells every project its suite takes 313 seconds, which was keel's own.
+- `ship` passes a plan when `keel plan status` prints `next: none` and exits 0; a plan with no step
+  ids is still checked by its boxes, as before.
+- `execute-plan` resumes with `keel plan status` and ticks with `keel plan tick`, by hand where
+  `keel` cannot run or the plan has no step ids.
+- `keel plan tick` takes a lock, `<plan>.lock`, so ticks started together on one plan all land.
+- `keel plan status` and `keel plan tick` report a plan with no step ids as unaddressable, exit 3,
+  and change nothing. A fence that never closes is reported as such instead.
+- `keel plan tick --defer <reason>` and `--not-applicable <reason>` park a step with its reason,
+  and refuse without one.
+- `keel plan tick <plan> <id> [--note <text>]` marks one step done by its id, changing no other
+  line.
+- `keel plan status` exits 1 on a deferred or not-applicable step with no reason, an id that appears
+  twice, an open checkbox it cannot read as a step, or a fence that never closes, naming each.
+- `keel plan status <plan>` prints each task's steps by state and the next open step's id.
+- Plans written from the template give every step an id, `**Step <task>.<step>: ...**`, and a step
+  can be deferred, `[-]`, or not applicable, `[~]`, each with its reason after the title.
+  `tests/validate-skills.sh` fails a plan template whose steps lost their ids.
+- The pre-push hook runs `keel scan --push` on each commit a ref is pushed to, not the working
+  tree, and only with the installed keel's scanner, never the repository's own
+  `tests/supply-chain-scan.sh`. With no `keel` on PATH it says nothing was scanned and allows the
+  push; with a `keel` too old for `--push` it says so and scans the working tree. An existing
+  install keeps its old hook until `keel guard install` is run again in that clone.
+- The pre-push hook reads git's lines from the right, so a push source holding a space, such as
+  `:/fix HEAD`, no longer shifts the fields. Such a push was scanned as the wrong commit, and one
+  to the default branch was not refused as one. `keel guard status` calls a hook written before
+  `--push` stale rather than active.
+- `keel scan --push <remote> <commit>` scans a commit rather than the working tree: its tree, and
+  any version of a key, keystore or certificate file a commit not yet on `<remote>` added or
+  changed and the tip does not hold with that content. An entry in `.keel/scan-allow` covers only
+  the version the tip holds, so a live key put at an allowed path and replaced or deleted before
+  the tip is refused; an older reviewed version is allowed by a line naming the path and then its
+  blob. It refuses a commit holding
+  a path git refuses to check out, paths the filesystem cannot write apart, or something the
+  filesystem reads as `.keel/scan-allow` that is not that file, and applies none of this user's
+  git configuration to the copy it scans.
+- The supply chain scan counts a file the index records as executable in its executable scope,
+  whatever its bit on disk, so a noexec mount no longer hides one from the rules scoped to
+  executables.
+- The supply chain scan reads a file named `-` or starting with a dash as a file, where `-` hid
+  every file listed after it, and a file name holding colons can no longer forge a suppression of
+  its own finding. A grep with no `--null`, such as BusyBox's, fails the scan instead of silencing
+  every pattern rule.
+- The supply chain scan reads file names git quotes (a byte outside printable ASCII, a tab, a
+  double quote, a backslash), which it skipped, so a payload in such a file no longer passes; a
+  name holding a newline is refused. `--secret-paths` reads a final path with no trailing NUL.
+- CI grants its jobs read-only `contents` permission explicitly, pins `actions/checkout` to a
+  commit and installs ruff by hash.
+- A failing `verify.security` in full `keel doctor` reads `verify.security exited <code>` and
+  says an audit exits non-zero on a finding or an unreachable registry, not `does not run`. A
+  project keeps its own audit, or a no-op, by setting `verify.security` to it; init keeps any
+  value that is not null.
+- `keel doctor` reports the push guard in the same states `keel guard status` does. An install at
+  `.githooks` warns that a checkout runs the branch's own hooks, and names any hooks there keel did
+  not write, which must move before install will; another tool's `core.hooksPath` or same-named
+  hook is named, not counted as the guard and not sent to `keel guard install`. Both commands name
+  the config a foreign `core.hooksPath` is set in.
+- `keel guard install` writes its hooks into git's own hooks directory and sets no
+  `core.hooksPath`. It used `core.hooksPath=.githooks`, a working-tree path, so checking out any
+  branch, a fork's pull request included, ran that branch's own hooks. install moves an install at
+  `.githooks` and unsets the setting, and refuses while another tool's `core.hooksPath` or
+  same-named hook is present. install and uninstall leave a `.githooks` that also holds a
+  project's own hooks in place, and install stops if a `core.hooksPath` from another scope takes
+  over after the move. The hooks are no longer committed; each clone installs its own.
+- `keel profile set` refuses a value the profile schema's enum does not list, and names the
+  values it accepts. A gate set to a typo was written and then read as a weaker gate.
+- `keel doctor` fails any profile value outside the schema's enum, naming the key and the values
+  it accepts, and warns when it cannot read the schema to check them. Nothing checked them before.
+- The CI workflow `keel init` generates runs on pushes to `conventions.default_branch`, not to a
+  hardcoded `main`. It applies where init writes a workflow, which it does only when no CI is
+  declared yet; a `master` repository initialised earlier keeps `branches: [main]` in its
+  `.github/workflows/ci.yml` until someone edits it.
+- `keel doctor` warns when `conventions.protect_default_branch` is not false and `keel guard
+  install` has not been run, and says ok once it has. The guard was opt-in and nothing reported it
+  off. It reads the key with the hook's own sed, so an absent key, which the hook protects on,
+  warns too.
+- The prepare-commit-msg hook from `keel guard install` adds no `Keel-Version` trailer where the
+  profile sets `conventions.no_attribution_footers` to `true`, a key the schema now declares.
+  A hook installed before this release needs `keel guard install` re-run to pick it up, and
+  `keel guard status` says so. Profile schema version 5: `keel doctor` asks each project to re-run
+  `keel init` once.
+- `keel init` detects `verify.security` from a single npm, pnpm or yarn 2+ lockfile, the same
+  audit the generated CI already ran, and full `keel doctor` runs it, so it fails offline or on a
+  high advisory. `keel doctor --fast` does not. Generated CI runs that audit once, as the `security`
+  step, and keeps its own audit step beside a different `verify.security`.
+- keel runs its own push guard, installed in `.git/hooks`, and its `.claude/settings.json`
+  carries the curl, wget and nc ask rules. Its profile records 0.21.0.
+  `keel doctor` on this repository failed on the rules and warned on the guard.
+- CI runs the test suite on macOS as well as Linux, as its own job, advisory until it has a week
+  of green runs.
+- CI lints the Python in `lib/` with ruff 0.16.9, correctness rules only (E4, E7, E9, F), as its
+  own job. The local lint command is unchanged.
+
 ## 0.21.0 - 2026-09-22
 
 - Release gate 2026-09-22 against `9e3321b`: **seven treatment arms, all seven pass**, $2.37 across
@@ -398,15 +547,15 @@ Entries are terse by design; the narrative for each release is in this file's gi
   `docs/profile-keys.md` gains a **Read by** column.
 - **`x-keel-read-by`'s reader rule checked that a citation resolved, never that it named the key.**
   `project.kind`'s real marker turned out, on inspection, to already cite a genuine read site
-  (`bin/keel:1354`, the same line `doctor`'s kind-based branching runs on), correcting an earlier
-  finding that it pointed at the write-side default instead. But the gap the finding was really
-  naming is real: nothing stopped a citation from resolving to a line that names nothing the key
-  owns, only luck did. `code:` now also requires the key's own leaf name (its last dotted segment,
-  not the full path, since a single-purpose read of a nested key almost never repeats the parent
-  segment) on the cited line or within the three lines above it, catching exactly that drift.
-  Measured against every real `code:` marker in this schema, only the six `artifacts.*` keys
-  failed: their one shared citation is a Python dict loop over `d.get('artifacts',{})`, where the
-  loop variable is `k` and no source line ever names `snapshot` or `stories` or any of the other
+  (`bin/keel#echo service`, the same line `doctor`'s kind-based branching runs on), correcting
+  an earlier finding that it pointed at the write-side default instead. But the gap the
+  finding was really naming is real: nothing stopped a citation from resolving to a line that names
+  nothing the key owns, only luck did. `code:` now also requires the key's own leaf name (its last
+  dotted segment, not the full path, since a single-purpose read of a nested key almost never
+  repeats the parent segment) on the cited line or within the three lines above it, catching exactly
+  that drift. Measured against every real `code:` marker in this schema, only the six `artifacts.*`
+  keys failed: their one shared citation is a Python dict loop over `d.get('artifacts',{})`, where
+  the loop variable is `k` and no source line ever names `snapshot` or `stories` or any of the other
   four. A dotted-path version of this idea was tried and measured at 28% false positives against
   this tree before this rule existed in any form, which is why the check is leaf-only and windowed
   rather than exact-line: a `jq` read three lines above its own marker line is a legitimate reader

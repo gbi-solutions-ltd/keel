@@ -15,8 +15,9 @@ whatever the tool's current popularity, and changing it is a normal edit.
    bad idea. Read what is installed before reading these tables.
 2. **One pick, one reason, one runner-up.** The runner-up says when the pick is wrong. A list of
    five is the decision fatigue this file exists to remove.
-3. **At most three new tools per document.** Section 10 caps recommendations at seven items and asks
-   for two or three in the handoff, for the same reason: a reader adopts none of a list of seven.
+3. **At most three new tools per document.** `repo-snapshot`'s section 10 caps recommendations at
+   seven items and asks for two or three in the handoff, for the same reason: a reader adopts none
+   of a list of seven.
 4. **Key on `profile.stack.language`**, which every keel project already has, rather than
    re-detecting. Where a repository is multi-stack, `stack.also` holds the rest and the primary
    language wins.
@@ -70,7 +71,7 @@ author never read. `verify.format_fix` is the writing one.
 | `lua` | Stylua with luacheck | none | Formatting and static analysis are separate here, and both are small |
 | `plsql` | none | none | No linter ships outside vendor IDE tooling, and a rule set nobody can run in CI is not a lint step. Say `null` in the profile |
 | `dart` | `dart analyze` with `dart format` | none | Both ship with the SDK and both run with no configuration, which is why `verify.lint` is not gated on `analysis_options.yaml`: measured 2026-08-29, `dart analyze` reports real type errors in a package that has no such file. `flutter analyze` is the same analyzer invoked through the Flutter SDK. `flutter format` was removed; `dart format` is the only spelling left |
-| shell | shellcheck | none | Nothing else finds shell bugs. It is what this repository uses on itself |
+| shell | shellcheck | none | Nothing else finds shell bugs. |
 
 ## Typecheck
 
@@ -87,8 +88,7 @@ author never read. `verify.format_fix` is the writing one.
 
 ## Everything else
 
-Mostly language-independent, and the first rule is the same in every row: use what the repository
-and its host already have.
+Mostly language-independent.
 
 | Gap | Pick | Runner-up | Why the pick |
 |---|---|---|---|

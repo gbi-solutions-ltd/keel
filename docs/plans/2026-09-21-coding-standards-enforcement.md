@@ -470,8 +470,8 @@ not touch, say so and leave it unstaged.
 later line of `skills/ship/SKILL.md` by one more than step 4 accounted for. That shift broke three
 citations step 4 had already fixed
 (`docs/plans/2026-08-31-release-operations-and-claims-audit.md:388`,
-`docs/plans/2026-09-07-declared-profile-keys-take-effect.md:813`,
-`docs/ideas/declared-profile-keys-take-effect.md:91`, each re-bumped by one more) and revealed five
+`docs/plans/2026-09-07-declared-profile-keys-take-effect.md:815`,
+`docs/ideas/declared-profile-keys-take-effect.md:93`, each re-bumped by one more) and revealed five
 pre-existing shorthand citations (`ship/SKILL.md:N`,
 a form `tests/validate-citations.sh` does not scan, by its own documented design) in
 `docs/ideas/write-ci-does-not-match-ship.md`, `docs/ideas/standards-that-bind.md` (two), and
@@ -959,14 +959,14 @@ the `docs/audits/2026-08-19-efficiency.md` line 9 citation,
 the `docs/audits/2026-09-02-standards.md` line 39 citation (second occurrence),
 the `docs/audits/2026-09-20-security.md` line 81 citation (first occurrence), `docs/ideas/fleet-view-for-doctor.md:19`
 and `:20`, `docs/ideas/leon-van-zyl-skill-collection.md:177`,
-`docs/plans/2026-09-19-make-keel-enforceable-outside-the-agent.md:490,921,993`,
+`docs/plans/2026-09-19-make-keel-enforceable-outside-the-agent.md:490,922,996`,
 `docs/ideas/profile-loosening-goes-unnoticed.md:30`, `docs/ideas/context-window-at-init.md:100,129`,
 `docs/ideas/snapshot-records-its-own-path.md:36,86`, `docs/ideas/snapshot-citation-accuracy.md:46`,
 `docs/stories/context-window-at-init.md:339`'s `bin/keel:1602` citation,
-the `docs/audits/2026-09-20-security.md` line 81 citation (second occurrence, now `bin/keel:2070`),
-the `docs/audits/2026-08-19-delegation-rules-baselines.md` lines 318 and 322 citations, and
-`docs/plans/2026-09-07-declared-profile-keys-take-effect.md`'s `artifacts.*` and `project.kind`
-citations. One genuine task-5-caused miss was found and fixed:
+the `docs/audits/2026-09-20-security.md` line 81 citation (second occurrence, now
+`bin/keel#eval "$cmd"`), the `docs/audits/2026-08-19-delegation-rules-baselines.md` lines 318 and
+322 citations, and `docs/plans/2026-09-07-declared-profile-keys-take-effect.md`'s `artifacts.*` and
+`project.kind` citations. One genuine task-5-caused miss was found and fixed:
 `docs/stories/coding-standards-enforcement.md:324` still cited the pre-should-fix value for
 `write_ci`; its sibling `docs/prd/coding-standards-enforcement.md` had the correct one, which is how
 the miss was caught. A full semantic audit of every citation into `bin/keel` is a separate, larger,

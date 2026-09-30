@@ -44,7 +44,7 @@ lose the ordering.
 
 ## Business time is not wall clock time
 
-The payments-specific section, and the one that produces disputes rather than bugs.
+The section for projects that move money, and the one that produces disputes rather than bugs.
 
 - **A cutoff has a timezone, and it is the business's, not the server's.** "Settlement cutoff 16:00"
   is meaningless without the zone. Store the zone with the rule, and evaluate it by converting the

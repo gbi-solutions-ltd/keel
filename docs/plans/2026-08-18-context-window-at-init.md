@@ -35,7 +35,7 @@ section must still obey them.
   profile while a configured value is still a ceiling would hard-stop a 1M session at 170,000 tokens
   permanently. This is a correctness ordering, not a preference.
 - `SCHEMA_VERSION` does not move. `gates.context_window` is already declared at
-  `templates/profile.schema.json:284`, so no field is added (`CON-01`).
+  `templates/profile.schema.json:287`, so no field is added (`CON-01`).
 - `hooks/session-start` is not touched by any task. It is at about 356 estimated tokens against a
   400 ceiling, and the remaining headroom is spoken for.
 - The watchdog is advisory. It must stay silent when it cannot run, and must never exit non-zero

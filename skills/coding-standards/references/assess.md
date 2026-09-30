@@ -15,16 +15,18 @@ project, never edit `standards.md`. **The report is one numbered section per che
 order:**
 
 1. **House-defaults coverage.** `standards.md` against all ten references the index lists,
-   applicable or not, each row saying what decided it. Those predicates are prose, not profile
-   fields. No code read.
-   - **The house defaults themselves, reported as check 1b.** `standards.md` against
-     all 12 house defaults, which is every `##` section of `house-defaults.md` bar its index and
-     its scope statement. Reported immediately after check 1, as its own number.
+   applicable or not, each row saying what decided it. All but the frontend predicate are prose, not
+   profile fields. No code read.
+   - **The house defaults themselves, reported as check 1b**, counted as
+     [assessment-report.md](assessment-report.md) defines.
 2. **The backlog.** Follow-ups and inconsistencies against HEAD, not the document's own status text.
 3. **A judgement sample.** Up to eight rules, all of them where fewer exist, source read for those
    only, every imprecise match opened.
 4. **The departures ledger.** Each departure into one of six categories, three of which are
    findings. Re-verify every kept departure's basis.
+
+**The reply keeps that order.** Name each check as the report does, check 1's number first, then
+1b, 2, 3 and 4, however short the summary.
 
 ## Where the document exists and there is no code
 

@@ -1,6 +1,6 @@
 ---
 name: coding-standards
-description: Use when asked about a project's conventions or assessing code against them, setting up linting or formatting, onboarding onto an unfamiliar codebase, or when review feedback keeps repeating the same style point.
+description: Use when asked about a project's conventions or assessing code against them, setting up linting or formatting, onboarding onto an unfamiliar codebase, a project with no code yet, or review repeating a style point.
 allowed-tools: [Read, Write, Edit, Bash, Grep, Glob]
 ---
 
@@ -18,8 +18,9 @@ is for judgement calls only.
 Two facts choose it, before anything is read: whether `<docs_root>/standards.md` exists, and whether
 there is code. No document and code is **audit**, [references/audit.md](references/audit.md). No
 document and no code is **seed**, [references/seed.md](references/seed.md). A document, either way,
-is **assess**, [references/assess.md](references/assess.md), naming any check a missing corpus
-stopped. **Author** is steps 1 to 5, and is what audit offers at its end.
+is **assess**, [references/assess.md](references/assess.md), naming any check that ran with no
+corpus. **Author** is steps 1 to 5: what audit offers at its end, and the mode for a request to set
+up linting or formatting or to write the standard.
 
 The request's words win where they conflict. Where a precondition is wrong, say so: asked to assess
 with no document, offer seed or audit by which fact holds; asked to seed or author over one, name it
@@ -78,9 +79,10 @@ Write `<docs_root>/standards.md`. Follow
 Every entry states the rule, one line on why, and a concrete example from this codebase. A rule
 with no reason gets argued about; a rule with no example gets misread.
 
-Include the house defaults from [references/house-defaults.md](references/house-defaults.md), noting any
-this project deliberately departs from. It opens with an index of the topic references and when each
-applies. Read the ones that do, no more.
+Include the judgement house defaults from
+[references/house-defaults.md](references/house-defaults.md), wiring the mechanical ones in Step 3,
+and note any this project deliberately departs from. It opens with an index of the topic references
+and when each applies. Read the ones that do, no more.
 
 ## Step 5: Verify and report
 
@@ -94,10 +96,4 @@ inconsistency you found but did not resolve.
 
 | Mistake | Instead |
 |---|---|
-| Importing a generic style guide | Derive from the code. Ten files, then count |
-| A style guide nobody can enforce | Move it into the linter, or delete it |
-| Landing a linter with hundreds of warnings | Add rules incrementally, fix as you go |
-| A `lint` script that rewrites files | Gates need a check-only command |
-| Rules with no reason | Unexplained rules get relitigated every quarter |
 | Treating a cache or a limit as performance work | Both are correctness. Staleness and the effective limit are stated numbers, not emergent ones |
-| Fixing the minority pattern silently | Count first, then say which you chose and why |

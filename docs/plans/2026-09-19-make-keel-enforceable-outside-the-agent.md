@@ -82,7 +82,7 @@ the documents this plan is built from.
 **Files:**
 - Modify: `docs/ideas/profile-loosening-goes-unnoticed.md`, `docs/ideas/no-durable-provenance-record.md`,
   `docs/ideas/standards-that-bind.md`, `docs/ideas/incidents-do-not-feed-back-into-standards.md`
-  (each contains at least one em dash, which `tests/validate-skills.sh:279` reports as a FAIL)
+  (each contains at least one em dash, which `tests/validate-skills.sh#Em and en` reports as a FAIL)
 - Stage, unchanged: `docs/ideas/write-ci-does-not-match-ship.md`, `docs/ideas/fleet-view-for-doctor.md`,
   and this plan, `docs/plans/2026-09-19-make-keel-enforceable-outside-the-agent.md`. All six idea
   documents and the plan are untracked or modified in the working tree today, and no other task
@@ -171,10 +171,10 @@ witnessed directly in this session; what was witnessed is two independent subage
 against the diff as it stood (spec-compliance: COMPLIES; code-quality: no blocking findings, two
 should-fix, one consider, see below), plus this session's own run of `tests/test-keel.sh`.
 
-Add near the existing `keel new` CI coverage (around `tests/test-keel.sh:2627`, which checks that
-`.github/workflows/ci.yml` is written), a fixture-based check that the generator reaches every
-non-null `verify.*` command, and a second check that `keel init` on an existing project without a
-CI file writes one:
+Add near the existing `keel new` CI coverage (around
+`tests/test-keel.sh#ok "new writes a CI workflow"`, which checks that `.github/workflows/ci.yml` is
+written), a fixture-based check that the generator reaches every non-null `verify.*` command, and a
+second check that `keel init` on an existing project without a CI file writes one:
 
 ```bash
 # --- write_ci reaches every verify.* command, and keel init writes it too ------------------------
@@ -378,9 +378,9 @@ task can make.
 **Idea:** `docs/ideas/no-durable-provenance-record.md`
 
 **Files:**
-- Modify: `bin/keel` (new `guard_prepare_commit_msg_body` function beside
-  `guard_precommit_body` at `bin/keel:1802`; `cmd_guard`'s `install`/`uninstall` cases at
-  `bin/keel:2109-2125`)
+- Modify: `bin/keel` (new `guard_prepare_commit_msg_body` function beside `guard_precommit_body`
+  at `bin/keel#guard_precommit_body() {`; `cmd_guard`'s `install`/`uninstall` cases at
+  `bin/keel#cmd_guard() {`)
 - Modify: `README.md` (line 290, "pre-push and pre-commit hooks")
 - Modify: `docs/03-install-and-distribution.md` (line 346, "Installs two hooks")
 - Test: `tests/test-keel.sh`
@@ -402,8 +402,8 @@ task can make.
 
 - [x] **Step 1: Write the failing test**
 
-Add beside the existing guard tests (near `tests/test-keel.sh:3565`, which already builds a `$g`
-fixture and runs `"$KEEL" guard install`):
+Add beside the existing guard tests (near `tests/test-keel.sh#---- the push guard ---`, which
+already builds a `$g` fixture and runs `"$KEEL" guard install`):
 
 ```bash
 # --- guard install: prepare-commit-msg appends Keel-Version -----------------------------------
@@ -454,7 +454,7 @@ write this file yet.
 
 - [x] **Step 3: Write the minimal implementation**
 
-Add a new function beside `guard_precommit_body` (`bin/keel:1802`, before `cmd_guard`):
+Add a function beside `guard_precommit_body` (`bin/keel#precommit_body() {`, before `cmd_guard`):
 
 ```bash
 # Appends the keel_version a commit was made under, so a later question ("was this commit made
@@ -487,7 +487,8 @@ HOOK
 }
 ```
 
-In `cmd_guard`, `install`) case (`bin/keel:2138-2146`), add the new hook alongside the existing two:
+In `cmd_guard`, `install`) case (`bin/keel#guard_hook_body > "$d/pre-push"`), add the new
+hook alongside the existing two:
 
 ```bash
         install)
@@ -520,11 +521,11 @@ Expected: PASS.
 Change to `keel guard install    # pre-push, pre-commit, and prepare-commit-msg hooks, repo-local,
 opt-in`.
 
-`docs/03-install-and-distribution.md:351` says `Installs two hooks, by writing
-`.githooks/pre-push` and `.githooks/pre-commit` and setting`. Change to `Installs three hooks, by
-writing `.githooks/pre-push`, `.githooks/pre-commit`, and `.githooks/prepare-commit-msg`, and
-setting`. Immediately after the existing pre-commit paragraph (ends `...because neither can be run
-as written.`), add one paragraph:
+`docs/03-install-and-distribution.md#Installs three hooks` says `Installs two hooks,
+by writing `.githooks/pre-push` and `.githooks/pre-commit` and setting`. Change to `Installs three
+hooks, by writing `.githooks/pre-push`, `.githooks/pre-commit`, and
+`.githooks/prepare-commit-msg`, and setting`. Immediately after the existing pre-commit paragraph
+(ends `...because neither can be run as written.`), add one paragraph:
 
 ```markdown
 The prepare-commit-msg hook appends a `Keel-Version: <version>` trailer to every commit message,
@@ -626,8 +627,8 @@ session is the check that would falsify this conclusion if wrong.
 
 - [x] **Step 1: Write the failing test**
 
-Add beside the existing pre-push tests (near `tests/test-keel.sh:3907`, which already fakes a push
-by piping ref lines into the hook):
+Add beside the existing pre-push tests (near `tests/test-keel.sh#push_to() {`, which already fakes a
+push by piping ref lines into the hook):
 
 ```bash
 # --- pre-push: refuses a push that loosens the profile -----------------------------------------
@@ -701,8 +702,9 @@ since nothing today reads `_lsha`/`_rsha`.
 
 - [x] **Step 3: Write the minimal implementation**
 
-Replace the stdin-reading block inside `guard_hook_body` (`bin/keel:1754-1781`, the comment through
-the closing `fi` of the branch check) with one block that reads stdin once and runs both checks:
+Replace the stdin-reading block inside `guard_hook_body`
+(`bin/keel#Only when git is feeding the hook`, the comment through the closing `fi` of the branch
+check) with one block that reads stdin once and runs both checks:
 
 ```bash
 # Only when git is feeding the hook. A push supplies its refs on stdin; run by hand from a terminal
@@ -838,10 +840,10 @@ one too, the same as the other two."
 
 - [x] **Step 6: Run the suite at the unit boundary, then hand over**
 
-The existing shellcheck assertion at `tests/test-keel.sh:3657` already lints
-`"$g/.githooks/pre-push"`, the file `guard_hook_body` generates; because it reads the generated
-file rather than a hardcoded copy, it automatically covers this task's change with no new test
-code. Confirm it still passes when the full suite runs in step 4 above.
+The existing shellcheck assertion at `tests/test-keel.sh#pre-push hook is shellcheck clean` already
+lints `"$g/.githooks/pre-push"`, the file `guard_hook_body` generates; because it reads the
+generated file rather than a hardcoded copy, it automatically covers this task's change with no new
+test code. Confirm it still passes when the full suite runs in step 4 above.
 
 Run: `tests/run-tests.sh`
 Expected: PASS, or reds this task did not cause. **Witnessed 2026-09-20**: clean except the one
@@ -919,7 +921,8 @@ value this plan cannot source from the tree. See open question 5.
 
 **Files:**
 - Modify: `bin/keel` (`cmd_doctor` at `bin/keel:1268-1701`, renamed to `cmd_doctor_text` with a
-  thin `cmd_doctor` wrapper in front of it; the two usage lines at `bin/keel:8` and `bin/keel:2154`)
+  thin `cmd_doctor` wrapper in front of it; the two usage lines at `bin/keel:8` and
+  `bin/keel#say "  doctor [--fast] [--json]`)
 - Modify: `README.md` (the `keel doctor --fast` usage line, near line 41)
 - Test: `tests/test-keel.sh`
 
@@ -943,8 +946,8 @@ flattens scalars only and returns a Python repr for a list, so the field is read
 
 - [x] **Step 1: Write the failing test**
 
-Add beside the existing doctor tests (near `tests/test-keel.sh:2613`, which already runs `"$KEEL"
-doctor` against a fixture):
+Add beside the existing doctor tests (near `tests/test-keel.sh#bad "doctor no profile"`, which
+already runs `"$KEEL" doctor` against a fixture):
 
 ```bash
 # --- keel doctor --json ---------------------------------------------------------------------
@@ -1058,13 +1061,13 @@ PY
 }
 ```
 
-Update the dispatch table entry at `bin/keel:2228` from `doctor) shift; cmd_doctor "$@" ;;` to the
-same line unchanged (it already calls `cmd_doctor`, which now dispatches correctly). Two usage
-lines name `doctor [--fast]` and both need the new flag: the top-of-file usage comment at
+Update the dispatch table entry at `bin/keel#cmd_doctor "$@" ;;` from `doctor) shift; cmd_doctor
+"$@" ;;` to the same line unchanged (it already calls `cmd_doctor`, which now dispatches correctly).
+Two usage lines name `doctor [--fast]` and both need the new flag: the top-of-file usage comment at
 `bin/keel:8` (`#   keel doctor [--fast]                check this project, non-zero on any
-problem`) and the runtime `--help` text at `bin/keel:2154`. Change both to `doctor [--fast]
-[--json]`, and extend `bin/keel:2154`'s trailing description to add ", or --json for one parseable
-document instead of the printed lines".
+problem`) and the runtime `--help` text at `bin/keel#say "  doctor [--fast] [--json]`. Change both
+to `doctor [--fast] [--json]`, and extend `bin/keel#say "  doctor [--fast] [--json]`'s trailing
+description to add ", or --json for one parseable document instead of the printed lines".
 
 - [x] **Step 4: Run it and watch it pass**
 
@@ -1514,7 +1517,7 @@ applies when the diff touches a partner surface, personal data, or async and net
 finding. All file names below are relative to `skills/coding-standards/references/`.
 
 **Section 1 (Correctness).** Directly after the existing "If the change adds a cache" bullet
-(`skills/review-code/references/rubric.md:18`):
+(`skills/review-code/references/rubric.md:21`):
 
 ```markdown
 - A cache under load from many concurrent requests for the same key: does it use single flight,
@@ -1538,7 +1541,7 @@ Directly after the existing "Time:" bullet, the last in section 1:
 ```
 
 **Section 2 (Security).** Directly after the existing "A cache key that omits the principal or the
-tenant" bullet (`skills/review-code/references/rubric.md:44`):
+tenant" bullet (`skills/review-code/references/rubric.md:47`):
 
 ```markdown
 - A cached permission set: is it invalidated when a role changes, or left to expire on its own
@@ -1607,7 +1610,7 @@ personal data that the deletion path does not know about" bullet, the last in 4c
   parties and borders."
 ```
 
-**New section 4d.** After 4c (`skills/review-code/references/rubric.md:97`, before "## 5. Reuse
+**New section 4d.** After 4c (`skills/review-code/references/rubric.md` line 97 at `bda1acc`, before "## 5. Reuse
 and simplification"):
 
 ```markdown

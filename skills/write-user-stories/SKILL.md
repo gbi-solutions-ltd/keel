@@ -33,8 +33,9 @@ left open is theatre, and it teaches people the process wastes their time.
 
 ## Step 2: Decide each story's kind
 
-For a PRD written `from-repo`, most requirements already have working code. Writing "build X"
-for something that exists wastes a sprint. Classify first:
+Every story gets a kind. It matters most for a PRD written `from-repo`, where most requirements
+already have working code and writing "build X" for something that exists wastes a sprint. Classify
+first:
 
 | Kind | When | Produces |
 |---|---|---|
@@ -57,6 +58,7 @@ needs two people, or when its acceptance criteria exceed about six scenarios.
 and list: each is one story, because shipping half delivers nothing.
 
 Follow [references/story-template.md](references/story-template.md) for the exact shape. Write to
+`profile.artifacts.stories` if that is set, adding to that document in place, otherwise
 `<docs_root>/stories/<slug>.md`.
 
 Every story carries: an ID, its kind, the requirement IDs it satisfies, `As a / I want / So
@@ -87,8 +89,5 @@ others. Then name `design-architecture` or `write-plan` as next. Do not start ei
 
 | Mistake | Instead |
 |---|---|
-| "Build X" for code that already exists | Step 2. Most `from-repo` stories are `verify`, not `build` |
 | Acceptance criteria restating the title | State observable outcomes, one scenario per behaviour |
-| Stories with no requirement ID | Every story traces back, or it is invented scope |
-| Claiming full coverage without tabulating it | Step 4 produces a table. No table, no claim |
 | Estimating in hours | Size relatively. Hours invite a commitment nobody made |

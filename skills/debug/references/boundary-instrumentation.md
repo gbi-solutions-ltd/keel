@@ -26,10 +26,10 @@ that component and nowhere upstream of it.
 
 ```bash
 # Layer 1: the pipeline
-echo "IDENTITY: ${IDENTITY:+SET}${IDENTITY:-UNSET}"
+echo "IDENTITY: $([ -n "${IDENTITY+x}" ] && { [ -n "${IDENTITY:+x}" ] && echo SET || echo EMPTY; } || echo UNSET)"
 
 # Layer 2: the build script
-env | grep -c IDENTITY || echo "IDENTITY absent from build environment"
+env | grep -c IDENTITY; echo "exit=$?"
 
 # Layer 3: the signing environment
 security find-identity -v | head
@@ -63,8 +63,8 @@ A result you did not get is not the same as a result of nothing.
 
 ## Logging the absence of a value
 
-`${VAR:+SET}${VAR:-UNSET}` prints `SET` or `UNSET` and never prints the value. Use it for
-credentials.
+`[ -n "${VAR+x}" ] && { [ -n "${VAR:+x}" ] && echo SET || echo EMPTY; } || echo UNSET` prints `SET`,
+`EMPTY` or `UNSET` and never the value. Use it for credentials.
 
 The common mistake is `echo "VAR=$VAR"`, which prints an empty line for an unset variable and for
 an empty one, so it cannot distinguish them. Those are different bugs, and the empty case is the
@@ -84,8 +84,6 @@ scaffold is how logs become unreadable.
 The same technique applies to a failing test you did not write:
 
 - Print the actual value at every assertion boundary, not only the failing one.
-- **Run the single test alone.** Passing alone and failing in the suite means the bug is shared
-  state, not the test. That one check saves the most time of anything here.
 - Log setup and teardown entry and exit. A teardown that fails silently leaves state for the next
   test, producing a failure in a test that has nothing to do with the cause.
 - For a worker or handle that outlives the test, log what was created and what was closed. A

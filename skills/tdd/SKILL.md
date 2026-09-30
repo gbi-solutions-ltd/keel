@@ -84,7 +84,7 @@ Only once green. Remove duplication, improve names, extract helpers. No new beha
 
 ### Unit boundary: run the suite
 
-The unit ends with one `verify.test` run. The suite is 313 seconds and one test is 2.
+The unit ends with one `verify.test` run. A suite run costs far more than one test's.
 
 Red for tests this unit did not touch? Name them and match them against the start record. All
 matched means the unit is done: record them and carry on. An unmatched red is this unit's: hand it
@@ -98,17 +98,16 @@ properly. "I will tidy it later" means the spike is production code with no test
 
 ### The project has no test tooling at all
 
-Both commands `null` and not greenfield? You do not resolve that yourself. Ask, with the three
-options and their costs in [references/no-test-tooling.md](references/no-test-tooling.md), and
-record the answer.
+`verify.test` and `verify.test_one` both `null`, and not greenfield? You do not resolve that
+yourself. Ask, with the three options and their costs in
+[references/no-test-tooling.md](references/no-test-tooling.md), and record the answer.
 
 ## Rationalisations
 
 | Excuse | Reality |
 |---|---|
 | "I will test after" | It passes immediately, proving nothing. You never saw it fail, so never proved it catches the bug |
-| "I will backfill the tests" | They pass on the first run and prove nothing about whether the guard ever caught anything |
-| "This code has no tests" | You are improving it. Add one for what you touch. This assumes a runner exists; where none does, see the exception below rather than installing one |
+| "This code has no tests" | You are improving it. Add one for what you touch. This assumes a runner exists; where none does, see the exception above, under "The project has no test tooling at all", rather than installing one |
 | "The suite is green, do not risk touching it" | It may be green *because* a test asserts the current wrong behaviour. Writing the test first tells you in two minutes, not mid-release |
 
 The rest, unchanged, in [references/rationalisations.md](references/rationalisations.md).

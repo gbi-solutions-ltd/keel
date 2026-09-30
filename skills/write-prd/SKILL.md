@@ -14,11 +14,12 @@ Requirements someone can build from and disagree with.
 existing system those differ, and the gap is this skill's most valuable output.
 
 <HARD-GATE>
-No design, no plan, no code until the user has approved the PRD, however simple the request looks.
-A short PRD is fine; skipping it is not.
+No design, no plan, no code until the user has approved the PRD, however simple the product surface
+looks. A single feature or bug routed to `tdd` or `debug` does not enter this gate: name that skill
+and stop. A short PRD is fine; skipping it is not.
 </HARD-GATE>
 
-If overridden, write down what you assumed and carry on.
+If the user overrides the gate, write down what you assumed and carry on.
 
 ## Step 1: Pick the mode and gather inputs
 
@@ -50,8 +51,9 @@ what is out of scope. The snapshot has the rest.
 **In `from-idea`, read the idea record if there is one and ask nothing it settles.** If there is
 none and the idea is still rough, `shape-idea` comes first.
 
-**In `from-repo`, do step 3 first, then return here.** The questions worth asking are the ambiguities
-classification turns up. Ask the purpose questions, classify, then one question per ambiguity.
+**In `from-repo`, step 3 runs in the middle of this step.** The questions worth asking are the
+ambiguities classification turns up. Ask the purpose questions, classify, then one question per
+ambiguity.
 
 ## Step 3: Separate observed from required
 
@@ -72,7 +74,7 @@ by mistake is worse than no PRD: the next engineer will defend it.
 ## Step 4: Write it
 
 Follow [references/prd-template.md](references/prd-template.md). Write to
-`<docs_root>/prd/<slug>.md`.
+`<docs_root>/prd/<slug>.md`; in `revise`, edit the existing PRD in place.
 
 Every functional requirement gets `FR-NN`, non-functional `NFR-NN`, constraint `CON-NN`, plus a
 status. `write-user-stories` traces to these and `write-plan` proves coverage against them, so they
@@ -83,8 +85,10 @@ are structural, not decoration.
 Check your draft: any untestable requirement, any "should" hiding an undecided question, any two
 requirements that conflict, any empty section. Fix them.
 
-Update the idea record's open questions first. Then present the PRD for approval and **stop**. Say plainly which requirements are `inferred` and
-which are `disputed`, because those are what the user is really being asked to rule on.
+Where this PRD came from an idea record, strike through the questions it settles there first. Ask
+the blocking open questions (below), then present the PRD for approval and **stop**. Say plainly
+which requirements are `inferred`, `disputed` and `author-added`, because those are what the user is
+really being asked to rule on.
 
 **Surface open questions as choices, not a list.** Use `AskUserQuestion` for the ones that block
 work, following [../keel/references/asking-questions.md](../keel/references/asking-questions.md).
@@ -102,9 +106,6 @@ On approval, name `write-user-stories` as next. Do not start it.
 
 | Mistake | Instead |
 |---|---|
-| Describing the code and calling it requirements | Step 3. Observed is not required |
-| Requirements nobody can test | State the observable outcome, not the intent |
 | Accepting a shape as requirements | "A list, filters, a chart" describes a shape and commits to nothing. Ask who acts on it |
 | Inventing metrics because the template has a slot | `Unknown, needs a decision` is a valid entry |
 | Inventing *requirements* because they seem sensible | Mark them `author-added` and count them. The no-invention rules cover numbers, not features |
-| Writing the plan because the PRD went well | The gate is the whole point. Stop |

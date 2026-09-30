@@ -1,8 +1,7 @@
 # Snapshot section templates
 
-The structure of `<docs_root>/snapshot.md`. Eleven sections. Adapted from
-`cursor-starter/documentation/repository-snapshot.md`, tightened so every claim carries
-evidence.
+The structure of `<docs_root>/snapshot.md`. Eleven sections. Adapted from cursor-starter's
+repository snapshot prompt, tightened so every claim carries evidence.
 
 ## Evidence rules
 
@@ -20,9 +19,8 @@ plausible one.
    Mixing them makes both harder to act on.
 6. **Date and pin it.** The header records the commit the snapshot describes, so a reader can
    tell how stale it is.
-7. **Verified or not recommended.** Nothing reaches section 10 that you did not verify yourself
-   in step 3. An unverified observation belongs in section 8 with `unverified` next to it. A
-   recommendation is a request for someone's afternoon, so it has to be right.
+7. **Verified or not recommended.** A recommendation is a request for someone's afternoon, so it has
+   to be right.
 8. **Numbers come from commands, not from artifacts.** A committed coverage report, a badge, or
    a figure in a doc is a claim about the past. Run the command. Observed in practice: a
    committed report said 1.94% statement coverage where the real figure was 23.29%, because the
@@ -199,8 +197,8 @@ they can start. Three new tools is the most one document may propose, and a repo
 working equivalent has no gap: 2,000 passing Jest tests is a test runner, and recommending Vitest
 there is a migration proposal rather than a finding.
 
-Every item here was verified in step 3. If you find yourself writing "this appears to" or
-"the code suggests", the item belongs in section 8 instead.
+Every item here was verified in step 3, or is a remedy cited to the assess report. If you find
+yourself writing "this appears to" or "the code suggests", the item belongs in section 8 instead.
 
 ```markdown
 ### Do first
@@ -237,12 +235,12 @@ deliberately does not do either job and a document that omits them reads as a cl
 
 Then close the document with one line naming what this snapshot did not check, in the same place
 every time, so a reader who skips to the end still sees it. `security-audit` already carries this
-rule as "say plainly what you did not cover"; the asymmetry was accidental.
+rule as "say plainly what you did not cover".
 
 ## 11. Proposed profile
 
-What agents D and E found, in the shape `.keel/profile.json` expects, so `keel init` can
-consume it. Mark every uncertain value.
+What agents D and E found, in the shape `.keel/profile.json` expects, so each value can be recorded
+with `keel profile set <key> <value>`. Mark every uncertain value.
 
 ```markdown
 Detected, for `.keel/profile.json`:

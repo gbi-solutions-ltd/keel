@@ -246,7 +246,7 @@ Scenario: the schema version does not move
 ```
 
 **Notes:** the gates object is written at `bin/keel:364` and does not currently include this key.
-`gates.context_window` is already declared at `templates/profile.schema.json:284`, so no field is
+`gates.context_window` is already declared at `templates/profile.schema.json:287`, so no field is
 added and `SCHEMA_VERSION` stays put (`CON-01`). **This story is unsafe to ship before S-01 and
 S-02**: without the floor, writing 200000 everywhere converts a self-correcting assumption into a
 permanent wrong answer.
@@ -336,7 +336,7 @@ Scenario: no documented site still claims a configured value simply wins
   Then each describes the floor, the environment override, and the one million bound
 ```
 
-**Notes:** the four sites are `templates/profile.schema.json:287`, `bin/keel:1602`, `bin/keel:1307`
+**Notes:** the four sites are `templates/profile.schema.json:290`, `bin/keel:1602`, `bin/keel:1307`
 and `lib/context_watch.py:130-140`. All four currently state that an explicit setting wins outright,
 which is why this is `fix`. The second scenario is not redundant: `bin/keel:1307` remains reachable
 for every profile written before S-05.

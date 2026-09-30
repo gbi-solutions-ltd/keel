@@ -75,7 +75,7 @@ Established by reading the tree on 2026-08-17, so no task has to rediscover them
 | There are six eval scenarios, five of which discriminate | `ls tests/evals/scenarios/` is six files; `tests/evals/results.md` records `done-without-verifying` passing in both arms and calls the scenario invalid |
 | `supply-chain-scan.sh --list-rules` prints 24 ids, five of them structural | `tests/supply-chain-scan.sh --list-rules \| wc -l` is 24; `grep -c structural` is 5. README says four structural |
 | `docs/07-open-decisions.md` has eleven numbered sections, all resolved | Its own status line, plus sections 10 and 11 added after the table was written. README says "Nine decisions: 5 resolved, 4 open" |
-| `keel guard install` writes **two** hooks | `bin/keel#guard_hook_body > "$GUARD_DIR/pre-push"` writes `pre-push` and `pre-commit`. README's Tests section names only the pre-push one |
+| `keel guard install` writes **two** hooks | `bin/keel#guard_hook_body > "$d/pre-push"` writes `pre-push` and `pre-commit`. README's Tests section names only the pre-push one |
 | `skills/ship` is credited nowhere in `SOURCES.md` | `grep -n ship SOURCES.md` matches only table headers. SOURCES.md claims originals are listed by name rather than left to "everything not above" |
 | No `SKILL.md` carries a source trailer | `grep -rn superpowers skills/*/SKILL.md` is empty. SOURCES.md line 9 asserts that close adaptations name their source in a trailer, which is false for all five |
 | `CHANGELOG.md` calls the project `gbaiutils` | `CHANGELOG.md:3` |

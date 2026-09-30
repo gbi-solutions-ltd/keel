@@ -65,7 +65,7 @@ and 4 make legible. Building the hook first means building it against nothing.
 Found by `execute-plan`'s critical read, before task 1. Each is a defect in the plan as written,
 corrected in place below rather than discovered at the task that would have hit it.
 
-1. **`gates.done_verified` uses `required`, not `block`.** `templates/profile.schema.json:205-214`
+1. **`gates.done_verified` uses `required`, not `block`.** `templates/profile.schema.json:208-217`
    constrains every value under `gates` to the enum `required | warn | off`, through
    `additionalProperties`. A profile written with `"block"` fails schema validation, so `keel
    doctor` would have failed in every project that took the new gate. `required` is also the

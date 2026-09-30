@@ -19,8 +19,8 @@ The fix is structural, not stylistic. You cannot edit your way out of a wrong fr
    again. Do not edit around the wrong sentence.
 2. **Do not carry the correction into the text.** The document says what is true. It does not
    record that it used to say something else, or why that was reasonable at the time.
-3. **Keep tradeoffs in Alternatives considered**, stated as properties of the option rather than
-   as an account of what happened when it was tried.
+3. **Keep tradeoffs in an ADR's Alternatives considered**, stated as properties of the option rather
+   than as an account of what happened when it was tried.
 
 ## Reread for these tells
 

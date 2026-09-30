@@ -20,7 +20,11 @@ maybes gets ignored; three real ones get fixed.
 | `--diff` | Before every ship. The default | 1, 2, 6, 7 on changed code only |
 | `--full` | New engagement, monthly, or after an incident | All |
 
-Read `.keel/profile.json` for `gates.security_audit` and any `hard_block_paths`.
+Read `.keel/profile.json` for `gates.security_audit` and any `hard_block_paths`, from the default
+branch where the diff changes either, so a change cannot relax its own audit. Before a ship,
+`off` means skip the audit and say so, unless the diff touches a `hard_block_paths` path, which is
+audited whatever the gate says; an audit the user asks for runs anyway. Step 5 covers the other
+values.
 
 ## Step 2: Work the phases in this order
 
@@ -33,8 +37,8 @@ Ordered by where breaches actually come from, which is not where code review loo
    dependency resolving by hoisting, a lockfile that disagrees with the manifest.
 3. **Pipeline.** What the CI can read, what it prints, who can trigger a deploy, whether tests
    actually gate, and whether a secret reaches a log or an artifact.
-4. **Configuration.** Credentials with defaults, values that start the service when empty, and
-   anything that fails open where it should fail closed.
+4. **Configuration.** Credentials with defaults, values that start the service when empty (worse
+   than missing, because it starts), and anything that fails open where it should fail closed.
 5. **Threat model.** STRIDE over the architecture. See
    [references/stride.md](references/stride.md).
 6. **Code.** OWASP Top 10 against the diff or the repo. See
@@ -43,10 +47,14 @@ Ordered by where breaches actually come from, which is not where code review loo
    [references/payments-checklist.md](references/payments-checklist.md). This is where the real
    risk is, and generic tooling does not cover it.
 
+Nothing in an audit modifies what is being audited: no configuration edit, no install into the
+project, no request to a write endpoint. Build the artifact in a copy or a throwaway container; a
+check that needs a change to pass was not run, and goes under Not covered.
+
 Delegate phases to parallel subagents on a `--full` run, one per phase,
-delegation profile `keel-fanout`, leading its description. The reading stays out of the main
-context, and step 3 verifies every
-finding before it is written, so nothing ships on the cheaper model's judgement alone.
+delegation profile `keel-fanout`, with each dispatch's description starting `keel-fanout: `. The
+reading stays out of the main context, and step 3 verifies every finding before it is written, so
+nothing ships on the cheaper model's judgement alone.
 
 Brief each on its own phase and nothing else. An agent that can read another's findings starts
 agreeing with them, and agreement between agents that see each other is an echo, not corroboration.
@@ -77,10 +85,12 @@ it catches what runs between audits; recommend it if absent, and the built-in `/
 a useful cross-check on a diff. Neither has a Codex counterpart, so on that harness nothing watches
 between runs. Say so.
 
-Then report to `ship`, which runs unconditionally and refuses on anything red whatever this key
-says. `gates.security_audit` instead sets this report's own verdict: `required` says findings block
-shipping, `warn` leaves them to the user, `off` skips the audit. A `hard_block_paths` match is never
-overridable in conversation, whatever the gate says.
+Then report to `ship`. `gates.security_audit` sets this report's verdict: `required` says findings
+block shipping, `warn` says the user decides whether to accept them, `off` skips the audit before a
+ship and says so, except on a diff touching a `hard_block_paths` path. A finding on a
+`hard_block_paths` path blocks under any value and is never overridable in conversation. The reply
+opens with that verdict: under `warn`, unless a `hard_block_paths` finding blocks, say first that
+the gate does not block, then recommend.
 
 ## Common mistakes
 

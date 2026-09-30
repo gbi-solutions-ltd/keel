@@ -5,9 +5,10 @@ Only what changes an answer on this engine. Everything else is in the engine-agn
 ## Types
 
 `NUMBER(p, s)` is the exact decimal for money. `BINARY_FLOAT` and `BINARY_DOUBLE` are the binary
-floating point types and carry the reproducibility problem in the money section; a bare `NUMBER` with
-no precision is variable precision and is a different decision from `NUMBER(19, 4)`, so an unqualified
-`NUMBER` on a money column is worth asking about rather than assuming.
+floating point types and carry the reproducibility problem in
+[type-selection.md](type-selection.md), Money; a bare `NUMBER` with no precision is variable
+precision and is a different decision from `NUMBER(19, 4)`, so an unqualified `NUMBER` on a money
+column is worth asking about rather than assuming.
 
 `DATE` includes a time component, which surprises readers who expect a calendar date, and it has
 second resolution. `TIMESTAMP` carries fractional seconds. `TIMESTAMP WITH TIME ZONE` keeps the

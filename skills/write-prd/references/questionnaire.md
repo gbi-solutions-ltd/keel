@@ -1,7 +1,7 @@
 # Questionnaire
 
-Question banks per mode. Adapted from `cursor-starter/planning/prd-questionnaire.md`, with the
-per-mode split and the answer-first rule added.
+Question banks per mode. Adapted from cursor-starter's PRD questionnaire, with the per-mode split
+and the answer-first rule added.
 
 ## Which sections apply to your mode
 
@@ -26,10 +26,10 @@ lost.
 have a good guess. "I think X, because Y. Correct?" is answerable in one word. "What is X?" makes
 the user do work you could have done.
 
-**Use `AskUserQuestion` when the answer is a choice** between two to four options, which is most
-of the time. Use open text when the answer is a paragraph, like the problem statement. How to
-shape the options, and when to batch:
-[../../keel/references/asking-questions.md](../../keel/references/asking-questions.md).
+**Use `AskUserQuestion` when the answer is a choice** between two to four options, which is most of
+the time. Use open text when the answer is a paragraph, like the problem statement. How to shape the
+options: [../../keel/references/asking-questions.md](../../keel/references/asking-questions.md). Its
+batching section does not apply here.
 
 **Stop when you can write every section.** The bank is a source of questions, not a checklist to
 complete. Ten good answers beat thirty shallow ones. If a section can only be `Unknown, needs a
@@ -49,7 +49,7 @@ them:
 4. Requirements detail
 5. Success and constraints
 
-Stop early if the answers make later questions moot. If question 3 establishes this is a
+Stop early if the answers make later questions moot. If the scope answers establish this is a
 throwaway internal tool, do not ask about compliance.
 
 ---
@@ -68,7 +68,7 @@ than a conversation. Carry forward:
 |---|---|
 | The problem, and its evidence | The PRD's problem statement, unchanged where it is already specific |
 | Alternatives considered and rejected | Context in the PRD, so nobody re-proposes them |
-| The assumptions table | `CON-NN` entries, one per assumption still unchecked |
+| The assumptions table | Section 12 Assumptions, one per assumption still unchecked |
 | Open questions | The PRD's open questions, unresolved ones surfaced as choices |
 | The recommendation, if it was "build something smaller" | The scope boundary. This is the one most often lost |
 
@@ -80,7 +80,8 @@ requirements for an unexamined idea produces a well-formed document nobody shoul
 Where the idea arrived fully formed and the user does not want it questioned, that is their call:
 note it in the PRD and carry on.
 
-Nothing is written. You are establishing the whole thing, so most questions are open.
+Where there is no record, nothing is written: you are establishing the whole thing, so most
+questions are open.
 
 **Problem**
 - What happens today that is bad enough to build something? Ask for a specific recent instance,

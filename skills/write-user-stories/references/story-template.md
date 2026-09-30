@@ -1,6 +1,6 @@
 # Story template
 
-The structure of `<docs_root>/stories/<slug>.md`. Adapted from `cursor-starter/planning/user-stories.md`,
+The structure of `<docs_root>/stories/<slug>.md`. Adapted from cursor-starter's user-stories prompt,
 with requirement tracing, story kinds, and the two-way coverage proof added.
 
 ## Header
@@ -10,7 +10,7 @@ with requirement tracing, story kinds, and the two-way coverage proof added.
 
 | | |
 |---|---|
-| Derived from | `<docs_root>/prd/<slug>.md`, PRD status `<draft/approved>` |
+| Derived from | `<the PRD path read in step 1>`, PRD status `<draft/approved>` |
 | Date | YYYY-MM-DD |
 | Stories | N (build: a, verify: b, fix: c, decide: d) |
 | Coverage | X of Y requirements covered. See the table at the end |
@@ -78,17 +78,6 @@ Scenario: currency is absent
   `FR-10 confirmed, FR-11 inferred`. One word cannot describe two requirements, and the optimistic
   half is the one a reader remembers.
 
-## Keeping the PRD current
-
-A story frequently settles an open question the PRD lists, because writing acceptance criteria
-forces a decision the requirement left vague. When that happens, update the PRD's open questions
-row with the answer and the date rather than leaving it open, and mark any requirement it moves
-from `inferred` to `confirmed`.
-
-The obligation runs upstream as far as the chain goes: the same rule sends `write-prd` back to the
-idea record. Without it every artifact keeps asserting what was true on the day it was written,
-which is precisely what `skills/write-docs/references/current-state-prose.md` exists to prevent.
-
 ### Acceptance criteria rules
 
 - Gherkin, because it forces the observable outcome into the open.
@@ -118,7 +107,8 @@ expanding the scope of the `verify`.
 there buries them. A timeout, a tolerance band, a retry count and a minimum supported version are
 **requirement values**: they belong in the `NFR` or `FR` they qualify, which is where anyone
 building against them will look. An ADR is for a decision that shapes the system, which is the test
-`skills/design-architecture/references/adr-template.md` applies under "when not to write one".
+[../../design-architecture/references/adr-template.md](../../design-architecture/references/adr-template.md)
+applies under "when not to write one".
 
 Either way the reasoning survives. Record why the value is what it is, and why the nearby
 alternatives lost, in the requirement's `Evidence` column. "30 seconds, because 5 would fail a
@@ -127,6 +117,19 @@ when a decision is recorded as a bare figure.
 
 Say in the story where its answer landed, so the next reader is not hunting for an ADR that was
 correctly never written.
+
+## Keeping the PRD current
+
+A story frequently settles an open question the PRD lists, because writing acceptance criteria
+forces a decision the requirement left vague. When the user's answer settles one, update the PRD's
+open questions row with the answer and the date rather than leaving it open, and mark `confirmed`
+any requirement the user confirmed.
+
+The obligation runs upstream as far as the chain goes: the same rule sends `write-prd` back to the
+idea record. Without it every artifact keeps asserting what was true on the day it was written,
+which is precisely what
+[../../write-docs/references/current-state-prose.md](../../write-docs/references/current-state-prose.md)
+exists to prevent.
 
 ## Epics
 
@@ -171,12 +174,11 @@ because an unexplained blank row reads as an oversight.
 
 1. Every story has a non-empty `Satisfies`, and each ID exists in the PRD.
 2. Every `FR` and `NFR` appears in the coverage table with either stories or a stated reason.
-3. No story bundles two things that could ship separately. "and" in a title is a prompt to
-   check this, not a defect in itself: "upload and download", "rotate and purge", "query and
-   list" are each one story, because shipping half of either delivers nothing.
+3. No story bundles two things that could ship separately. "and" in a title is a prompt to check
+   this, not a defect in itself (step 3).
 
-   This is the second place a crude word check has flagged correct output, after the `must`
-   rule in `write-prd`. When a mechanical check disagrees with clear English, fix the check.
+   This is the second place a crude word check has flagged correct output, after the `must` rule in
+   `write-prd`. When a mechanical word check disagrees with clear English, the English is right.
 4. No acceptance criterion asserts on an internal call.
 5. Every `decide` story is ordered before the stories that depend on it.
 6. Sizes are `S`, `M`, or `L`, and no story is bigger than `L`.

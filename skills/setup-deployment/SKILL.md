@@ -1,6 +1,6 @@
 ---
 name: setup-deployment
-description: Use when a project has no pipeline, when asked to add CI, containerise a service, set up environments, or when an existing deployment needs fixing or documenting.
+description: Use when a project has no pipeline, when asked to add CI, containerise a service, set up environments or provision infrastructure, or when an existing deployment or release needs fixing, verifying, or documenting.
 allowed-tools: [Read, Write, Edit, Bash, Grep, Glob]
 ---
 
@@ -23,12 +23,15 @@ files will not answer directly:
 - **Does every environment have a deploy path?** A build job with no matching deploy job means
   that environment is not being deployed by this pipeline, whatever the file implies.
 
-Both of those have been found in real repositories. Check them explicitly.
+Both of those have been found in real repositories. Check them explicitly. Read
+[references/release-operations.md](references/release-operations.md) before provisioning anything,
+and again before calling a release done.
 
 ## Step 2: Establish the verify commands first
 
-Every pipeline stage runs a command from `profile.verify`. If a command is `null`, the pipeline
-cannot check that thing and you must say so rather than substituting a guess.
+Every checking stage (lint, typecheck, test, security scan, build) runs a command from
+`profile.verify`. If a command is `null`, the pipeline cannot check that thing and you must say so
+rather than substituting a guess.
 
 Run each one locally before putting it in a pipeline. A CI job whose command fails on the
 developer's machine will fail in CI too, and the pipeline gets blamed.
@@ -78,15 +81,13 @@ host or credential unless recorded as a decision; sharing means one incident tak
 Migrations need a stated position: when they run, what happens when a deploy is rolled back, and
 whether a failed candidate has already migrated shared state.
 
-Read [references/release-operations.md](references/release-operations.md) before provisioning
-anything, and again before calling a release done.
+## Step 7: Test the rollback when there is one, then write the runbook
 
-## Step 7: Write the runbook, then test it
-
-Write `<docs_root>/runbooks/deploy.md`: how to deploy, how to roll back, where the logs are, the
-three most likely failures, and who to call.
-
-**Then execute the rollback once**, by hand. An untested rollback is a hope. Record that you ran it.
+**Execute the rollback once**, by hand. An untested rollback is a hope. Then write
+`<docs_root>/runbooks/deploy.md`: how to deploy, how to roll back, where the logs are, the three
+most likely failures, and who to call. Note in the runbook when you ran the rollback. If there is
+nothing yet to roll back to, write the runbook anyway, mark the rollback not yet executed, and name
+running it as the next step in Step 8.
 
 ## Step 8: Report
 
@@ -102,4 +103,4 @@ actually been tested.
 | Reading the Dockerfile to check contents | Build it and look inside |
 | An env file copied into the image | Inject at runtime |
 | Rebuilding per environment | Build once, promote the digest |
-| A runbook nobody has run | Execute the rollback once |
+| A runbook nobody has run | Execute the rollback once, or mark it pending |

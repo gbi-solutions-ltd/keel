@@ -14,14 +14,10 @@ partitioning decision that gets mentioned rather than decided. Each is an omissi
 the reader already produces, and `create-skill` Step 2 says that is fixed by a required field rather
 than by a reminder. Hence sections, not advice.
 
-## The rule that makes this work
+## What `None found` claims
 
-**Every section appears in the output.** A section with nothing in it says `None found`. A section
-left out is not permitted.
-
-`None found` is a claim that somebody looked, so it is honest only after the sweep. Writing it
-because a section looked unpromising is the exact failure this file exists to prevent, and it is
-worse than omitting the section, because it asserts a sweep that did not happen.
+`None found` written without the sweep is worse than omitting the section, because it asserts a
+sweep that did not happen.
 
 ## 1. What was read, and what could not be
 
@@ -36,7 +32,8 @@ Give the row counts you used. A schema fact plus a row count is a finding; eithe
 
 ## 2. The model, as an ERD
 
-Mermaid, every relationship labelled, per `design-architecture/references/mermaid-patterns.md`.
+Mermaid, every relationship labelled, per
+[../../design-architecture/references/mermaid-patterns.md](../../design-architecture/references/mermaid-patterns.md).
 
 Never omitted on the grounds that the model is small or obvious. You reconstructed it in order to
 review it, so the reader is being asked to reconstruct it too, from prose, in order to follow you.
@@ -94,8 +91,6 @@ because they combine a type with a row count, which is why the query belongs bes
 
 ## 8. What to change first
 
-Ordered by what breaks soonest, not by what is worst in principle. A wrong column type that nothing
-is failing on outranks nothing; a key three months from exhaustion outranks everything.
-
-For each, the smallest correct change. Where the smallest correct change is still large, say what
-the stopgap is and what it costs, so somebody can act this week and plan for the rest.
+For each finding, in the order the skill's Step 4 sets, the smallest correct change. Where the
+smallest correct change is still large, say what the stopgap is and what it costs, so somebody can
+act this week and plan for the rest.

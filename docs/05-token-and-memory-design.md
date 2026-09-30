@@ -58,8 +58,8 @@ was. That is the whole mechanism, and it is why the replacement is a target the 
 rather than a third documented number.
 
 The relief this document used to assume, moving substance into `references/`, does not work at the
-margin. `coding-standards` carries **17 reference files and 22,750 words** in them and its body is
-still 795, against 12, 17,816 and 683 when ADR-0001 measured it on 2026-08-16. A body's floor
+margin. `coding-standards` carries **17 reference files and 22,726 words** in them and its body is
+still 726, against 12, 17,816 and 683 when ADR-0001 measured it on 2026-08-16. A body's floor
 is set by its step count and by the sentence each reference costs to introduce, not by how much
 detail it holds.
 

@@ -1,6 +1,6 @@
 {
-  "keel_version": "0.18.0",
-  "schema_version": 4,
+  "keel_version": "0.21.0",
+  "schema_version": 5,
   "project": {
     "name": "keel",
     "kind": "plugin",

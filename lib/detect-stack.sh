@@ -609,6 +609,17 @@ detect_verify() {
             elif [ -n "$(pkg_script type-check)" ]; then pkg_run type-check
             elif [ -f tsconfig.json ]; then printf 'npx tsc --noEmit'; fi ;;
           e2e) [ -n "$(pkg_script 'test:e2e')" ] && pkg_run 'test:e2e' ;;
+          # A dependency audit, with the mapping write_ci uses, and only where the lockfile the
+          # audit reads exists: npm audit exits non-zero with no package-lock.json, and detect_js_pm
+          # prints npm when there is no lockfile at all. It names pnpm or yarn only from their own
+          # lockfile, and nothing when two conflict. yarn only from a yarn 2+ lockfile, which has a
+          # __metadata: block, because yarn 1 has no `yarn npm` and full doctor would fail on it.
+          security)
+            case "$(detect_js_pm)" in
+              npm)  [ -f package-lock.json ] && printf 'npm audit --audit-level=high' ;;
+              pnpm) printf 'pnpm audit --audit-level high' ;;
+              yarn) grep -q '^__metadata:' yarn.lock && printf 'yarn npm audit --severity high' ;;
+            esac ;;
         esac ;;
       go)
         case "$what" in

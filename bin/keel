@@ -34,7 +34,7 @@ HERE="$(cd "$(dirname "$SELF")/.." && pwd)"
 # expects", which is the only version of that question worth warning about. Bump it only when a
 # field is added, removed, renamed or moved. 0.7.0 and 0.7.1 changed none, and a warning that fires
 # on releases like those is one nobody reads by the time it matters.
-SCHEMA_VERSION=4
+SCHEMA_VERSION=5
 
 # The keys a schema version removed, the version that removed each, and what to do instead. Read by
 # cmd_doctor, which is the only thing that can tell a person their profile still carries one.
@@ -942,7 +942,7 @@ cmd_init() {
 # walks away believing the fact was recorded, which is worse than the refusal by exactly the
 # amount of time it takes to notice.
 profile_set() {
-    python3 - "$1" "$2" <<'PY'
+    python3 - "$1" "$2" "$HERE/templates/profile.schema.json" <<'PY'
 import json, sys
 path, raw = sys.argv[1], sys.argv[2]
 p = ".keel/profile.json"
@@ -976,6 +976,23 @@ elif raw == "null":  val = None
 else:
     try:              val = int(raw)
     except ValueError: val = raw
+
+# The schema's enums are the only record of which values a key accepts, and until this check a
+# typo in a gate was written, accepted by doctor, and read as a weaker gate by every hook. A
+# missing or unreadable schema skips the check rather than refusing every write: an install with
+# no templates/ fails louder elsewhere. null is let through because `profile set <key> null` is the
+# documented way to clear a value. Keys under gates.additionalProperties are not walked: a path
+# the profile does not already hold is refused above, so such a key only arrives by hand edit.
+try:
+    s = json.load(open(sys.argv[3]))
+except Exception:
+    s = None
+for k in keys:
+    s = (s.get("properties") or {}).get(k) if isinstance(s, dict) else None
+if isinstance(s, dict) and "enum" in s and val is not None and val not in s["enum"]:
+    sys.stderr.write("keel: '%s' is not a value %s accepts. Use one of: %s.\n"
+                     % (raw, path, ", ".join(str(e) for e in s["enum"])))
+    sys.exit(1)
 
 node[keys[-1]] = val
 json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
@@ -1220,6 +1237,12 @@ write_ci() {
     json_load .keel/profile.json || true
     local lang; lang="$(json_get .keel/profile.json stack.language || true)"
     local test_cmd; test_cmd="$(json_get .keel/profile.json verify.test || true)"
+    # The trigger branch is the profile's, not an assumption. Hardcoding main meant a master
+    # repository's CI never ran on a push to its default branch. The fallback is default_branch,
+    # not main, because without python3 json_get comes back empty while write_profile recorded the
+    # branch from default_branch with printf.
+    local branch; branch="$(json_get .keel/profile.json conventions.default_branch || true)"
+    local sec; sec="$(json_get .keel/profile.json verify.security || true)"
     # house-defaults.md, "Dependencies": an advisory scan runs in CI and fails the build on a high
     # severity finding. Keyed on the package manager, because `npm audit` in a pnpm project fails for
     # the wrong reason. Computed here rather than inside the block below, because a `say` in there
@@ -1236,7 +1259,7 @@ write_ci() {
     CI_AUDIT_SKIPPED=""
     [ -n "$audit" ] || CI_AUDIT_SKIPPED="${pm:-none declared}"
     {
-      printf 'name: CI\n\non:\n  push:\n    branches: [main]\n  pull_request:\n\njobs:\n'
+      printf 'name: CI\n\non:\n  push:\n    branches: [%s]\n  pull_request:\n\njobs:\n' "${branch:-$(default_branch)}"
       printf '  verify:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n'
       case "$lang" in
         javascript|typescript) printf '      - uses: actions/setup-node@v4\n        with:\n          node-version: "20"\n' ;;
@@ -1256,7 +1279,10 @@ write_ci() {
           [ -n "$c" ] || continue
           printf '\n      - name: %s\n        run: %s\n' "$k" "$c"
       done
-      [ -n "$audit" ] && printf '\n      - name: Audit dependencies\n        run: %s\n' "$audit"
+      # Skipped only when verify.security is this same audit, which the loop above already wrote as
+      # a step and which would otherwise run twice and fail twice. A different security command,
+      # such as a code scanner, does not replace the dependency audit.
+      [ -n "$audit" ] && [ "$sec" != "$audit" ] && printf '\n      - name: Audit dependencies\n        run: %s\n' "$audit"
       printf '\n      - name: Refuse committed key material\n        run: |\n'
       printf '          if git ls-files | grep -qE "\\.(pem|key|pfx|p12|jks)$|^\\.env$"; then\n'
       printf '            echo "::error::key material is tracked in git"; git ls-files | grep -E "\\.(pem|key|pfx|p12|jks)$|^\\.env$"; exit 1\n'
@@ -1443,10 +1469,48 @@ cmd_doctor_text() {
 
     [ -f .keel/profile.json ] || { fail "no .keel/profile.json. Run 'keel init'."; return 1; }
     if have_python; then
-        local profile_err
-        profile_err="$(python3 -c "import json;json.load(open('.keel/profile.json'))" 2>&1 >/dev/null)"
+        local profile_out profile_err enum_line
+        # One interpreter start parses the profile and checks its enum values against the schema,
+        # because doctor's python3 starts are budgeted ("keel doctor starts python3 at most 10
+        # times" in tests/test-keel.sh). Enum findings come back on stdout prefixed enum|, a schema
+        # it could not read as one line prefixed noschema| (a WARN, since the profile parsed and
+        # only the check could not run), and anything else is the parse error. An out-of-enum
+        # value is a FAIL and not a WARN: whatever reads a gate treats a value it does not
+        # recognise as a weaker one (hooks/done-guard treats it as warn), so the file reads as
+        # configured while enforcing less.
+        profile_out="$(python3 - "$HERE/templates/profile.schema.json" 2>&1 <<'PY'
+import json, sys
+prof = json.load(open(".keel/profile.json"))
+try:
+    schema = json.load(open(sys.argv[1]))
+except Exception:
+    print("noschema|the profile schema at %s could not be read, so profile values were not "
+          "checked against it" % sys.argv[1])
+    sys.exit(0)
+def walk(s, p, path):
+    for k, sub in (s.get("properties") or {}).items():
+        if not isinstance(p, dict) or k not in p or not isinstance(sub, dict):
+            continue
+        v, here = p[k], path + [k]
+        if "enum" in sub and v is not None and v not in sub["enum"]:
+            gate = ", and for a gate that means a weaker one" if here[0] == "gates" else ""
+            print("enum|%s is %r, which is not one of %s. keel does not recognise it%s. Fix it "
+                  "with: keel profile set %s <value>" % (".".join(here), v,
+                  ", ".join(str(e) for e in sub["enum"]), gate, ".".join(here)))
+        if isinstance(v, dict):
+            walk(sub, v, here)
+walk(schema, prof, [])
+PY
+)"
+        profile_err="$(printf '%s\n' "$profile_out" | grep -v -e '^enum|' -e '^noschema|' || true)"
         if [ -z "$profile_err" ]; then
             good "profile parses"
+            while IFS= read -r enum_line; do
+                case "$enum_line" in
+                  enum\|*)     fail "${enum_line#enum|}" ;;
+                  noschema\|*) warn "${enum_line#noschema|}" ;;
+                esac
+            done <<< "$profile_out"
         else
             # have_python already proved python3 runs, so a failure here is either the JSON itself
             # (json.load raises json.decoder.JSONDecodeError) or something else python3 hit trying
@@ -1594,6 +1658,38 @@ for k,v in d.items():
           || fail "gates.coding_standards is required and $root/standards.md does not exist. Write it with coding-standards, or set the gate to warn or off"
     fi
 
+    # The push guard is the only thing that enforces protect_default_branch outside a session, and
+    # init does not install it, so without this line nothing tells anyone it is off. A WARN, not a
+    # FAIL: installing it writes into the developer's git directory, which stays their choice. It
+    # reads the key as the hook does, the same sed and the same `!= false`, so it reports the guard
+    # wherever the hook would enforce, the key absent or not a boolean included.
+    local pdb; pdb="$(sed -n 's/.*"protect_default_branch": *\([a-z]*\).*/\1/p' .keel/profile.json 2>/dev/null | head -1)"
+    if [ "$pdb" != "false" ] && git rev-parse --git-dir >/dev/null 2>&1; then
+        # The same state `keel guard status` reports, so the two never disagree. The absent and
+        # legacy states are sent to guard install, which installs or moves the guard; the foreign
+        # ones are not, because install refuses them: running it there would switch another tool's
+        # hooks off. A legacy install beside hooks keel did not write is refused too, until those
+        # hooks are moved, so that line names them instead.
+        local lo
+        case "$(guard_state)" in
+          installed)
+            good "push guard installed: a push to the default branch is refused outside a session too" ;;
+          legacy)
+            lo="$(guard_legacy_others)"
+            if [ -n "$lo" ]; then
+                warn "the push guard is installed in $GUARD_LEGACY_DIR/, a working-tree path, so checking out a branch runs that branch's own hooks. $GUARD_LEGACY_DIR/ also holds $lo, hooks keel did not write: move them into $(guard_dir) or remove them before keel guard install can move the guard"
+            else
+                warn "the push guard is installed in $GUARD_LEGACY_DIR/, a working-tree path, so checking out a branch runs that branch's own hooks. Run: keel guard install, which moves it into $(guard_dir)"
+            fi ;;
+          foreign-path)
+            warn "conventions.protect_default_branch is not false and the push guard is not installed: core.hooksPath, which keel did not set, is $(guard_hooks_path_source), and keel guard install refuses to replace it" ;;
+          foreign-hook)
+            warn "conventions.protect_default_branch is not false and the push guard is not installed: $(guard_dir)/$(guard_foreign_hook) is another tool's hook, which keel guard install will not overwrite" ;;
+          *)
+            warn "conventions.protect_default_branch is not false and the push guard is not installed, so nothing outside a session enforces it. Run: keel guard install" ;;
+        esac
+    fi
+
     if [ "$kind" != "docs" ] && have_python; then
         # A missing test_one is an oversight when there are tests to run, and it is required then.
         # With verify.test null as well the project declares no tests at all, and failing on the
@@ -1605,9 +1701,21 @@ for k,v in d.items():
         elif [ -z "$t0" ]; then warn "verify.test_one is null, and so is verify.test: this project declares no tests"
         else fail "verify.test_one is null. It is required: the commit guard and tdd both need it."
         fi
-        for k in test lint typecheck build; do
+        # security runs here, in full doctor, by decision on 2026-09-25: it reaches the network,
+        # and --fast, which never executes a verify command, is the offline form.
+        for k in test lint typecheck build security; do
             local c; c="$(json_get .keel/profile.json "verify.$k" || true)"
-            [ -z "$c" ] && { warn "verify.$k is null"; continue; }
+            if [ -z "$c" ]; then
+                # A null security is ok and not a warning. keel detects one only from an npm, pnpm
+                # or yarn 2+ lockfile, so a warning would fire on every other project and no keel
+                # command could clear it.
+                if [ "$k" = security ]; then
+                    good "verify.security is null: keel detects one only from an npm, pnpm or yarn 2+ lockfile, so set it if this project has another"
+                else
+                    warn "verify.$k is null"
+                fi
+                continue
+            fi
             case "$c" in *"{path}"*|*"{name}"*) good "verify.$k set (templated, not run)"; continue ;; esac
             [ "$fast" -eq 1 ] && { good "verify.$k set (not run, --fast)"; continue; }
             # Said before it runs, not after. Output is discarded, so a suite taking eleven minutes
@@ -1627,36 +1735,29 @@ for k,v in d.items():
             if [ "$rc" -eq 0 ]; then good "verify.$k runs (${el}s): $c"
             elif [ -n "$TIMEOUT_BIN" ] && [ "$rc" -eq 124 ]; then
                 fail "verify.$k timed out after ${VERIFY_TIMEOUT}s: $c. Either it hangs, or it needs longer than doctor is willing to wait; run it by hand to tell the two apart."
+            elif [ "$k" = security ]; then
+                # An audit exits non-zero on a finding at or above its threshold and when it cannot
+                # reach its registry, so "does not run" would send the reader to debug a command that
+                # ran. Its output is discarded like every verify command's, so the line says how to
+                # tell the two apart.
+                fail "verify.security exited $rc (${el}s): $c. An audit exits non-zero on a finding at or above its threshold and when it cannot reach its registry; run it to see which"
             else fail "verify.$k does not run (${el}s): $c"; fi
         done
 
-        # Declared and never run, which is the honest treatment for these two. e2e needs a running
-        # system by its own description and security reaches the network, so running either here
-        # would make doctor cost what a deployment costs. Both were written into every profile by
-        # write_profile and read by nothing, so a user opened their profile, saw a real command in
-        # a real field, and had no way to learn that nothing would ever run it.
+        # Declared and never run, which is the honest treatment for e2e: it needs a running system
+        # by its own description, so running it here would make doctor cost what a deployment
+        # costs. security was declared here too until 2026-09-25, when init began detecting it and
+        # it moved to the loop above.
         #
-        # A second loop rather than two more keys on the one above, because that one runs what it
-        # reads and these two never run: folding them in means a `case` that jumps 2 of 6 keys past
-        # twenty lines of timeout and exit-code handling, which is harder to read than the repeated
-        # json_get line is to tolerate.
-        for k in e2e security; do
-            local dc; dc="$(json_get .keel/profile.json "verify.$k" || true)"
-            # null is `ok` and not a warning. Neither key has a detector worth the name: security
-            # has no branch in detect_verify at all, and e2e has one only for a node `test:e2e`
-            # script, so init writes null into effectively every profile. A warning here would
-            # fire on every project keel has ever made, would be clearable by no keel command, and
-            # is the required value on Dart per that stack's own FR-14. The message says what to do
-            # instead.
-            #
-            # "does not detect", present tense, and a claim about this project rather than about
-            # what keel can do. security has no detector to have tried; e2e's fires only on a node
-            # `test:e2e` script. The past tense would assert a search happened, which is false for
-            # security and not knowable from here for e2e.
-            if [ -z "$dc" ]; then good "verify.$k is null: keel does not detect one, so set it if this project has one"
-            else good "verify.$k is set (declared, not run): $dc"
-            fi
-        done
+        # null is `ok` and not a warning. e2e's detector fires only on a node `test:e2e` script, so
+        # init writes null into effectively every profile. A warning here would fire on every
+        # project keel has ever made, would be clearable by no keel command, and is the required
+        # value on Dart per that stack's own FR-14. "does not detect", present tense, is a claim
+        # about this project rather than about what keel can do.
+        local dc; dc="$(json_get .keel/profile.json verify.e2e || true)"
+        if [ -z "$dc" ]; then good "verify.e2e is null: keel does not detect one, so set it if this project has one"
+        else good "verify.e2e is set (declared, not run): $dc"
+        fi
     fi
 
     # stack.has_ui is written once, by init, and a project grows a user interface after that.
@@ -1882,16 +1983,325 @@ SCANNER="$HERE/tests/supply-chain-scan.sh"
 
 cmd_scan() {
     [ -x "$SCANNER" ] || die "the supply chain scanner is missing from this install ($SCANNER)."
+    if [ "${1:-}" = "--push" ]; then
+        [ "$#" -eq 3 ] || die "usage: keel scan --push <remote> <commit>"
+        scan_push "$2" "$3"
+        return
+    fi
     "$SCANNER" "$@"
 }
 
-# The guard is opt-in, and it is opt-in for a reason worth stating rather than assuming: it sets
-# core.hooksPath, which is a change to the developer's git configuration for this repository. A tool
-# that reconfigures git the moment you run `init` is a tool people stop running.
+# `keel scan --push <remote> <commit>` is what the pre-push hook runs, once per pushed commit. It
+# scans the commit, never the working tree, which can hold a file the commit lacks or lack one it
+# carries. Two parts: the commit's tree in full, and the key-file rule alone over every key file a
+# commit in the push added, changed or changed the type of that the tip does not hold as a file,
+# because git keeps a committed key in history and the push carries that history to the remote. It
+# refuses, rather than scans in part, a commit it cannot write to disk faithfully.
+scan_push() {   # scan_push <remote> <commit>
+    local remote="$1" sha work tree objects fmt entry meta p mode type oid h i rc=0 allow_mode=""
+    local paths=() oids=() fix=() bad=() hist=() hoids=() look=() loids=()
+    # Replace refs change what git reads and not what push sends, so none is followed anywhere here.
+    export GIT_NO_REPLACE_OBJECTS=1
+    sha="$(git rev-parse --verify --quiet "$2^{commit}" 2>/dev/null)" || die "'$2' is not a commit in this repository."
+    objects="$(cd "$(git rev-parse --git-common-dir)" && pwd -P)/objects" || die "could not find this repository's objects."
+    # The scan repository must name objects the way this one does, or a SHA-256 repository could
+    # not be read. A git too old to answer echoes the flag back, and has only SHA-1.
+    fmt="$(git rev-parse --show-object-format 2>/dev/null)"
+    case "$fmt" in sha1|sha256) ;; *) fmt="" ;; esac
+    work="$(mktemp -d)" || die "could not create a temporary directory for the scan."
+    # Removed however this ends, a die or an interrupted hook included, since it holds a full copy
+    # of the commit. Expanded now, since $work is local and gone by the time the trap runs.
+    # shellcheck disable=SC2064
+    trap "rm -rf '$work'" EXIT
+    tree="$work/tree"
+    mkdir "$tree" || die "could not create a temporary directory for the scan."
+    say "scanning $sha, as pushed to $remote"
+    while IFS= read -r -d '' entry; do
+        meta="${entry%%$'\t'*}"; p="${entry#*$'\t'}"
+        read -r mode type oid <<< "$meta"
+        # git refuses to check out a path with a .git component, in any case, because it would
+        # configure the repository it lands in, and a path with a ., .. or empty component, because
+        # it would land outside or beside where it belongs; git mktree builds either. Refused here
+        # before anything is written: a clone never holds one, and a .. path would put a file
+        # anywhere this user can write.
+        case "/$p/" in
+            */[.][gG][iI][tT]/*|*/./*|*/../*|*//*) die "$sha holds '$p', a path git refuses to check out. Nothing was scanned." ;;
+        esac
+        # A submodule is a commit, whose content is not in this repository to scan.
+        [ "$type" = blob ] || continue
+        paths+=("$p"); oids+=("$oid")
+        if [ "$p" = .keel/scan-allow ]; then allow_mode="$mode"; fi
+    done < <(git ls-tree -r -z "$sha")
+    # The copy gets a repository of its own, outside the copy, whose index is the commit's own tree:
+    # names and modes come from the commit, never from what the disk kept, so A.key beside a.KEY on
+    # a case-folding disk still reaches the key rule by its own name. checkout-index writes the
+    # files, with the commit's .gitattributes out of the index meanwhile and no symlink written, so
+    # the pushed tree chooses no filter command, no conversion, and nowhere outside the copy to
+    # write. Every file is then checked against its blob, any that differs is written again from the
+    # object store, and the check runs a second time. A file still wrong then is one this filesystem
+    # cannot keep apart from another path, Payload.sh and payload.sh on a case-folding disk, or A.sh
+    # beside a directory a.sh, and cannot be scanned.
+    scan_push_in "$work" "$tree" scan_push_checkout "$sha" "$objects" "$fmt" \
+      || die "could not write $sha's tree for the scanner. git refuses to write a path it will not check out, such as one it reads as .git on this filesystem, and that is the likely reason. Nothing was scanned."
+    while IFS= read -r i; do fix+=("$i"); done < <(scan_push_mismatches "$tree")
+    for i in "${!fix[@]}"; do
+        scan_push_blob "$tree" "${paths[${fix[$i]}]}" "${oids[${fix[$i]}]}"
+    done
+    while IFS= read -r i; do bad+=("${paths[$i]}"); done < <(scan_push_mismatches "$tree")
+    if [ "${#bad[@]}" -gt 0 ]; then
+        err "$sha holds paths this filesystem cannot keep apart, such as two that differ only in case, so not all of them can be scanned. Refused rather than scanned in part:"
+        for p in "${bad[@]}"; do err "  $p"; done
+        return 1
+    fi
+    # .keel/scan-allow is read by name, and a case-folding disk answers to it for .keel/SCAN-ALLOW,
+    # while a symlink by that name is written as a file holding its target's path. So an allow list
+    # is honoured only where the commit holds that exact path as a file, and anything else the disk
+    # answers to the name refuses the scan.
+    if [ -e "$tree/.keel/scan-allow" ] && [ "$allow_mode" != 100644 ] && [ "$allow_mode" != 100755 ]; then
+        err "$sha holds a path this filesystem reads as .keel/scan-allow, and not that file itself, so its allow list cannot be trusted. Nothing was scanned."
+        return 1
+    fi
+    scan_push_in "$work" "$tree" "$SCANNER" || rc=1
+    # Key file versions in the history the push carries that the tip does not hold as a file with
+    # that same content: an entry in .keel/scan-allow covers the version the tip holds, so a live key
+    # a pushed commit put at an allowed path is refused though a later commit put the fixture back.
+    # A pinned version is allowed, see scan_push_gone. The push is every commit reachable from the
+    # tip and from no ref of <remote> fetched here, so a first push, or a remote named by URL, which
+    # has no refs here, counts the tip's whole history. Added, modified or changed in type, A, M and
+    # T: a key the remote already holds, changed in the push and then deleted, sends the new key all
+    # the same. -c lists what a merge commit itself adds,
+    # and --root what a root commit does. Plumbing, rev-list and diff-tree, because git log follows
+    # porcelain configuration: with log.showRoot false it shows nothing a root commit added. The
+    # walk's status is checked, since one that stops partway, on an object missing from a partial
+    # clone, would otherwise read as a clean history.
+    if ! git rev-list "$sha" --not --remotes="$remote" -- 2>/dev/null \
+        | git diff-tree --stdin -r -c --root --no-commit-id --no-renames --diff-filter=AMT -z > "$work/log" 2>/dev/null; then
+        err "could not read the history $sha carries, so its key files were not checked."
+        return 1
+    fi
+    # Raw records, the metadata and then the path, each NUL-ended. The metadata ends in the new blob
+    # and the status, for a merge's combined record as for a plain one.
+    while IFS= read -r -d '' meta && IFS= read -r -d '' p; do
+        meta="${meta% *}"
+        if [ -n "$p" ]; then hist+=("$p"); hoids+=("${meta##* }"); fi
+    done < "$work/log"
+    # What the tip holds is looked up in the tip itself, exactly, case and all, never through a
+    # filesystem that may fold case: TEST.key is not held because test.key is. Only a file with the
+    # same blob counts: a tip holding deploy.key/notes.txt does not hold the key a pushed commit
+    # added as deploy.key.
+    # A name holding a newline cannot be looked up one per line, and one with a ., .. or empty
+    # component would be read relative to the working directory, so each is checked outright, and so
+    # is any path cat-file did not answer for.
+    : > "$work/gone"
+    for p in "${!hist[@]}"; do
+        case "/${hist[$p]}/" in
+            *$'\n'*|*/./*|*/../*|*//*) scan_push_gone "${hist[$p]}" "${hoids[$p]}" ;;
+            *) look+=("${hist[$p]}"); loids+=("${hoids[$p]}") ;;
+        esac
+    done
+    if [ "${#look[@]}" -gt 0 ]; then
+        i=0
+        while IFS= read -r h; do
+            [ "$h" = "blob ${loids[$i]}" ] || scan_push_gone "${look[$i]}" "${loids[$i]}"
+            i=$((i+1))
+        done < <(for p in "${look[@]}"; do printf '%s:%s\n' "$sha" "$p"; done | git cat-file --batch-check='%(objecttype) %(objectname)' 2>/dev/null)
+        while [ "$i" -lt "${#look[@]}" ]; do
+            scan_push_gone "${look[$i]}" "${loids[$i]}"
+            i=$((i+1))
+        done
+    fi
+    ( cd "$tree" && "$SCANNER" --secret-paths < "$work/gone" ) || rc=1
+    return "$rc"
+}
+
+# scan_push_gone <path> <blob>: run inside scan_push, whose $work and $tree it reads. Queues the
+# history version for the key-file rule, unless the commit's .keel/scan-allow pins it: a line naming
+# the path and then that blob. A pin covers one reviewed version, so a fixture regenerated in the
+# history a first push walks can be allowed without allowing whatever else that path ever held. By
+# here, anything at .keel/scan-allow is the commit's own file, since scan_push refused the rest.
+scan_push_gone() {
+    local line f o
+    if [ -f "$tree/.keel/scan-allow" ]; then
+        while IFS= read -r line || [ -n "$line" ]; do
+            case "$line" in \#*) continue ;; esac
+            f="${line%% *}"; o="${line#"$f"}"; o="${o# }"; o="${o%% *}"
+            if [ "$f" = "$1" ] && [ "$o" = "$2" ]; then
+                printf 'ALLOW %s %s [structural-secret-material] pinned in .keel/scan-allow\n' "$1" "$2"
+                return 0
+            fi
+        done < "$tree/.keel/scan-allow"
+    fi
+    printf '%s\0' "$1" >> "$work/gone"
+}
+
+# scan_push_in <work> <tree> <command>...: <command> run in <tree>, with git pointed at the scan's
+# own repository and at nothing else. Every variable git reads to find or configure a repository is
+# cleared first, from git's own list: a linked worktree's hook runs with GIT_DIR set, and
+# GIT_CONFIG_PARAMETERS and its kin carry configuration. System and global configuration are left
+# out too, so no filter or hook this user has configured runs over the pushed tree. HOME and
+# XDG_CONFIG_HOME point at the work directory as well: a git older than 2.32 ignores
+# GIT_CONFIG_GLOBAL and reads ~/.gitconfig, and every git reads the global attributes file under
+# XDG_CONFIG_HOME whatever GIT_CONFIG_GLOBAL says.
+scan_push_in() {
+    local work="$1" tree="$2" v
+    shift 2
+    (
+        for v in $(git rev-parse --local-env-vars); do unset "$v"; done
+        export GIT_DIR="$work/git" GIT_WORK_TREE="$tree" GIT_NO_REPLACE_OBJECTS=1 \
+            GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null HOME="$work" XDG_CONFIG_HOME="$work"
+        cd "$tree" || exit 1
+        "$@"
+    )
+}
+
+# scan_push_checkout <commit> <objects> <format>: run through scan_push_in. The scan repository,
+# reading the pushed repository's objects in place, with the commit's tree as its index and on disk.
+# The commit's .gitattributes leave the index while checkout-index writes, so they choose no filter,
+# eol conversion or encoding; they come back with the rest when the index is read again, and on disk
+# through scan_push_mismatches; matched in any case, since a case-folding disk reads
+# A/.GITATTRIBUTES for a/. core.symlinks is off so checkout-index writes a symlink as the plain file
+# git stores, its target's path: on a case-folding disk a symlink x can replace a directory X whose
+# files are then written through it, outside the copy. core.fsmonitor and core.autocrlf are set here
+# because on a git older than 2.32, which ignores GIT_CONFIG_GLOBAL, a global setting would still
+# apply. core.precomposeunicode is off because git on macOS turns it on at init, and then lists a
+# decomposed name it reads from disk a second time, precomposed, as an untracked file the allow list
+# does not name.
+scan_push_checkout() {
+    local sha="$1" objects="$2" fmt="$3" p
+    git init -q ${fmt:+"--object-format=$fmt"} && git config core.fsmonitor false && git config core.autocrlf false \
+      && git config core.symlinks false && git config core.precomposeunicode false \
+      && printf '%s\n' "$objects" > "$(git rev-parse --git-path objects/info/alternates)" \
+      && git read-tree "$sha" || return 1
+    git ls-files -z | while IFS= read -r -d '' p; do
+        case "/$p" in */[.][gG][iI][tT][aA][tT][tT][rR][iI][bB][uU][tT][eE][sS]) printf '%s\0' "$p" ;; esac
+    done | git update-index -z --force-remove --stdin || return 1
+    # Its failures, a path this filesystem cannot write as the commit has it, are left to
+    # scan_push_mismatches, which decides.
+    git checkout-index -a -f 2>/dev/null
+    git read-tree "$sha"
+}
+
+# scan_push_mismatches <dir>: one line per index into the caller's paths and oids whose file under
+# <dir> is not exactly that blob. hash-object reads one path per line, drops a trailing CR from it,
+# and stops at a file it cannot open; it also follows a symlink, which would read outside the tree.
+# So a symlink, or anything not a plain file, is a mismatch outright, and a name holding a newline
+# or a CR is hashed on its own. Any file the batch did not reach is a mismatch too.
+scan_push_mismatches() {
+    local dir="$1" i n h hidx=()
+    for i in "${!paths[@]}"; do
+        if [ -L "$dir/${paths[$i]}" ] || [ ! -f "$dir/${paths[$i]}" ]; then
+            printf '%s\n' "$i"
+        elif [[ "${paths[$i]}" == *$'\n'* || "${paths[$i]}" == *$'\r'* ]]; then
+            [ "$(git hash-object --no-filters -- "$dir/${paths[$i]}" 2>/dev/null)" = "${oids[$i]}" ] || printf '%s\n' "$i"
+        else
+            hidx+=("$i")
+        fi
+    done
+    [ "${#hidx[@]}" -gt 0 ] || return 0
+    n=0
+    while IFS= read -r h; do
+        [ "$h" = "${oids[${hidx[$n]}]}" ] || printf '%s\n' "${hidx[$n]}"
+        n=$((n+1))
+    done < <(for i in "${hidx[@]}"; do printf '%s/%s\n' "$dir" "${paths[$i]}"; done | git hash-object --no-filters --stdin-paths 2>/dev/null)
+    while [ "$n" -lt "${#hidx[@]}" ]; do
+        printf '%s\n' "${hidx[$n]}"
+        n=$((n+1))
+    done
+}
+
+# scan_push_blob <dir> <path> <blob>: the blob's bytes at <dir>/<path>, as git stores them. Its
+# failures are not checked here: the second scan_push_mismatches is what decides.
+scan_push_blob() {
+    {
+        rm -f "$1/$2"
+        mkdir -p "$(dirname "$1/$2")"
+        git cat-file blob "$3" > "$1/$2"
+    } 2>/dev/null
+}
+
+# The guard is opt-in: it writes three hooks into this repository's git directory, and a tool that
+# does that the moment you run `init` is a tool people stop running.
 #
-# It is repo-local. Setting core.hooksPath globally would silently disable every other repository's
-# hooks on the machine, which is a far larger blast radius than anything this guard protects against.
-GUARD_DIR=".githooks"
+# It lives in git's own hooks directory, never in the working tree, and sets no core.hooksPath.
+# Until 2026-09-26 it used core.hooksPath=.githooks, a working-tree path, so every checkout replaced
+# the hooks with the checked-out branch's own and a fork's pull request ran its code on checkout.
+# No checkout writes into the git directory. `git rev-parse --git-common-dir` is used and not
+# `--git-path hooks`, because --git-path follows core.hooksPath, which would name .githooks again;
+# the common dir is shared by every worktree, and is relative to the current directory.
+#
+# It never takes over another tool's hooks: a core.hooksPath keel did not set, or a same-named hook
+# without keel's mark, belongs to husky, lefthook or a scanner, and replacing either switches that
+# tool off. Nothing here writes git configuration at all, least of all globally.
+GUARD_LEGACY_DIR=".githooks"
+GUARD_MARK='installed by `keel guard install`'
+
+guard_dir() { printf '%s/hooks' "$(git rev-parse --git-common-dir)"; }
+
+# The top of the working tree, which git resolves a relative core.hooksPath against, rather than the
+# current directory. A bare repository has no working tree, so the current directory stands in.
+guard_top() { git rev-parse --show-toplevel 2>/dev/null || pwd; }
+
+# core.hooksPath as git reads it and the config it came from, so a refusal names the file to edit:
+# nothing in this repository undoes a global or system setting.
+guard_hooks_path_source() {
+    local s; s="$(git config --show-scope --get core.hooksPath 2>/dev/null)" || return 0
+    printf "'%s', set in the %s git config" "${s#*$'\t'}" "${s%%$'\t'*}"
+}
+
+# The hooks in keel's old .githooks install that keel did not write, space separated. git runs them
+# only while core.hooksPath points there, so moving keel's out must not unset it while any remain.
+# Only executable files count, because git runs no other kind: a README.md there is no hook. A
+# *.sample file is one of git's inert examples, which git skips even when it is executable.
+guard_legacy_others() {
+    local f out=""
+    for f in "$(guard_top)/$GUARD_LEGACY_DIR"/*; do
+        [ -f "$f" ] && [ -x "$f" ] || continue
+        case "$f" in *.sample) continue ;; esac
+        grep -qF "$GUARD_MARK" "$f" || out="$out ${f##*/}"
+    done
+    printf '%s' "${out# }"
+}
+
+# The first of keel's three hook names whose file in the hooks directory lacks keel's mark, which
+# makes it another tool's: the pre-commit framework and lefthook write there. Status 1 when none.
+guard_foreign_hook() {
+    local d f; d="$(guard_dir)"
+    for f in pre-push pre-commit prepare-commit-msg; do
+        if [ -e "$d/$f" ] && ! grep -qF "$GUARD_MARK" "$d/$f"; then printf '%s' "$f"; return 0; fi
+    done
+    return 1
+}
+
+# One answer to "is the guard installed", for `guard status` and doctor alike:
+#   legacy        core.hooksPath is .githooks and keel's pre-push is there: keel's own old install
+#   foreign-path  core.hooksPath points anywhere else, so git never runs the hooks directory. A
+#                 .githooks without keel's mark is a project's own hooks, and lands here
+#   installed     keel's executable pre-push is in the hooks directory, whatever sits beside it:
+#                 the push guard runs, and status names another tool's pre-commit on its own line
+#   foreign-hook  the hooks directory holds another tool's pre-push, pre-commit or prepare-commit-msg
+#   absent        none of these, a keel pre-push that lost its executable bit included
+guard_state() {
+    local hp d top rp rd; hp="$(git config core.hooksPath 2>/dev/null || true)"; d="$(guard_dir)"
+    top="$(guard_top)"
+    # A core.hooksPath naming the hooks directory itself redirects nothing, so it is not foreign.
+    # A relative one is resolved as git resolves it, against the top of the working tree.
+    if [ -n "$hp" ]; then
+        case "$hp" in /*) rp="$hp" ;; *) rp="$top/$hp" ;; esac
+        rp="$(cd "$rp" 2>/dev/null && pwd -P)"; rd="$(cd "$d" 2>/dev/null && pwd -P)"
+        if [ -n "$rp" ] && [ "$rp" = "$rd" ]; then hp=""; fi
+    fi
+    if [ "$hp" = "$GUARD_LEGACY_DIR" ] && grep -qF "$GUARD_MARK" "$top/$GUARD_LEGACY_DIR/pre-push" 2>/dev/null; then
+        printf 'legacy'
+    elif [ -n "$hp" ]; then
+        printf 'foreign-path'
+    elif [ -x "$d/pre-push" ] && grep -qF "$GUARD_MARK" "$d/pre-push"; then
+        printf 'installed'
+    elif guard_foreign_hook >/dev/null; then
+        printf 'foreign-hook'
+    else
+        printf 'absent'
+    fi
+}
 
 guard_hook_body() {
     printf '#!/usr/bin/env bash\nVERIFY_KEYS="%s"\n' "$VERIFY_KEYS"  # baked in: this file runs later as its own process, with no access back into this shell
@@ -1921,6 +2331,8 @@ fi
 # switched it off. Caught by the test for exactly that case.
 protect="$(sed -n 's/.*"protect_default_branch": *\([a-z]*\).*/\1/p' .keel/profile.json 2>/dev/null | head -1)"
 
+# The commits the push sends, each once: the scan at the end reads them.
+pushed=""
 # Only when git is feeding the hook. A push supplies its refs on stdin; run by hand from a terminal
 # there is nothing to read, and a `read` against a tty would hang rather than check anything.
 if [ ! -t 0 ]; then
@@ -1931,7 +2343,24 @@ if [ ! -t 0 ]; then
     # PATH that prints a not-found message and exits 49 without running anything, and command -v
     # would call that present.
     python3 -c 'pass' >/dev/null 2>&1 && have_py=1
-    while read -r _lref lsha rref rsha; do
+    # Each line is <local ref> <local sha> <remote ref> <remote sha>, and the local ref is the push
+    # source as written, which can hold a space: `:/fix HEAD` names a commit by its message. So the
+    # fields are taken from the right, where neither sha nor a ref name can hold one.
+    while IFS= read -r line; do
+        rsha="${line##* }"; line="${line% *}"
+        rref="${line##* }"; line="${line% *}"
+        lsha="${line##* }"
+        # A branch delete, a local sha of all zeros, 40 of them or a SHA-256 repository's 64, sends
+        # no content. A commit pushed under two refs, a branch and an annotated tag on it, is
+        # scanned once: a tag's own sha is peeled to its commit, and one that does not peel is kept
+        # as it is, so the scan still refuses it. The peel ignores replace refs, as keel scan --push
+        # does: they change what git reads and not what push sends, so a replaced tag object would
+        # peel to the replacement's commit.
+        case "$lsha" in
+            *[!0]*)
+                commit="$(GIT_NO_REPLACE_OBJECTS=1 git rev-parse --verify --quiet "$lsha^{commit}" 2>/dev/null)" || commit="$lsha"
+                case " $pushed " in *" $commit "*) ;; *) pushed="$pushed $commit" ;; esac ;;
+        esac
         if [ -n "$protected" ] && [ "$protect" != "false" ] && [ "$rref" = "refs/heads/$protected" ]; then
             blocked="$protected"
         fi
@@ -2057,19 +2486,44 @@ MSG
     fi
 fi
 
-if command -v keel >/dev/null 2>&1; then
-    SCAN="keel scan"
-elif [ -x tests/supply-chain-scan.sh ]; then
-    SCAN="tests/supply-chain-scan.sh"
-else
-    printf 'keel guard: no scanner reachable, so nothing was checked. Push allowed.\n' >&2
+# The installed keel's scanner, never one from the repository being pushed: a branch that edits
+# tests/supply-chain-scan.sh would otherwise be judged by its own copy, and could weaken the check
+# on the very push that publishes the change. With no keel reachable nothing is checked, and it
+# says so rather than refusing: keel is often on PATH only inside an agent session, and a refusal
+# outside one teaches --no-verify by reflex.
+if ! command -v keel >/dev/null 2>&1; then
+    printf 'keel guard: keel is not on PATH, so nothing was scanned. Push allowed.\n' >&2
     exit 0
 fi
 
-printf 'keel guard: scanning before push\n'
-if $SCAN; then
-    exit 0
+# What git feeds the hook is what gets scanned: each pushed commit and the history it carries, and
+# never the working tree, which can hold a file the commit lacks or lack one it carries. git always
+# passes the remote and its URL, so a hook with no arguments is one run by hand, and the working
+# tree is what there is to scan. With git's arguments and nothing pushed, a delete or a push with
+# nothing to update, nothing is published and nothing is scanned.
+#
+# The hook is written by the keel that installed it, and the scan runs with the keel on PATH, which
+# can be older: one with no --push ignores it and scans the working tree while reading as a clean
+# scan of the push. So it is asked first, and an older one says so and scans the working tree, as
+# this hook did before, rather than pass a push it never looked at. Its help is read whole, not
+# piped to grep -q, since grep stopping early would fail that pipeline under pipefail.
+refused=0
+if [ "$#" -eq 0 ]; then
+    printf 'keel guard: scanning the working tree\n'
+    keel scan || refused=1
+elif [ -n "$pushed" ]; then
+    case "$(keel --help 2>/dev/null)" in
+        *"scan --push"*)
+            printf 'keel guard: scanning before push\n'
+            for sha in $pushed; do
+                keel scan --push "$1" "$sha" || refused=1
+            done ;;
+        *)
+            printf 'keel guard: the keel on PATH is too old to scan the commits being pushed, so the working tree is scanned instead. Update keel to scan what is pushed.\n' >&2
+            keel scan || refused=1 ;;
+    esac
 fi
+[ "$refused" -eq 0 ] && exit 0
 
 cat >&2 <<'MSG'
 
@@ -2201,6 +2655,12 @@ msg_file="${1:-}"
 [ -n "$msg_file" ] && [ -f "$msg_file" ] || exit 0
 [ -f .keel/profile.json ] || exit 0
 
+# conventions.no_attribution_footers true means this repository's commit messages are a title and a
+# body and nothing else, and a trailer is a footer. Read with sed, like keel_version below, because
+# a git hook cannot count on python3.
+footers="$(sed -n 's/.*"no_attribution_footers": *\([a-z]*\).*/\1/p' .keel/profile.json 2>/dev/null | head -1)"
+[ "$footers" = true ] && exit 0
+
 version="$(sed -n 's/.*"keel_version": *"\([^"]*\)".*/\1/p' .keel/profile.json 2>/dev/null | head -1)"
 [ -n "$version" ] || exit 0
 
@@ -2217,28 +2677,73 @@ cmd_guard() {
     git rev-parse --git-dir >/dev/null 2>&1 || die "not a git repository."
     case "${1:-status}" in
         install)
-            mkdir -p "$GUARD_DIR"
-            guard_hook_body > "$GUARD_DIR/pre-push"
-            guard_precommit_body > "$GUARD_DIR/pre-commit"
-            guard_prepare_commit_msg_body > "$GUARD_DIR/prepare-commit-msg"
-            chmod +x "$GUARD_DIR/pre-push" "$GUARD_DIR/pre-commit" "$GUARD_DIR/prepare-commit-msg"
-            git config core.hooksPath "$GUARD_DIR"
-            say "installed $GUARD_DIR/pre-push, $GUARD_DIR/pre-commit, and $GUARD_DIR/prepare-commit-msg, and set core.hooksPath for this repository only"
+            local st d f others; st="$(guard_state)"; d="$(guard_dir)"
+            # Decided by guard_state, not by the setting's value: a .githooks without keel's mark
+            # is a project's own hooks, and unsetting core.hooksPath would switch them off.
+            if [ "$st" = foreign-path ]; then
+                die "core.hooksPath is $(guard_hooks_path_source) and not by keel, so git runs no hooks from $d. Replacing it would switch those hooks off; unset it yourself if keel's guard should take their place."
+            fi
+            if f="$(guard_foreign_hook)"; then
+                die "$d/$f is another tool's hook, and installing would overwrite it. Remove or rename it, then re-run."
+            fi
+            # Checked before anything is written, so a refusal leaves the repository as it was.
+            if [ "$st" = legacy ]; then
+                others="$(guard_legacy_others)"
+                [ -z "$others" ] || die "$GUARD_LEGACY_DIR/ also holds $others, hooks keel did not write, and unsetting core.hooksPath would stop them running. Move them into $d or remove them, then re-run."
+            fi
+            mkdir -p "$d"
+            guard_hook_body > "$d/pre-push"
+            guard_precommit_body > "$d/pre-commit"
+            guard_prepare_commit_msg_body > "$d/prepare-commit-msg"
+            chmod +x "$d/pre-push" "$d/pre-commit" "$d/prepare-commit-msg"
+            if [ "$st" = legacy ]; then
+                # The unset reaches this repository's own config only, so a setting from another
+                # scope, a global one included, is named rather than retried.
+                git config --unset core.hooksPath 2>/dev/null || die "could not unset core.hooksPath, which is $(guard_hooks_path_source). Unset it in that config, which for a global or system setting changes every repository on the machine, then re-run 'keel guard install'."
+                # Only the repository's own setting is unset. One from another scope then takes
+                # over, and git would run none of the hooks just written.
+                [ "$(guard_state)" = installed ] || die "unset this repository's core.hooksPath, but git now reads core.hooksPath as $(guard_hooks_path_source), so it runs no hooks from $d. Unset it there, then re-run 'keel guard install'."
+                say "moved the guard out of $GUARD_LEGACY_DIR/, a working-tree path that every checkout replaces, and unset core.hooksPath. Delete $GUARD_LEGACY_DIR/, with 'git rm -r $GUARD_LEGACY_DIR' where it is committed"
+            fi
+            say "installed pre-push, pre-commit and prepare-commit-msg in $d, where no checkout can replace them"
             say "the commit hook stays inert until gates.commit_guard is 'required' or 'warn'"
-            say "commit $GUARD_DIR/ so a teammate gets it by running 'keel guard install' too"
+            say "the hooks are not committed: each clone runs 'keel guard install' for itself"
             ;;
         uninstall)
-            git config --unset core.hooksPath 2>/dev/null || true
-            rm -f "$GUARD_DIR/pre-push" "$GUARD_DIR/pre-commit" "$GUARD_DIR/prepare-commit-msg"
-            rmdir "$GUARD_DIR" 2>/dev/null || true
-            say "removed the push, commit and message guards. core.hooksPath is back to git's default"
+            local d f others; d="$(guard_dir)"
+            # Only files carrying keel's mark: a same-named hook without it is another tool's.
+            for f in pre-push pre-commit prepare-commit-msg; do
+                if grep -qF "$GUARD_MARK" "$d/$f" 2>/dev/null; then rm -f "$d/$f"; fi
+            done
+            # An install at .githooks is unhooked, not deleted: those files are often committed,
+            # and keel does not delete tracked files. Not even unhooked while it also holds hooks
+            # keel did not write, since unsetting core.hooksPath would stop those running too.
+            if [ "$(guard_state)" = legacy ] && others="$(guard_legacy_others)" && [ -n "$others" ]; then
+                say "left core.hooksPath pointing at $GUARD_LEGACY_DIR/, which also holds $others, hooks keel did not write. keel's own hooks there still run; remove them and the setting yourself if you want them gone"
+            elif [ "$(guard_state)" = legacy ]; then
+                if git config --unset core.hooksPath 2>/dev/null; then
+                    say "unset core.hooksPath, which pointed at keel's old install in $GUARD_LEGACY_DIR/. Delete $GUARD_LEGACY_DIR/ yourself, with 'git rm -r $GUARD_LEGACY_DIR' where it is committed"
+                else
+                    say "left core.hooksPath as $(guard_hooks_path_source), which this repository cannot unset, so keel's old hooks in $GUARD_LEGACY_DIR/ still run. Unset it in that config, which for a global or system setting changes every repository on the machine"
+                fi
+            fi
+            say "removed keel's push, commit and message hooks from $d. Hooks other tools wrote are untouched"
             ;;
         status)
-            local hp; hp="$(git config core.hooksPath 2>/dev/null || true)"
-            if [ "$hp" = "$GUARD_DIR" ] && [ -x "$GUARD_DIR/pre-push" ]; then
-                say "push guard: active"
+            local d st others; d="$(guard_dir)"
+            st="$(guard_state)"
+            if [ "$st" = installed ]; then
+                # A hook body is fixed at install time, and one written before keel scan --push
+                # scans the working tree rather than the commits being pushed.
+                if grep -qF "scan --push" "$d/pre-push"; then
+                    say "push guard: active"
+                else
+                    say "push guard: installed before it scanned the commits being pushed, so it scans the working tree. Re-run 'keel guard install'"
+                fi
                 local cg; cg="$(json_get .keel/profile.json gates.commit_guard 2>/dev/null || true)"
-                if [ ! -x "$GUARD_DIR/pre-commit" ]; then
+                if [ -e "$d/pre-commit" ] && ! grep -qF "$GUARD_MARK" "$d/pre-commit"; then
+                    say "commit guard: not keel's. $d/pre-commit is another tool's hook"
+                elif [ ! -x "$d/pre-commit" ]; then
                     say "commit guard: not installed. Re-run 'keel guard install'"
                 else
                     case "$cg" in
@@ -2247,13 +2752,39 @@ cmd_guard() {
                       *)        say "commit guard: installed but off. Set gates.commit_guard to 'required' in .keel/profile.json" ;;
                     esac
                 fi
-                if [ ! -x "$GUARD_DIR/prepare-commit-msg" ]; then
+                if [ -e "$d/prepare-commit-msg" ] && ! grep -qF "$GUARD_MARK" "$d/prepare-commit-msg"; then
+                    say "message guard: not keel's. $d/prepare-commit-msg is another tool's hook"
+                elif [ ! -x "$d/prepare-commit-msg" ]; then
                     say "message guard: not installed. Re-run 'keel guard install'"
                 else
-                    say "message guard: active. commits get a Keel-Version trailer"
+                    # The line says what the hook will do, and a hook body is fixed at install time:
+                    # one written before the hook read conventions.no_attribution_footers adds the
+                    # trailer whatever the key says. Read with the hook's own sed, because that read
+                    # is the one the hook acts on.
+                    local nf_key; nf_key="$(sed -n 's/.*"no_attribution_footers": *\([a-z]*\).*/\1/p' .keel/profile.json 2>/dev/null | head -1)"
+                    if [ "$nf_key" != true ]; then
+                        say "message guard: active. commits get a Keel-Version trailer"
+                    elif grep -q no_attribution_footers "$d/prepare-commit-msg"; then
+                        say "message guard: installed, adds no trailer (conventions.no_attribution_footers is true)"
+                    else
+                        say "message guard: installed before conventions.no_attribution_footers, so commits still get a Keel-Version trailer. Re-run 'keel guard install'"
+                    fi
                 fi
-            elif [ -n "$hp" ]; then
-                say "push guard: inactive. core.hooksPath points at '$hp', which keel did not set"
+            elif [ "$st" = legacy ]; then
+                # install refuses to move it while hooks keel did not write sit beside it, so those
+                # are named first rather than sending the user to a command that will refuse.
+                others="$(guard_legacy_others)"
+                if [ -n "$others" ]; then
+                    say "push guard: installed in $GUARD_LEGACY_DIR/, a working-tree path, so checking out a branch runs that branch's own hooks. $GUARD_LEGACY_DIR/ also holds $others, hooks keel did not write: move them into $d or remove them before 'keel guard install' can move the guard"
+                else
+                    say "push guard: installed in $GUARD_LEGACY_DIR/, a working-tree path, so checking out a branch runs that branch's own hooks. Re-run 'keel guard install' to move it into $d"
+                fi
+                return 1
+            elif [ "$st" = foreign-path ]; then
+                say "push guard: inactive. core.hooksPath, which keel did not set, is $(guard_hooks_path_source)"
+                return 1
+            elif [ "$st" = foreign-hook ]; then
+                say "push guard: not installed. $d/$(guard_foreign_hook) is another tool's hook"
                 return 1
             else
                 say "push guard: not installed. Run 'keel guard install'"
@@ -2264,6 +2795,250 @@ cmd_guard() {
     esac
 }
 
+# `keel plan status` and `keel plan tick` read and tick an implementation plan's steps by id. A step
+# is a checkbox line whose bold title opens with its id, `- [ ] **Step 3.2: Run it and watch it
+# fail**`, the form skills/write-plan/references/plan-template.md writes. Its box is ` ` open, `x`
+# done, `-` deferred or `~` not applicable, and anything after the closing ** is its tail: a note,
+# or a deferred step's reason. A line inside a fenced code block is an example, as the template's own
+# are, so it is never a step.
+#
+# PLAN_AWK_LIB is prepended to both commands' awk programs so they cannot disagree about what a
+# step is. fenced(line) tracks fences and returns 1 for a fence line or a line inside one; a fence
+# may open after one list marker, `1. ```bash`, as CommonMark allows, since a missed one's closing
+# line would open a phantom fence hiding steps, and such a fence also closes when its item ends, at
+# a list item indented less than the fence's content, so one never closed cannot hide the steps
+# after it; a fence closes only on the same character, at least as long, with nothing after it, so a
+# ```` fence holding a ``` example stays open. A line opening with an inline backtick span is not a
+# fence: a backtick run followed later on its line by another backtick opens none, as CommonMark
+# rules. A closing fence may end in CR, since a CRLF checkout adds one. step(line) returns 1 for a
+# step line and sets sid, smark, stitle and stail.
+PLAN_AWK_LIB='
+function fenced(line,   t, c, n, s) {
+    t = line; sub(/^[ \t]+/, "", t)
+    if (infence && findent && t ~ /^([-*+]|[0-9]+[.)])[ \t]/ && length(line) - length(t) < findent)
+        infence = 0
+    s = 0
+    if (!infence && sub(/^([-*+]|[0-9]+[.)])[ \t]+/, "", t)) s = length(line) - length(t)
+    c = substr(t, 1, 1)
+    if (c == "`" || c == "~") {
+        n = 0; while (substr(t, n + 1, 1) == c) n++
+        if (n >= 3) {
+            if (!infence) {
+                if (c == "`" && index(substr(t, n + 1), "`")) return 0
+                infence = 1; fch = c; flen = n; fline = NR; findent = s; return 1
+            }
+            if (c == fch && n >= flen && substr(t, n + 1) ~ /^[ \t\r]*$/) { infence = 0; return 1 }
+        }
+    }
+    return infence
+}
+function step(line,   rest, i, j, t) {
+    if (line !~ /^- \[[ xX~-]\] \*\*Step [0-9]+[a-z]*\.[0-9]+: /) return 0
+    smark = substr(line, 4, 1); if (smark == "X") smark = "x"
+    rest = substr(line, 14)
+    i = index(rest, ": "); sid = substr(rest, 1, i - 1); rest = substr(rest, i + 2)
+    # The title ends at the first ** that ends the line or opens a note or reason, since a title may
+    # hold one, as a glob does, and parking rewrites all after the end. With none such it ends at the
+    # first **, so a parked step whose tail lacks its prefix stays a step that status flags.
+    for (i = 1; (j = index(substr(rest, i), "**")) > 0; i += j) {
+        t = substr(rest, i + j + 1)
+        if (t == "" || t == "\r" || t ~ /^ (Note|Deferred|Not applicable): /) {
+            stitle = substr(rest, 1, i + j - 2); stail = t
+            return 1
+        }
+    }
+    i = index(rest, "**"); if (i == 0) return 0
+    stitle = substr(rest, 1, i - 1); stail = substr(rest, i + 2)
+    return 1
+}
+'
+
+cmd_plan() {
+    case "${1:-}" in
+        status) shift
+                [ "$#" -eq 1 ] || die "usage: keel plan status <plan>"
+                plan_status "$1" ;;
+        tick)   shift; plan_tick "$@" ;;
+        *) die "unknown plan subcommand '${1:-}'. Try status or tick." ;;
+    esac
+}
+
+# plan_unaddressable <plan>: prints that the plan has no step ids, as one written before steps
+# carried them. Neither status nor tick can find a step in it, so after printing this they exit 3,
+# which a caller tells apart from a plan that is merely not done, and reads the plan by hand.
+plan_unaddressable() {
+    err "$1 has no step ids, so it is unaddressable: read and tick its checkboxes by hand"
+}
+
+# plan_status <plan>: one line per task, in the order tasks first appear, counting its steps by
+# state, then `next: <id>` for the first open step, or `next: none`, then a `problem:` line for each
+# deferred or not-applicable step with no reason, each id that appears twice, each open checkbox
+# that is not a step it can read, and a fence that never closes, and exit 1 when there is one. A
+# reason must start with a character that is not blank (a space, tab or CR). A parked step without
+# its reason is indistinguishable from a forgotten one, and a repeated id names no one step. An open
+# box is recognised in any GFM list-item form, `-`, `*`, `+` or numbered, indented or quoted, and
+# one it cannot read, for its form or a missing id, is open work that ship's gate, which reads this,
+# would otherwise pass. An unclosed fence hides every step after the line it opens on, so an
+# unfinished plan would read as done. A plan with no step ids exits 3; a fence that never closes is
+# reported as such rather than as a plan without ids.
+plan_status() {
+    [ -f "$1" ] || die "no such plan: $1"
+    local rc
+    # shellcheck disable=SC2016  # $0 is awk's record, not a shell expansion
+    awk "$PLAN_AWK_LIB"'
+        fenced($0) { next }
+        step($0) {
+            nstep++
+            task = sid; sub(/\.[0-9]+$/, "", task)
+            if (!(task in seen)) { seen[task] = 1; order[++ntask] = task }
+            count[task, smark]++
+            if (smark == " " && nextid == "") nextid = sid
+            if (sid in ids) problem[++nproblem] = "step " sid " appears more than once"
+            ids[sid] = 1
+            if (smark == "-" && stail !~ /^ Deferred: [^ \t\r]/)
+                problem[++nproblem] = "step " sid " is deferred with no reason"
+            if (smark == "~" && stail !~ /^ Not applicable: [^ \t\r]/)
+                problem[++nproblem] = "step " sid " is not applicable with no reason"
+        }
+        /^[ \t>]*([-*+]|[0-9]+[.)])[ \t]+\[ \]/ && !step($0) {
+            problem[++nproblem] = "line " NR " is an open checkbox that is not a step keel can read"
+        }
+        END {
+            if (!nstep && !infence) exit 3
+            for (k = 1; k <= ntask; k++) {
+                t = order[k]
+                printf "task %s: %d done, %d open, %d deferred, %d not applicable\n",
+                    t, count[t, "x"], count[t, " "], count[t, "-"], count[t, "~"]
+            }
+            print "next: " (nextid == "" ? "none" : nextid)
+            if (infence) problem[++nproblem] = "line " fline " opens a fence that never closes"
+            for (k = 1; k <= nproblem; k++) print "problem: " problem[k]
+            exit (nproblem > 0 ? 1 : 0)
+        }' "$1"
+    rc=$?
+    [ "$rc" -ne 3 ] || plan_unaddressable "$1"
+    return "$rc"
+}
+
+# plan_lock <plan>: holds <plan>.lock until plan_unlock, so two ticks on one plan cannot each
+# read it before the other writes and drop one's change, which a concurrent batch's ticks otherwise
+# do. mkdir is the lock because it is atomic on every filesystem keel runs on and needs no flock,
+# which macOS lacks. It waits about ten seconds, then fails naming the lock, because a tick killed
+# with SIGKILL leaves it behind and nothing else would say so. A mkdir that fails with no lock
+# present is retried once, since a lock released between the failed mkdir and the check is not an
+# error; if that fails with still no lock, as in a directory it cannot write, it fails at once.
+plan_lock() {
+    local n=0
+    until mkdir "$1.lock" 2>/dev/null; do
+        if [ ! -e "$1.lock" ]; then
+            mkdir "$1.lock" 2>/dev/null && break
+            [ -e "$1.lock" ] || die "cannot create $1.lock, so the plan cannot be locked: check its \
+directory is writable"
+        fi
+        n=$((n + 1))
+        [ "$n" -lt 100 ] || die "$1.lock is held by another keel plan tick. If none is running, one was killed: remove $1.lock"
+        sleep 0.1
+    done
+    PLAN_LOCK="$1.lock"
+    trap 'rmdir "$PLAN_LOCK" 2>/dev/null' EXIT
+    trap 'exit 130' INT TERM
+}
+
+# plan_unlock: clears the traps before releasing, because an EXIT trap left set would rmdir the lock
+# a second time at exit, by which point another tick may hold it. Planning saw exactly that: 18 of
+# 20 concurrent ticks landed until the traps were cleared first.
+plan_unlock() {
+    trap - EXIT INT TERM
+    rmdir "$PLAN_LOCK"
+}
+
+# plan_tick <plan> <id> [--note <text> | --defer <reason> | --not-applicable <reason>]: sets one
+# step's state and rewrites only its line. Done is the default; a note follows the title as
+# ` Note: <text>`, for a step the ticker did not witness. --defer and --not-applicable park the step
+# with ` Deferred: <reason>` or ` Not applicable: <reason>` instead, and refuse without a reason,
+# since a parked step without one reads as forgotten. A reason must start with a character that is
+# not blank, matching what status accepts, so tick never writes a line status then flags. Parking
+# replaces anything after the title, a note included, since it no longer describes the step. Ticking
+# a parked step done drops its reason, which no longer describes it. Text must be one line, since
+# it is written on the step's own line. The rewrite goes through a temporary file, so an awk that
+# fails leaves the plan as it was. It is written back with `cat >` rather than `mv`, so the plan
+# keeps its mode and a symlinked plan is written through; a failed write is an error, since the plan
+# is then unticked or truncated. A CRLF line keeps its CR at the end, after any note or reason. A
+# plan with no step ids exits 3; a fence that never closes is reported as such rather than as a plan
+# without ids.
+plan_tick() {
+    local plan="${1:-}" id="${2:-}" opt="${3:-}" text="${4:-}" mark=x tail="" tmp rc
+    [ -n "$plan" ] && [ -n "$id" ] && [ "$#" -le 4 ] \
+      || die "usage: keel plan tick <plan> <id> [--note <text> | --defer <reason> | --not-applicable <reason>]"
+    [ -f "$plan" ] || die "no such plan: $plan"
+    case "$text" in *$'\n'*) die "a note or reason must be one line: it is written on the step's own line" ;; esac
+    case "$opt" in
+        "") ;;
+        --note) [ -n "$text" ] || die "--note needs its text"; tail=" Note: $text" ;;
+        --defer)
+                 case "$text" in
+                     ""|[[:space:]]*) die "a reason is required: --defer <reason>" ;;
+                 esac
+                 mark=-; tail=" Deferred: $text" ;;
+        --not-applicable)
+                 case "$text" in
+                     ""|[[:space:]]*) die "a reason is required: --not-applicable <reason>" ;;
+                 esac
+                 mark="~"; tail=" Not applicable: $text" ;;
+        *) die "unknown option '$opt'. Try --note, --defer or --not-applicable." ;;
+    esac
+    plan_lock "$plan"
+    tmp="$(mktemp)" || die "cannot create a temporary file"
+    # ENVIRON rather than awk -v, because -v rewrites backslash escapes: a note holding \t would be
+    # written with a tab.
+    # shellcheck disable=SC2016  # $0 is awk's record, not a shell expansion
+    PLAN_ID="$id" PLAN_MARK="$mark" PLAN_TAIL="$tail" awk "$PLAN_AWK_LIB"'
+        BEGIN { id = ENVIRON["PLAN_ID"]; mark = ENVIRON["PLAN_MARK"]; tail = ENVIRON["PLAN_TAIL"] }
+        { line[NR] = $0 }
+        fenced($0) { next }
+        step($0) { nstep++; if (sid == id) { hits++; at = NR; oldtail = stail; title = stitle } }
+        END {
+            if (!nstep) exit (infence ? 6 : 3)
+            if (!hits) exit 4
+            if (hits > 1) exit 5
+            cr = ""; if (oldtail ~ /\r$/) { cr = "\r"; sub(/\r$/, "", oldtail) }
+            if (mark == "x") {
+                if (oldtail ~ /^ (Deferred|Not applicable): /) oldtail = ""
+                tail = oldtail tail
+            }
+            line[at] = "- [" mark "] **Step " id ": " title "**" tail cr
+            for (i = 1; i <= NR; i++) print line[i]
+        }' "$plan" > "$tmp"
+    rc=$?
+    # A complete copy has the plan's record count and ends in a newline, as awk's print always does:
+    # busybox awk exits 0 on a failed write, and copying a short file back would cut the plan.
+    if [ "$rc" -eq 0 ] \
+       && { [ "$(awk 'END { print NR }' "$tmp")" != "$(awk 'END { print NR }' "$plan")" ] \
+            || [ -n "$(tail -c 1 "$tmp")" ]; }; then
+        err "could not write the tick: the ticked copy of $plan came out incomplete, so $plan \
+is unchanged"
+        rc=1
+    fi
+    case "$rc" in
+        0) if ! cat "$tmp" > "$plan"; then
+               # The > has already truncated the plan, so the ticked copy is the only whole one and
+               # is not removed.
+               err "could not write $plan, which may now be truncated; the ticked copy is kept \
+at $tmp"
+               plan_unlock
+               return 1
+           fi ;;
+        3) plan_unaddressable "$plan" ;;
+        6) err "$plan has a fence that never closes, which hides every step after it: see keel \
+plan status $plan"; rc=1 ;;
+        4) err "no step $id in $plan"; rc=1 ;;
+        5) err "step $id appears more than once in $plan, so it names no one step"; rc=1 ;;
+    esac
+    rm -f "$tmp"
+    plan_unlock
+    return "$rc"
+}
+
 case "${1:-}" in
     init)        shift; cmd_init "$@" ;;
     new)         shift; cmd_new "$@" ;;
@@ -2272,6 +3047,7 @@ case "${1:-}" in
     apex-export) shift; cmd_apex_export "$@" ;;
     scan)        shift; cmd_scan "$@" ;;
     guard)       shift; cmd_guard "$@" ;;
+    plan)        shift; cmd_plan "$@" ;;
     version)     cat "$HERE/VERSION" 2>/dev/null || echo unknown ;;
     ""|-h|--help)
         say "keel <command>"; say ""
@@ -2282,7 +3058,13 @@ case "${1:-}" in
         say "  profile sync         record where this project's documents already are"
         say "  apex-export --app <id>   export an Oracle APEX application for porting"
         say "  scan                 supply chain scan of this tree; non-zero on any finding"
+        # The pre-push hook `keel guard install` writes reads this help for the words "scan --push"
+        # to tell a keel that has it from an older one. Keep them, or every hook installed since reads
+        # this keel as too old and scans the working tree.
+        say "  scan --push <remote> <commit>   the same scan of a commit being pushed, and of its history's key files"
         say "  guard install|status|uninstall   pre-push hook: the scan, and no pushes to the default branch, plus a pre-commit hook that stays off until gates.commit_guard turns it on"
+        say "  plan status <plan>   an implementation plan's steps by state, per task, and the next open step's id"
+        say "  plan tick <plan> <id> [--note <text> | --defer <reason> | --not-applicable <reason>]   set one step's state"
         say "  version" ;;
     *) die "unknown command '$1'. Try 'keel --help'." ;;
 esac

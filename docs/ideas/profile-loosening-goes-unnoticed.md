@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-09-19, "plan the work that makes keel enforceable outside the agent" |
-| Status | shaped |
+| Status | built via docs/plans/2026-09-19-make-keel-enforceable-outside-the-agent.md. Status corrected 2026-09-25 by docs/snapshot.md |
 | Recommendation | Extend `keel guard`'s pre-push hook to diff `.keel/profile.json` between old and new sha and refuse on loosening. Add a `CODEOWNERS` entry over `.keel/` as a config-only companion. Do not build a second, doctor-only ratchet |
-| Next | `write-plan`, as one increment of the outside-the-agent plan |
+| Next | The `CODEOWNERS` companion, skipped by that plan's open question 5 because the file is inert until the hosting platform's branch protection requires code-owner review. It needs an owner and that setting |
 
 ## The problem
 
@@ -19,14 +19,14 @@ gate passes forever and `keel doctor` reports no problems. The profile is honest
 **Evidence, ranked by whether the surface sees a raw `git push`, including a human pushing directly
 from a terminal, outside any Claude Code or Codex session.**
 
-1. **`keel guard`'s pre-push hook** (`bin/keel:1697-1745`, `guard_hook_body`, installed by `keel
-   guard install` into `.githooks/`) is the only surface that fires on an actual push regardless of
-   what produced the commit. It already reads old-sha/new-sha pairs per ref off stdin
-   (`bin/keel:1754`) and currently discards both. Diffing `.keel/profile.json` between the two shas
-   (`git show $old:.keel/profile.json` vs `$new:...`) and refusing on a short allow-list of
-   loosening moves (`hard_block_paths` shrinking, a `gates.*` value moving toward `off`, a
-   `verify.*` command becoming null or a non-string) is a natural, cheap extension of a hook that
-   already parses the inputs it needs.
+1. **`keel guard`'s pre-push hook** (`bin/keel#guard_hook_body() {`, `guard_hook_body`, installed by
+   `keel guard install` into `.githooks/`) is the only surface that fires on an actual push
+   regardless of what produced the commit. It already reads old-sha/new-sha pairs per ref off stdin
+   (`bin/keel#while IFS= read -r line; do`, which takes the fields from the right) and currently discards both. Diffing
+   `.keel/profile.json` between the two shas (`git show $old:.keel/profile.json` vs `$new:...`)
+   and refusing on a short allow-list of loosening moves (`hard_block_paths` shrinking, a
+   `gates.*` value moving toward `off`, a `verify.*` command becoming null or a non-string) is a
+   natural, cheap extension of a hook that already parses the inputs it needs.
 2. **`keel doctor`** (`bin/keel:1268`) runs inside a session or CI, after the fact. It can warn, not
    block, and today has no git-diff-based check against `.keel/profile.json` anywhere (confirmed:
    no `git diff`/`git show` against that path exists in `bin/keel` or `lib/`). Advisory only.

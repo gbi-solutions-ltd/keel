@@ -26,7 +26,7 @@ set -uo pipefail
 # was the only number enforced, bodies migrated to it: 15 of 24 skills landed within 20 words of it
 # and none met 400. The remedy the standard named, moving substance into references/, is exhausted,
 # which coding-standards demonstrated at 12 reference files and 17,816 reference words with a body
-# still at 683, measured 2026-08-16. It is 17, 22,750 and 795 today, and tests/test-doc-claims.sh
+# still at 683, measured 2026-08-16. It is 17, 22,726 and 726 today, and tests/test-doc-claims.sh
 # asserts that rather than leaving it to the next reader to notice. So the ceiling moves and the
 # target below it is enforced as a warning, because a ceiling with nothing under it is simply where
 # bodies settle.
@@ -85,6 +85,7 @@ schema_fingerprint_for() {
         2) printf '24e947eee3ce' ;;
         3) printf '2313ce09f5c0' ;;
         4) printf 'd5159ecbff0b' ;;
+        5) printf 'ebcd5f8fba88' ;;
     esac
 }
 
@@ -383,6 +384,18 @@ done
 if [ -f skills/write-plan/references/plan-template.md ]; then
     grep -q '\*\*Done when:\*\*' skills/write-plan/references/plan-template.md \
       || report "skills/write-plan/references/plan-template.md has no **Done when:** marker. A plan task with no done condition leaves done as an adjective."
+fi
+
+# The plan template's step ids, **Step <task>.<step>: ...**. keel plan status and keel plan tick
+# find a step by that id and read a plan without ids as unaddressable, so a template trimmed of them
+# writes plans neither command can read. A step left in the old form, **Step 5: ...**, is refused
+# too, because a plan copied from the template would then hold both.
+if [ -f skills/write-plan/references/plan-template.md ]; then
+    grep -Eq '^ *- \[ \] \*\*Step [0-9]+[a-z]*\.[0-9]+: ' skills/write-plan/references/plan-template.md \
+      || report "skills/write-plan/references/plan-template.md has no step carrying an id, **Step <task>.<step>: ...**. keel plan status and keel plan tick read a plan without them as unaddressable."
+    if grep -Eq '^ *- \[.\] \*\*Step [0-9]+[a-z]*: ' skills/write-plan/references/plan-template.md; then
+        report "skills/write-plan/references/plan-template.md has a step with no id, **Step <n>: ...**. Give it one, **Step <task>.<step>: ...**."
+    fi
 fi
 
 # The router's destinations must exist. A route to a deleted skill is a dead end the model

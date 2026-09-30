@@ -6,7 +6,7 @@ allowed-tools: [Read, AskUserQuestion]
 
 # keel
 
-Route to one skill, then stop. Do not do the work here.
+Route to one skill and follow it. Do not do the work in this skill.
 
 ## Routing
 
@@ -22,9 +22,9 @@ Route to one skill, then stop. Do not do the work here.
 | how should we build this, what stack, which database, record a decision | `design-architecture` |
 | write the implementation plan, plan this out | `write-plan` |
 | execute the plan, start building, go | `execute-plan` |
-| implement X, add feature Y, fix bug Z | `tdd` |
+| implement X, add feature Y | `tdd` |
 | **production is down right now**, on call, outage, customers affected | `incident-response` |
-| this is broken, why does X fail, this test is flaky | `debug` |
+| this is broken, why does X fail, this test is flaky, fix bug Z | `debug` |
 | what are our conventions, set up linting, does the code still follow our standards | `coding-standards` |
 | review my changes, look at this diff, check this PR | `review-code` |
 | is this secure, security audit, check for vulnerabilities | `security-audit` |
@@ -39,9 +39,9 @@ Route to one skill, then stop. Do not do the work here.
 
 ## Rules
 
-**One skill.** If two fit, the process skill goes first: it sets the approach and may invoke the
-other itself. `debug` before `tdd` for a bug; `shape-idea` before `write-prd` when the idea is still
-rough; `write-prd` before `design-architecture` once it is not.
+**One skill.** If two fit and one is a process skill, the process skill goes first: it sets the
+approach and may invoke the other itself. `debug` before `tdd` for a bug; `shape-idea` before
+`write-prd` when the idea is still rough; `write-prd` before `design-architecture` once it is not.
 **`incident-response` before `debug`** when it is happening now: restoring outranks explaining.
 
 **Announce it in one line**, then follow that skill exactly.
@@ -49,7 +49,10 @@ rough; `write-prd` before `design-architecture` once it is not.
 **When nothing fits, answer directly.** Not every request needs a skill, and forcing one is worse
 than answering.
 
-**When two fit equally, ask.** One `AskUserQuestion`, not a guess.
+**When two fit equally and neither is a process skill, ask.** One `AskUserQuestion`, not a guess.
+
+**When asked what keel can do**, answer from the routing table above, one line per skill, and invoke
+nothing.
 
 **Every question any skill here asks follows**
 [references/asking-questions.md](references/asking-questions.md). The rule most often got wrong:

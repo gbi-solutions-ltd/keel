@@ -1,6 +1,6 @@
 ---
 name: debug
-description: Use when encountering any bug, test failure, unexpected behaviour, performance anomaly, build failure, or integration problem, before proposing a fix.
+description: Use when encountering any bug, test failure, unexpected behaviour, build failure, or integration problem, before proposing a fix.
 allowed-tools: [Read, Write, Edit, Bash, Grep, Glob, Agent]
 ---
 
@@ -24,9 +24,9 @@ Phase 1 is not slow. Guessing is, because each wrong guess adds code you must re
 ## Phase 1: Establish the facts
 
 1. **Read the error.** All of it, stack trace included. Errors frequently contain the answer, and
-   skipping to the code is how you miss it. A service following the observability standard logs
-   `op`, `actor`, and a `remediation` field naming the skill to use: start from those rather than
-   the stack.
+   skipping to the code is how you miss it. A service following [the observability
+   standard](../coding-standards/references/observability.md) logs `op`, `actor`, and a
+   `remediation` field naming the skill to use: start from those then read the stack.
 2. **Confirm you are reading the right code.** In a session touching several repositories, check the
    file you opened belongs to the system that failed. Diagnosing repository A's symptom against
    repository B's code produces a confident, wrong answer.
@@ -52,8 +52,9 @@ cause. Following a reference? Read all of it; partial understanding guarantees a
 
 State it in a sentence: "X happens because Y." Specific enough to be wrong.
 
-Then make the smallest change that would confirm or refute it. One variable. Do not fix three
-things and run the suite; you will not know which mattered, and you may have added a bug.
+Then run the smallest experiment that would confirm or refute it: a log line, a different input, one
+reverted line. The fix waits for Phase 4. One variable. Do not fix three things and run the suite;
+you will not know which mattered, and you may have added a bug.
 
 Refuted? Form a new hypothesis from what you learned. Do not stack another fix on top.
 
@@ -90,7 +91,5 @@ Most such findings are incomplete investigations.
 
 | Mistake | Instead |
 |---|---|
-| Fixing where the error surfaced | Trace to where the bad value originated |
 | "Fixed" with no test | A bug with no regression test returns |
 | Skipping it because the bug looks obvious | Obvious bugs have root causes too |
-| A fourth fix attempt | Three failures means question the design |

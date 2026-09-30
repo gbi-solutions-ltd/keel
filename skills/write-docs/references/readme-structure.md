@@ -1,7 +1,7 @@
 # README structure
 
-Adapted from `cursor-starter/documentation/readme-generator.md`. Ordered by what a reader needs
-first, which is not what the author finds most interesting.
+Adapted from cursor-starter's README generator prompt. Ordered by what a reader needs first, which
+is not what the author finds most interesting.
 
 ## The order
 

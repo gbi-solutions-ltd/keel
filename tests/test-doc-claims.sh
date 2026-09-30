@@ -122,8 +122,8 @@ hd="skills/coding-standards/references/house-defaults.md"
 # house-defaults.md carries no fence today, so both spellings answer 14 and the denominator is the
 # same either way; the pattern is live in this directory all the same, since assessment-report.md
 # holds a fenced `## Not covered` in its template block. Left as a bare grep, the day somebody adds
-# a fenced example to house-defaults.md this file fails loudly and names the wrong cause: the two
-# claim_in cases below would report the documents as stale when nothing about the definition of a
+# a fenced example to house-defaults.md this file fails loudly and names the wrong cause: the
+# claim_in case below would report the document as stale when nothing about the definition of a
 # house rule had moved.
 hd_all="$(awk '/^```/ {fence = !fence; next} !fence && /^## / {n++} END {print n + 0}' "$hd")"
 hd_excluded=2
@@ -140,17 +140,13 @@ else
         "a heading was renamed, so the exclusion no longer subtracts what it says it does"
 fi
 
-# claim_in takes the FIRST match of its phrase in the file. Both phrases below are unique today:
-# "denominator is" does not otherwise occur in assessment-report.md, and assess.md spells its only
-# other count as the word "ten". A sentence added above either one carrying a digit in the same
-# shape would silently make these read the wrong number and still pass.
+# claim_in takes the FIRST match of its phrase in the file. The phrase below is unique today:
+# "denominator is" does not otherwise occur in assessment-report.md. A sentence added above it
+# carrying a digit in the same shape would silently make this read the wrong number and still pass.
+# assess.md states no count of its own: its check 1b is counted as assessment-report.md defines.
 claim_in skills/coding-standards/references/assessment-report.md \
          "check 1b denominator in assessment-report.md" "$hd_rules" \
          'denominator is [0-9]+'
-
-claim_in skills/coding-standards/references/assess.md \
-         "check 1b denominator in assess.md" "$hd_rules" \
-         'all [0-9]+ house defaults'
 
 # The header must carry both coverage figures under distinct names. A single "coverage <n>" is the
 # shape S-10 exists to remove, so the check fails on its absence rather than on its presence.
@@ -211,11 +207,13 @@ fi
 # legitimately moved it rather than simply tracking whatever bin/keel says: a pin whose expected
 # value is read from the file it guards catches nothing.
 sv="$(grep -oE '^SCHEMA_VERSION=[0-9]+' bin/keel | head -1 | cut -d= -f2)"
-if [ "$sv" = "4" ]; then
-    ok "SCHEMA_VERSION is where the retired-keys plan left it ($sv)"
+# 5 since 2026-09-25, when docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md
+# task 5 declared conventions.no_attribution_footers, the key the message hook now honours.
+if [ "$sv" = "5" ]; then
+    ok "SCHEMA_VERSION is where the no-footers task left it ($sv)"
 else
-    bad "SCHEMA_VERSION is where the retired-keys plan left it" \
-        "bin/keel is at $sv, expected 4. docs/plans/2026-09-07-declared-profile-keys-take-effect.md was the last plan to move it, by retiring the six keys nothing could honour. A further bump is either a change riding along or one that needs its own story, its own schema row and its own fingerprint line in tests/validate-skills.sh"
+    bad "SCHEMA_VERSION is where the no-footers task left it" \
+        "bin/keel is at $sv, expected 5. docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md was the last plan to move it, by declaring conventions.no_attribution_footers. A further bump is either a change riding along or one that needs its own story, its own schema row and its own fingerprint line in tests/validate-skills.sh"
 fi
 
 # Plan 0 left these two changes of its own untested. Both are literal strings in a file that exists
@@ -533,7 +531,7 @@ fi
 #
 # Three clauses, because they fail independently. An arm can be told the record has three states and
 # still be left to invent a decider for the third, which is the exclusion seed did not make.
-if printf '%s' "$sd_flat" | grep -q 'this record has three states' \
+if printf '%s' "$sd_flat" | grep -qi 'this record has three states' \
    && printf '%s' "$sd_flat" | grep -q 'no reference leaves it without one' \
    && printf '%s' "$sd_flat" | grep -q 'record it in the document as undecided' \
    && printf '%s' "$sd_flat" | grep -q 'names no decider'; then
@@ -719,7 +717,7 @@ fi
 #
 # Both files are asserted to exist before the negated grep, and that is not defensive noise. `!
 # grep -q` inverts grep's exit 2 on a missing file into a pass, so deleting references/seed.md would
-# turn this case green while proving nothing. tests/test-doc-claims.sh:186-193 already guards the
+# turn this case green while proving nothing. tests/test-doc-claims.sh:182-189 already guards the
 # same shape for schema_s12 and says so; this is that guard.
 #
 # The missing-file branch is separate, and for the reason b6e8662 separated the empty-block branch
@@ -745,7 +743,7 @@ fi
 # The registration side of the same question. A mode that names no hook but is wired into one is
 # enforced anyway, and hooks/hooks.json is where wiring that ships to an installer lives, which is
 # the property this story protects. It is not the only hooks block in the tree:
-# .claude/settings.json:39-46 wires SessionStart to ./.claude/keel-nudge. That file is this
+# .claude/settings.json:42-49 wires SessionStart to ./.claude/keel-nudge. That file is this
 # repository's own development-time configuration, and this case deliberately does not read it.
 #
 # Split the same way as the case above, and here the folded message was the worse of the two: it

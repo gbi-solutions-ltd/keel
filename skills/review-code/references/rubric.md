@@ -1,7 +1,10 @@
 # Review rubric
 
-Work down in order. Stop escalating severity once you find something blocking; finish the pass,
-but the blocker is the headline.
+A bare file name below, such as caching.md, is in
+[../../coding-standards/references/](../../coding-standards/references/).
+
+Work down in order. Once something is blocking, finish the pass anyway, and lead the report with the
+blocker.
 
 ## 1. Correctness
 
@@ -94,15 +97,13 @@ through:
 - **A suite that cannot fail is a finding, and it outranks a missing case.** Read what the added
   cases hold constant. Where every case passes the same value on both sides of the distinction the
   change turns on, `GBP GBP` where the bug is a payout currency read from the wrong variable, every
-  case is correct, every case is green, and none of them could have caught it. `verify.test` is
-  already running from step 3, so this costs two minutes: revert the line, run the file, restore it.
-  A green run is the finding, and the fix is the case that would kill it. The recipe and the worked
+  case is correct, every case is green, and none of them could have caught it. `verify.test` already
+  ran in SKILL.md step 3, so this costs two minutes: revert the line, run the file, restore it. A
+  green run is the finding, and the fix is the case that would kill it. The recipe and the worked
   example are in
   [../../tdd/references/writing-good-tests.md](../../tdd/references/writing-good-tests.md).
 - Does the test assert on observable behaviour, or on a mock having been called?
-- Was it written first? Check commit order, not the author's word.
 - Is the failure path tested, or only the happy path?
-- Does the suite still pass? Run `verify.test`; do not take the diff's word for it.
 
 ## 4. Standards
 
@@ -144,9 +145,9 @@ The distinguishing test is whether you could fix every caller yourself; if not, 
 - A support or admin endpoint that exports in bulk under the same permission as a single lookup,
   or an access to sensitive records that is not logged. See `data-protection.md`, "Access to
   personal data is authorisation, and it is logged."
-- A new store holding personal data that the subject export path does not know about; the bullet
-  above covers deletion, this one covers the other half. See `data-protection.md`, "Subject rights,
-  built once rather than by hand each time."
+- A new store holding personal data that the subject export path does not know about; the first
+  bullet on a new store covers deletion, this one covers the other half. See `data-protection.md`,
+  "Subject rights, built once rather than by hand each time."
 - A new managed service or third-party integration whose region nobody stated, or personal data
   reaching a new processor with no entry in the processor list. See `data-protection.md`, "Third
   parties and borders."
@@ -154,8 +155,7 @@ The distinguishing test is whether you could fix every caller yourself; if not, 
 ## 4d. Resilience and async work, where the diff touches a network call, a queue, a worker, or a scheduled job
 
 Section 1 already covers timeouts, retries, the partner-timeout pending state, and the dead letter
-path. This section catches what section 1 does not; both reference files are in
-`skills/coding-standards/references/`.
+path. This section catches what section 1 does not.
 
 - A dependency behind a circuit breaker: does it have all three states, closed, open, and half
   open, and is half open bounded to a small number of trial calls rather than reopening to full
@@ -199,9 +199,7 @@ validated at the boundary works today and needs repeating at the next leaf. See
 
 ## 7. Scope
 
-- Every changed line traces to the request. Adjacent improvements are their own change.
 - Reformatting mixed with logic makes both unreviewable. Ask for a split.
-- Is anything here that no task asked for?
 
 ## 8. Documentation
 

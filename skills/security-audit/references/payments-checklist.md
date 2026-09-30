@@ -51,7 +51,6 @@ because every item is business logic.
 
 ## Partner integrations
 
-- Is an inbound outcome authenticated in a way that binds the message, not just the sender?
 - Can a partner's response drive a state transition that should require a second check?
 - What happens on a partner timeout: does the transaction hold as pending, or fail? Failing an
   authorised transaction loses money; approving an unconfirmed one loses more.
@@ -80,9 +79,8 @@ because every item is business logic.
 
 ## Going live
 
-- Is the switch from test to live a separate, explicitly confirmed act, rather than a consequence
-  of a general go-ahead? It is the only step that can charge a real card, and
-  `docs/07-open-decisions.md` decision 3 resolved that money movement is not overridable by a
+- Is the switch from test to live a separate, explicitly confirmed act, rather than a consequence of
+  a general go-ahead? It is the only step that can charge a real card, so it is not overridable by a
   sentence in chat.
 - Is the current mode visible to whoever is operating the system, rather than inferable only from a
   credential prefix?

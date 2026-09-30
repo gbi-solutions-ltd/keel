@@ -80,10 +80,10 @@ in this plan that unblocks a release, and whoever holds the push decision should
 
 ## FR-11 says "seed's body", and it means seed's own text
 
-`docs/prd/coding-standards-audit-and-seed.md:225` requires that "Seed's body says explicitly that it
-inverts Step 1". Read literally against `tests/validate-skills.sh`'s vocabulary, "body" is the part
-of `SKILL.md` after the frontmatter, and satisfying FR-11 there would mean spending body words the
-PRD's own budget section says are not available.
+`docs/prd/coding-standards-audit-and-seed.md#Seed's body says` requires that "Seed's body says
+explicitly that it inverts Step 1". Read literally against `tests/validate-skills.sh`'s vocabulary,
+"body" is the part of `SKILL.md` after the frontmatter, and satisfying FR-11 there would mean
+spending body words the PRD's own budget section says are not available.
 
 **This plan reads it as the mode's own text, which is `references/seed.md`.** That is what
 `docs/stories/coding-standards-audit-and-seed.md:290-293` means by "the mode's own text", and it is
@@ -643,12 +643,13 @@ layer keel has no reference for is exactly the imposition seed's opening paragra
 
 Then correct `docs/prd/coding-standards-audit-and-seed.md`, two edits:
 
-- FR-09's row at `:223`, so the settled placement lives with the requirement. Replace the
-  requirement cell with: "Seed reports which house references were missing for the stack it
-  detected, **in its reply and not in a file**. The finding is addressed to keel's maintainers, not
-  to the project, and a report written into the project's tree is addressed to the wrong reader."
-  Append `, placement settled 2026-09-03` to that row's Source cell, which is the shape FR-03's row
-  already uses for a correction.
+- FR-09's row at
+  `docs/prd/coding-standards-audit-and-seed.md#Seed reports which house references were missing`, so
+  the settled placement lives with the requirement. Replace the requirement cell with: "Seed reports
+  which house references were missing for the stack it detected, **in its reply and not in a file**.
+  The finding is addressed to keel's maintainers, not to the project, and a report written into the
+  project's tree is addressed to the wrong reader." Append `, placement settled 2026-09-03` to that
+  row's Source cell, which is the shape FR-03's row already uses for a correction.
 - Line 60's citation, `references/house-defaults.md:27` to `references/house-defaults.md:31`. The
   four other copies are dated records and are deliberately left; the top of this plan says why.
 
@@ -730,11 +731,12 @@ pass, with `git commit -m "feat(coding-standards): seed reports the gaps in keel
 is green with exit 0 and zero `FAIL` lines.
 
 **This is a `verify` story and is planned as one.** The assumption in the PRD's section 12 is that
-the new modes stay outside the open question at `docs/ideas/standards-that-bind.md:624`, "why does a
-loaded rule not bind". They stay outside it by not enforcing anything at the point of work. That is
-believed true today. Step 2 is where it is measured, and **a red result here is a finding about the
-modes, not a broken test**: it would mean one of them acquired a hook, a gate or a read enforced
-elsewhere while nobody was watching.
+the new modes stay outside the open question at
+`docs/ideas/standards-that-bind.md#Why does a loaded rule not bind?`, "why does a loaded rule not
+bind". They stay outside it by not enforcing anything at the point of work. That is believed true
+today. Step 2 is where it is measured, and **a red result here is a finding about the modes, not a
+broken test**: it would mean one of them acquired a hook, a gate or a read enforced elsewhere while
+nobody was watching.
 
 **Why none of these cases counts anything.** An assertion on the number of gate keys, hook entries
 or profile properties goes red on every legitimate addition anywhere in the project, and the fix
@@ -767,7 +769,7 @@ fi
 # The registration side of the same question. A mode that names no hook but is wired into one is
 # enforced anyway, and hooks/hooks.json is where wiring that ships to an installer lives, which is
 # the property this story protects. It is not the only hooks block in the tree:
-# .claude/settings.json:39-46 wires SessionStart to ./.claude/keel-nudge. That file is this
+# .claude/settings.json:42-49 wires SessionStart to ./.claude/keel-nudge. That file is this
 # repository's own development-time configuration, and this case deliberately does not read it.
 if [ -f hooks/hooks.json ] && [ -f .keel/profile.json ] \
    && ! /usr/bin/grep -qE 'coding-standards|audit|seed' hooks/hooks.json \

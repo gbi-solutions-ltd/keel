@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-09-19, "plan the work that makes keel enforceable outside the agent" |
-| Status | shaped |
+| Status | built via docs/plans/2026-09-19-make-keel-enforceable-outside-the-agent.md. Status corrected 2026-09-25 by docs/snapshot.md |
 | Recommendation | Extend `write_ci` to run every non-null `verify.*` command as its own CI step. Do not attempt to make CI enforce review, docs, plan-checkboxes, or mutation testing |
-| Next | `write-plan`, as one increment of the outside-the-agent plan |
+| Next | Whether keel's own `.github/workflows/ci.yml` adopts the generated shape, keeps its hand-authored one or merges them, left by that plan as a manual decision |
 
 ## The problem
 
@@ -31,7 +31,7 @@ thinner than even the pipeline the project that ships it actually relies on.
 
 ## The delta
 
-| Ship requirement (`skills/ship/SKILL.md:20-32`) | CI (`write_ci`) enforces? | Evidence |
+| Ship requirement (`skills/ship/SKILL.md:20-36`) | CI (`write_ci`) enforces? | Evidence |
 |---|---|---|
 | 1. Tests pass | Partial. Generated CI runs `verify.test`, but only protects a merge if branch protection requires the check | `bin/keel:1146,1156` |
 | 2. New code has new tests | No | No such step exists |

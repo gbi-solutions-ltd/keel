@@ -1,8 +1,8 @@
 # Asynchronous work
 
-Read this where there is a queue, a worker, a scheduled job, or an event published to anything. In a
-payments system this is where money goes missing, and it goes missing quietly: a synchronous bug
-returns an error to somebody, an asynchronous one leaves a row in a state nobody is looking at.
+Read this where there is a queue, a worker, a scheduled job, or an event published to anything. This
+is where work goes missing, and it goes missing quietly: a synchronous bug returns an error to
+somebody, an asynchronous one leaves a row in a state nobody is looking at.
 
 The rules below all follow from one fact worth stating first. **Every practical message broker
 delivers at least once, not exactly once.** Duplicates are not a failure mode to be prevented, they

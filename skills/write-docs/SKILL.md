@@ -1,6 +1,6 @@
 ---
 name: write-docs
-description: Use when asked to write or update a README, document a feature or module, produce a runbook, draw a process flow or diagram, or create onboarding material.
+description: Use when asked to write or update a README, document a feature or module, produce a runbook, draw a process flow or diagram, create onboarding material, or check what the docs claim is still true.
 allowed-tools: [Read, Write, Edit, Bash, Grep, Glob, Agent]
 ---
 
@@ -28,8 +28,8 @@ context.
 Each has a different reader in a different state. A README written for the 3am reader is
 unreadable, and a runbook written for the browsing reader is useless.
 
-Auditing what the docs already claim, rather than writing them, is
-[references/claims-audit.md](references/claims-audit.md).
+To audit what the docs already claim, rather than write them, follow
+[references/claims-audit.md](references/claims-audit.md) instead of Steps 2 to 6.
 
 ## Step 2: Generate what can be generated
 
@@ -52,9 +52,9 @@ Most of what a README needs has already been established, and re-deriving it pro
 subtly different account.
 
 Where those do not exist and the code must be read instead, delegate that reading to concurrent
-subagents in one message, delegation profile `keel-fanout`, leading its description: theirs is
-discarded, yours sits in context all session. Findings are leads, so verify anything you state as
-fact.
+subagents in one message, delegation profile `keel-fanout`, with each dispatch's description
+starting `keel-fanout: `: theirs is discarded, yours sits in context all session. Findings are
+leads, so verify anything you state as fact.
 
 Where something is genuinely unknown, write `Unknown` rather than a plausible guess. A confidently
 wrong setup step costs more than a gap.
@@ -92,18 +92,13 @@ code. Reread against the tells in
 
 ## Step 6: Say when it was true
 
-Every generated doc records the commit it describes. Undated documentation gets trusted long after
-it should be, because nobody can judge its staleness.
+Every document this skill writes records the commit it describes. Undated documentation gets trusted
+long after it should be, because nobody can judge its staleness.
 
 ## Common mistakes
 
 | Mistake | Instead |
 |---|---|
-| A quickstart nobody ran | Execute it on a clean checkout |
 | A README that is a feature list | Say what it is, who it is for, and how to run it |
 | Restating the code in prose | Generate it, or document why and what the code cannot say |
-| A runbook with an untested recovery | Execute the recovery once |
-| An image of a diagram | Mermaid. It diffs and renders |
-| No date and no commit | The reader cannot judge staleness |
 | A doc the change outdated | Update it in the same commit. Stale reads as true |
-| A wrong section patched in place | Delete it and write it again from the code |

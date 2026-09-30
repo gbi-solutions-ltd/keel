@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-08-18 |
-| Status | **pieces one and two built 2026-08-18**, via `docs/plans/2026-08-18-context-window-at-init.md`, fully ticked. `gates.context_window` is written at init, `bin/keel:430`, and read as a floor by doctor, `bin/keel:1530`. **Piece three, the session-start pointer, is not built and is not scoped:** that plan puts it out of scope at line 1015, blocked on the PRD's open question 3. Status corrected 2026-08-30 |
+| Status | **pieces one and two built 2026-08-18**, via `docs/plans/2026-08-18-context-window-at-init.md`, fully ticked. `gates.context_window` is written at init, `bin/keel:430`, and read as a floor by doctor, `bin/keel#local cw; cw="$(json_get .keel/profile.json gates.context_window`. **Piece three, the session-start pointer, is not built and is not scoped:** that plan puts it out of scope at line 1015, blocked on the PRD's open question 3. Status corrected 2026-08-30 |
 | Recommendation | Build it, in three independent pieces, and only in this order: make a configured window a floor rather than a ceiling, then write it at init, then inject a bounded pointer at session start. The `/clear` itself cannot be automated |
 | Next | `docs/prd/context-window-at-init.md` (draft, awaiting approval). Piece three still depends on open question 2 |
 
@@ -97,7 +97,7 @@ costed together or the second one to land fails the build.
 | SessionStart injects a bounded pointer when `.keel/handoff.md` exists | Recommended for the resume side. Two forms, ~15 tokens, within the hook's stated bound |
 | SessionStart injects the handoff contents | Rejected on `hooks/session-start:4-7`. About 1,300 volatile tokens in the cached prefix |
 | The stop instruction stops naming `/clear` | Rejected. The keystroke is the user's and the instruction is the only way they learn it is needed |
-| Delete the handoff once consumed | Open. It is already git-ignored (`bin/keel:1391-1395`) and already stale-by-design, but a pointer that outlives its work sends the next session to a file about something else |
+| Delete the handoff once consumed | Open. It is already git-ignored (`bin/keel#".keel/handoff.md"; do`) and already stale-by-design, but a pointer that outlives its work sends the next session to a file about something else |
 
 **Assumptions this rests on**
 
@@ -108,7 +108,7 @@ costed together or the second one to land fails the build.
 | A pointer at session start is enough to resume | The model reads the file when told it exists | Nobody has tried it. It is one line and easily tested | **No** |
 | The handoff is fresh when the pointer fires | The file relates to the work about to resume | Not guaranteed. A handoff from last week's task would misdirect a new session | **No, and it is the main risk of piece three** |
 | 44 tokens of headroom is enough for both open ideas | Only one of them adds | The plain-language record swaps rather than adds, so it costs nothing. This costs ~15 | Yes, if built in that shape |
-| SCHEMA_VERSION need not move | `gates.context_window` is already declared | `templates/profile.schema.json:284` declares it, so init writing it is not a new field | Yes |
+| SCHEMA_VERSION need not move | `gates.context_window` is already declared | `templates/profile.schema.json:287` declares it, so init writing it is not a new field | Yes |
 
 ## What the system says
 
@@ -117,7 +117,7 @@ costed together or the second one to land fails the build.
 | A configured window defeats the upward correction | `lib/context_watch.py:142-146` returns before `:149-150` | The idea as stated is harmful without the floor change. This inverts the build order |
 | The correction exists because of a real 401,247-token session | `lib/context_watch.py:121-127` | The failure mode is not hypothetical; it was found against a real transcript |
 | init never writes `gates.context_window` | `bin/keel:364` | The gap is real and the fix is one field |
-| The schema already declares it | `templates/profile.schema.json:284` | No schema version bump, no drift report on existing profiles |
+| The schema already declares it | `templates/profile.schema.json:287` | No schema version bump, no drift report on existing profiles |
 | doctor exists to nag about it | `bin/keel:1307` | The nudge is a workaround for the missing write and could be simplified afterwards |
 | The handoff is already written automatically before compaction | `lib/context_watch.py:369-372`, on `PreCompact` | Half of "automatic handoff" already ships. Only the resume side is manual |
 | SessionStart already fires on `clear` | `hooks/hooks.json`, matcher `startup|clear|compact` | The hook that would carry the pointer already runs at exactly the right moment |
@@ -126,7 +126,7 @@ costed together or the second one to land fails the build.
 | The handoff is roughly 1,300 tokens | `lib/context_watch.py:200-235`: 5 prompts at 300 chars, 30 paths | Far too large for the cached prefix |
 | The hook is at 356 of a 400 ceiling | Measured 2026-08-18; `tests/validate-skills.sh:283-284` | ~44 tokens for this and `plain-language-chat.md` combined |
 | Write, Edit and Read stay allowed at the stop | `lib/context_watch.py:260-263` | The session can always write its handoff. No deadlock to design around |
-| The handoff is git-ignored and doctor enforces it | `bin/keel:1391-1395` | Nothing here risks committing session state |
+| The handoff is git-ignored and doctor enforces it | `bin/keel#if repo_ignores .keel/handoff.md; then` | Nothing here risks committing session state |
 
 ## Open questions
 

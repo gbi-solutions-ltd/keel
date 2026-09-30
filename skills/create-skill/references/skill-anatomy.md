@@ -1,6 +1,7 @@
 # Skill anatomy
 
-The shape every keel skill follows, enforced by `tests/validate-skills.sh`.
+The shape every keel skill follows. keel's own repository enforces it with
+`tests/validate-skills.sh`; where a project has its own validator, run that.
 
 ## Frontmatter
 
@@ -13,9 +14,8 @@ allowed-tools: [Read, Write, Edit, Bash, Grep, Glob]
 ```
 
 - `name`: letters, numbers, hyphens.
-- `description`: starts with "Use when", under 260 characters, third person. **Triggering
-  conditions only.** Never a summary of the process, because that summary becomes a shortcut the
-  model follows instead of reading the body.
+- `description`: starts with "Use when", at most 216 characters, third person, triggering conditions
+  only.
 - `allowed-tools`: the minimum that works.
 
 Compare:
@@ -31,8 +31,8 @@ description: Use when asked to review changes, look at a diff, or check work bef
 ## Body
 
 Target 700 words. 900 is a hard ceiling; past it the model skims, which is the failure the budget
-prevents. `tests/validate-skills.sh` warns over the target, and crossing it needs a passing eval arm
-at that length, per `docs/decisions/ADR-0001-skill-body-word-ceiling.md`.
+prevents. keel's `tests/validate-skills.sh` warns over 700, and a body over 700 words needs a
+passing eval arm at that length, per keel's ADR-0001.
 
 Shorter is still better, and the warning is a question rather than a quota to fill. The previous
 numbers were 400 and 600 under a hard 700, and every skill drifted to the ceiling because it was the

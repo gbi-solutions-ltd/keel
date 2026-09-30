@@ -18,7 +18,8 @@ reads the views and keeps the native export under `raw/` only as ground truth.
 
 ## Step 1: Check what you have
 
-Run `keel apex-export --help`. It fails with a named dependency if `python3` or `java` is absent.
+Run `command -v python3 java sql`. `keel apex-export` refuses with a named dependency if `python3`
+or `java` is absent, but `--help` does not check.
 
 SQLcl is the only supported client. It needs Java and nothing else, no Oracle Instant Client. If
 it is missing, say so and stop: unzip `sqlcl-latest.zip` from Oracle and put its `bin/` on PATH.

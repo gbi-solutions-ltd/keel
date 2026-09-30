@@ -1153,7 +1153,7 @@ Expected: FAIL, one new failure: `FAIL  has_ui: Flutter project got 'false', wan
 
 - [x] **Step 3: Write the minimal implementation**
 
-One word, in `detect_has_ui` at `lib/detect-stack.sh:704`:
+One word, in `detect_has_ui` at `lib/detect-stack.sh#case "$fw" in next`:
 
 ```bash
     case "$fw" in next|react|vue|svelte|angular|apex|flutter) printf 'true'; return 0 ;; esac
@@ -1282,8 +1282,8 @@ Expected: FAIL, one new failure: `FAIL  datastores: got '', want sqlite`.
 - [x] **Step 3: Write the minimal implementation**
 
 Two edits in `detect_datastores`. Add `pubspec.yaml` to the manifest list. It goes at the end of the
-**second** line of the `for f in` continuation, `lib/detect-stack.sh:729`, and that line is therefore
-one of the two the diff touches:
+**second** line of the `for f in` continuation, `lib/detect-stack.sh#build.gradle.kts pubspec.yaml`,
+and that line is therefore one of the two the diff touches:
 
 ```bash
     for f in package.json requirements.txt pyproject.toml Pipfile go.mod composer.json Gemfile \
@@ -2279,7 +2279,7 @@ approved. Recorded so they are not rediscovered from scratch.
 | **`verify.format` can be red on a clean checkout.** `dart format .` descends into `build/`, which is not hidden, and rewrites generated `*.g.dart` files there | Task 5's review, measured on a scratch copy: one misformatted generated file under `build/` turned the gate red on an otherwise clean tree | Exposure is nil today: none of the 13 local Flutter repositories has any `.dart` file under `build/`, since Flutter puts compiled artifacts there and `build_runner` writes to `lib/` or the hidden `.dart_tool/`. Narrowing to `lib test` would stop checking `bin/` and `tool/`, trading a measured-zero risk for a real gap |
 | **The datastore list under-reports for real Flutter apps.** `hive`, `drift`, `isar`, `objectbox`, `sembast`, `cloud_firestore` and `supabase_flutter` all report nothing; `drift` is SQLite and `supabase_flutter` is Postgres | Task 7's review, probed against a realistic 30-package pubspec | `FR-15` names `sqflite` only, so the change is compliant. Widening the pair list is a requirement change, not an implementation detail, and belongs to whoever decides how much of the Dart datastore ecosystem keel should know |
 | **The `psycopg` regression guard is a substring match** and would not notice an extra store appearing beside postgres | Task 7's review | Pre-existing, and task 10's exact-match checks partly close it |
-| **`has_ui` also routes browser-specific coding standards to Flutter.** `skills/coding-standards/references/house-defaults.md:27` gates `references/frontend.md` on `profile.stack.has_ui`, and that reference is about bundle supply chain, CDN caching, browser history and referrer headers | Task 9's review | **The same root cause task 9 fixed, in a second consumer.** `has_ui` answers "does this have a UI" while three different callers ask three different questions of it. Task 9 patched the plugin caller because that one wrote wrong output into a user's settings file; this one routes prose a reader can ignore. Fixing it properly means deciding whether `has_ui` should be split, which is a design change and not this plan's |
+| **`has_ui` also routes browser-specific coding standards to Flutter.** `skills/coding-standards/references/house-defaults.md:26` gates `references/frontend.md` on `profile.stack.has_ui`, and that reference is about bundle supply chain, CDN caching, browser history and referrer headers | Task 9's review | **The same root cause task 9 fixed, in a second consumer.** `has_ui` answers "does this have a UI" while three different callers ask three different questions of it. Task 9 patched the plugin caller because that one wrote wrong output into a user's settings file; this one routes prose a reader can ignore. Fixing it properly means deciding whether `has_ui` should be split, which is a design change and not this plan's |
 | **The detection matrix listed Java above Kotlin**, while `detect_languages` matches `kotlin` first and says why in its own comment | The review of PR #49 | **Never recorded by this plan's own reviews, and added here for completeness.** Same defect the Dart row had before PR #49, in a pair that predates this work. Closed by task 5 of `docs/plans/2026-08-30-dart-followups.md` |
 | **`tests/validate-skills.sh:409` called a hypothetical `nest` "a fourteenth language"** | The review of PR #49 | Also never recorded here. `detect_languages` now yields fifteen. The rule is correct and only its explanation was stale. Closed by task 6 of the same plan |
 | **The detection matrix row prescribes an outcome for a condition it does not list.** Its left column names `next.config`, `vite.config`, `angular.json` and `public/`, none of which is a Flutter or an APEX signal | Task 9's and task 11's reviews | Partly pre-existing: `apex` was never in that column either. ~~**Left open deliberately, 2026-08-30.**~~ **Closed after all, by task 5 of `docs/plans/2026-08-30-dart-followups.md`.** Deferring it read as a table restructure; it turned out to be one left column, which now names the APEX manifest and the Flutter framework its right column had grown to talk about |

@@ -46,14 +46,12 @@ you are covered for.
   anything over 700 requires a passing eval arm at that length recorded in `tests/evals/results.md`.
   **An arm discharges the length it was run at, not the body it was run against**, so a body that
   grows past the length of its last passing arm owes a new one. A gate arm counts, per ADR-0001's
-  clarification of 2026-09-04. Six bodies carry a passing arm at their current length:
-  `coding-standards` 795 (2026-09-03), `write-docs` 756 (2026-09-02), `context-budget` 723
-  (2026-09-02), `write-prd` 793 (2026-08-30) and `tdd` 869 (2026-09-07) on dedicated length arms,
-  and `execute-plan` 884 on the 0.17.0 release gate of 2026-09-01, all in `tests/evals/results.md`.
-  `tdd` reached 869 on 2026-09-07, over two edits the same day, and the `tdd-under-deadline` arm
-  dispatched at each of those lengths the same day passes, so it is discharged rather than owed.
-  Assume 700 is the limit unless you are willing to run one. Aim at 400 for one linear path, 600
-  when it fans out to subagents or carries modes.
+  clarification of 2026-09-04. Every body over 700 carries a passing arm at its current length, in
+  the two 2026-09-30 entries of `tests/evals/results.md`: `coding-standards` 726, `repo-snapshot`
+  748, `write-prd` 794, `execute-plan` 889, `tdd` 855, `security-audit` 840, `ship` 751,
+  `incident-response` 746, `setup-deployment` 744 and `write-plan` 761. Assume 700 is the limit
+  unless you are willing to run one. Aim at 400 for one linear path, 600 when it fans out to
+  subagents or carries modes.
 - No `@` links. They force-load at parse time and burn context before it is needed.
 - No literal `docs/keel`. Skills use `<docs_root>` and read `profile.docs_root`; templates use
   `{{DOCS_ROOT}}`.

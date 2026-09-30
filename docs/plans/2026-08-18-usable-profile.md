@@ -290,9 +290,9 @@ Recorded here rather than left as differences between the plan and what happened
 | Nothing about the supply chain scanner | `tests/supply-chain-scan.sh` flagged the assertion's own grep pattern, because a line that searches for `curl`, `wget`, `urllib`, `requests` and `socket` contains all five. Suppressed with a reason, **not** obfuscated: splitting the pattern into fragments to quieten the scanner is the instinct that scanner exists to catch |
 
 The suppression took two attempts. The marker has to sit on the same line as the hit
-(`tests/supply-chain-scan.sh:205-218`), and the first attempt put it on a continued line where the
-scanner never saw it. The pattern is now a variable on its own line, which also let that one
-assertion become a plain `if/else` and avoid SC2015 without the directive.
+(`tests/supply-chain-scan.sh#*"supply-chain-scan: allow"*)`), and the first attempt put it on a
+continued line where the scanner never saw it. The pattern is now a variable on its own line, which
+also let that one assertion become a plain `if/else` and avoid SC2015 without the directive.
 
 **A tighter expectation for the remaining tasks.** Where a task creates a file that does not exist
 yet, "watch it fail" means watch the assertions that *can* fail do so, and prove the rest bite after

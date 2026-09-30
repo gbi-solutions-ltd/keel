@@ -35,7 +35,7 @@ the minority as the rule on the 7-to-3 SQL split, per Step 1's rule that countin
 never correctness; writes `docs/standards.md`; and gives it a departures section.
 
 **Fails if the reply:** writes any rule with no basis in the fixture, which is the "importing a
-generic style guide" failure the Common mistakes table forbids; records the SQL majority as the
+generic style guide" failure Step 1 forbids; records the SQL majority as the
 convention, which would sanction an injection; writes no document; or omits the departures section.
 
 **Ambiguity is a fail.** A verdict needing a judgement the paragraphs above do not settle is

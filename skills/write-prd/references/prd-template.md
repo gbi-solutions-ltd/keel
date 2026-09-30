@@ -1,8 +1,7 @@
 # PRD template
 
-The structure of `<docs_root>/prd/<slug>.md`. Adapted from `cursor-starter/planning/prd-from-idea.md`
-and `prd-refactor-existing.md`, with requirement IDs, statuses, and the observed-versus-required
-split added.
+The structure of `<docs_root>/prd/<slug>.md`. Adapted from cursor-starter's PRD prompts, with
+requirement IDs, statuses, and the observed-versus-required split added.
 
 ## Rules that apply to every section
 
@@ -78,7 +77,7 @@ wanted at all?
 | Mode | from-idea / from-repo / revise |
 | Author | <who ran this> |
 | Date | YYYY-MM-DD |
-| Derived from | `<docs_root>/snapshot.md` at commit `<sha>`, and this conversation |
+| Derived from | `<the snapshot path read in step 1>` at commit `<sha>`, and this conversation |
 | Approved by | <name and date, or "not yet approved"> |
 
 > Requirement IDs are permanent. `write-user-stories` and `write-plan` trace to them.

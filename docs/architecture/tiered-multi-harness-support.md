@@ -261,10 +261,10 @@ who owns each one and what happens when two harnesses want the same repository.
 | `.codex/agents/*.toml` | keel | `init` | Codex | Carries the delegation model pin the skill bodies no longer name |
 | `hooks/hooks.json`, `hooks/hooks.codex.json` | generated from the manifest | release | Both | In the plugin, not the repo. Never hand-edited |
 
-**`schema_version` is the migration mechanism and it already exists.** `bin/keel:1584-1606` warns
-when a repository's profile is older or newer than the installed keel, with wording that already
-handles the mixed-team case. Adding `harnesses` bumps `SCHEMA_VERSION` from 2 to 3 and reuses that
-path rather than inventing one.
+**`schema_version` is the migration mechanism and it already exists.**
+`bin/keel#if [ "$sv_num" -eq "$SCHEMA_VERSION" ]` warns when a repository's profile is older or
+newer than the installed keel, with wording that already handles the mixed-team case. Adding
+`harnesses` bumps `SCHEMA_VERSION` from 2 to 3 and reuses that path rather than inventing one.
 
 **The derived-versus-stored question.** The active gate set is **derived**, always, from the
 manifest plus the harness. It is never stored in the profile, never cached, and never written into a
@@ -835,7 +835,7 @@ a plugin delegation claimed in `docs/04-plugin-strategy.md` to be named in the d
 body, so the doc and the body move together or the build fails.
 
 **The most harness-locked line in the corpus is in a reference, not a body.**
-`skills/execute-plan/references/parallel-batches.md:40` instructs `isolation: worktree`, which is the
+`skills/execute-plan/references/parallel-batches.md` line 40 at `bda1acc` instructs `isolation: worktree`, which is the
 literal parameter name and value of Claude Code's Agent tool. References are not word-capped but are
 swept by the same validator rules, so this is a rewrite in the same pass.
 

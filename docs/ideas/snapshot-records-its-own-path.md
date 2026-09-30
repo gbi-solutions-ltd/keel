@@ -29,7 +29,7 @@ those three skills have), and `.keel/profile.json:74` still reads `"snapshot": n
 reads, and writing the default path into it changes no behaviour while creating a new way for
 `keel doctor` to go red.** The map is documented as an override, not a record. `.keel/profile.json:73`
 says "Set any of these to a path when the artifact already exists **elsewhere**", and
-`templates/profile.schema.json:180-183` repeats it: "Where an artifact already lives, when it is not
+`templates/profile.schema.json:183-186` repeats it: "Where an artifact already lives, when it is not
 under `docs_root`". A snapshot written at `<docs_root>/snapshot.md` is at the default, so every
 consumer already finds it by falling back. Grepped across `skills/`, `bin/keel` and `templates/` on
 2026-08-29: **no skill reads `artifacts.snapshot` at all.** The only code that touches it is
@@ -70,18 +70,18 @@ wired to it, and the monorepo path is not derivable at all.
 
 | Assumption | True if | How we would know | Checked? |
 |---|---|---|---|
-| Something will eventually read `artifacts.snapshot` | A consumer is wired to it | `write-prd`'s `from-repo` mode is the obvious one and it hardcodes `<docs_root>/snapshot.md` at `skills/write-prd/SKILL.md:28` while checking `profile.artifacts.prd` three lines later at `:31`. **The asymmetry is in one table on one screen** | **Yes, and it is currently false.** This is why the reader half comes first |
-| The default path is what gets written | A single-unit repository | `skills/repo-snapshot/SKILL.md:87-88` also emits `snapshot-<unit>.md` per unit in a monorepo, which is not derivable and which a single string key cannot hold | **Yes, and it is false for monorepos.** Open question 2 |
+| Something will eventually read `artifacts.snapshot` | A consumer is wired to it | `write-prd`'s `from-repo` mode is the obvious one and it hardcodes `<docs_root>/snapshot.md` at `skills/write-prd/SKILL.md:29` while checking `profile.artifacts.prd` three lines later at `:32`. **The asymmetry is in one table on one screen** | **Yes, and it is currently false.** This is why the reader half comes first |
+| The default path is what gets written | A single-unit repository | `skills/repo-snapshot/SKILL.md:89-90` also emits `snapshot-<unit>.md` per unit in a monorepo, which is not derivable and which a single string key cannot hold | **Yes, and it is false for monorepos.** Open question 2 |
 | A skill can be trusted to run a command after writing a file | The instruction is in the body and the body has room | `design-architecture/SKILL.md:65-66` already does exactly this for `stack.has_ui`, so the pattern is established and works | Partly. Established, but never measured for compliance |
 | The five bodies can afford the line | Each is under its ceiling after the edit | Measured 2026-08-29 by `tests/validate-skills.sh`: `write-plan` 897, `write-prd` 791, `repo-snapshot` 699, `design-architecture` 694, `write-user-stories` 689 | **Yes, and one of them cannot.** `write-plan` has three words |
-| Setting the key is safe once set | The document is never moved or deleted | `bin/keel:1518-1519` fails doctor on a set path that does not exist | **Yes, and it is a real cost.** A user who deletes a stale snapshot gets a red doctor and a message about a key they did not set |
+| Setting the key is safe once set | The document is never moved or deleted | `bin/keel#points at '$path', which does not exist` fails doctor on a set path that does not exist | **Yes, and it is a real cost.** A user who deletes a stale snapshot gets a red doctor and a message about a key they did not set |
 
 ## What the system says
 
 | Finding | Evidence | What it means for the idea |
 |---|---|---|
-| Nothing reads `artifacts.snapshot` | Grep over `skills/`, `bin/keel`, `templates/`, 2026-08-29. Five skills read sibling keys: `write-prd/SKILL.md:31` (`prd`), `write-user-stories/SKILL.md:18` (`prd`), `design-architecture/SKILL.md:25`, `write-plan/SKILL.md:19`, `repo-snapshot/SKILL.md:41` | The writer half has no consumer. Building it first produces a key that is written and never read, which is the definition of ceremony |
-| `write-prd` reads the snapshot from a hardcoded path | `skills/write-prd/SKILL.md:28` gives `from-repo`'s first read as `<docs_root>/snapshot.md`, while `:31` checks `profile.artifacts.prd` | **The defect, and it is not the one that was reported.** A repository that maps its snapshot elsewhere is silently ignored by the one skill built to consume it |
+| Nothing reads `artifacts.snapshot` | Grep over `skills/`, `bin/keel`, `templates/`, 2026-08-29. Five skills read sibling keys: `write-prd/SKILL.md:32` (`prd`), `write-user-stories/SKILL.md:18` (`prd`), `design-architecture/SKILL.md:25`, `write-plan/SKILL.md:19`, `repo-snapshot/SKILL.md:41` | The writer half has no consumer. Building it first produces a key that is written and never read, which is the definition of ceremony |
+| `write-prd` reads the snapshot from a hardcoded path | `skills/write-prd/SKILL.md:29` gives `from-repo`'s first read as `<docs_root>/snapshot.md`, while `:32` checks `profile.artifacts.prd` | **The defect, and it is not the one that was reported.** A repository that maps its snapshot elsewhere is silently ignored by the one skill built to consume it |
 | The writer already exists and needs no code | `bin/keel:973-1017` `profile_set`, reachable as `keel profile set <dotted.path> <value>`. It refuses a path that is not already in the file (`:990-998`), and every `artifacts.*` key is seeded by `write_profile` at `bin/keel:445-448`, so all six are settable today. Proven on a fixture 2026-08-29 | Whatever is decided, this is a wiring change and not a feature. No new writer needs building |
 | Doctor already validates the map, generically | `bin/keel:1356-1370` iterates every non-underscore key with a value | Doctor needs no change to cover a newly set key, and it is where a "null but the default exists" report belongs |
 | The gap is systemic, not `repo-snapshot`'s | All five artifact-producing skills write to a fixed path and set nothing: `repo-snapshot/SKILL.md:87-88`, `write-prd/SKILL.md:74-75`, `write-user-stories/SKILL.md:59-60`, `design-architecture/SKILL.md:56-57`, `write-plan/SKILL.md:55-56` | Fixing `repo-snapshot` alone answers the feedback and leaves four instances of it |
@@ -112,7 +112,7 @@ wired to it, and the monorepo path is not derivable at all.
 
 ## What has landed
 
-**The reader half, 2026-08-30.** `skills/write-prd/SKILL.md:28` now gives `from-repo`'s first read as
+**The reader half, 2026-08-30.** `skills/write-prd/SKILL.md:29` now gives `from-repo`'s first read as
 `profile.artifacts.snapshot`, else `<docs_root>/snapshot.md`, which is what the sentence three lines
 below it already did for `artifacts.prd`. `artifacts.snapshot` has a consumer, so it is a key worth
 setting rather than decoration, and the finding this record calls "the defect, and it is not the one

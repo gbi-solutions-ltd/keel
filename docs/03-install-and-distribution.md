@@ -248,9 +248,13 @@ keel doctor
 
 The verification command. Checks that:
 
-- every command in `profile.verify` actually runs and exits 0 (each is timed, printed as it
-  starts, and capped at 900s where a `timeout` binary exists; `--fast` skips executing them
-  and only validates the fields, for when the suite itself is the slow part)
+- every command in `profile.verify` actually runs and exits 0 (each is timed, printed as it starts,
+  and capped at 900s where a `timeout` binary exists; `--fast` skips executing them and only
+  validates the fields, for when the suite itself is the slow part). `verify.security` is one of
+  them and reaches the network, so full doctor fails with `verify.security exited <code>` offline
+  or when the audit finds a high advisory. A project that wants another threshold, or no audit in
+  doctor, sets `verify.security` to that command; `keel init` keeps any value that is not null,
+  and detects the audit again where it is null
 - the CLAUDE.md block markers are intact and not duplicated
 - recommended plugins for this stack are installed, and names the missing ones
 - `docs/keel/` structure exists
@@ -260,12 +264,17 @@ The verification command. Checks that:
   missing fields the new skills read says so. It reports the `keel_version` that configured the
   project alongside it, but does not warn on that: most releases change no field, and a warning
   that fires on every upgrade is one nobody reads on the upgrade that mattered
+- every profile value the schema constrains to an enum holds one of its values. A gate holding a
+  typo fails, because whatever reads a gate treats a value it does not recognise as a weaker one.
+  A schema doctor cannot read warns, since the check did not run
+- the push guard is installed, where `conventions.protect_default_branch` is not false. A warning,
+  since installing it writes into the developer's git directory
 - the `gbi` marketplace, which carries keel, is registered on this machine, which decides whether a session
   has any skills at all
 - no skill in the installed plugin exceeds its word budget or contains an `@` link
 
-Exits non-zero on failure so CI can run it. The last three above are advisory: a CI runner
-legitimately has no marketplace, and an un-upgraded project still works.
+Exits non-zero on failure so CI can run it. The `schema_version` check and the last two above
+are advisory: a CI runner legitimately has no marketplace, and an un-upgraded project still works.
 
 ### The artifact map, for a repo that already has documents
 
@@ -345,26 +354,109 @@ or leak to, whoever clones or installs the repository. Details and the suppressi
 `tests/supply-chain-scan.sh` and the README.
 
 ```bash
+keel scan --push <remote> <commit>
+```
+
+Scans a commit instead of the working tree: the commit's own tree in full, and every version of a
+key, keystore or certificate file that a commit reachable from it, and from no ref of `<remote>`
+fetched here, added or changed and the tip does not hold with that same content. git keeps such a
+file in history, so a push carries it to the remote though the tip does not show it. Other content
+in those intermediate commits is not scanned. The commit itself is scanned whatever the
+remote-tracking refs say, since they record what was last fetched, possibly from another URL, and
+not what the remote holds; so a new tag or branch on a commit the remote already has is refused
+over anything the scan flags in it. The history walk does trust them, so after `git remote set-url`
+a key the old remote's refs reach is not checked. It refuses, before scanning, a commit
+holding a path git refuses to check out, one with a `.git`, `.`, `..` or empty component, and one
+holding paths this filesystem cannot write apart, such as two that differ only in case and in
+content. The copy it scans has the commit's own names and modes, and no filter or conversion the
+pushed `.gitattributes`, or this user's own git configuration, names is applied to it.
+
+The allow list is the commit's own `.keel/scan-allow`, and an entry covers the version of the path
+the commit holds, the one reviewed. A version of that path a pushed commit held and the tip does
+not is refused, so a live key put at an allowed path and replaced with the fixture again, or
+deleted, before the tip does not pass. An older version that was reviewed too, a fixture since
+regenerated, is pinned by a line naming the path and then that version's blob, `git rev-parse
+<commit>:<path>`, before any reason: a first push to a remote with no fetched refs walks the whole
+history and refuses every unpinned older version. A pin covers that one version only. A commit holding something this filesystem reads as `.keel/scan-allow` that is not that file
+itself, a symlink by that name or `.keel/SCAN-ALLOW` on a case-folding disk, is refused outright.
+
+```bash
+keel plan status <plan>
+```
+
+Reads an implementation plan written from `skills/write-plan/references/plan-template.md` and
+prints one line per task counting its steps by state, open, done, deferred and not applicable, then
+`next: <id>` naming the first open step, or `next: none`. A step is a checkbox whose bold title
+opens with its id, `**Step 3.2: ...**`; one inside a fenced code block is an example and is not
+counted. It exits 1, with a `problem:` line for each, where a deferred or not-applicable step has no
+reason, an id appears twice, an open checkbox is not a step it can read, or a fence never closes.
+A plan with no step ids, such as one written before steps carried them, is unaddressable: `status`
+and `tick` say so, change nothing, and exit 3, and the plan is read and ticked by hand.
+
+```bash
+keel plan tick <plan> <id> [--note <text> | --defer <reason> | --not-applicable <reason>]
+```
+
+Marks one step done, rewriting only its line. `--note` writes ` Note: <text>` after the step's
+title, for a step the ticker did not witness; a note holding a newline is refused. An id the plan
+does not hold, or holds twice, changes nothing and exits 1.
+A plan with no step ids changes nothing and exits 3; a fence that never closes is reported, exit 1,
+rather than read as a plan without ids.
+`--defer` and `--not-applicable` park the step instead, writing ` Deferred: <reason>` or
+` Not applicable: <reason>`, and refuse without a reason. Ticking a parked step done drops its
+reason. Parking replaces anything after the title, a note included, and a reason must start with a
+non-blank character, since `plan status` reads one that starts with a space, tab or CR as missing.
+Ticks on one plan take turns through a lock, the directory `<plan>.lock`, so a concurrent batch's
+ticks all land. A tick waits about ten seconds for it, then fails naming it, since a killed tick can
+leave it behind.
+
+```bash
 keel guard install | status | uninstall
 ```
 
-Installs three hooks, by writing `.githooks/pre-push`, `.githooks/pre-commit`, and
-`.githooks/prepare-commit-msg`, and setting
-`core.hooksPath` **for this repository only**. Opt-in, because it changes your git configuration, and
-repo-local because setting `core.hooksPath` globally would silently disable every other repository's
-hooks on the machine. `git push --no-verify` is the deliberate way past it.
+Installs three hooks, `pre-push`, `pre-commit` and `prepare-commit-msg`, into git's own hooks
+directory (`.git/hooks`, shared by every worktree), and sets no `core.hooksPath`. No checkout
+writes there, so checking out a branch, a fork's pull request included, never runs that branch's
+own hooks; until 2026-09-26 the guard lived in `.githooks` behind `core.hooksPath`, a working-tree
+path every checkout replaced. `keel guard install` moves such an install and unsets the setting,
+unless `.githooks` also holds hooks keel did not write, which unsetting it would stop running.
+It refuses while `core.hooksPath` points anywhere else, or while a same-named hook without keel's
+mark is present, because replacing either switches another tool's hooks off. The hooks are not
+committed: each clone runs `keel guard install` for itself. Opt-in, because it writes into your git
+directory. `git push --no-verify` is the deliberate way past it.
+`keel doctor` warns while `conventions.protect_default_branch` is not false and the guard is not
+installed, because nothing else outside a session enforces that key. It reports the state
+`keel guard status` does: an install at `.githooks` is a warning to move it, naming first any hooks
+there keel did not write, and another tool's `core.hooksPath`, with the config it is set in, or
+same-named hook is named without sending you to `keel guard install`.
 
-The pre-push hook refuses three things. A push carrying anything `keel scan` flags. And a push to
-`conventions.default_branch`, because work lands through a pull request, so that branch is written by
-a merge rather than by a push. The branch name is read from the profile and never assumed: with
-neither a profile nor a remote HEAD to read, the hook checks nothing rather than guessing `main`, on
-the reasoning that a refusal naming the wrong branch teaches people to reach for `--no-verify` by
-reflex. And a push whose `.keel/profile.json` is weaker, on the branch being pushed, than the one
-already on the remote (or, on a branch's first push, than the remote default branch): a gate moved
-toward `off`, a `verify.*` command that became null or a non-string, or a path dropped from the
-profile's list of blocked paths. `git push --no-verify` is the deliberate way past this one too, the
-same as the other two. A project that genuinely pushes to its default branch sets
-`conventions.protect_default_branch` to `false`.
+The pre-push hook refuses three things. A push carrying anything `keel scan --push` flags: the hook
+runs it once for each commit a ref is pushed to, which scans that commit's tree and the key files
+anywhere in the history the push carries, never the working tree. The scanner is the installed
+keel's, the one `keel` on PATH runs, never the pushed repository's own `tests/supply-chain-scan.sh`,
+so a branch cannot weaken the scanner's rules on the push that publishes the change. The allow list
+is another matter: it is the pushed commit's own, so an entry a branch adds counts on that push and
+is reviewed with the rest of the branch. Where `keel` on PATH is a symlink into a clone of keel,
+that clone's working tree is the installed keel, so in keel's own repository a branch checked out
+there is scanned by its own copy. With no `keel` on PATH the hook says nothing was scanned and lets
+the push through, and with a `keel` too old for `--push` it says so and scans the working tree
+instead. Run by hand, with no arguments, it scans the working tree;
+with nothing to push, it scans nothing. The hook reads git's lines from the right, so a push source
+holding a space, such as `:/fix HEAD`, is still read as the commit it names and the ref it updates.
+`keel guard status` calls a hook written before `--push` stale, since it scans the working tree.
+
+The other two refusals. A push to `conventions.default_branch`, because work lands through a pull
+request, so that branch is written by a merge rather than by a push. The branch name is read from
+the profile and never assumed: with neither a profile nor a remote HEAD to read, the hook checks
+nothing rather than guessing `main`, on the reasoning that a refusal naming the wrong branch teaches
+people to reach for `--no-verify` by reflex. And a push whose
+`.keel/profile.json` is weaker, on the branch being pushed, than the one already on the remote (or,
+on a branch's first push, than the remote default branch): a gate moved toward `off`, a `verify.*`
+command that became null or a non-string, or a path dropped from the profile's list of blocked
+paths. `git push --no-verify` is the deliberate way past this one too, the same as the other two. A
+project that genuinely pushes to its default branch sets `conventions.protect_default_branch` to
+`false`. The hooks are written at install time, so running `keel guard install` again picks up a
+newer keel's hooks.
 
 The pre-commit hook is inert until `gates.commit_guard` says otherwise. `off`, which is what `init`
 writes, and it exits before checking anything: a team adopts the guard for the push protections
@@ -383,11 +475,17 @@ plugin adds to `PATH` alongside `keel`, not a `keel` subcommand, and it runs the
 next to it, falling back to the one on `PATH`, so the login-shell install's single symlink is
 enough.
 
-The prepare-commit-msg hook appends a `Keel-Version: <version>` trailer to every commit message,
+The prepare-commit-msg hook appends a `Keel-Version: <version>` trailer to each commit message,
+unless the profile sets `conventions.no_attribution_footers` to `true`,
 read from `.keel/profile.json`'s `keel_version` field, so which standard a change was made under
 survives into `git log` rather than only being visible live during the session that made it. It
 never duplicates the trailer on `git commit --amend`. Unlike the pre-push and pre-commit hooks,
-`git commit --no-verify` does not skip it, only bypassing `core.hooksPath` skips the trailer.
+`git commit --no-verify` does not skip it; only running git with hooks disabled, such as
+`git -c core.hooksPath=/dev/null commit`, skips the trailer.
+A repository whose commit messages carry a title and body only sets
+`conventions.no_attribution_footers` to `true` in its profile, and the hook then adds nothing.
+A hook written by an older keel adds the trailer whatever that key says; `keel guard status` names
+that case, and `keel guard install` replaces the hook.
 
 It refuses and never formats. Both `house-defaults.md` and `coding-standards` require a gate to be a
 check-only command, and a hook that rewrote your files and re-staged them would put content into a
@@ -410,7 +508,9 @@ this is how a project records that it grew a user interface without hand-editing
 and `null` are written as JSON literals rather than the strings that spell them, and a bare integer as
 a number. A path that does not already exist is refused, since a typo would otherwise write a key
 nothing reads while the caller walks away believing the fact was recorded. `keel_version` and
-`schema_version` are refused too: `init` owns both.
+`schema_version` are refused too: `init` owns both. A value outside the enum the profile schema
+declares for that key is refused as well, and the refusal names the values it accepts. `null` still
+clears one.
 
 `sync` is the same map filled from the other direction. It records where this project's documents
 already are, for the three artifact keys whose default is one unambiguous location: `snapshot`,
@@ -433,8 +533,9 @@ within two releases and would be a recommendation nobody asked for. `design-arch
 stack, after `write-prd` establishes what is being built. The sample source file exists so the
 project has somewhere for its first real test to go, and it says so in a comment.
 
-**The property that matters: doctor's only complaint on a fresh project is the one thing `new`
-told it about, and nothing else.** That is tested. `gates.coding_standards` defaults to required
+**The property that matters: doctor's only failure on a fresh project is the one thing `new`
+told it about, and nothing else.** That is tested. It also warns that the push guard is not
+installed, which `keel guard install` clears. `gates.coding_standards` defaults to required
 and `new` cannot write `docs/standards.md` itself, so doctor names that gap and `NEXT-STEPS.md`
 puts writing it first. Past that, the sample test must run with nothing installed, so node uses
 `node --test`, python uses `unittest`, and the minimal stack uses a shell script. Where detection

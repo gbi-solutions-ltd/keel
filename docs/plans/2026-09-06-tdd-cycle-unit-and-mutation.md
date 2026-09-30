@@ -172,8 +172,8 @@ corrected rather than met by cutting something this task does not name.
   explanation moves.
 - [x] **Step 2** Cut the second and third sentences of `skills/tdd/SKILL.md:30-32`. "Never guess the
   stack's idiomatic command" is stated almost verbatim at
-  `skills/write-plan/references/plan-template.md:301-303`. Keep "Read `.keel/profile.json` first"
-  and the three command names, which are the rule.
+  `skills/write-plan/references/plan-template.md#Do not guess, and do not use the`. Keep "Read
+  `.keel/profile.json` first" and the three command names, which are the rule.
 - [x] **Step 3** Run `tests/validate-skills.sh` and record the new count in the commit body.
 
 ---
@@ -196,9 +196,9 @@ reason. Anything longer than the rule itself goes to `references/`.
   it twice for one assertion.
 - [x] **Step 2** The boundary is a positive recipe, not a prohibition: say what to run and when, not
   "do not run the suite". The wrong shaped output here is a cycle that never runs the suite at all.
-- [x] **Step 3** `skills/debug/SKILL.md:68` says "the suite passes" and names no command, so it
+- [x] **Step 3** `skills/debug/SKILL.md:69` says "the suite passes" and names no command, so it
   leans on tdd having run it. Give it its own instruction naming `profile.verify.test`, the way
-  `skills/ship/SKILL.md:20` and `skills/review-code/SKILL.md:81` already do. **This is the signal
+  `skills/ship/SKILL.md:20` and `skills/review-code/SKILL.md:85` already do. **This is the signal
   that would otherwise be lost rather than relocated.**
 - [x] **Step 4** `skills/write-plan/references/plan-template.md` contradicts itself: `:178-180` says
   "Scope the `Done when:` to the task's own test... The suite gate moves to the join" and the worked

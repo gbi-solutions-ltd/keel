@@ -51,7 +51,8 @@ Read the project's runbook first: `<docs_root>/runbooks/`. The rollback command 
 guessing it during an incident is how a bad hour becomes a bad day.
 
 Prefer, in order: roll back the recent deploy, disable the feature flag, fail over or pause the
-affected corridor, scale out. Each is reversible and none needs a diagnosis.
+affected corridor, scale out. Each is reversible, and only failing over or pausing a corridor needs
+even a partial diagnosis: which corridor.
 
 **Give the command before the explanation.** An on-call reader should not read past your analysis to
 find what to run. The argument goes after it.
@@ -83,10 +84,9 @@ Service restored is not resolved. In order:
 4. If the design allowed it, `keel:design-architecture` for an ADR.
 5. Add what you learned to the runbook. A symptom that has happened once will happen again, and the
    next person on call should not start where you did.
-6. If the incident was preventable, say which of these it changes: a rule in a reference file, an
-   eval scenario, or a line in a skill. Those three belong to this plugin's own repository; a
-   project that owns none of them names its project-level equivalent instead (a runbook, per item
-   5) or says why nothing applies.
+6. If the incident was preventable, say what would have prevented it and where that lives in this
+   project: a runbook entry (item 5), a test, an alert, or a pipeline check. Or say why nothing
+   applies.
 
 ## Common mistakes
 

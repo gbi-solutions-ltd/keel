@@ -11,9 +11,9 @@
 
 All 7 stories are `build`: every FR describes behaviour that does not exist yet, wired into a
 mechanism that does. Checked against the current code before classifying, not assumed:
-`skills/ship/SKILL.md:26` has no `gates.coding_standards` awareness at all;
-`skills/execute-plan/references/subagent-prompts.md:146-166` states `DEVIATES` handling in full
-and nothing about a `Blocking` quality finding; `lib/detect-stack.sh` only detects existing
+`skills/ship/SKILL.md:29` has no `gates.coding_standards` awareness at all;
+`skills/execute-plan/references/subagent-prompts.md#On a DEVIATES` states `DEVIATES` handling in
+full and nothing about a `Blocking` quality finding; `lib/detect-stack.sh` only detects existing
 lint/type-check tooling, never writes it; `skills/repo-snapshot/SKILL.md` has zero mentions of
 `coding-standards` or `assess`; `keel doctor`'s `gates.coding_standards` check does not exist
 (the key's only appearance in `bin/keel` is the pre-push loosening-check). No `verify`, `fix` or

@@ -1,11 +1,11 @@
 # OWASP checklist
 
-Worked against the diff on a `--diff` run, or the whole repo on `--full`. Ordered by how often
-each one is the real finding in a service like ours, not by the OWASP numbering.
+Worked against the diff on a `--diff` run, or the whole repo on `--full`. Ordered by how often each
+one is the real finding in a typical web service, not by the OWASP numbering.
 
 ## Broken access control
 
-The most common serious finding, and the one scanners miss entirely.
+A frequent serious finding, and the one scanners miss entirely.
 
 - Is authorisation enforced **by default**, or opt-in per route? Opt-in means a forgotten
   decorator is a public endpoint. Count the routes and count the checks.
@@ -32,7 +32,6 @@ The most common serious finding, and the one scanners miss entirely.
 - Is anything sensitive hashed without a salt or a key? A bare SHA-256 of a value from a small
   space, such as a card number whose BIN and last four are stored alongside, is reversible by
   brute force. Tokenisation that does this protects nothing.
-- Are secrets in the working tree, in history, or in a build artifact?
 - Is TLS enforced on every outbound call, and is certificate verification ever disabled?
 - Is a signature over the exact bytes transmitted, or over a re-serialisation that can diverge?
 
@@ -127,10 +126,8 @@ outcome on this page. Detail is in the `coding-standards` reference `caching.md`
 
 ## Vulnerable components
 
-- Outdated majors, known advisories, unmaintained packages.
-- A dependency imported but not declared, resolving by hoisting. It works until it does not.
-- A lockfile that disagrees with the manifest, or a CI step that resolves fresh rather than
-  installing from the lockfile. The latter means the code tested and the code shipped can differ.
+- A CI step that resolves fresh rather than installing from the lockfile. The code tested and the
+  code shipped can differ.
 - A pipeline step pinned to a moving tag rather than a commit. It runs with your CI credentials, so
   whoever can move that tag can read your secrets.
 - An advisory scan that runs and whose findings nothing must act on.

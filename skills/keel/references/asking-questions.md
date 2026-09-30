@@ -5,17 +5,15 @@ user to decide something, so the shape of a question is the same wherever it com
 
 ## The rule that matters most
 
-**An unresolved question belongs in a prompt, not only in a document section.** Every skill here
-produces artifacts with an Open questions section, and a question filed there has a low chance of
-being answered: the reader is reviewing a document, not making decisions. The same question asked
-as a choice is usually settled in seconds, and the answer improves the document before anyone
-reads it.
+**An unresolved question belongs in a prompt, not only in a document section.** Skills here that
+write a document give it an Open questions section, and a question filed there has a low chance of
+being answered: the reader is reviewing a document, not making decisions. The same question asked as
+a choice is usually settled in seconds, and the answer improves the document before anyone reads it.
 
 So: write the question into the artifact **and** put the ones that block work to the user as
 choices. The section is the record. The prompt is how it gets answered.
 
-Ask about what blocks work. A question whose answer changes nothing you are about to do goes in
-the section only.
+A question whose answer changes nothing you are about to do goes in the section only.
 
 ## Single-select and multi-select are different questions
 

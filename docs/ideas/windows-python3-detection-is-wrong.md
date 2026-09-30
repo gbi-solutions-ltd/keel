@@ -1,5 +1,10 @@
 # Windows: python3 detection is wrong in two ways
 
+| | |
+|---|---|
+| Status | built in `9c68003`, both bugs, each with a test using a stub python3. No CI job runs on Windows |
+| Next | Nothing here. A Windows CI job is listed under "Not in this plan" in docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md |
+
 Two PRs opened directly against the public repo (`gbi-solutions-ltd/keel`, branches
 `fix/python3-presence-is-not-runnability` and `fix/windows-crlf-in-python-output`, gfsekamanya,
 2026-09-07) describe real bugs in `bin/keel` that are still present here. The public repo has no
@@ -19,8 +24,9 @@ downstream check that gates on `have_python()` believes python3 works.
   read
 - `bin/keel:1439-1440`, doctor's profile-parse check, which folds "didn't run" and "invalid JSON"
   into one failure message
-- `bin/keel:1910`, the pre-push loosening check, `have_py=1`, does not go through `HAVE_PYTHON`
-- `bin/keel:2109`, the pre-commit guard, `if ! command -v python3`, same
+- `bin/keel#&& have_py=1`, the pre-push loosening check, `have_py=1`, does not go through
+  `HAVE_PYTHON`
+- `bin/keel#if ! python3 -c 'pass'`, the pre-commit guard, `if ! command -v python3`, same
 
 **Fix:** replace `command -v python3` with `python3 -c 'pass'` (actually runs the interpreter, so
 the Store shim's exit 49 is caught) at all four sites, not just the first. At the doctor call site,

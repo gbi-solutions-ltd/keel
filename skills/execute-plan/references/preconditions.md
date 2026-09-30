@@ -13,7 +13,7 @@ project on 2026-08-15 and hitting a gate that could not be cleared by doing anyt
 | An ADR the plan cites is `proposed` | Building on it means building on something nobody agreed. See the exception below |
 | The plan has open questions blocking its own tasks | The plan is telling you it is not finished. Ask them as choices rather than reporting them |
 | The PRD is a draft, or the stories are provisional | The requirement may change or vanish, and the work with it |
-| You are on the default branch | Never implement on `main` without explicit consent. Branch first, which most plans say in their own constraints |
+| You are on the default branch | Never implement on the default branch without explicit consent. Branch first, which most plans say in their own constraints |
 | A verify command cannot produce a verdict | Steps 2 and 4 of every task then prove nothing. Absent from the profile is one way; present and unable to run is the other, and both are below. **Investigative commands need no profile entry**: `grep`, `git log` and `ls` are not verification |
 
 ## What "cannot produce a verdict" means, and how to establish it
@@ -41,10 +41,10 @@ a missing file complains about itself, which is the signature this check reads a
 
 **Do not delegate this to `keel doctor`.** It runs the commands rather than reading the profile,
 which is why it looks like the right instrument, and it discards their output
-(`bin/keel#The managed block's size, which doc 05 has always said doctor enforces`), so the exit code is the only thing it keeps. An exit code cannot separate a
-verdict about the code from a complaint about the tool, which is the whole of the question here.
-Doctor answers "is this project healthy". It cannot answer this one, and rewording it would not
-change that.
+(`bin/keel#Output is discarded, so a suite taking eleven minutes`), so the exit code is the only
+thing it keeps. An exit code cannot separate a verdict about the code from a complaint about the
+tool, which is the whole of the question here. Doctor answers "is this project healthy". It cannot
+answer this one, and rewording it would not change that.
 
 ## The condition that is not in the table: a dirty working tree
 
@@ -80,7 +80,9 @@ task that creates them runs, and that task cannot run while they are missing.
 task 1 does it, start. Task 1's own step 2 legitimately watches its test command fail because the
 toolchain is absent. Every task after it must use the real commands, and if task 1 finishes without
 `keel doctor` passing, stop there. Doctor is right for that one: after task 1 the bar really is
-exit 0, which is all it keeps.
+exit 0, which is all it keeps. Full doctor also runs `verify.security` where `keel init` detected
+one, which needs the network and fails on a high advisory. Name that line when stopping on it: it is
+the dependency tree's state, not task 1's toolchain.
 
 **The exception is about the plan, not about greenfield.** What clears the gate is that a task in
 this plan makes the command produce a verdict. A new project whose task 1 writes the toolchain and

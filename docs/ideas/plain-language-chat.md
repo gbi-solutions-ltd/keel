@@ -110,7 +110,7 @@ hit, and it has 44 tokens less room than it did then.
 |---|---|---|
 | The always-loaded hook is at 356 of a 400 ceiling | Measured 2026-08-18; rule at `tests/validate-skills.sh:283-284`, budget in `docs/05-token-and-memory-design.md` | 44 tokens of headroom. The rule must swap, not add |
 | The hook is deliberately bounded to a fixed set of forms | `hooks/session-start:9-14`, and it forbids anything volatile for prompt-cache reasons | A third form is allowed by that doctrine. A rule that varied per reply is not |
-| `response_style` is an enum of exactly two, and stays that way | `templates/profile.schema.json:329-336` | Untouched by the chosen design. A **new sibling key** is still a schema change, so `SCHEMA_VERSION` moves and `keel doctor` reports drift on existing profiles |
+| `response_style` is an enum of exactly two, and stays that way | `templates/profile.schema.json:335-342` | Untouched by the chosen design. A **new sibling key** is still a schema change, so `SCHEMA_VERSION` moves and `keel doctor` reports drift on existing profiles |
 | Two independent keys give four combinations, not four paragraphs' worth of tokens | The hook picks one paragraph; the set it picks from may grow without the injected size growing | The 44-token headroom survives the separate-key design. Only a rule that **appends** breaks it |
 | The hook matches the profile textually with a builtin `case`, no python3 | `hooks/session-start:16-20, 70-73` | A third branch is two lines and no new dependency |
 | Terse resolves its own conflicts in favour of the statement | `output-styles/keel-terse.md:42-48` | A plain rule needs the same tie-break written down, or the two rules fight silently |

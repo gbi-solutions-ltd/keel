@@ -44,15 +44,6 @@ recommendation. If there genuinely is not one, say so and say why.
 | Buy it | | |
 | Build something smaller | | |
 
-Doing nothing is always listed, and those four rows come first. **Variants of the idea go in a
-separate table below, not in this one.** A run added two rows that were both ways of building it, and
-noted afterwards that it had diluted the table in exactly the direction this warning points at. Keep
-the alternatives table answerable by somebody who does not want the thing built.
-
-**Status and Recommendation must agree**, or the record says why they differ. `paused` beside "do not
-build it" is defensible when the answer to a blocking question was assumed rather than given, but
-that has to be stated rather than left for a reader to notice.
-
 **Assumptions this rests on**
 
 | Assumption | True if | How we would know | Checked? |
@@ -71,7 +62,8 @@ the case against land rather than read as reluctance.
 ## Open questions
 
 The ones that would change the answer, in descending order of how much. Surfaced as choices where
-they block, per the shared question convention.
+they block, per
+[../../keel/references/asking-questions.md](../../keel/references/asking-questions.md).
 
 ## Recommendation
 
@@ -85,6 +77,18 @@ Everything deliberately left to `write-prd` and `design-architecture`, so a read
 silence for an answer.
 ```
 
+## Filling in the case against
+
+Doing nothing is always listed in the Alternatives table, and its four rows come first. **Variants
+of the idea go in a separate table after it, not in it.** A run added two rows that were both ways
+of building it, and noted afterwards that it had diluted the table in exactly the direction this
+warning points at. Keep the alternatives table answerable by somebody who does not want the thing
+built.
+
+**Status and Recommendation must agree**, or the record says why they differ. `paused` beside "do
+not build it" is defensible when the answer to a blocking question was assumed rather than given,
+but that has to be stated rather than left for a reader to notice.
+
 ## What this file is not
 
 Not a PRD. No `FR-NN` ids, no acceptance criteria, no non-functional requirements. If you are
@@ -95,7 +99,7 @@ decides an architecture nobody reviewed.
 
 ## Where `write-prd` picks it up
 
-`write-prd --from-idea` reads this file and skips every question it answers, the same way
+`write-prd` in `from-idea` mode reads this file and skips every question it answers, the same way
 `from-repo` reads `snapshot.md`. The sections it consumes directly are **The problem**, **What was
 asked for**, **Open questions**, and the assumptions table. Filling those in properly is what stops
 the user being asked the same things twice.

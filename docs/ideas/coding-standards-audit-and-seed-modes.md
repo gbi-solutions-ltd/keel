@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-09-02 |
-| Status | shaped. Three decisions taken 2026-09-02 and recorded here for the first time; the mode shape is argued rather than accepted |
+| Status | built via docs/plans/2026-09-02-the-four-mode-router-and-audit.md and docs/plans/2026-09-03-seed-mode-and-its-arm.md. Status corrected 2026-09-25 by docs/snapshot.md |
 | Recommendation | Build audit and seed, but only with Step 0a out of the body first, because the restructure is unaffordable otherwise and moving it is a real change rather than a word trick |
-| Next | `write-prd`, following the `standards-that-bind.md` to `standards-assessment.md` path this skill already has. Not started |
+| Next | Nothing |
 
 ## The decisions taken 2026-09-02
 
@@ -76,10 +76,10 @@ and Step 1 without that sentence is right to distrust one of them.
 
 ### Seed and audit sidestep the open question rather than answering it
 
-`docs/ideas/standards-that-bind.md:624` leaves **"Why does a loaded rule not bind?"** open, and
-calls it keel's own precondition for any wording change, citing `tests/evals/results.md` at "not be
-a fourth copy of a sentence". Every option ranked below third in that record's question 3 is
-blocked on it.
+`docs/ideas/standards-that-bind.md#Why does a loaded rule not bind?` leaves **"Why does a loaded
+rule not bind?"** open, and calls it keel's own precondition for any wording change, citing
+`tests/evals/results.md` at "not be a fourth copy of a sentence". Every option ranked below third in
+that record's question 3 is blocked on it.
 
 Both new modes create a document. Neither adds a reminder, a gate or a read at the point of use, so
 neither touches the precondition, and neither is blocked by it either. That is a defensible position

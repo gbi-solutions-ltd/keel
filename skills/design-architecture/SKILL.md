@@ -26,6 +26,8 @@ Read the PRD and stories, at `profile.artifacts` paths where set, otherwise unde
 `existing` mode follow [references/existing-mode.md](references/existing-mode.md). Designing against
 requirements you have not read produces an architecture for a different product.
 
+In `adr` mode, do Step 5 and stop.
+
 ## Step 2: Establish the forces
 
 Before proposing anything, list what actually constrains the design: the `NFR` and `CON` entries
@@ -89,8 +91,5 @@ not address. Surface the open questions as choices too: one left sitting in sect
 
 | Mistake | Instead |
 |---|---|
-| One option, presented as the answer | Two or three, with the losers' reasons stated |
-| Naming a version you did not check | Verify with `context7`, or say it is unverified |
 | Redesigning a working system because you would have built it differently | `existing` mode: match the pattern, or write an ADR for deviating |
 | Diagrams that restate the file tree | Diagram the runtime and the data flow, not the folders |
-| Only the happy path | Failure modes are part of the design |

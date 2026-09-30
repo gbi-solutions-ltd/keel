@@ -1,8 +1,7 @@
 # Design document template
 
-The structure of `<docs_root>/architecture/<slug>.md`. Adapted from
-`cursor-starter/planning/architecture-design.md` and `tech-stack-selection.md`, merged because
-in practice they are one conversation.
+The structure of `<docs_root>/architecture/<slug>.md`. Adapted from cursor-starter's architecture
+design and stack selection prompts, merged because in practice they are one conversation.
 
 ## Header
 
@@ -49,18 +48,13 @@ a taste argument into a decision, and makes the ADRs write themselves.
 Two or three, each with: how it works in three sentences, cost, what it forecloses, and when it
 would be wrong. Then the recommendation and why the others lost.
 
-Never present one. A single option is a preference wearing a decision's clothes.
-
-In `existing` mode, "continue with the current pattern" is always one of the options, and often
-the right one. Deviating needs its own ADR.
-
 ## 4. Structure
 
 **Name the stack, in words, before the diagrams.** Language, runtime, and framework or the explicit
-decision to use none, for each thing that runs. This document merged `tech-stack-selection.md` and
-has to carry that job: a design that names no stack passes every check below and still cannot be
-planned against, because `write-plan` cannot write a line of code without knowing what it is written
-in. Found exactly that way on the first greenfield run.
+decision to use none, for each thing that runs. This document carries the stack choice: a design
+that names no stack passes every check below and still cannot be planned against, because
+`write-plan` cannot write a line of code without knowing what it is written in. Found exactly that
+way on the first greenfield run.
 
 Naming the stack is not the same as naming a version, and self-review item 5 is about versions.
 "TypeScript, no UI framework" is required here. "TypeScript 5.4" is a claim that needs checking

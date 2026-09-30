@@ -62,9 +62,9 @@ Report both, name both, and let the reader do any arithmetic they want.
 State the counting unit before any number. Without it two runs produce different denominators from
 the same corpus and nothing is comparable.
 
-**The unit:** one house rule is one H2 section of a topic reference, excluding any trailing
-checklist heading. Three names are in use, `Testing it`, `What review looks for` and `What good
-looks like`, and no file carries all three, so exclude by name rather than subtracting a fixed
+**The unit:** one house rule is one H2 section of a topic reference, excluding every checklist
+heading, by the names below. Three names are in use, `Testing it`, `What review looks for` and `What
+good looks like`, and no file carries all three, so exclude by name rather than subtracting a fixed
 number. Count every other H2, with no judgement about whether it reads like a rule, because that
 judgement is what makes a denominator irreproducible.
 
@@ -116,9 +116,9 @@ immediately after check 1 and before check 2.
 
 **What counts as an item.** Any row or bullet in `standards.md` naming work not yet done, whatever
 the document calls it: a "Not yet mechanical" list, a follow-up table, or a known inconsistency.
-`skills/coding-standards/references/standards-template.md` prescribes no numbering, so where the
-document numbers its items use its numbers, and where it does not, identify each by its first clause
-and **say so in the report**, because the trend section then has no stable key to match on.
+[standards-template.md](standards-template.md) prescribes no numbering, so where the document
+numbers its items use its numbers, and where it does not, identify each by its first clause and
+**say so in the report**, because the trend section then has no stable key to match on.
 
 Every item gets exactly one of three states.
 
@@ -153,9 +153,9 @@ uses, because they give different denominators. `standards-template.md` permits 
 document has **eight or more** judgement sections, take the first rule of each of the first eight,
 in document order, and take nothing else. Where it has **fewer than eight**, take every rule it
 holds, in document order, until you reach eight or run out. The two branches do not overlap, so
-there is exactly one reading for any document. **Name the sections you did not
-reach**, and where the document holds fewer than six rules in total, sample all of them and say how
-many existed: six is a target, not a floor a short document can be made to meet.
+there is exactly one reading for any document. **Name the sections you did not reach**, and where
+the document holds fewer than eight rules in total, say how many existed: eight is a ceiling, not a
+floor a short document can be made to meet.
 
 | Verdict | Means |
 |---|---|

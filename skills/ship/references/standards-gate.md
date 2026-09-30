@@ -21,17 +21,16 @@ Three things it is not:
 
 - A `Blocking` finding. It stays `Blocking` whatever it cites, and item 5 refuses on it whether or
   not this gate is on.
-- A `Should fix` finding that cites nothing under `skills/coding-standards/references/`. Reuse of
-  something the codebase already has, a name, a test asserting something adjacent: real findings,
-  not this gate's.
+- A `Should fix` finding that cites no file under `skills/coding-standards/references/` and restates
+  no rubric bullet that does. Reuse of something the codebase already has, a name, a test asserting
+  something adjacent: real findings, not this gate's.
 - A finding that cites nothing and restates no rubric bullet. It is not a standards violation
   here. Say in the ship report when a finding looks rubric-sourced and no bullet can be matched to
   it: that is a defect in the review, not a reason to guess.
 
 ## What the gate does with one
 
-Read `gates.coding_standards` from `.keel/profile.json` before item 5. The three values mean what
-they mean for every other gate in the profile.
+Read `gates.coding_standards` from `.keel/profile.json` before item 5.
 
 | Value | An unaddressed standards violation |
 |---|---|
@@ -42,6 +41,6 @@ they mean for every other gate in the profile.
 A profile with no `gates.coding_standards` key reads as `off`. `keel init` writes `required` on
 every profile it creates.
 
-**Addressed** means one of two things. Fixed: the diff no longer carries what the finding
-described. Accepted: the user names the finding under "Overrides" in the skill body, and it goes in
-the PR body. "Ship it anyway" names nothing and is not an acceptance.
+**Addressed** means one of two things. Fixed: the diff no longer carries what the finding described.
+Accepted: the user names the finding under "Overrides" in the skill body, and it goes in the PR
+body.

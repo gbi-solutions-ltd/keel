@@ -44,8 +44,8 @@ in the very files it derived them from (`docs/ideas/standards-that-bind.md:214-2
 ## 2. Problem statement
 
 A standards document is written once and read by one skill, over a diff. `review-code` is that skill
-and its scope is defined over changed lines (`skills/review-code/SKILL.md:21`,
-`skills/review-code/references/rubric.md:61-63`). Nothing reads the document as a whole against the
+and its scope is defined over changed lines (`skills/review-code/SKILL.md:24`,
+`skills/review-code/references/rubric.md:64-66`). Nothing reads the document as a whole against the
 tree as a whole, so a document decays silently and the decay is only discovered by whoever next
 trips over it.
 
@@ -112,10 +112,10 @@ claimed: section 16 measured it the most expensive of the four.
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
 | FR-06 | Check 1 must read exactly three inputs: the project's `standards.md`, `skills/coding-standards/references/house-defaults.md` and the topic references it indexes, and `.keel/profile.json`. It must not read project source code. | confirmed | `docs/ideas/standards-that-bind.md:438`, "No code is read at all" |
-| FR-07 | For each of the ten indexed topic references, the report must record an applies or does-not-apply verdict and the fact that decided it. | author-added, see note | The index gives ten prose predicates at `skills/coding-standards/references/house-defaults.md:18-27`. Only one, `frontend.md` at `:27`, names profile fields (`profile.stack.has_ui`, `profile.stack.framework`). The other nine are judgements a second run can make differently |
+| FR-07 | For each of the ten indexed topic references, the report must record an applies or does-not-apply verdict and the fact that decided it. | author-added, see note | The index gives ten prose predicates at `skills/coding-standards/references/house-defaults.md:17-26`. Only one, `frontend.md` at `:26`, names profile fields (`profile.stack.has_ui`, `profile.stack.framework`). The other nine are judgements a second run can make differently |
 | FR-08 | The report must state the counting unit it used for "rules" and the per-file denominator that unit produces, both for applicable references and for the rules it reports as folded in, adapted, departed from, or omitted. | author-added, see note | See the reproducibility note below |
 | FR-09 | Where a whole applicable reference has no rule-level content in `standards.md` and no departure row recording the choice, the report must name it as a skipped reference distinctly from an individually omitted rule. | author-added | `docs/ideas/standards-that-bind.md:115-124` treats these as the headline finding, and they are the only part of it that survived the tally's withdrawal, because they rest on zero-hit greps rather than on a count |
-| FR-10 | Check 1 must be assessable against `skills/coding-standards/SKILL.md:69-71`, which requires the house defaults to be included "noting any this project deliberately departs from". A rule neither folded in nor recorded as a departure is a coverage failure. | confirmed | `skills/coding-standards/SKILL.md:69-71`; `docs/ideas/standards-that-bind.md:136-138` |
+| FR-10 | Check 1 must be assessable against `skills/coding-standards/SKILL.md:70-72`, which requires the house defaults to be included "noting any this project deliberately departs from". A rule neither folded in nor recorded as a departure is a coverage failure. | confirmed | `skills/coding-standards/SKILL.md:70-72`; `docs/ideas/standards-that-bind.md:136-138` |
 
 **Why FR-08 exists.** The record's first version of this finding reported "76 house rules assessed:
 9 folded in, 9 adapted, 1 departed, 58 silently omitted", with per-reference ratios. That tally has
@@ -153,7 +153,7 @@ carries an identifier, so an omitted rule can be counted but not named. That was
 | FR-16 | Every imprecise pattern match must be opened and hand-verified before it is reported. A raw match count is not a finding. | confirmed | Brief item 2; `docs/ideas/standards-that-bind.md:452-454`. In the instance all seven apparent leaks were conforming once opened |
 | FR-17 | The report must state what proportion of the tree predates the commit the document was derived from. | confirmed | Brief item 2; `docs/ideas/standards-that-bind.md:452-454`. 78 percent in the instance (`:62-63`) |
 | FR-18 | A finding must state whether it is reachable in production, and must not be presented at a severity its reachability does not support. | inferred | `docs/ideas/standards-that-bind.md:220-231`: the instance's unguarded interpolation sites are unreachable and the record requires they "must not be written up as an injection bug". Cross-check "Counting decides style, never correctness" in `skills/coding-standards/SKILL.md` |
-| FR-27 | Check 3 is the only check that reads project source code, and it must read it only in service of the rules it sampled. It must not report a finding outside those rules, and must not use git history for anything except the pre-derivation proportion FR-17 requires. | confirmed | Symmetry with FR-06, requested 2026-09-01. Without the bound the check becomes an unscoped code review, which `review-code` already owns over a diff (`skills/review-code/references/rubric.md:104-106`) |
+| FR-27 | Check 3 is the only check that reads project source code, and it must read it only in service of the rules it sampled. It must not report a finding outside those rules, and must not use git history for anything except the pre-derivation proportion FR-17 requires. | confirmed | Symmetry with FR-06, requested 2026-09-01. Without the bound the check becomes an unscoped code review, which `review-code` already owns over a diff (`skills/review-code/references/rubric.md:106-108`) |
 
 ### 5.5 Check 4, the departures ledger
 
@@ -170,7 +170,7 @@ carries an identifier, so an omitted rule can be counted but not named. That was
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
 | FR-23 | The mode must write `<docs_root>/audits/YYYY-MM-DD-standards.md` and must not create or modify any other file. In particular it must never edit `standards.md`. | confirmed | `docs/ideas/standards-that-bind.md:462-463`; the existing form of this rule is `skills/security-audit/references/report-template.md`, "Nothing in an audit modifies what is being audited" |
-| FR-24 | Where a report for the same repository already exists under `<docs_root>/audits/`, the new report must carry a trend section stating what closed, what is new, and what has been open longest. | author-added | The shape already exists at `skills/security-audit/references/report-template.md:85`, section 6. Applying it here is this PRD's addition, and it is what makes NFR-05 observable rather than aspirational |
+| FR-24 | Where a report for the same repository already exists under `<docs_root>/audits/`, the new report must carry a trend section stating what closed, what is new, and what has been open longest. | author-added | The shape already exists at `skills/security-audit/references/report-template.md:84`, section 6. Applying it here is this PRD's addition, and it is what makes NFR-05 observable rather than aspirational |
 | FR-25 | All four checks must run on every assessment, and the report must present them in the CON-02 order with each check's finding count stated separately. | confirmed | Decision 1 in section 14; `docs/ideas/standards-that-bind.md:433-460` |
 
 ## 6. Non-functional requirements
@@ -231,7 +231,7 @@ is Q3.
 
 ## 11. Out of scope
 
-- **Problem B, making standards bind during coding.** Already shipped in `13d90d9`, verified in the tree: the `=== PROJECT STANDARDS ===` block is now in the implementer prompt at `skills/execute-plan/references/subagent-prompts.md:29` as well as the review prompt at `:114`; the plan template names the standards document at `skills/write-plan/references/plan-template.md:28` with an example at `:34`; `docs/02-skill-catalog.md:69` now reads "Enforced by nothing at coding time"; and `:382` now reads "Not `<docs_root>/standards.md`, which this line claimed".
+- **Problem B, making standards bind during coding.** Already shipped in `13d90d9`, verified in the tree: the `=== PROJECT STANDARDS ===` block is now in the implementer prompt at `skills/execute-plan/references/subagent-prompts.md:29` as well as the review prompt at `:114`; the plan template names the standards document at `skills/write-plan/references/plan-template.md#Copied verbatim from the stories` with an example at `skills/write-plan/references/plan-template.md#requires a named exception type, never a bare catch`; `docs/02-skill-catalog.md:69` now reads "Enforced by nothing at coding time"; and `:382` now reads "Not `<docs_root>/standards.md`, which this line claimed".
 - **Open question 3, why a loaded rule does not bind.** Untouched by this work and still open (`docs/ideas/standards-that-bind.md`, "Why does a loaded rule not bind?"). No requirement here depends on its answer, because the mode is a procedure that returns findings rather than a rule told to a model.
 - **Answering Q1, whether the ranked order generalises.** Still open, and deliberately not blocking. Section 14's decision 1 runs all four checks together whatever the answer, so nothing in this PRD waits on it. It closes when a second repository is assessed and its per-check finding counts are recorded, which is the first row of section 9. It carries in the idea record as its open question 5 (`docs/ideas/standards-that-bind.md:625-632`).
 - **Remediating anything an assessment finds.** The mode reports. Fixes route to the skill the finding names.
@@ -255,7 +255,7 @@ is Q3.
 | Q2 | Should the ten topic references gain stable rule identifiers, so an omitted rule can be named rather than counted? | Bernard | **Answered 2026-09-01: not now.** FR-08 stands as written, so the mode states its counting unit and per-file denominator and the number becomes reproducible without identifiers. Identifiers stay deferred: ten files of edits, no skill-word cost, larger than the mode itself, and wanting their own PRD |
 | Q3 | Is there a success metric for whether an assessment changes anything, or is the artifact the deliverable? | Bernard | Section 9 |
 | Q4 | Does the NFR-03 arm get a fixture of its own, given that no existing fixture has a `standards.md`? | Bernard | **Answered 2026-09-01: yes, and it is now NFR-08**, an explicit prerequisite rather than a question, so a plan cannot miss it. The residue, whether the new scenario joins the release gate, was also settled: it does not. The gate stays at six, following the `write-prd` precedent (`tests/evals/results.md`, "`write-prd` at 793 words, the ADR-0001 length arm"). Nothing in Q4 is open |
-| Q5 | Should `repo-snapshot`'s section template gain a "present but unassessed" state, now that one is detectable? | Bernard | Nothing in this PRD. Raised because the mode creates the state (`skills/repo-snapshot/references/section-templates.md:147,227`) |
+| Q5 | Should `repo-snapshot`'s section template gain a "present but unassessed" state, now that one is detectable? | Bernard | Nothing in this PRD. Raised because the mode creates the state (`skills/repo-snapshot/references/section-templates.md:145,227`) |
 
 ## 14. The two decisions this PRD closes
 
@@ -292,16 +292,16 @@ Every routing and documentation surface, measured in this repository at `13d90d9
 
 | Surface | Line and current text | Edit | Budget cost |
 |---|---|---|---|
-| Router | `skills/keel/SKILL.md:28`, `\| what are our conventions, set up linting \| coding-standards \|` | Add an assess phrasing to the trigger cell | About 5 words on a 553 word body with 147 spare to the 700 target (`docs/ideas/standards-that-bind.md:531`) |
+| Router | `skills/keel/SKILL.md:28`, `\| what are our conventions, set up linting \| coding-standards \|` | Add an assess phrasing to the trigger cell | About 5 words on a 553 word body with 147 spare to the 700 target (`docs/ideas/standards-that-bind.md#TARGET_WORDS=700`) |
 | Skill description | `skills/coding-standards/SKILL.md:3`, 181 characters | Append a 32 character assess clause | 213 of 216. Measured |
 | Skill body | `skills/coding-standards/SKILL.md`, 683 words | The mode's 193 words | 876 of 900. Measured. Triggers NFR-03 |
 | Report format | New file under `skills/coding-standards/references/` | Write it | Zero. References are unbounded (`tests/validate-skills.sh:161-162`) |
 | Prompting map | `docs/prompting.md:34`, `\| "what are our conventions", "set up linting", "enforce style" \| coding-standards \| docs/standards.md plus lint config \|` | Add the assess phrasing, and the audits path to the Produces column, following the `security-audit` row at `docs/prompting.md:38` | Zero, documentation. **Not test-enforced**: no test reads this file |
 | Cheatsheet template | `templates/prompting-cheatsheet.md:33`, the same row with `{{DOCS_ROOT}}` | Same | Zero. The only check on this file (`tests/validate-skills.sh:312-314`) requires the router's destination name to appear somewhere in it, and `coding-standards` already does, so this edit is for accuracy, not to pass a test |
-| Catalog entry | `docs/02-skill-catalog.md:293-308`, "**Does:** two distinct jobs", Derive and Enforce; **Writes:** names only `<docs_root>/standards.md` | Add the third job and the audits output. The catalog already documents modes this way for `security-audit` at `:345-354`, "**Does:** two scopes" | Zero, documentation. Not test-enforced: no test reads this file |
+| Catalog entry | `docs/02-skill-catalog.md:295-310`, "**Does:** two distinct jobs", Derive and Enforce; **Writes:** names only `<docs_root>/standards.md` | Add the third job and the audits output. The catalog already documents modes this way for `security-audit` at `:345-354`, "**Does:** two scopes" | Zero, documentation. Not test-enforced: no test reads this file |
 | Scaffolded README table | `bin/keel:499`, `\| \`audits/\` \| \`security-audit\` \|` | Add `coding-standards` | Zero. `bin/keel:482` already creates `audits/` in a scaffolded docs root, so no directory change is needed |
 | SessionStart roster | `hooks/session-start:30`, `coding-standards` in the Build line | **No change.** The roster names skills, and the presence check at `tests/validate-skills.sh:323-327` already passes on that mention | Zero |
-| Snapshot section template | `skills/repo-snapshot/references/section-templates.md:147,227`, which lists "Coding standards" under **Missing** | Consider, and decide separately: the mode creates a third state, present but unassessed, which this template has no row for | Zero, and out of scope here. Raised as Q5 |
+| Snapshot section template | `skills/repo-snapshot/references/section-templates.md:145,227`, which lists "Coding standards" under **Missing** | Consider, and decide separately: the mode creates a third state, present but unassessed, which this template has no row for | Zero, and out of scope here. Raised as Q5 |
 | Skill count claim | `README.md:6`, "25 skills built", enforced by `tests/test-doc-claims.sh:45-47` | **No change.** A mode is not a skill | Zero |
 
 **The SessionStart roster, measured rather than inherited.** Reproducing the validator's own probe

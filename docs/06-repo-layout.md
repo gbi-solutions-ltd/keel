@@ -200,7 +200,8 @@ keel/
 │   └── evals/                          # 14 scenarios, 14 fixtures, results.md
 │
 ├── .github/
-│   └── workflows/ci.yml                # the pipeline. Its lint comes from .keel/profile.json
+│   ├── ruff-requirements.txt           # ruff for the Python lint job, one hash per published file
+│   └── workflows/ci.yml                # the pipeline. Shell lint from the profile; ruff only here
 │
 ├── docs/                               # keel's own docs_root, written by keel's own skills
 │   ├── 01-architecture.md

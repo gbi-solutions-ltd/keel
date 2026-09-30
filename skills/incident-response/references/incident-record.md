@@ -88,8 +88,9 @@ the runbook before rolling back, and if the schema moved, forward is sometimes t
 
 Blameless, and specific. "We should be more careful" is not an action.
 
-The three questions worth answering: why did it take 20 minutes to detect, what made the fix slower
-than it needed to be, and what would have made this impossible rather than merely less likely.
+The three questions worth answering: why did detection take as long as it did, what made the fix
+slower than it needed to be, and what would have made this impossible rather than merely less
+likely.
 
 Every action gets an owner and a date, or it is a wish. And put the answers in the runbook, not only
 in the review, because the runbook is what someone reads at 4am and the review is not.

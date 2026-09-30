@@ -175,13 +175,13 @@ shape checks cannot; results and the arguments they produced are in
 A project using keel gets its own opt-in guard:
 
 ```bash
-keel guard install    # pre-push, pre-commit, and prepare-commit-msg hooks, repo-local
+keel guard install    # pre-push, pre-commit, and prepare-commit-msg hooks, in .git/hooks
 keel scan             # run the supply chain scan by hand
 ```
 
-Pre-push refuses anything `keel scan` flags, a push straight to the default branch, and a push
-whose profile is weaker than what is already on the remote. Pre-commit is inert until
-`gates.commit_guard` turns it on. Detail is in
+Pre-push refuses anything `keel scan` flags in the tree being pushed or a key file in the history
+it carries, a push straight to the default branch, and a push whose profile is weaker than what is
+already on the remote. Pre-commit is inert until `gates.commit_guard` turns it on. Detail is in
 [`docs/03-install-and-distribution.md`](docs/03-install-and-distribution.md#commands).
 
 ## How to read this repo

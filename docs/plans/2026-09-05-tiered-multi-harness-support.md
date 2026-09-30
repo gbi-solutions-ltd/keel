@@ -1821,7 +1821,8 @@ gives the 18 locations with line numbers and remedy classes **W** word change, *
 **N** new section. Three of its notes change what the work is rather than adding to it, and each is
 the reason a mechanical pass over the 18 would be wrong:
 
-- **A nineteenth location.** `docs/03-install-and-distribution.md:475` says "The skills
+- **A nineteenth location.**
+  `docs/03-install-and-distribution.md#The skills are no longer Claude-only.` says "The skills
   themselves stay Claude-only for now". It is true today and false the moment this ships. Class N,
   and it is the natural home for the Tier B install path.
 - **`docs/04-plugin-strategy.md` is Claude-shaped across all 221 lines**, not at line 11. Rewrite the
@@ -2642,8 +2643,9 @@ harness_running() {
 }
 ```
 
-Then add the section to `cmd_doctor`, using its existing `good`/`warn` printers (`bin/keel:1339-1341`)
-so the output matches every other check rather than inventing a format:
+Then add the section to `cmd_doctor`, using its existing `good`/`warn` printers
+(`bin/keel#good() {`, `bin/keel#warn() {`) so the output matches every other check rather than
+inventing a format:
 
 ```bash
     # The harness section. ADR-0004: a guarantee is a property of (repository, harness), so this
@@ -3421,21 +3423,22 @@ make room:
 
 - `skills/repo-snapshot/SKILL.md:49`: `Dispatch these subagents concurrently **in one message**, delegation profile \`keel-fanout\`:`
 - `skills/port-assess/SKILL.md:37`: `Dispatch these subagents in one message, delegation profile \`keel-fanout\`. Each is told:`
-- `skills/apex-port-plan/SKILL.md:30`: `Dispatch these subagents **in one message** so they run concurrently, delegation profile \`keel-fanout\`, and`
-- `skills/write-plan/SKILL.md:44`: `one message, delegation profile \`keel-fanout\`, each citing \`path:line\`, said in one line.`
-- `skills/security-audit/SKILL.md:46`: `one per phase, delegation profile \`keel-fanout\`, and say`
-- `skills/shape-idea/SKILL.md:39` and `skills/write-docs/SKILL.md:55`: same substitution, `model
+- `skills/apex-port-plan/SKILL.md` line 30 at `bda1acc`: `Dispatch these subagents **in one message** so they run concurrently, delegation profile \`keel-fanout\`, and`
+- `skills/write-plan/SKILL.md` line 44 at `bda1acc`: `one message, delegation profile \`keel-fanout\`, each citing \`path:line\`, said in one line.`
+- `skills/security-audit/SKILL.md:54`: `one per phase, delegation profile \`keel-fanout\`, and say`
+- `skills/shape-idea/SKILL.md` line 39 at `bda1acc` and `skills/write-docs/SKILL.md:55`: same substitution, `model
   \`sonnet\`` to `delegation profile \`keel-fanout\``. Read each line first: neither is a lettered
   fan-out, so confirm the sentence still reads correctly before and after the replacement rather
   than applying it blind.
-- `skills/execute-plan/references/parallel-batches.md:40`: replace `isolation: worktree`, which is
+- `skills/execute-plan/references/parallel-batches.md` line 40 at `bda1acc`: replace `isolation: worktree`, which is
   the literal parameter name of Claude Code's Agent tool, with a sentence describing the property:
   each agent works in its own checkout so no two write the same tree.
 
-`model \`inherit\`` stays where it is, at `skills/write-plan/SKILL.md:93`,
+`model \`inherit\`` stays where it is, at `skills/write-plan/SKILL.md` line 93 at `bda1acc`,
 `skills/write-plan/references/plan-review.md:3` and
-`skills/execute-plan/references/subagent-prompts.md:171`. It is already harness-neutral and it means
-what it says there: judgement work runs on the driver's model deliberately
+`skills/execute-plan/references/subagent-prompts.md#Dispatch implementation and both reviews`.
+It is already harness-neutral and it means what it says there: judgement work runs on the driver's
+model deliberately
 (`docs/ideas/model-routing.md:114-116`). **`execute-plan`'s body needs no edit at all.**
 
 - [x] **Step 4: Run it and watch it pass**
@@ -3623,7 +3626,7 @@ warnings are "pre-existing and unchanged", and it was right to say so: a task th
 obligation for one word has not done the cheap thing. Reworded to 698.
 
 **Two entries in `docs/02-skill-catalog.md` are still unmarked and this task does not cover them.**
-Line 226 hands `design-architecture` to `context7`, and `skills/design-architecture/SKILL.md:43`
+Line 226 hands `design-architecture` to `context7`, and `skills/design-architecture/SKILL.md:45`
 gives that instruction unqualified too. `code-review` at line 354 is the same shape. Both are in doc
 04's delegation table, so doc 04's promise covers them and doc 02 does not keep it. They are
 pre-existing rather than introduced here, and the check added in step 1 names two files by hand

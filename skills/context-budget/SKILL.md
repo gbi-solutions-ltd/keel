@@ -1,6 +1,6 @@
 ---
 name: context-budget
-description: Use when a session is using too many tokens, when compaction keeps happening, when a session feels slow or forgetful, or when asked to audit context or token cost.
+description: Use when a session is using too many tokens, when compaction keeps happening, when a session feels slow or forgetful, when a handoff is about to be discarded, or when asked to audit context or token cost.
 allowed-tools: [Read, Write, Edit, Bash, Grep, Glob]
 ---
 
@@ -22,7 +22,7 @@ These load into every request in every session:
 | `CLAUDE.md`, and any imported file | `wc -c`, divided by about 3.6 for tokens |
 | `AGENTS.md`, if present | Same |
 | `SessionStart` hook output | Run the hook, measure what it prints |
-| Skill descriptions | Count skills, times about 44 tokens each. Sum ceiling 1,320 |
+| Skill descriptions | Sum the description characters of every installed skill and divide by about 3.6 |
 
 Report each with a number. "CLAUDE.md is large" is not a finding; "CLAUDE.md is 38,662 bytes,
 roughly 10,000 tokens per request" is, because it can be compared to a budget.
@@ -53,15 +53,15 @@ values is the most costly pattern available, and it looks helpful.
 | Session history, "last time you were" | On disk, read when relevant |
 | Anything changing weekly | Out of the prefix entirely |
 
-What stays: the behavioural rules, the verify commands, and where to find everything else. That is
-roughly 450 tokens, not 10,000.
+What stays: the behavioural rules, the verify commands, and where to find everything else. keel's
+own managed block budgets about 450 tokens for this.
 
 **Judging what is left.** If the `claude-md-management` plugin is installed, use its rubric on the
 trimmed file. Otherwise judge it against the table above and say the rubric was not available.
 
 ## Step 4: Check the skills
 
-Per skill: body word count against the 700 ceiling, description length, and any `@` link, which
+Per skill: body word count against a 700-word target, description length, and any `@` link, which
 force-loads at parse time.
 
 Where a project has a validator, run it. In keel that is `tests/validate-skills.sh`.
@@ -93,8 +93,5 @@ paragraph, whether it is state or knowledge. State goes; knowledge moves first.
 
 | Mistake | Instead |
 |---|---|
-| "The context is bloated" | Give the number, per source, against a budget |
-| Injecting live git state at session start | Nothing volatile in the prefix, ever |
 | Trimming prose to save tokens | Move whole sections out. Trimming saves tens, moving saves thousands |
-| Ignoring skill descriptions | They load every session. 25 skills is about 1,130 tokens |
-| A recommendation with no saving attached | Quantify it, or it will not be actioned |
+| Ignoring skill descriptions | They load every session, one per skill from every installed plugin |

@@ -111,9 +111,8 @@ to be worth stating.
 
 `coding-standards` calling `context7` for "current lint and framework conventions" would contradict
 the skill it was attached to. Step 1 is "Derive, do not impose. The conventions that matter are the
-ones already in use, not the ones you would choose", and the first row of its Common mistakes table
-is "Importing a generic style guide, instead: derive from the code". Calling a documentation service
-for current conventions is importing a generic style guide with a citation attached.
+ones already in use, not the ones you would choose". Calling a documentation service for current
+conventions is importing a generic style guide with a citation attached.
 
 `execute-plan` calling `playwright` for browser verification is unpayable rather than wrong: the
 body sits close to the limit ADR-0001 sets, and the shortest honest conditional would still cost

@@ -71,11 +71,11 @@ Variants of building it:
 
 | Finding | Evidence | What it means for the idea |
 |---|---|---|
-| The snapshot already bans doing the audit | `skills/repo-snapshot/references/section-templates.md:164`, section 8 | The idea reverses a decision that was taken deliberately. Reversing it is allowed, but it needs a reason better than convenience |
+| The snapshot already bans doing the audit | `skills/repo-snapshot/references/section-templates.md:162`, section 8 | The idea reverses a decision that was taken deliberately. Reversing it is allowed, but it needs a reason better than convenience |
 | Security posture is already a named category in the debt section | Same file, section 8's grouping | The snapshot already records what it noticed. It just refuses to go looking |
 | Section 10 already names the fixing skill per item | Same file, section 10, "Fix: `write-docs`", "Fix: `tdd`" | The handoff shape exists. What is missing is a requirement to use it for these two |
 | `security-audit --full` is scoped for exactly this moment | `skills/security-audit/SKILL.md:21`, "New engagement, monthly, or after an incident" | The capability is not missing. The referral is |
-| Agent C already reads auth, authorisation and webhook signature checks | `skills/repo-snapshot/SKILL.md:55` | A shallow security read is already happening, which is the dangerous middle: enough to look covered, not enough to be |
+| Agent C already reads auth, authorisation and webhook signature checks | `skills/repo-snapshot/SKILL.md:56` | A shallow security read is already happening, which is the dangerous middle: enough to look covered, not enough to be |
 | No room in the body | `repo-snapshot` 698 words, `coding-standards` 683, `security-audit` 593, against ADR-0001's 700 | Anything added to the snapshot body must displace something. References are unbudgeted |
 | Nothing in keel compares two runs of anything over time | No skill takes a prior artifact as a baseline | The "run it again to see if we improved" half is genuinely new, and it is the more interesting half |
 

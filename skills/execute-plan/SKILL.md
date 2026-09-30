@@ -1,6 +1,6 @@
 ---
 name: execute-plan
-description: Use when an implementation plan exists and the user wants it built, or says to start building, execute the plan, or go ahead.
+description: Use when an implementation plan exists and the user wants it built: says to start building, execute the plan, or go ahead.
 allowed-tools: [Read, Write, Edit, Bash, Grep, Glob, Agent, AskUserQuestion]
 ---
 
@@ -24,8 +24,8 @@ common, so read [references/preconditions.md](references/preconditions.md) befor
 |---|---|
 | An ADR the plan depends on is `proposed` | Nobody has agreed it |
 | The plan has open questions that block its own tasks | The plan says it is not ready |
-| The PRD is a draft and the stories are provisional | The work may be cancelled |
-| You are on the default branch | Never implement on `main` without consent |
+| The PRD is a draft, or the stories are provisional | The work may be cancelled |
+| You are on the default branch | Never implement on the default branch without consent |
 | A command the plan uses **to verify** cannot produce a verdict | It cannot be verified as written |
 
 These are not obstacles to route around. A plan that says it is blocked is doing its job.
@@ -50,8 +50,9 @@ run that no review pass sees, because the diff both reviewers are given is the s
 
 Inline is still right for a plan of one or two tasks, or when the user asks to watch. Five tasks is
 not short; that is the size this skill exists for. Take it by **naming it and why in one line**, not
-by drifting into it. Steps 4 to 6 below are written for whoever holds the
-keyboard: in inline mode that is you, in delegated mode it is never you.
+by drifting into it. Step 4's execution is written for whoever holds the keyboard: in inline mode
+that is you, in delegated mode the implementer. Ticking, stopping (step 5) and reporting (step 6)
+are yours in both modes.
 
 In delegated mode, dispatch the task **verbatim** plus the plan's whole Global constraints block. A
 summary is where "never start on the default branch" quietly disappears. Then review in two passes:
@@ -61,15 +62,17 @@ The three prompts, one implementer and two reviewers, are in
 [references/subagent-prompts.md](references/subagent-prompts.md). Read it before the first dispatch.
 
 **Tasks the plan declares as a concurrent batch may be dispatched together**, each in its own
-worktree. A batch is eligible only where the plan says so and its tasks meet the template's
-conditions; everything else is one task at a time, and never the next while the previous is
-unreviewed. [references/parallel-batches.md](references/parallel-batches.md) has the rules and what
-breaks without them.
+worktree. A batch is eligible only where the plan says so and its tasks meet the conditions in
+[references/parallel-batches.md](references/parallel-batches.md); everything else is one task at a
+time, and never the next while the previous is unreviewed.
+[references/parallel-batches.md](references/parallel-batches.md) has the rules and what breaks
+without them.
 
 ## Step 4: Execute, one task at a time
 
-For each task: mark it in progress, follow its steps exactly, run its `Done when:` command, then
-hand over as the task specifies.
+For each task: follow its steps exactly, run its `Done when:` command, then
+hand over as the task specifies. Resume with `keel plan status`; tick with `keel plan tick`, or by
+hand where `keel` cannot run or reports the plan unaddressable.
 
 **REQUIRED SUB-SKILL:** `keel:tdd`. The plan's steps assume it.
 
@@ -84,8 +87,10 @@ Stop immediately, and ask, when: a verification fails in a way you cannot explai
 ambiguous, a dependency is missing, a `verify` command does not run, or the same failure
 recurs twice.
 
-**REQUIRED SUB-SKILL:** `keel:debug` for any failure. Do not adjust the plan to make a
-failing step pass; that is fixing the thermometer.
+**REQUIRED SUB-SKILL:** `keel:debug` for any failure this task caused, through Phase 3; a red
+`keel:tdd`'s start record already lists is recorded beside the task, not debugged. In delegated mode
+debug's Phase 4 goes back to an implementer as a re-dispatch carrying the explanation, never your
+edit. Do not adjust the plan to make a failing step pass; that is fixing the thermometer.
 
 Stopping costs a question. Guessing costs a day and someone's trust.
 
@@ -94,17 +99,13 @@ Stopping costs a question. Guessing costs a day and someone's trust.
 Say which tasks completed, which were skipped and why, what deviated from the plan and why, and
 what remains. Then name `review-code` and `ship`. Do not start them.
 
-If you deviated from the plan, say so explicitly and update the plan file to match reality.
+If you deviated from the plan, say so explicitly and, once the user has agreed the deviation, update
+the plan file to match.
 
 ## Common mistakes
 
 | Mistake | Instead |
 |---|---|
-| Starting on a plan blocked by a `proposed` ADR | Step 1. Say what blocks it and stop |
-| Reading task 1 and starting | Read all of them first |
-| Editing the plan so a failing step passes | Fix the code, or stop and ask |
 | Leaving checkboxes unticked | The plan is the progress record |
 | Deviating quietly because your way is better | Raise it. Then update the plan if agreed |
-| Continuing past an unexplained failure | Stop. Use `debug` |
 | Making the small fix yourself instead of re-dispatching | Re-dispatch. Your edit is the one nobody reviews |
-| Overlapping tasks the plan did not declare a batch | Disjoint files are not enough. Read the batch rules |

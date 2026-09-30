@@ -166,7 +166,7 @@ as alternatives A, B and C rather than leaving them unexamined, and because this
 that returns.
 
 **Property-based testing. Rejected for now.** Its only mention anywhere is one Kotest aside at
-`skills/keel/references/tool-choices.md:37`. No arm has produced a case where examples demonstrably
+`skills/keel/references/tool-choices.md:38`. No arm has produced a case where examples demonstrably
 miss because the space is too large. The `done-without-verifying` finding looks like a property
 argument and is not: the arm's own remedy was a mutant plus one more example with two different
 currencies, which is an example, not a property. Per `CONTRIBUTING.md`, content comes from observed
@@ -187,7 +187,7 @@ failures. What would earn it: an arm whose own words say it cannot enumerate the
    put the escape in the skill first, with task 8 gating task 7, is the third of the ADR's five
    reasons. The rationalisation row still cannot be written, and reviving tiering inherits this
    question unpaid.
-2. **`skills/debug/SKILL.md:68`** says "the suite passes" and names no command, so it leans on the
+2. **`skills/debug/SKILL.md:69`** says "the suite passes" and names no command, so it leans on the
    tdd cycle having run it. Change 1 must give debug its own instruction or the signal is lost
    rather than relocated.
    **Closed 2026-09-07 by task 3.** That line now reads "Run `profile.verify.test` yourself".

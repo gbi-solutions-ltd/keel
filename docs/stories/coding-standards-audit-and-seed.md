@@ -466,7 +466,7 @@ Scenario: no mechanism is added
 
 **As a** keel maintainer
 **I want** the assumption in the PRD's section 12 held as a check rather than a hope
-**So that** the modes stay outside the open question at `standards-that-bind.md:624`
+**So that** the modes stay outside the open question at `standards-that-bind.md#rule not bind?`
 
 **Acceptance criteria**
 

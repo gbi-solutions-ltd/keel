@@ -22,19 +22,19 @@ Read `INDEX.md`, `manifest.json`, and `xref.tsv`. **Read no page files yourself.
 application is tens of megabytes of SQL, and reading it inline puts it in context for the rest of
 the session. That is what the subagents are for.
 
-Confirm the target stack before dispatching. If the profile does not name one, ask once: the data
-model brief and the screens brief both change with the answer.
+Ask for the target stack once, unless the user already named it: the data model brief and the
+screens brief both change with the answer.
 
 ## Step 2: Delegate the reading
 
-Dispatch these subagents **in one message** so they run concurrently, delegation profile `keel-fanout`,
-leading its description. Each is told: cite
-`path:line` from the export for every claim, mark anything absent as `Unknown` rather than
-inferring it, and never estimate hours.
+Dispatch these subagents **in one message** so they run concurrently,
+delegation profile `keel-fanout`, with each dispatch's description starting `keel-fanout: `. Each is
+told: cite `path:line` from the export for every claim, mark anything absent as `Unknown` rather
+than inferring it, and never estimate hours.
 
 | Agent | Brief |
 |---|---|
-| A. Data | Read `db/tables/` and `xref.tsv`. Produce the entity list, keys, foreign keys, and which tables are written by the application rather than only read. Flag tables in `xref.tsv` with no file under `db/tables/`: those are objects the export could not see, and each is unscoped work |
+| A. Data | Read `db/tables/` and `xref.tsv`. Produce the entity list, keys, foreign keys, and which tables are written by the application rather than only read. Flag every name in `xref.tsv` with no file under `db/tables/` or `db/plsql/`: those are objects the export could not see, and each is unscoped work |
 | B. Logic | Read `db/plsql/`. For each package: what it does, which pages call it, and whether it is a candidate to keep behind an API or must be rewritten. Name any package that does DML across several tables in one call, because that is a transaction boundary the new stack has to reproduce |
 | C. Screens | Read every `pages/*/page.md`. Produce a route map: page id, purpose, its regions, and the proposed route. Group pages that are one flow. Name every page whose only purpose is navigation, since those usually disappear |
 | D. Auth | Read `shared/authorization/`, `shared/authentication/`, and the Authorization column of the page inventory. State the authentication mechanism, every distinct authorization scheme, and which pages use each. Flag any page with no authorization scheme and no page access protection |
@@ -63,8 +63,8 @@ Write `<docs_root>/apex/APP-<id>/PORT-ASSESSMENT.md` using
 [references/assessment-template.md](references/assessment-template.md).
 
 The mapping from each APEX mechanic to its replacement, and the four that have no replacement, are
-in [references/apex-to-web-mapping.md](references/apex-to-web-mapping.md). Read it before writing
-Step 4, not before Step 2.
+in [references/apex-to-web-mapping.md](references/apex-to-web-mapping.md). Read it now, after the
+agents have reported, and not before Step 2.
 
 ## Step 5: Route onwards
 

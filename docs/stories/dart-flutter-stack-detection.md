@@ -217,9 +217,9 @@ Scenario: the settings file gains no unresolvable id
 ```
 
 **Notes:** `verify` and not `build`, because `lang_lsp` already returns empty for an unmapped language
-and `detect_plugins` already drops it (`lib/detect-stack.sh:758-785`). The work is the test proving
-Dart takes that path, not a new branch. If the test fails, this becomes a `fix`. `CON-03` is why
-there is nothing to add.
+and `detect_plugins` already drops it (`lib/detect-stack.sh#lang_lsp() {` and
+`lib/detect-stack.sh#detect_plugins() {`). The work is the test proving Dart takes that path, not a
+new branch. If the test fails, this becomes a `fix`. `CON-03` is why there is nothing to add.
 
 ### S-10 No existing stack's profile changes
 
@@ -449,7 +449,7 @@ Scenario: no existing framework's answer changes
 ```
 
 **Notes:** `fix` and not `build`, which is unusual in a `from-idea` PRD. The current code returns
-`false` for a Flutter application because `lib/detect-stack.sh:700-706` keys on
+`false` for a Flutter application because `lib/detect-stack.sh#case "$fw" in next` keys on
 `next react vue svelte angular apex` and then falls back to `public/` or `index.html`, and a Flutter
 app has none of them. **This is the only field that is currently wrong rather than merely empty**, so
 it is the only story here correcting a behaviour instead of adding one.
@@ -487,10 +487,10 @@ Scenario: no other language's datastores change
   Then each reports exactly what it reported before
 ```
 
-**Notes:** `detect_datastores` (`lib/detect-stack.sh:721-753`) already carries a `sqlite` pair; what
-it lacks is `pubspec.yaml` in the list of manifest files it greps. This is **the only story that
-edits a function shared by every language**, which is why the third scenario exists and why `S-10`
-depends on it. `sqflite` appears in 13 of the 15 repositories in the fleet.
+**Notes:** `detect_datastores` (`lib/detect-stack.sh#detect_datastores() {`) already carries a
+`sqlite` pair; what it lacks is `pubspec.yaml` in the list of manifest files it greps. This is **the
+only story that edits a function shared by every language**, which is why the third scenario exists
+and why `S-10` depends on it. `sqflite` appears in 13 of the 15 repositories in the fleet.
 
 ---
 

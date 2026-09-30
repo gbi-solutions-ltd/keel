@@ -119,8 +119,8 @@ document, which is the only place most of them can be checked.
 - Produces: the file `skills/coding-standards/references/assessment-report.md`. Task 2 links to it
   from `skills/coding-standards/SKILL.md` as a relative markdown link whose text and target are both
   the string `references/assessment-report.md`; the exact link is written out in task 2 step 3.
-  `tests/validate-skills.sh:148-153` fails if that path does not resolve, so the filename is fixed
-  here and must not be changed later.
+  `tests/validate-skills.sh#report "$name: broken link to $target"` fails if that path does not
+  resolve, so the filename is fixed here and must not be changed later.
 - Consumes: nothing.
 
 **Depends on:** none
@@ -1160,7 +1160,7 @@ below are left as written, because a prediction table that quietly agrees with t
 is not a prediction.
 
 **Check 1, house-defaults coverage. Three of the ten references apply.** Derived row by row against
-`skills/coding-standards/references/house-defaults.md:18-27`:
+`skills/coding-standards/references/house-defaults.md:17-26`:
 
 | Reference | Applies | Because |
 |---|---|---|

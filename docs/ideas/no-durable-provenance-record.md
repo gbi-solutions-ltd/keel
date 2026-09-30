@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-09-19, "plan the work that makes keel enforceable outside the agent" |
-| Status | shaped |
+| Status | built via docs/plans/2026-09-19-make-keel-enforceable-outside-the-agent.md. Status corrected 2026-09-25 by docs/snapshot.md |
 | Recommendation | A `Keel-Version` commit trailer, added mechanically via a hook under `keel guard install`. Drop the model trailer |
-| Next | `write-plan`, as one increment of the outside-the-agent plan |
+| Next | Nothing |
 
 ## The problem
 

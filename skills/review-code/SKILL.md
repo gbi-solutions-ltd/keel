@@ -18,6 +18,9 @@ findings block.
 Read the diff, and read the plan or story it claims to implement. A review without the intent is
 proofreading.
 
+No plan or story? Ask the author what the change is for, or state the intent you inferred and review
+against that.
+
 `git diff <base>...HEAD`, plus `<docs_root>/standards.md` for the conventions and the plan for the
 contract.
 
@@ -46,11 +49,12 @@ reviewer cannot run:
    scope. Anything a task asked for and is absent is an incomplete claim.
 2. **Does every changed line trace to the request?** Adjacent improvements, reformatting, and
    drive-by refactoring belong in their own change. This is the surgical-changes test.
-3. **Were the tests written first?** A test committed after its implementation, in the same
-   commit or a later one, passed on its first run and proves nothing. Check the commit order.
-4. **Does it contradict an accepted decision?** Check wherever this project records them: an ADR
-   directory, or a decision log. Not every project uses ADRs, and an empty `decisions/` means
-   look elsewhere before concluding there are none.
+3. **Were the tests written first?** A test committed after its implementation never ran red, so it
+   is unproven until item 5's revert check. Commit order shows this across commits; within one
+   commit, only the revert check can.
+4. **Does it contradict an accepted decision?** Check `artifacts.decisions` in `.keel/profile.json`,
+   else `<docs_root>/decisions/`, else a decision log. Not every project uses ADRs, and an empty
+   directory means look elsewhere before concluding there are none.
 5. **Has any test in the diff been proved able to fail?** A case nobody watched go red is
    unproven. Revert the line it covers, run it, restore it. A suite that cannot fail is a finding.
 
@@ -79,10 +83,7 @@ Then name `security-audit` and `ship` as next. Do not start them.
 
 | Mistake | Instead |
 |---|---|
-| Reviewing without reading the plan | Intent is what makes a review more than proofreading |
-| Thirty equally weighted findings | Rank. Blocking first, cap around ten |
 | Style comments a formatter should make | Fix the tooling instead, once |
 | "Looks good" with no evidence of reading | Name what you checked, including what was fine |
-| Approving a diff you did not run the tests on | Run `verify.test`. A green claim needs a green run |
 | Rewriting it yourself in the review | Say what is wrong. The author fixes it |
 | Passing a behaviour change with stale docs | Documentation is part of the gate, not a follow-up |

@@ -15,11 +15,9 @@ The structure of `<docs_root>/decisions/ADR-NNNN-<slug>.md`.
    had no alternative, the alternative was "do nothing" and you should say why that lost. State
    each option by its properties, never as an episode: "we tried it and it was slow" cannot be
    re-evaluated when the constraints change, and a number can.
-6. **Never write `accepted` on a human's behalf.** An ADR you generate is `proposed`, and its
-   `Deciders` row names the roles that must decide, not a person who has not spoken. Only a
-   person moves an ADR to `accepted`. Marking your own analysis as an accepted decision
-   manufactures an agreement that never happened, and every downstream skill will treat it as
-   settled.
+6. **Never write `accepted` on a human's behalf.** Marking your own analysis as an accepted
+   decision manufactures an agreement that never happened, and every downstream skill will treat
+   it as settled.
 
 ## Template
 
@@ -30,7 +28,7 @@ The structure of `<docs_root>/decisions/ADR-NNNN-<slug>.md`.
 |---|---|
 | Status | proposed / accepted / superseded by ADR-NNNN / rejected |
 | Date | YYYY-MM-DD |
-| Deciders | who actually decided, by name |
+| Deciders | the roles that must decide; a person's name only once that person has decided |
 | Requirements | FR-12, NFR-04 |
 | Supersedes | ADR-0003, if any |
 

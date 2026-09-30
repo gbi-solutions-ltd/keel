@@ -1,6 +1,6 @@
 ---
 name: write-plan
-description: Use when a design or stories exist and implementation is about to start, or the user asks for an implementation plan, a task breakdown, or how to build something.
+description: Use when a design or stories exist and implementation is about to start, or the user asks for an implementation plan or a task breakdown.
 allowed-tools: [Read, Write, Grep, Glob, Bash, Agent, AskUserQuestion]
 ---
 
@@ -21,7 +21,8 @@ Check `profile.artifacts` for mapped paths first. Otherwise stories at
 if it exists, and `.keel/profile.json` for the verify commands. Read the ADRs the stories point
 at; a plan that contradicts an accepted decision is worse than no plan.
 
-If no stories exist, **REQUIRED SUB-SKILL:** `keel:write-user-stories`.
+If no stories exist, stop and name `keel:write-user-stories` as next; it routes to `write-prd` where
+no PRD exists. A plan cannot be written in the same pass as the requirements it rests on.
 
 On a greenfield project every verify command is `null`. Task 1 creates the toolchain and writes them
 into the profile; the template says how.
@@ -40,9 +41,10 @@ fails.
 List every file to create or modify and what each is responsible for. Decomposition decisions
 get locked in here, and they are much cheaper to change now than inside task 7.
 
-**Where the area to map is larger than you can hold, delegate the reading**: subagents in
-one message, delegation profile `keel-fanout`, leading its description, each citing `path:line`. The predicate is the tree,
-not the mood: more directories than you can list from memory. Under that, read it yourself.
+**Where the area to map is larger than you can hold, delegate the reading**: subagents in one
+message, delegation profile `keel-fanout`, with each dispatch's description starting
+`keel-fanout: `, each citing `path:line`. The predicate is the tree, not the mood: more directories
+than you can list from memory. Under that, read it yourself.
 
 Their findings are leads; the decomposition stays yours. Step 4 forbids naming a function no task
 defines, and second-hand knowledge is how that creeps in.
@@ -53,13 +55,14 @@ follow the established pattern even where you would do it differently.
 ## Step 3: Write the tasks
 
 Follow [references/plan-template.md](references/plan-template.md). Write to
-`<docs_root>/plans/YYYY-MM-DD-<slug>.md`.
+`profile.artifacts.plans` if that is set, otherwise `<docs_root>/plans/`, as `YYYY-MM-DD-<slug>.md`.
 
 A task is the smallest unit that carries its own test cycle and is worth a fresh reviewer's
 gate. Fold setup and configuration into the task whose deliverable needs them. Split only where
 a reviewer could reject one task while approving its neighbour.
 
-**Every task carries a `Done when:` line**: a `profile.verify` command and its passing result.
+**Every task carries a `Done when:` line**: a `profile.verify` command and its passing result, or,
+where a task genuinely has none, a statement that there is no command.
 
 **Every task carries a `Depends on:` line** naming the tasks that must land first, or `none`;
 absent is read as unknown and runs alone. Where tasks depend on nothing outstanding and no two name
@@ -67,8 +70,9 @@ the same file, declare a concurrent batch in the header. The template states the
 conditions a batch must also meet.
 
 Every task follows the same five steps: write the failing test, run it and watch it fail, write
-minimal code, run it and watch it pass, commit. Use the exact commands from
-`profile.verify`, never a guess at what the project uses.
+minimal code, run it and watch it pass, then run the suite at the unit boundary and hand over by
+staging the named paths. Only a task in a declared concurrent batch commits, inside its own
+worktree. Use the exact commands from `profile.verify`, never a guess at what the project uses.
 
 ## Step 4: No placeholders
 
@@ -77,7 +81,7 @@ These are plan failures, not shortcuts. Never write them:
 - "TBD", "implement later", "fill in details"
 - "Add appropriate error handling", "handle edge cases", "add validation"
 - "Write tests for the above" without the test code
-- "Similar to Task 3" instead of repeating the code
+- "Similar to Task 3" instead of repeating the code. Tasks are read out of order
 - A type, function, or method that no task defines
 
 Each one moves a decision from you to someone with less context. That is the opposite of
@@ -90,8 +94,8 @@ mechanical, and a dispatch is slower and no more reliable.
 
 **Then dispatch a reviewer.** Those checks compare the plan to itself; none opens the codebase, so a
 plan can pass every one and still be unbuildable. Brief in
-[references/plan-review.md](references/plan-review.md), model `inherit`, leading its description. Fix what
-it returns, or record why not.
+[references/plan-review.md](references/plan-review.md), model `inherit`, with the dispatch's
+description starting `inherit: `. Fix what it returns, or record why not.
 
 ## Step 6: Hand off
 

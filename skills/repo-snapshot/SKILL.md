@@ -26,7 +26,7 @@ Run `git log -1 --format=%H`, `git log --oneline -20`, `git ls-files | wc -l`,
 `git branch -a -v`. Read the root listing and any README.
 
 **Compare the default branch against HEAD.** If they differ, record both and establish which
-deploys. A default branch that is not the code you read is itself a finding.
+deploys. A default branch that is not the code you read is itself a finding. They diverge often.
 
 Then find what agents must not read; one 500KB generated file eats a budget:
 
@@ -46,7 +46,8 @@ re-deriving what someone already wrote.
 **Delegate even though it costs more.** Files read inline sit in context all session; a subagent's are
 discarded.
 
-Dispatch these subagents concurrently **in one message**, delegation profile `keel-fanout`, leading its description:
+Dispatch these subagents concurrently **in one message**, delegation profile `keel-fanout`, with
+each dispatch's description starting `keel-fanout: `:
 
 | Agent | Brief |
 |---|---|
@@ -66,23 +67,24 @@ Append to every brief verbatim, filling in the Step 1 exclusions:
 > it from naming. Flag anything that contradicts the README.
 
 Where `<docs_root>/standards.md` exists, **REQUIRED SUB-SKILL:** `keel:coding-standards` in
-assess mode once the agents return, whoever wrote the document; its report's findings go to
-section 8 and its remedies to section 10. Where it does not exist, section 8 says so as a gap and
-section 10 names `coding-standards`.
+assess mode once the agents return, whoever wrote the document; its report's findings go to section
+8 and its remedies to section 10, cited to that report; they count as verified by it. Where it does
+not exist, section 8 says so as a gap and section 10 names `coding-standards`.
 
 ## Step 3: Verify what will drive action
 
-**Subagent findings are leads, not facts.** Before writing, verify anything reaching section 10 or
-carrying a number. Cap at six: where being wrong changes what somebody does.
+**Subagent findings are leads, not facts.** Before writing, verify everything reaching section 10,
+and every number. Where that is more than you can do, verify the claims where being wrong changes
+what somebody does, and move the rest to section 8 as `unverified`.
 
 | Claim | How to verify |
 |---|---|
-| Any number | Run the command. Never report a figure from a committed report or an agent's count |
+| Any number | Run the command. Never report a figure from a committed report or an agent's count: stale reports are confidently wrong by an order of magnitude |
 | Security or delivery | Read the cited lines yourself |
 | Setup steps | Execute them |
 
-**Check each command ran.** An errored tool and one that found nothing both exit
-non-zero. Read the output, not the code.
+**Check each command ran.** An errored tool and one that found nothing both exit non-zero. Read the
+output, not the exit code.
 
 **A claim you could not verify does not reach section 10.** It goes in section 8, marked
 `unverified`.
@@ -106,6 +108,4 @@ Name section 10's highest-value actions with their skills, and what you did not 
 
 | Mistake | Instead |
 |---|---|
-| Reporting a number an agent read off a committed report | Run it. Stale reports are confidently wrong by an order of magnitude |
-| Snapshotting HEAD without checking the default branch | Compare them in Step 1. They diverge often |
 | Fixing what you find | This skill reports. Fixes belong to the skill for that problem |

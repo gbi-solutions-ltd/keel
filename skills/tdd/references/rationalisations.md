@@ -1,7 +1,7 @@
 # Rationalisations
 
-The rest of the excuses for skipping the cycle, with the answer each one gets. No arm has
-produced any of these; they are kept because they complete the list.
+The rest of the excuses for skipping the cycle, with the answer each one gets. They are kept because
+they complete the list, though keel's evals have not yet seen a run offer any of them.
 
 | Excuse | Reality |
 |---|---|

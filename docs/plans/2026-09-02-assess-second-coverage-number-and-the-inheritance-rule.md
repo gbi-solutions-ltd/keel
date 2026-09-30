@@ -200,7 +200,7 @@ failure.
   "house" and "defaults", which step 1's line oriented regex cannot match, so it reflowed the line
   and changed no words. The plan text is corrected above. A quality review then found three more
   sites, corrected by a second dispatch: a fifth "four checks" claim inside the copied block at
-  `assessment-report.md:260`, a live one at `docs/02-skill-catalog.md:309`, and `1b.` not being a
+  `assessment-report.md:260`, a live one at `docs/02-skill-catalog.md:311`, and `1b.` not being a
   valid CommonMark marker, now a sub-item)
 
 In `skills/coding-standards/references/assessment-report.md`, add a section immediately after

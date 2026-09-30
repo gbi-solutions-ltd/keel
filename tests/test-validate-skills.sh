@@ -334,17 +334,45 @@ run "an external link is not treated as a path" 0 m_link_external
 # never going to have.
 m_plan_template_no_marker() {
     mkdir -p "$1/skills/write-plan/references"
-    printf '# Plan template\n\n**Interfaces:**\n\n- [ ] **Step 1**\n' \
+    printf '# Plan template\n\n**Interfaces:**\n\n- [ ] **Step 1.1: Write the failing test**\n' \
       > "$1/skills/write-plan/references/plan-template.md"
 }
 run "a plan template with no Done when marker is rejected" 1 m_plan_template_no_marker
 
 m_plan_template_marker() {
     mkdir -p "$1/skills/write-plan/references"
-    printf '# Plan template\n\n**Done when:** `npm test` passes.\n\n- [ ] **Step 1**\n' \
+    printf '# Plan template\n\n**Done when:** `npm test` passes.\n\n- [ ] **Step 1.1: Write the failing test**\n' \
       > "$1/skills/write-plan/references/plan-template.md"
 }
 run "a plan template carrying the marker passes" 0 m_plan_template_marker
+
+# The plan template's step ids. keel plan status and keel plan tick find a step by the id in its
+# bold title and read a plan without ids as unaddressable, so a template trimmed of them writes
+# plans neither command can read.
+m_plan_template_no_ids() {
+    mkdir -p "$1/skills/write-plan/references"
+    printf '# Plan template\n\n**Done when:** `npm test` passes.\n\n- [ ] **Step 1: Write the failing test**\n' \
+      > "$1/skills/write-plan/references/plan-template.md"
+}
+run "a plan template whose steps carry no id is rejected" 1 m_plan_template_no_ids
+
+# One step left in the old form is refused too: a plan copied from the template would hold both.
+m_plan_template_mixed_ids() {
+    mkdir -p "$1/skills/write-plan/references"
+    printf '# Plan template\n\n**Done when:** `npm test` passes.\n\n- [ ] **Step 3.1: Write the failing test**\n\n   - [ ] **Step 5: Commit**\n' \
+      > "$1/skills/write-plan/references/plan-template.md"
+}
+run "a plan template with one step missing its id is rejected" 1 m_plan_template_mixed_ids
+
+# A template with no step at all is refused too. Only the "no step carrying an id" check sees it,
+# since there is no old-form step for the other check to find, so this case is what fails if that
+# check is deleted.
+m_plan_template_no_steps() {
+    mkdir -p "$1/skills/write-plan/references"
+    printf '# Plan template\n\n**Done when:** `npm test` passes.\n' \
+      > "$1/skills/write-plan/references/plan-template.md"
+}
+run "a plan template with no step at all is rejected" 1 m_plan_template_no_steps
 
 # A dispatch that names no model at all inherits whatever the driver is paying for, silently, and
 # the output looks like output either way. That is why the rule exists. What it accepts changed on
@@ -1082,7 +1110,7 @@ check_reports "advisory: naming a file that is not markdown is reported" yes \
 
 # THE FLOOR. A schema with no properties yields no keys, so the rule checks nothing and would pass
 # everything. Copied from the tool-table floor at `tests/validate-skills.sh#rule rather than break it. Found in review, before it happened.`, pinned at
-# tests/test-validate-skills.sh:425, and deliberately NOT from the delegation floor at
+# `tests/test-validate-skills.sh#a tool rule that reads no languages is rejected`, and deliberately NOT from the delegation floor at
 # `tests/validate-skills.sh#Ten pairs on 2026-09-02`, which is pinned in neither direction.
 m_readby_no_keys() {
     local root="$1"

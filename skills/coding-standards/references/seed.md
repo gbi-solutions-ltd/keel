@@ -34,15 +34,15 @@ exclusion that nothing decided is a finding seed invented.
 
 **Only the topic references whose index predicate holds.** The index gives every reference its own
 condition, and evaluating each condition against this project is the work. Fold in the ones that
-hold, and record in the document which did not and what decided it. Record a reference no decider
-settled as undecided instead: this record has three states, and no reference leaves it without one.
-Folding in all of them is the failure the index exists to prevent, and it is invisible in the output
-unless the document says what it left out.
+hold, and record in the document which did not and what decided it. This record has three states,
+and no reference leaves it without one. Folding in all of them is the failure the index exists to
+prevent, and it is invisible in the output unless the document says what it left out.
 
 **The document states its provenance in its own header:** that it was seeded from the house defaults
 and not derived from code, and that it becomes a derived standard only once there is code and
-somebody runs audit or author against it. Without that sentence an inherited default reads later as
-an observed convention, which is worse than having written nothing.
+somebody asks for audit or author: both derive from that code, and author, which audit offers at its
+end, replaces this document. Without that sentence an inherited default reads later as an observed
+convention, which is worse than having written nothing.
 
 ### Where the template asks for something there is no code to give
 
@@ -61,8 +61,8 @@ reader expects a commit is a question; an invented commit is a lie the reader ha
   there is no code to take one from. Rule and reason are still required and are both available from
   the house defaults. **Do not write an example from another project, from the house reference's own
   illustration, or from an imagined file in this one.** An invented example is the failure the
-  template's own closing line names, and it is worse here than elsewhere, because a reader who finds
-  one assumes the rest was observed too.
+  template's per-entry section closes on, and it is worse here than elsewhere, because a reader who
+  finds one assumes the rest was observed too.
 
 The departures ledger is written with its heading and no entries. A project that disagrees with a
 house default records the departure there, with a reason, and that is the only mechanism there is.

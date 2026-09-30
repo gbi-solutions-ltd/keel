@@ -68,9 +68,4 @@ you noticed but did not touch.
 
 | Mistake | Instead |
 |---|---|
-| Refactoring untested code | Write tests first, and stop there |
-| Editing a test to make the refactor pass | That is a behaviour change. Say so |
-| Fixing the neighbours too | Stay in the boundary. Note the rest |
 | Reformatting in the same diff | Separate commit, or let the formatter own it |
-| One large commit | One per step, each green |
-| "Cleaner" with no stated cost | Name the concrete cost, or leave it |

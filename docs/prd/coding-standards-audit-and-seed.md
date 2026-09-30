@@ -70,7 +70,8 @@ library is missing. All three within the existing word ceiling, with no gate wea
 
 **Non-goals.** Changing what author or assess do. Changing the house defaults themselves. Making the
 skill enforce anything at the point of work: that is the open question at
-`docs/ideas/standards-that-bind.md:624` and section 12 explains why this PRD does not touch it.
+`docs/ideas/standards-that-bind.md#Why does a loaded rule not bind?` and section 12 explains why
+this PRD does not touch it.
 
 ## 4. Users and personas
 
@@ -320,12 +321,13 @@ plugin, which `docs/ideas/plugin-delegation-eval-gap.md` records as deliberately
 ## 12. Assumptions
 
 **Both new modes route around the open question rather than answering it.**
-`docs/ideas/standards-that-bind.md:624` leaves "Why does a loaded rule not bind?" open and calls it
-keel's precondition for any wording change. Both modes create a document and neither adds a
-reminder, a gate or a read at the point of use, so neither touches the precondition and neither is
-blocked by it. **That holds only while they stay document-producing.** FR-21 makes it a requirement
-rather than an accident, and the moment either mode gains a rule intended to change behaviour at the
-point of work, it inherits the blocker and this assumption fails.
+`docs/ideas/standards-that-bind.md#Why does a loaded rule not bind?` leaves "Why does a loaded rule
+not bind?" open and calls it keel's precondition for any wording change. Both modes create a
+document and neither adds a reminder, a gate or a read at the point of use, so neither touches the
+precondition and neither is blocked by it. **That holds only while they stay document-producing.**
+FR-21 makes it a requirement rather than an accident, and the moment either mode gains a rule
+intended to change behaviour at the point of work, it inherits the blocker and this assumption
+fails.
 
 ## 13. Open questions
 

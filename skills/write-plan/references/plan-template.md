@@ -13,9 +13,11 @@ that has loaded nothing else.
 # <Feature> Implementation Plan
 
 > **For agentic workers:** use `keel:execute-plan` to implement this task by task.
-> Steps use `- [ ]` checkboxes; tick them as you go, on output you read.
+> Steps are checkboxes with ids, `**Step <task>.<step>: ...**`. Find your place with
+> `keel plan status <this file>` and tick with `keel plan tick <this file> <id>`, on output you
+> read; where `keel` cannot run, tick by hand.
 > A box for a step you did not perform yourself is ticked only with a note naming what you did
-> and did not witness, or left unticked and reported.
+> and did not witness (`--note <text>`), or left unticked and reported.
 > **REQUIRED SUB-SKILL:** `keel:tdd` for every task.
 
 **Goal:** one sentence.
@@ -28,7 +30,8 @@ that has loaded nothing else.
 Copied verbatim from the stories, ADRs, the standards document, and profile. Every task inherits
 these.
 
-- Verify commands: test `npm test`, one test `npm test -- {path}`, lint `npm run lint`
+- Verify commands: test `./gradlew test`, one test `./gradlew test --tests '{name}'`, lint
+  `./gradlew check`
 - Never start on `main`
 - ADR-0003 requires that a missing or empty credential fails startup
 - `<docs_root>/standards.md` requires a named exception type, never a bare catch
@@ -57,7 +60,7 @@ only its own section must still obey them.
 
 **Done when:** `./gradlew test --tests '*SecurityPropertiesTest'` passes.
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 3.1: Write the failing test**
 
 ```java
 @Test
@@ -67,24 +70,24 @@ void emptyApiKeysFailsStartup() {
 }
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [ ] **Step 3.2: Run it and watch it fail**
 
 Run: `./gradlew test --tests '*SecurityPropertiesTest'`
 Expected: FAIL, "expected an exception but none was thrown"
 
-- [ ] **Step 3: Write the minimal implementation**
+- [ ] **Step 3.3: Write the minimal implementation**
 
 ```java
 @NotEmpty(message = "apiKeys must not be empty")
 private List<String> apiKeys;
 ```
 
-- [ ] **Step 4: Run it and watch it pass**
+- [ ] **Step 3.4: Run it and watch it pass**
 
 Run: `./gradlew test --tests '*SecurityPropertiesTest'`
 Expected: PASS. The suite runs at the unit boundary, not per step.
 
-- [ ] **Step 5: Run the suite at the unit boundary, then hand over**
+- [ ] **Step 3.5: Run the suite at the unit boundary, then hand over**
 
 Run: `./gradlew test`
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
@@ -111,31 +114,30 @@ first and review can then only be acted on by rewriting history, which is not a 
 Three things follow, and each closes a hole that was recorded before it was fixed:
 
 - **The reviewer gets a diff that exists.** `git diff` in the working tree is exactly this task's
-  change. `parallel-batches.md` already records the other outcome, that a plain diff shows "nothing
-  at all once each agent has committed, and an empty diff produces a confident COMPLIES over
-  nothing".
+  change. [parallel-batches.md](../../execute-plan/references/parallel-batches.md) already records
+  the other outcome, that a plain diff shows "nothing at all once each agent has committed, and an
+  empty diff produces a confident COMPLIES over nothing".
 - **A DEVIATES verdict costs nothing to act on.** The re-dispatch goes to a fresh subagent, and
   discarding an uncommitted working tree returns the tree to precisely the state the first subagent
   started from. With a commit already in, "fresh" is not true of the tree it arrives at.
 - **Staging names the task's paths.** `git status --porcelain` in the report is how the coordinator
   sees a file the task never mentioned before it is committed rather than afterwards.
 
-**The one exception is a declared concurrent batch**, where each task runs in its own worktree and
-does commit there, because the worktree is private and the join reads
-`git diff <the commit the batch started from>..HEAD` from it. Nothing enters the shared tree until
-the coordinator merges that worktree back, after review, so the guarantee holds in both modes.
+**The one exception is a declared concurrent batch**, whose tasks commit inside their own worktrees
+(rule 2 under "Tasks that run concurrently"). Nothing enters the shared tree until the coordinator
+merges each worktree back, after review, so the guarantee holds in both modes.
 
 ### Named paths only, in every task
 
 **Never `git add -A`, `git add .` or `git commit -a`, in any task, batch or not.** The hand-over step
 lists every path by name and stages those.
 
-This used to be stated only for tasks in a concurrent batch, where the harm is a sibling's
-half-written files being swept up. **Outside a batch the same rule is needed for a different reason:
-a working tree that was already dirty when the run started.** Whatever was sitting there uncommitted,
-someone's debugging edit, a half-finished experiment, gets swept into the first task's commit and
-attributed to work that never touched it. A batch is not what makes `git add -A` dangerous; a
-non-empty `git status` is, and that can be true on task 1 of a serial plan.
+This used to be stated only for tasks in a concurrent batch, where, in one shared tree, the harm is
+a sibling's half-written files being swept up. **Outside a batch the same rule is needed for a
+different reason: a working tree that was already dirty when the run started.** Whatever was sitting
+there uncommitted, someone's debugging edit, a half-finished experiment, gets swept into the first
+task's commit and attributed to work that never touched it. A batch is not what makes `git add -A`
+dangerous; a non-empty `git status` is, and that can be true on task 1 of a serial plan.
 
 ### Why the Interfaces block exists
 
@@ -148,8 +150,8 @@ Omit the block only when a task genuinely touches nothing shared.
 ### Why the Depends on line exists
 
 It is what lets `execute-plan` run tasks concurrently, and it is required on every task. Write
-`none` where a task depends on nothing; an absent line is not the same as `none` and is read as
-the second case below.
+`none` where a task depends on nothing; an absent line is not the same as `none`: it is read as
+unknown, and the task runs alone.
 
 The line is not redundant with `Consumes`. A run asked to execute a five-task plan as fast as it
 reasonably could worked out for itself that three leaf tasks had disjoint `Files` and no
@@ -179,21 +181,22 @@ Task 5 requires task 4.
 apply to every task in a concurrent batch, and each exists because the same baseline run predicted
 the failure in concrete terms:
 
-1. **Scope the `Done when:` to the task's own test.** `**Done when:** node --test test/format.test.js
-   passes.` and nothing about the full suite. The suite gate moves to the join, as its own line in
-   the header: `**Batch gate:** after tasks 1 to 3 land, node --test test/ is green.` A whole-suite
-   `Done when:` inside a batch cannot pass, because task 2's step 1 writes a failing test on
-   purpose while task 1 is running: *"even with perfect isolation of source files, three concurrent
-   agents each waiting for a green whole-suite cannot all pass."*
+1. **Scope the `Done when:` to the task's own test.**
+   `**Done when:** node --test test/format.test.js passes.` and nothing about the full suite. The
+   suite gate moves to the join, as its own line in the header:
+   `**Batch gate:** after tasks 1 to 3 land, node --test test/ is green.` A whole-suite `Done when:`
+   inside a batch proves nothing about the batch: each worktree holds only its own task's change, so
+   the suite that means anything is the one at the join, where every sibling's change first meets
+   the others.
 2. **Write the final step as a commit, not a hand-over.** A batched task is the one case that
    commits for itself, because it runs in its own worktree and the join reads
    `git diff <the commit the batch started from>..HEAD` from it. **The difference has to be in the
-   task text**, not added at dispatch time: a coordinator that pastes a hand-over step saying "do not
-   commit" and then appends a rule saying "do commit" has given the implementer two orders, and
-   `subagent-prompts.md` tells it the task wins.
+   task text**, not added at dispatch time: a coordinator that pastes a hand-over step saying "do
+   not commit" and then appends a rule saying "do commit" has given the implementer two orders, and
+   [subagent-prompts.md](../../execute-plan/references/subagent-prompts.md) tells it the task wins.
 
    ```markdown
-   - [ ] **Step 5: Commit**
+   - [ ] **Step 1.5: Commit**
 
    You are in your own worktree, so this task commits rather than handing over.
 
@@ -203,9 +206,8 @@ the failure in concrete terms:
    ```
    ```
 
-   The named-paths rule above still applies and is load bearing here, because `git add -A` in a
-   shared tree sweeps in a sibling's half-written files and produces *"a commit labelled 'format'
-   containing a half-written SMS module"*.
+   The named-paths rule above still applies: a worktree keeps a sibling's files out, but not
+   whatever else is in this one.
 
    **A batched task left with a hand-over step commits nothing, so the join diff is empty**, and an
    empty diff produces a confident COMPLIES over nothing. Observed on 2026-08-20: a real implementer
@@ -215,9 +217,10 @@ the failure in concrete terms:
    config, a CI file, or the profile is not eligible for the batch. Two agents each deciding the
    lint command needs a config file will each write one.
 
-The failure these prevent is not a lost race. It is quieter: with a sibling's failing test in the
-suite, every agent's step 2 sees red for the wrong reason and ticks the box, so *"the TDD gate
-silently stops proving anything"*.
+The failure these prevent is quieter than a lost race, and it is what a batch run in one shared tree
+produces: with a sibling's failing test in the suite, every agent's step 2 sees red for the wrong
+reason and ticks the box, so *"the TDD gate silently stops proving anything"*. A worktree per task
+is what keeps each suite to its own task.
 
 Where any of the three cannot hold, the tasks are sequential. Say so rather than declaring a batch
 and hoping.
@@ -238,8 +241,8 @@ Rules:
 - It is **scoped to the task's own test, never the full suite**, in every plan and not only in a
   concurrent batch. The suite runs once at the unit boundary, which for a sequential task is its
   hand-over step and for a batched one is the `Batch gate:` line at the join. A whole-suite `Done
-  when:` puts the suite back inside the cycle it was moved out of, and in a batch it also cannot
-  pass, for the reason under "Tasks that run concurrently" above.
+  when:` puts the suite back inside the cycle it was moved out of, and in a batch it also proves
+  nothing, for the reason under "Tasks that run concurrently" above.
 - It appears once per task, above the steps, so a fresh agent dispatched only that section still
   receives it.
 
@@ -264,10 +267,27 @@ that matters is *witnessed here* against *believed done*, not *done* against *no
 silent tick leaves the plan asserting that a failing test was watched failing in a session where
 nobody watched anything.
 
-## Task granularity
+### Step ids and states
 
-A task is the smallest unit that carries its own test cycle and is worth a fresh reviewer's
-gate.
+Every step carries an id, `<task>.<step>`, at the start of its bold title:
+`**Step 3.2: Run it and watch it fail**` is task 3's second step, and task 1b's first is `1b.1`.
+Ids are unique within the plan. `keel plan status <plan>` counts each task's steps and names the
+next open one, and `keel plan tick <plan> <id>` changes one step, both by id; a plan without ids
+is reported as unaddressable and is read and ticked by hand.
+
+A step is in one of four states, shown by its box, with anything more on the same line after
+the title:
+
+| Box | State | After the title |
+|---|---|---|
+| `[ ]` | open | nothing |
+| `[x]` | done | ` Note: <text>`, where the step was not witnessed (`--note <text>`) |
+| `[-]` | deferred | ` Deferred: <reason>`, required (`--defer <reason>`) |
+| `[~]` | not applicable | ` Not applicable: <reason>`, required (`--not-applicable <reason>`) |
+
+A step inside a fenced code block is an example, like this template's own, and is never counted.
+
+## Task granularity
 
 **Fold in:** setup, config, scaffolding, and documentation belonging to that deliverable.
 **Split when:** a reviewer could reject one half while approving the other.
@@ -289,13 +309,8 @@ The `verify` row matters most in an existing codebase. Planning a `verify` story
 
 ## No placeholders
 
-Every one of these moves a decision from the planner to someone with less context:
-
-- "TBD", "implement later", "fill in details"
-- "Add appropriate error handling", "handle edge cases", "add validation"
-- "Write tests for the above", without the test
-- "Similar to Task 3", instead of repeating the code. Tasks are read out of order
-- Any type or function no task defines
+Step 4 of the skill lists them. Every one moves a decision from the planner to someone with less
+context.
 
 If you cannot write the code for a step, the plan is not finished. Say what is blocking it and
 put it in an open questions section rather than hiding it behind a phrase.
@@ -317,10 +332,12 @@ exists. Admitting the gap in each task would leave every step 2 and step 4 unrun
 plan that cannot be executed.
 
 So **task 1 creates the toolchain and writes the commands into the profile**, ending with
-`keel profile set verify.test ...` for each and a `keel doctor` that must pass. State the commands
-it will create in the plan's global constraints, so every later task inherits a real command rather
-than a promise. Task 1's own step 2 watches the test command fail because the toolchain is absent,
-which is a real failure and the honest one to watch.
+`keel profile set verify.test ...` for each and a `keel doctor` that must pass. Full doctor also
+runs `verify.security` where one was detected, which needs the network, so a task that must leave
+doctor passing names that dependency. State the commands it will create in the plan's global
+constraints, so every later task inherits a real command rather than a promise. Task 1's own step 2
+watches the test command fail because the toolchain is absent, which is a real failure and the
+honest one to watch.
 
 That task satisfies no story and is infrastructure. Say so in it, rather than inventing a story for
 it to trace to.
@@ -332,7 +349,7 @@ that touches a partner, a decision recorded as a runbook entry. A plan may conta
 **must say so explicitly** rather than inventing a test to fill the shape.
 
 ```markdown
-- [ ] **Step 1: There is no test for this**
+- [ ] **Step 4.1: There is no test for this**
 
 This task is a human check. It cannot be automated because it requires reading configuration
 from environments this repository cannot see.
@@ -354,6 +371,8 @@ is worse than an honest gap because it reads as coverage.
    coordinator will make after both review passes. Only a task in a declared concurrent batch commits
    for itself, and then only inside its own worktree.
 6. No task depends on a file no task creates.
+7. Every step's bold title opens with its id, `Step <task>.<step>:`, and no id repeats:
+   `keel plan status <plan>` exits 0, and no step title is in the old form, `**Step <n>: `.
 
 Fix inline. Then report coverage and hand off.
 
@@ -361,9 +380,5 @@ Fix inline. Then report coverage and hand off.
 
 | Mistake | Instead |
 |---|---|
-| Steps that describe rather than instruct | Show the code. "Add validation" is not a step |
 | Guessing the test command | Read `profile.verify`. Guessing produces a plan that fails at step 2 |
-| Planning `verify` stories as new work | Its first task is a test for existing behaviour |
-| One giant task | If a reviewer could reject half of it, it is two tasks |
 | Skipping the failing-test step | Watching it fail is what proves the test works |
-| A done condition that describes rather than commands | Name the command and its expected result |

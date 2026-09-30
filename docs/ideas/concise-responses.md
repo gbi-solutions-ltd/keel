@@ -84,7 +84,7 @@ line". A blunt terseness instruction erodes the rules that make the process audi
 
 | Finding | Evidence | What it means for the idea |
 |---|---|---|
-| The always-loaded block is already over its budget, as a recorded departure | `docs/05-token-and-memory-design.md:279` measures it at 634 against 450; `bin/keel:1075` warns over 450 and fails over 700; `docs/standards.md:257` records the departure and its end condition | The cheapest-looking home for this rule is closed |
+| The always-loaded block is already over its budget, as a recorded departure | `docs/05-token-and-memory-design.md:279` measures it at 634 against 450; `bin/keel#harness_section context-block` warns over 450 and fails over 700; `docs/standards.md:257` records the departure and its end condition | The cheapest-looking home for this rule is closed |
 | Plugins may ship `output-styles/` | Claude Code output-styles documentation | A zero-always-loaded-cost mechanism exists, and keel ships none |
 | Output styles do not reach subagents | Same documentation: subagents run their own system prompt | Delegated work stays as verbose as before. This only fixes the main thread |
 | Several keel rules deliberately require the model to say more | `skills/ship/SKILL.md` overrides; block, "say which you skipped"; `skills/keel/SKILL.md`, "announce it in one line" | Any terseness rule must exempt these by name |

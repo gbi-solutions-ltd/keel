@@ -4,7 +4,8 @@ Write `<docs_root>/apex/APP-<id>/PORT-ASSESSMENT.md` with these sections, in thi
 section only when the export genuinely has nothing for it, and say so rather than removing it
 silently.
 
-Every claim cites a path inside the export. A claim that cannot cite one is written as `Unknown`.
+Every claim cites a `path:line` inside the export. A claim that cannot cite one is written as
+`Unknown`.
 
 ---
 
@@ -15,8 +16,8 @@ opened it and has to decide whether to fund the port.
 
 ## 2. Recommendation
 
-One of: keep Oracle and wrap the PL/SQL, keep Oracle and rewrite the logic, or move the database
-too. State it in the first sentence, then the reasoning, then what would change your mind.
+One of: do not port, keep Oracle and wrap the PL/SQL, keep Oracle and rewrite the logic, or move the
+database too. State it in the first sentence, then the reasoning, then what would change your mind.
 
 A recommendation with no stated way to be wrong is not a recommendation, it is a preference.
 
@@ -49,7 +50,7 @@ stack has to reproduce, and it is the most common source of a port that corrupts
 
 Page id, current purpose, proposed route, band, and whether the band was revised from `INDEX.md`.
 
-Revised bands carry the reason inline. An unrevised band was still a judgement someone made.
+Revised bands carry the reason inline.
 
 ## 7. Authentication and authorization
 
@@ -92,8 +93,12 @@ date, and it should be the first thing read after the recommendation.
 moment a number that looks like an estimate appears in this document it will be quoted as one, and
 it will have been derived from counting page items.
 
-**Cite paths, not summaries.** `pages/00020-merchant-detail/processes/01-save-merchant.process_source.plsql`
-is checkable. "The save process is complex" is not.
+**Cite `path:line` or mark `Unknown`, never a summary.**
+`pages/00020-merchant-detail/processes/01-save-merchant.process_source.plsql` is checkable.
+"The save process is complex" is not.
 
 **Name the pages, do not count them.** A count of 14 high pages is unactionable. Fourteen page ids
 can be assigned, split, or argued about.
+
+**`port-assess`'s template shares the no-hours and cite-a-source rules.** Read it before changing
+them here, so the part that genuinely is common stays common.

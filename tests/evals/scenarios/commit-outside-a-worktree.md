@@ -183,6 +183,6 @@ arrival is not "watch it fail". It is not completed, and whoever ticks the box n
 Paste `git status --porcelain` as your last line. If it lists a path this task does not name, say so
 rather than staging it.
 
-Run the task's `Done when:` command last and paste its output. If you did not run it, say so in
-your first line. A report claiming completion with no command output in it is rejected and
-re-dispatched, which costs more than saying you skipped it.
+Run the task's `Done when:` command after your last code change and paste its output. If you did not
+run it, say so in your first line. A report claiming completion with no command output in it is
+rejected and re-dispatched, which costs more than saying you skipped it.

@@ -34,9 +34,9 @@ half had nothing to port from and would have been sold as a translation.
 
 ## Step 3: Delegate the reading
 
-Dispatch these subagents in one message, delegation profile `keel-fanout`, leading its description.
-Each is told: cite `path:line`, mark anything absent as `Unknown` rather than inferring it, and
-never estimate effort.
+Dispatch these subagents in one message, delegation profile `keel-fanout`, with each dispatch's
+description starting `keel-fanout: `. Each is told: cite `path:line`, mark anything absent as
+`Unknown` rather than inferring it, and never estimate effort.
 
 | Agent | Brief |
 |---|---|
@@ -79,14 +79,11 @@ Carry every unresolved snapshot finding into the risk table. A port closes none 
 ## Step 7: Route onwards
 
 Offer one: `write-prd` when the port is agreed, `design-architecture` when the stack is open,
-`security-audit` when step 5 surfaced credentials or key material. Then stop.
+`security-audit` when the assessment surfaced credentials or key material. Then stop.
 
 ## Common mistakes
 
 | Mistake | Instead |
 |---|---|
-| Trusting the snapshot's branch | Step 1. Check it against the working tree |
-| Selling new build as a port | Step 2. Name what has no source |
-| One pass | Step 5. The gaps are known and unopened, not unknown |
-| An engineer-week headline | Units of work, the driver, what narrows it |
+| An engineer-week headline | Rank the work, name the driver, and say what would narrow it |
 | Tidying a contract oddity | Freeze the wire contract. Test it, do not improve it |

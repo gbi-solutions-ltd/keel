@@ -17,7 +17,8 @@ No design, no stack choice, no sprint slice, no tickets, no estimates. This skil
 idea record and one recommendation. If the idea is agreed, name `write-prd` and stop.
 </HARD-GATE>
 
-If overridden, write down what was skipped and carry on.
+If the user overrides the gate, record in the idea file which of these it skipped, then do what they
+asked.
 
 ## Step 1: Find the problem under the solution
 
@@ -29,14 +30,14 @@ One question per message, your own answer offered as the default, per
 [../keel/references/asking-questions.md](../keel/references/asking-questions.md). Never a closing
 list of five.
 
-**If nobody can name a specific recent instance, that is the finding.** Write the record with that as
-its headline and stop there: no PRD, no next skill. "Stop" never means write nothing. An idea with no
-evidence behind it is the cheapest thing you will ever decline to build.
+**If nobody can name a specific recent instance, that is the finding.** Write the record with that
+as its headline and stop after the record: no PRD, no next skill. "Stop" never means write nothing.
+An idea with no evidence behind it is the cheapest thing you will ever decline to build.
 
 ## Step 2: Check it against the system before challenging it
 
 Read the code, the snapshot, and the docs that bear on it. Delegate wide reading to subagents with
-delegation profile `keel-fanout`, leading its description.
+delegation profile `keel-fanout`, with each dispatch's description starting `keel-fanout: `.
 
 A challenge carrying a `path:line` changes a decision. The same challenge from instinct starts an
 argument and loses. Every objection in step 3 cites something.
@@ -79,9 +80,6 @@ re-ask what it answers.
 
 | Mistake | Instead |
 |---|---|
-| Producing a sprint plan | That is `write-plan`, three skills later, after a PRD nobody has written |
-| The objection folded into a plan | Its own section, first. See the table above |
+| Producing a sprint plan | That is `write-plan`, after `write-prd`, `write-user-stories` and `design-architecture`, after a PRD nobody has written |
 | Alternatives that are all versions of building it | Doing nothing is an alternative. So is a spreadsheet |
 | Accepting the solution as the problem | Step 1. "Always sees the true number" is a means, not an end |
-| A wall of questions at the end | One per message, throughout |
-| Nothing written | The file is the deliverable |

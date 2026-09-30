@@ -14,8 +14,8 @@ Two problems, not one. See question 1 below for why they are separated and stay 
 **A.** Somebody inherits a repository that already has a `standards.md` and wants to know whether the
 code follows it. Nothing in keel answers that. `coding-standards` writes the document
 (`skills/coding-standards/SKILL.md:16-79`, five authoring steps, no assessment branch), and
-`review-code` is the only reader, over a diff (`skills/review-code/SKILL.md:21`,
-`skills/review-code/references/rubric.md:61-63`).
+`review-code` is the only reader, over a diff (`skills/review-code/SKILL.md:24`,
+`skills/review-code/references/rubric.md:64-66`).
 
 **B.** keel's catalogue calls row 9 "Coding standards enforcement" (`docs/02-skill-catalog.md:69`)
 and nothing enforces them during coding.
@@ -135,7 +135,7 @@ hits are throttler constants (`:503-505` and around), and both "cache" hits are 
 Structural confirmation: the document's section list has no section for resilience, caching, data
 protection or async work. There is nowhere to put them.
 
-This is the rule `skills/coding-standards/SKILL.md:69-71` states, which requires including the house
+This is the rule `skills/coding-standards/SKILL.md:70-72` states, which requires including the house
 defaults "noting any this project deliberately departs from". Four references skipped whole, 28 of
 the 65 applicable rules with nothing written about them, breach it, and
 nothing in keel would ever notice.
@@ -343,16 +343,16 @@ is the defect. Deleting a claim costs no words at all.
 | Finding | Evidence | What it means for the idea |
 |---|---|---|
 | `coding-standards` authors and never assesses | `skills/coding-standards/SKILL.md:16-79`; step 4 writes the doc at `:63`, step 5 verifies the linter at `:75`, no branch reads an existing doc | Claim A is true |
-| Nothing checks house-defaults coverage, ever | `skills/coding-standards/SKILL.md:69-71` requires folding the applicable defaults in "noting any this project deliberately departs from"; no skill, test or hook reads back whether that happened | The highest-yield check in the mode is the one with no reader today. payments-api: four applicable references skipped whole, 28 of 65 rules with nothing written |
-| `review-code` is the only reader and is diff-scoped | `skills/review-code/SKILL.md:21`; `references/rubric.md:61-63`; scope defined over changed lines at `rubric.md:104-106` | Claim A is true. Widening this means widening a skill whose section 7 is literally about changed lines |
-| The snapshot only covers the *missing* case | `skills/repo-snapshot/references/section-templates.md:147` lists "Coding standards" under **Missing**, produced by `coding-standards`; `:227-228` recommends it "to establish what this repository's conventions are, and where they are **not written down anywhere**" | There is no route for "the doc exists and nobody knows if the code follows it" |
+| Nothing checks house-defaults coverage, ever | `skills/coding-standards/SKILL.md:70-72` requires folding the applicable defaults in "noting any this project deliberately departs from"; no skill, test or hook reads back whether that happened | The highest-yield check in the mode is the one with no reader today. payments-api: four applicable references skipped whole, 28 of 65 rules with nothing written |
+| `review-code` is the only reader and is diff-scoped | `skills/review-code/SKILL.md:24`; `references/rubric.md:61-63`; scope defined over changed lines at `rubric.md:104-106` | Claim A is true. Widening this means widening a skill whose section 7 is literally about changed lines |
+| The snapshot only covers the *missing* case | `skills/repo-snapshot/references/section-templates.md:145` lists "Coding standards" under **Missing**, produced by `coding-standards`; `:227-228` recommends it "to establish what this repository's conventions are, and where they are **not written down anywhere**" | There is no route for "the doc exists and nobody knows if the code follows it" |
 | `security-audit` is the precedent for a whole-repo mode and for its output path | `skills/security-audit/SKILL.md:18-21`, a two-row `--diff` / `--full` scope table, costing 52 words including the gate line at `:23`; `:63` writes `<docs_root>/audits/YYYY-MM-DD-security.md` | A mode is a proven shape here, it is cheap, and its output convention answers question 4 |
 | `tdd`, `write-plan` and `refactor` never mention standards | No occurrence of "standard" or "convention" in `skills/tdd/`, `skills/write-plan/`, `skills/refactor/` | Claim B is true for three of the four skills named |
 | `execute-plan` mentions them once, in the wrong prompt | `skills/execute-plan/references/subagent-prompts.md` puts `=== PROJECT STANDARDS ===` in the **quality review** prompt; the implementer prompt at `:20-61` has no such block | The reviewer is told the conventions; the agent writing the code is not. This is an inconsistency, not a missing rule |
-| `gates.coding_standards` is inert in code | `templates/profile.schema.json:254`; `docs/profile-keys.md:45`; a repo-wide grep finds it only in the schema, generated docs, an example file, this repo's own profile, a `printf` template in `bin/keel:430`, and eval prose. No hook, skill, lib or CLI path reads it | Claim B is true |
+| `gates.coding_standards` is inert in code | `templates/profile.schema.json:257`; `docs/profile-keys.md:45`; a repo-wide grep finds it only in the schema, generated docs, an example file, this repo's own profile, a `printf` template in `bin/keel:430`, and eval prose. No hook, skill, lib or CLI path reads it | Claim B is true |
 | One gate *is* read by a skill | `skills/security-audit/SKILL.md:23`: "Read `.keel/profile.json` for `gates.security_audit` and any `hard_block_paths`", 7 words | "A gate the skills read" is a shape that already exists and costs 7 words per site |
-| keel says this about itself in its release notes | `CHANGELOG.md:306`: "seven declared profile keys are read by nothing (`gates.tdd`, `gates.coding_standards`, `gates.review`, ...)" | The gap is admitted, not hidden. Nothing here is news to keel |
-| `ship` has no standards item | `skills/ship/SKILL.md:16-32`, eight items, none naming standards; items 5 and 6 are prose with no command behind them | Claim B is true |
+| keel says this about itself in its release notes | `CHANGELOG.md#seven declared profile keys are read by nothing`: "seven declared profile keys are read by nothing (`gates.tdd`, `gates.coding_standards`, `gates.review`, ...)" | The gap is admitted, not hidden. Nothing here is news to keel |
+| `ship` has no standards item | `skills/ship/SKILL.md:16-36`, eight items, none naming standards; items 5 and 6 are prose with no command behind them | Claim B is true |
 | Two documents claim an enforcement that does not exist | `docs/02-skill-catalog.md:69` "Coding standards enforcement"; `:382` says `refactor` reads `standards.md` | The false claim is fixable for free and is arguably the whole of B |
 | Hooks cannot decide this | `hooks/done-guard:127` works by substring-matching the configured test command in a `Bash` call; `hooks/done-guard:34-36` says outright "It cannot see the exit code, and does not pretend to" | There is no observable event whose presence proves standards were followed. A hook is not available for B |
 | A model acted on the inert gate unprompted | `tests/evals/results.md`: "arm 2 read the key out of the profile itself and used it to set severity" | See question 5 |
@@ -497,21 +497,23 @@ the previous task, so anything omitted is unavailable rather than merely unmenti
 lowest cost, and it closes an inconsistency rather than opening an argument.
 
 **2. A standards line in the plan template's Global constraints.** Zero body words.
-`skills/write-plan/references/plan-template.md:28` says the block is "Copied verbatim from the
-stories, ADRs, and profile" and `:37-38` says "Copy the constraints in full rather than linking. A
-task executed by a fresh agent that reads only its own section must still obey them." The standards
-document is not in that list, and it is precisely a thing a fresh agent reading only its own section
-must obey. Ten words in a reference file, and it reaches every task and every dispatch.
+`skills/write-plan/references/plan-template.md#Global constraints` says "Copied verbatim from the
+stories, ADRs, and profile" and
+`skills/write-plan/references/plan-template.md#Copy the constraints in full rather than linking`
+says "Copy the constraints in full rather than linking. A task executed by a fresh agent that reads
+only its own section must still obey them." The standards document is not in that list, and it is
+precisely a thing a fresh agent reading only its own section must obey. Ten words in a reference
+file, and it reaches every task and every dispatch.
 
 **3. A `gates.coding_standards` read, in the skills that can afford one.** Seven words per site, the
 measured length of `skills/security-audit/SKILL.md:23`, which is the only gate any skill reads today.
-This would make the schema's own admission at `templates/profile.schema.json:254` false in the good
+This would make the schema's own admission at `templates/profile.schema.json:257` false in the good
 direction. Ranked third rather than higher because it is still a sentence, and because
 `tests/evals/results.md`, at "read by nothing and acted on anyway", shows an agent already
 reading that key out of the profile and setting severity by it, unprompted, without being told to.
 
 **4. A ninth `ship` checklist item.** About 17 words, the average of items 1 to 8
-(`skills/ship/SKILL.md:20-32`, 135 words over 8 items). It fires only when the user says ship, and it
+(`skills/ship/SKILL.md:20-36`, 135 words over 8 items). It fires only when the user says ship, and it
 would join items 5 and 6 as prose with no command behind it, in a list whose working items name a
 command from the profile. It also crosses `ship` from 695 to about 712 and buys an eval arm.
 
@@ -584,7 +586,7 @@ ceiling at all.
 
 `tests/evals/results.md` records that arm 2 "read the key out of the profile itself and
 used it to set severity", unprompted, for a gate that
-`templates/profile.schema.json:254` said had "no effect". Three things follow, and all three make the
+`templates/profile.schema.json:257` said had "no effect". Three things follow, and all three make the
 fix for **B** smaller. None of them shrinks A.
 
 **The behaviour was already there.** The model found `docs/standards.md` with no skill pointing at
@@ -650,11 +652,11 @@ nothing else.
 **For B, ship the four small edits.** None is a new sentence of prose telling the model something it
 already does: add the `=== PROJECT STANDARDS ===` block to the implementer prompt in
 `skills/execute-plan/references/subagent-prompts.md` to match the one already at `:105-106`; add a
-standards line to the Global constraints in `skills/write-plan/references/plan-template.md:28`;
-delete the enforcement claim at `docs/02-skill-catalog.md:69` and correct the false `refactor` read
-at `:382`. All four cost zero body words, none touches a skill body, none needs an eval arm, and each
-fixes something inconsistent inside keel today rather than adding a rule whose measured effect on
-this exact question was zero (`tests/evals/results.md`, at "Arm 1, without the rule").
+standards line to `skills/write-plan/references/plan-template.md#Global constraints`; delete the
+enforcement claim at `docs/02-skill-catalog.md:69` and correct the false `refactor` read at `:382`.
+All four cost zero body words, none touches a skill body, none needs an eval arm, and each fixes
+something inconsistent inside keel today rather than adding a rule whose measured effect on this
+exact question was zero (`tests/evals/results.md`, at "Arm 1, without the rule").
 
 **For A, build the assessment mode.** It was parked for want of a named instance; the instance
 exists and is measured above. Build it inside `coding-standards` as a scope branch, at the measured

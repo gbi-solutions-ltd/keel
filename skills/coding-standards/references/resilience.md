@@ -5,8 +5,8 @@ Read this whenever anything calls anything else over a network, which is nearly 
 from your dependencies. A service with only one of the two has half a resilience story.
 
 Almost every entry here is about a default that is wrong. The libraries ship with no timeout, retry
-forever, and treat a failure as a reason to try harder, and each of those defaults is the opposite of
-what a payments system needs.
+forever, and treat a failure as a reason to try harder, and each of those defaults is the opposite
+of what a production system needs.
 
 ## Every outbound call has a timeout, and the number is written down
 

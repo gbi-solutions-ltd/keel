@@ -15,6 +15,7 @@
 # Usage:
 #   tests/supply-chain-scan.sh                 scan the tree, exit non-zero on any finding
 #   tests/supply-chain-scan.sh --list-rules    print every rule id, for the coverage test
+#   tests/supply-chain-scan.sh --secret-paths  the key-file rule alone, over NUL-separated paths on stdin
 #
 # LIMITS, stated so nobody mistakes this for a guarantee. It is a denylist over patterns we have
 # thought of. It cannot recognise a novel technique, it cannot read intent, and a determined author
@@ -112,7 +113,7 @@ allowed_executable() {
         bin/keel-fleet)      return 0 ;;   # a second binary the plugin adds to PATH alongside `bin/keel`, not a `keel` subcommand
         hooks/*)             return 0 ;;
         tests/*.sh)          return 0 ;;   # `*` matches `/` here, so this covers tests/evals/ too
-        .githooks/*)         return 0 ;;   # written by `keel guard install`, and scanned like everything else
+        .githooks/*)         return 0 ;;   # keel guard install wrote here until 2026-09-26; a plugin repo that committed it on that advice is not flagged for it
         .claude/keel-nudge)  return 0 ;;   # written by `keel init`, committed so a plugin-less session is told so
         *)                   return 1 ;;
     esac
@@ -132,7 +133,12 @@ in_scope() {  # in_scope <scope> <file>
         exec)
             case "$2" in
                 bin/*|hooks/*|lib/*|tests/*|.github/workflows/*) return 0 ;;
-                *) [ -x "$2" ] && return 0 || return 1 ;;
+                *)
+                    # The index's mode first, then the disk's bit: a noexec mount, or a copy written
+                    # without modes, reads every file as not executable, and the mode git records
+                    # is the one a clone gets.
+                    case "$EXEC_INDEX" in *$'\n'"$2"$'\n'*) return 0 ;; esac
+                    [ -x "$2" ] && return 0 || return 1 ;;
             esac ;;
         prompt)
             case "$2" in
@@ -143,11 +149,52 @@ in_scope() {  # in_scope <scope> <file>
     return 1
 }
 
+# structural-secret-material's filename test, shared by the tree walk below and by --secret-paths.
+secret_material_path() {
+    case "$1" in
+        *.pfx|*.p12|*.jks|*.keystore|*.truststore|*.pem|*.key|*.der|*.asc|*id_rsa|*id_dsa|*id_ecdsa|*id_ed25519) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# .keel/scan-allow, read from the current directory: one path per line, a reason after a space. See
+# structural-secret-material below.
+scan_allowed_path() {
+    [ -f .keel/scan-allow ] || return 1
+    while IFS= read -r entry; do
+        entry="${entry%% *}"
+        [ -n "$entry" ] || continue
+        case "$entry" in \#*) continue ;; esac
+        [ "$entry" = "$1" ] && return 0
+    done < .keel/scan-allow
+    return 1
+}
+
 if [ "${1:-}" = "--list-rules" ]; then
     rules | cut -f1
     printf 'structural-binary\nstructural-executable\nstructural-invisible\nstructural-orphan-hook\n'
     printf 'structural-secret-material\n'
     exit 0
+fi
+
+# --secret-paths: structural-secret-material alone, over NUL-separated paths on stdin rather than
+# over this tree. keel scan --push feeds it every file a commit in the push added or changed to a
+# version the tip does not hold: git keeps a committed key in history, so the push carries it to the
+# remote though no tree being pushed shows it. Nothing else is scanned, since the tip's own tree is
+# scanned in full by the ordinary run. .keel/scan-allow is not read: an entry covers the version the
+# tip holds, the one reviewed, and a live key a pushed commit put at that path and a later one
+# replaced with the fixture again is not that version. A history version the allow list pins, by
+# path and blob, never reaches here: keel scan --push allows it before feeding this list.
+if [ "${1:-}" = "--secret-paths" ]; then
+    # `|| [ -n "$f" ]` keeps a final path with no trailing NUL, which read otherwise drops.
+    while IFS= read -r -d '' f || [ -n "$f" ]; do
+        [ -n "$f" ] || continue
+        secret_material_path "$f" || continue
+        report "$f [structural-secret-material] a version of a key, keystore or certificate in the history this push carries that its tip does not hold and .keel/scan-allow does not pin, as the path then this version's blob. git keeps it in history, so the remedy is rotating the credential, not deleting the file"
+    done
+    [ "$errors" -eq 0 ] && exit 0
+    printf '\n%s key file(s) in the history this push carries.\n' "$errors"
+    exit 1
 fi
 
 # Tracked files plus anything untracked that git is not ignoring.
@@ -157,14 +204,19 @@ fi
 # files is blind during the only window in which removing the file is free. It found this by missing
 # eight of its own new files on the run that was meant to verify them.
 #
-# `--exclude-standard` keeps ignored scratch out of it. The cost is that the pre-push hook can flag
-# something not actually being pushed, which is a false stop rather than a false pass, and the
-# suppression marker is there for it.
+# `--exclude-standard` keeps ignored scratch out of it. When git feeds the pre-push hook refs, it
+# does not read this list: it scans the commits being pushed, through `keel scan --push`, which
+# writes each commit's tree to a directory of its own. Run by hand, or with a keel on PATH too old
+# for --push, the hook scans this list.
+#
+# NUL-separated, never one name per line: without -z git quotes a name holding a byte outside
+# printable ASCII, a tab, a double quote or a backslash, the quoted form matches no file on disk,
+# and every such file went unscanned.
 list_files() {
     if git rev-parse --git-dir >/dev/null 2>&1; then
-        git ls-files --cached --others --exclude-standard
+        git ls-files --cached --others --exclude-standard -z
     else
-        find . -type f -not -path './.git/*' | sed 's|^\./||'
+        find . -type f -not -path './.git/*' -print0
     fi
 }
 
@@ -177,6 +229,12 @@ list_files() {
 
 check_patterns
 
+# The pattern rules read grep --null output. Not every grep has it: BusyBox's refuses it and exits
+# 2, which the loop below discards with grep's other errors, so every pattern rule would go silent
+# and the scan would read as clean. Proven once here, and a grep without it fails the scan.
+printf 'x\n' | grep -H --null x >/dev/null 2>&1 \
+  || report "this grep has no --null, which the pattern rules read, so none of them can run. Use GNU grep, BSD grep or ugrep"
+
 # Five lists, built in one walk instead of the four separate walks the structural checks below used
 # to do on their own: each of them called list_files() again and, for two of them, redid the same
 # LC_ALL=C grep -qI text/binary test this walk already has the answer to. FULL_LIST is every entry
@@ -188,11 +246,29 @@ ALL_LIST="$(mktemp)"; EXEC_LIST="$(mktemp)"; PROMPT_LIST="$(mktemp)"
 FULL_LIST="$(mktemp)"; BINARY_LIST="$(mktemp)"
 trap 'rm -f "$ALL_LIST" "$EXEC_LIST" "$PROMPT_LIST" "$FULL_LIST" "$BINARY_LIST"' EXIT
 
-while IFS= read -r f; do
+# Every path the index records as executable, one per line between newlines, for in_scope. Read once
+# and NUL-separated, for the reason list_files is; a name holding a newline is refused in the walk
+# below, so it never needs matching here.
+EXEC_INDEX=$'\n'
+if git rev-parse --git-dir >/dev/null 2>&1; then
+    while IFS= read -r -d '' e; do
+        if [ "${e%% *}" = 100755 ]; then EXEC_INDEX="$EXEC_INDEX${e#*$'\t'}"$'\n'; fi
+    done < <(git ls-files -s -z)
+fi
+
+while IFS= read -r -d '' f; do
     [ -n "$f" ] || continue
+    f="${f#./}"
+    # The lists below hold one path per line, so a name holding a newline cannot go in them. It is
+    # refused rather than skipped: a file the scan cannot read is not a file it may pass.
+    case "$f" in
+        *$'\n'*) report "$(printf '%q' "$f") has a newline in its name, which this scan cannot read. Rename it"; continue ;;
+    esac
     printf '%s\n' "$f" >> "$FULL_LIST"
     [ -f "$f" ] || continue
-    if LC_ALL=C grep -qI . "$f" 2>/dev/null; then
+    # ./ so that a file named - is a file and not grep's stdin, which here is this loop's own
+    # input, and a name like -x.sh is not read as options.
+    if LC_ALL=C grep -qI . "./$f" 2>/dev/null; then
         skip_file "$f" && continue
         printf '%s\n' "$f" >> "$ALL_LIST"
         in_scope exec "$f"   && printf '%s\n' "$f" >> "$EXEC_LIST"
@@ -214,9 +290,11 @@ while IFS=$'\t' read -r id scope flags pat why; do
     case "$flags" in i) gflags=-inHE ;; *) gflags=-nHE ;; esac
 
     # -H forces the filename prefix even when only one file is passed, so the parse below is uniform.
-    while IFS= read -r hit; do
-        [ -n "$hit" ] || continue
-        f="${hit%%:*}"; rest="${hit#*:}"
+    # --null ends the name with a NUL, so a name holding colons cannot move the split: split at the
+    # first colon, docs/x:y:supply-chain-scan: allow z.md read its own payload line as a suppression.
+    # Names go to grep as ./path, so one named - is a file and not grep's stdin.
+    while IFS= read -r -d '' f && IFS= read -r rest; do
+        f="${f#./}"
         line="${rest%%:*}"; text="${rest#*:}"
         case "$text" in
             *"supply-chain-scan: allow"*)
@@ -231,7 +309,9 @@ while IFS=$'\t' read -r id scope flags pat why; do
         esac
         report "$f:$line [$id] $why
       $(printf '%s' "$text" | sed 's/^[[:space:]]*//' | cut -c1-100)"
-    done < <(tr '\n' '\0' < "$list" | xargs -0 grep "$gflags" -- "$pat" 2>/dev/null)
+    # -a, since every file here already passed the walk's text test: GNU grep 3.4 and older print
+    # "Binary file matches" to stdout with no NUL, which would join the next hit's name and lose it.
+    done < <(sed 's|^|./|' "$list" | tr '\n' '\0' | xargs -0 grep -a "$gflags" --null -- "$pat" 2>/dev/null)
 done < <(rules)
 
 # ---- structural rules ------------------------------------------------------
@@ -248,25 +328,12 @@ done < <(rules)
 #
 # A repository with a genuine test fixture key lists it in .keel/scan-allow, one path per line with a
 # reason after a space. That file is committed, so the exception is reviewed like anything else.
-scan_allowed_path() {
-    [ -f .keel/scan-allow ] || return 1
-    while IFS= read -r entry; do
-        entry="${entry%% *}"
-        [ -n "$entry" ] || continue
-        case "$entry" in \#*) continue ;; esac
-        [ "$entry" = "$1" ] && return 0
-    done < .keel/scan-allow
-    return 1
-}
 
 # Reuses FULL_LIST, built once above: every entry list_files() prints, same as calling it again here
 # would give, since this check is deliberately not filtered by text or binary (a keystore is binary).
 while IFS= read -r f; do
     [ -n "$f" ] || continue
-    case "$f" in
-        *.pfx|*.p12|*.jks|*.keystore|*.truststore|*.pem|*.key|*.der|*.asc|*id_rsa|*id_dsa|*id_ecdsa|*id_ed25519) ;;
-        *) continue ;;
-    esac
+    secret_material_path "$f" || continue
     if scan_allowed_path "$f"; then
         printf 'ALLOW %s [structural-secret-material] listed in .keel/scan-allow\n' "$f"
         suppressed=$((suppressed+1))
@@ -299,11 +366,14 @@ fi
 # structural-executable: the executable set is enumerated in allowed_executable above, and the
 # enumeration only describes a plugin repository. See the note there.
 if [ -f .claude-plugin/plugin.json ] && git rev-parse --git-dir >/dev/null 2>&1; then
-    while IFS= read -r f; do
-        [ -n "$f" ] || continue
+    # The index listing is NUL-separated for the reason list_files is: a quoted name reads as a
+    # different path, one allowed_executable does not allow.
+    while IFS= read -r -d '' e; do
+        [ "${e%% *}" = 100755 ] || continue
+        f="${e#*$'\t'}"
         allowed_executable "$f" && continue
         report "$f [structural-executable] has the executable bit and is not in the allowed set. Add it to allowed_executable with a reason, or clear the bit"
-    done < <(git ls-files -s | awk '$1=="100755"{ $1=""; $2=""; $3=""; sub(/^[ \t]+/,""); print }')
+    done < <(git ls-files -s -z)
 fi
 
 # structural-invisible: bidirectional and zero-width characters. This is the one rule here a careful
@@ -314,7 +384,7 @@ fi
 # what this loop applied itself before checking each file for an invisible character.
 while IFS= read -r f; do
     [ -n "$f" ] || continue
-    if LC_ALL=C grep -qE "$(printf '\xe2\x80[\xaa-\xae\x8b-\x8f]|\xe2\x81[\xa6-\xa9]')" "$f" 2>/dev/null; then
+    if LC_ALL=C grep -qE "$(printf '\xe2\x80[\xaa-\xae\x8b-\x8f]|\xe2\x81[\xa6-\xa9]')" "./$f" 2>/dev/null; then
         report "$f [structural-invisible] contains a bidirectional or zero-width character. It renders as nothing and can make code read differently from how it runs"
     fi
 done < "$ALL_LIST"

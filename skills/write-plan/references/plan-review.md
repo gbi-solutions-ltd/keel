@@ -8,8 +8,9 @@ making cheaper.
 
 The self-review in [plan-template.md](plan-template.md) compares the plan to itself. Story coverage
 counts headings, the placeholder scan greps for phrases, name consistency reads two tasks side by
-side, command accuracy reads the profile, and the last two read task dependencies. **None of them
-opens the code the plan will be built on.**
+side, command accuracy reads the profile, the hand-over check reads each task's last step, the file
+check reads task dependencies, and the id check runs `keel plan status`. **None of them opens the
+code the plan will be built on.**
 
 A run given exactly the four checks step 5 then carried, over a deliberately flawed plan, passed all
 four and reported the plan's central defect only because it opened a source file off its own
@@ -30,8 +31,9 @@ So the reviewer is briefed on dimensions, not on items, and it is told to read t
 ```
 Review this implementation plan for whether it can actually be built against this repository.
 Someone has already run the plan self-review: story coverage, placeholder phrases, name consistency
-between tasks, commands coming from the profile, hand-over steps that stage named paths, and no task
-depending on a file no task creates. All of it passed. Do not repeat it.
+between tasks, commands coming from the profile, hand-over steps that stage named paths, no task
+depending on a file no task creates, and step ids that `keel plan status` accepts. All of it passed.
+Do not repeat it.
 
 === PLAN ===
 <paste the plan, or its path>

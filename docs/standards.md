@@ -4,7 +4,7 @@
 |---|---|
 | Derived from | All 9 skills, 3 scripts, and 3 templates, at commit `2e698ff` |
 | Date | 2026-08-11 |
-| Enforced by | `tests/run-tests.sh`, which runs `tests/validate-skills.sh`, `tests/no-internal-leaks.sh`, `tests/supply-chain-scan.sh`, and `shellcheck` from the profile |
+| Enforced by | `tests/run-tests.sh`, which runs `tests/validate-skills.sh`, `tests/no-internal-leaks.sh`, `tests/supply-chain-scan.sh`, and `shellcheck` from the profile; and ruff over `lib/` in CI only |
 | Departures from House defaults | Listed in the last section |
 
 > Anything a linter can check is not in this file, by design. If you find a formatting rule here,
@@ -35,7 +35,7 @@ that length in `tests/evals/results.md`. See `docs/decisions/ADR-0001-skill-body
 
 **Within 30 words of the ceiling the warning says how many are left**, added 2026-08-20. "Over the
 700 target" reads the same at 750 and at 897, and only one of those is a body where the next edit
-fails the suite. **`write-plan` was at 897, three words of headroom**, and `execute-plan` is at 884
+fails the suite. **`write-plan` was at 897, three words of headroom**, and `execute-plan` was at 884
 with sixteen; both were found by trying to edit them rather than by reading anything. The place a
 number like that has to reach someone is the moment they run the suite, which is what the warning
 now does.
@@ -63,7 +63,7 @@ number under it is not a limit, it is where bodies settle.**
 
 **Example:** `skills/coding-standards/SKILL.md` is the case that shows moving detail out has a
 floor: `coding-standards` carried 12 reference files and 17,816 words against a body of 683 when
-ADR-0001 measured it, and carries 17 and 22,750 against 795 today. Reach for a reference
+ADR-0001 measured it, and carries 17 and 22,726 against 726 today. Reach for a reference
 because a reader needs it at one step, not as a way to buy words.
 
 ## Subagent briefs stay in the body; everything else can move
@@ -247,9 +247,9 @@ everywhere else, and a skip list hides a whole file from every rule at once. A p
 is visible in the diff that introduces it, is printed on every run afterwards, and is counted in the
 summary, so growth is something a reviewer sees rather than discovers.
 
-**Example:** three suppressions exist, all in `tests/test-keel.sh`, where the tests that prove the
-push guard rejects a pipe-to-shell must contain a pipe-to-shell. A suppression with no reason is
-itself a finding.
+**Example:** most suppressions sit in `tests/test-keel.sh`, on the lines of tests that must
+contain what they prove the push guard or `keel scan --push` rejects. A suppression with no reason
+is itself a finding.
 
 ## One definition per verify command
 
@@ -262,6 +262,12 @@ The first instinct on that is to distrust the pipeline.
 
 **Example:** `.github/workflows/ci.yml` reads `verify.lint` with `jq`; `tests/run-tests.sh` reads the
 same field. Changing the severity now changes both.
+
+**Exception:** ruff over `lib/` runs in CI only, as the `Python lint` job, by the maintainer's
+decision of 2026-09-25, so a contributor needs nothing new installed. It is not a verify command,
+so there is no second copy to drift; the cost is that a ruff finding first appears in CI, and the
+job installs ruff by hash from `.github/ruff-requirements.txt` and names its rule set, so that it
+only ever reports the tree.
 
 ## Review
 

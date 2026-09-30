@@ -1,6 +1,6 @@
 ---
 name: create-skill
-description: Use when a workflow just went well and should be repeatable, when the user says to make something a skill, or when the same correction keeps being needed.
+description: Use when a workflow just went well and should be repeatable, when the user says to make something a skill, when an existing skill keeps being worked around, or when the same correction keeps being needed.
 allowed-tools: [Read, Write, Edit, Bash, Grep, Glob, Agent]
 ---
 
@@ -66,8 +66,8 @@ way around the edge. Add that, re-run, repeat. Two or three passes is normal.
 Run `profile.verify.test`. In keel that checks frontmatter shape, the word budget, `@` links,
 the docs-root notation, and link resolution.
 
-A check rejecting output you believe correct is probably wrong: fix the check and pin the case. See
-`docs/02-skill-catalog.md`.
+A check rejecting output you believe correct is probably wrong. Fix the check, and add the case to
+the validator's tests as a must-not-reject case.
 
 ## Step 6: Delegate the measurement
 
@@ -78,8 +78,8 @@ own harness. Say which you had.
 
 ## Step 7: Ship it as a reviewed change
 
-A skill affects every repository at once, so it goes through `review-code` and `ship` like any other
-change. Update `README.md`, `CHANGELOG.md`, and the plan in the same commit.
+A skill changes how every later task runs, so it goes through `review-code` and `ship` like any
+other change. Update the documents that list or describe the project's skills in the same commit.
 
 ## Common mistakes
 
@@ -89,5 +89,5 @@ change. Update `README.md`, `CHANGELOG.md`, and the plan in the same commit.
 | An invented rationalisation table | Quote what the agent actually said |
 | Prohibitions for a wrong-shaped output | A positive recipe. Prohibitions backfire here |
 | A description summarising the workflow | State when to use it only |
-| One pass and done | Re-run. The second loophole is always there |
+| One pass and done | Re-run. There is usually a second loophole |
 | Shipping without the docs | A skill nobody knows exists is not a skill |

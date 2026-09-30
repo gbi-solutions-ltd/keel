@@ -199,14 +199,14 @@ unmeasured claim, and task 5 records it as one rather than letting the changelog
 Self-contained. Nothing below requires reading another document.
 
 **Gap 1: nothing records what a provisioning run created.** `setup-deployment` covers rolling back
-a *deploy*: `skills/setup-deployment/SKILL.md:81-86` requires a runbook with a rollback and requires
-executing it once, and `skills/setup-deployment/references/pipeline-patterns.md:126-131` states what
+a *deploy*: `skills/setup-deployment/SKILL.md` lines 81-86 at `bda1acc` requires a runbook with a rollback and requires
+executing it once, and `skills/setup-deployment/references/pipeline-patterns.md` lines 126-131 at `bda1acc` states what
 is and is not rolled back. Nothing covers unwinding a *provisioning* run: the databases, buckets,
 DNS records, webhook endpoints and API keys created while standing an environment up. A run that
 fails halfway leaves resources nobody has a list of.
 
 **Gap 2: no per-variable method for configuration and secrets.**
-`skills/setup-deployment/SKILL.md:73-76` asks "what differs, where secrets come from, who can
+`skills/setup-deployment/SKILL.md:76-79` asks "what differs, where secrets come from, who can
 deploy", and `references/pipeline-patterns.md:120-124` says secrets are injected at runtime from the
 platform's store and never in an image layer or a build argument. Neither says how to decide, for
 one variable, whether its production value is the development value copied over, a different value,
@@ -215,8 +215,8 @@ is the variable whose wrong value produces a **successful deploy and a broken sy
 endpoint, a debug flag, a localhost URL, a test key, a session secret shared with a laptop.
 
 **Gap 3: nothing verifies a release against the thing actually running.**
-`skills/setup-deployment/SKILL.md:39` names "smoke test" as the last pipeline stage and says nothing
-about what one checks. `skills/ship/SKILL.md:20-31` gates on tests, lint, audit, review, docs, plan
+`skills/setup-deployment/SKILL.md:42` names "smoke test" as the last pipeline stage and says nothing
+about what one checks. `skills/ship/SKILL.md:20-36` gates on tests, lint, audit, review, docs, plan
 and branch, all of which are properties of the repository rather than of the running system. Nobody
 checks that what is live is the artifact that was intended, or reports the difference between a
 check that failed, a check that could not run because something upstream was broken, and a check
@@ -225,7 +225,7 @@ nobody attempted.
 **Gap 4: nothing audits what a repository claims against what it does.**
 `skills/write-docs/SKILL.md` warns that "restating what the code" goes stale silently, `:87-90`
 requires a document to record the commit it describes so staleness is judgeable, and
-`skills/review-code/SKILL.md:83` gates a behaviour change on its documentation. All three prevent
+`skills/review-code/SKILL.md` line 83 at `bda1acc` gates a behaviour change on its documentation. All three prevent
 *new* drift. None detects drift that already exists. This repository has already paid for that gap:
 `tests/test-doc-claims.sh:44-63` exists because README claimed counts the tree contradicted, and
 `docs/02-skill-catalog.md:7-11` records a skill that shipped with no catalog section and survived
@@ -385,10 +385,11 @@ justification, not from anywhere else.
    which may be retried, from a deterministic one, which may not: retrying a build error, a rejected
    request or a failed migration unchanged is superstition, because the same input produces the same
    result.
-   - *Justification class: keel practice.* `skills/ship/SKILL.md:36-37`: "Say which check failed,
-     show the output, and stop. Do not fix it as part of shipping: a gate that repairs its own
-     failures is not a gate, and the fix belongs in its own reviewed change." Same shape, applied to
-     provisioning: a process that repairs its own failures destroys the evidence of what happened.
+   - *Justification class: keel practice.* `skills/ship/SKILL.md#Say which check failed`: "Say
+     which check failed, show the output, and stop. Do not fix it as part of shipping: a gate that
+     repairs its own failures is not a gate, and the fix belongs in its own reviewed change." Same
+     shape, applied to provisioning: a process that repairs its own failures destroys the evidence
+     of what happened.
    - *Justification class: general engineering knowledge*, for the retry taxonomy and for the rule
      that a resource holding data is never recreated.
    - State the seam: an outage in a running system is `keel:incident-response`, not this file. A
@@ -398,13 +399,13 @@ justification, not from anywhere else.
    dispositions, decided per variable and recorded: copy the development value unchanged, transform
    it, regenerate it, refuse it because it must not exist in production, or ask the user because
    only they hold it. Nothing is copied by default.
-   - *Justification class: keel practice.* `skills/setup-deployment/SKILL.md:30-31`: "Every pipeline
+   - *Justification class: keel practice.* `skills/setup-deployment/SKILL.md` lines 30-31 at `bda1acc`: "Every pipeline
      stage runs a command from `profile.verify`. If a command is `null`, the pipeline cannot check
      that thing and you must say so rather than substituting a guess." The rule generalises: decide
      each item explicitly, and where the answer is unknown say so rather than substituting a
      plausible one.
    - *Justification class: keel practice.*
-     `skills/setup-deployment/references/pipeline-patterns.md:120-124` already sets the handling
+     `skills/setup-deployment/references/pipeline-patterns.md:119-123` already sets the handling
      rule: injected at runtime, never in an image layer or a build argument, never echoed. This
      section is the decision that precedes the handling, not a replacement for it.
 
@@ -414,7 +415,7 @@ justification, not from anywhere else.
    signing or session secret shared with a developer machine, and a value that is present at runtime
    but absent at build time in a stack that reads configuration at build time.
    - *Justification class: keel practice.*
-     `skills/security-audit/references/owasp-checklist.md:119-127`, "Security misconfiguration",
+     `skills/security-audit/references/owasp-checklist.md:118-126`, "Security misconfiguration",
      already names the shape: "A value that starts the service when empty is worse than one that is
      missing, because it starts." This section is that observation turned into a pre-deploy list.
    - *Justification class: general engineering knowledge*, for the specific classes.
@@ -426,7 +427,7 @@ justification, not from anywhere else.
    check could not run and says which), and `not attempted` (nobody ran it, and it is named rather
    than left out). A cascade reports one cause once rather than fifteen failures.
    - *Justification class: keel practice.*
-     `skills/repo-snapshot/references/section-templates.md:169` already runs a three-value evidence
+     `skills/repo-snapshot/references/section-templates.md:167` already runs a three-value evidence
      vocabulary, `measured`, `estimated`, `unmeasured`, "and the word" is required on every value.
      This is the same device for a different question.
    - *Justification class: keel practice.* `skills/security-audit/SKILL.md`: "Say plainly what
@@ -557,12 +558,12 @@ Net: plus 12, minus 19, so 738 becomes **731**.
 
 2. **`## A finding is a contradiction`.** Every finding is a claim the repository publishes set
    against the code that fails to keep it. An absence is not a finding here.
-   - *Justification class: keel practice.* `skills/review-code/SKILL.md:68-69`: "Per finding:
+   - *Justification class: keel practice.* `skills/review-code/SKILL.md:72-73`: "Per finding:
      `file:line`, what is wrong, why it matters, and what to do. Never a finding without a location,
      and never a location without a reason." A drift finding has two locations rather than one, and
      both are required.
    - **State the seam explicitly, because the rule is otherwise wrong.** keel's audits *are*
-     largely lists of absences: `skills/security-audit/references/owasp-checklist.md:79-101` is a
+     largely lists of absences: `skills/security-audit/references/owasp-checklist.md:78-100` is a
      whole section asking what is missing, and `skills/ship/SKILL.md:21-22` treats a missing test as
      an incomplete change. "Absence is not a finding" is a rule for **this** audit only, because a
      claims audit that lists what a bigger project would have has stopped being a claims audit.
@@ -610,7 +611,7 @@ Net: plus 12, minus 19, so 738 becomes **731**.
 6. **`## Reporting`.** Ranked by who is affected and how badly, capped, and closing with a named
    list of what could not be checked and why. The audit is read-only: it reports, and fixing is a
    separate explicit ask.
-   - *Justification class: keel practice.* `skills/review-code/SKILL.md:63-64` caps at "around ten
+   - *Justification class: keel practice.* `skills/review-code/SKILL.md:67-68` caps at "around ten
      findings. More than that means the change is too large to review, and that is itself the
      finding", and `:82` sets the read-only rule: "Rewriting it yourself in the review | Say what is
      wrong. The author fixes it." "Say plainly" in `skills/security-audit/SKILL.md` sets the close.
@@ -747,11 +748,11 @@ agreeing with them, and agreement between agents that see each other is an echo,
 620 plus 33 is **653**.
 
 **This goes in the body and not in a reference, and that is a deliberate departure worth
-recording.** `skills/security-audit/SKILL.md:29-44` lists seven phases and only three of them have a
+recording.** `skills/security-audit/SKILL.md:33-48` lists seven phases and only three of them have a
 reference file (`stride.md`, `owasp-checklist.md`, `payments-checklist.md`). A rule placed in a
 reference would reach three of seven subagents. The rule is an instruction to whoever dispatches, so
 it belongs where the dispatch instruction already is.
-- *Justification class: keel practice.* `skills/review-code/SKILL.md:26-27` already prefers
+- *Justification class: keel practice.* `skills/review-code/SKILL.md:29-30` already prefers
   independent reviewers for exactly this reason: "Its multi-agent confidence scoring catches more
   than one inline read." Confidence from several agents is only worth more than one agent's if the
   agents are independent.

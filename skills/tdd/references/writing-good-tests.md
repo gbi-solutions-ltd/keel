@@ -16,11 +16,10 @@ production change that should break it, saving the wrong data, does not.
 
 ## Picking the smallest production change when two names both cover a case
 
-The cycle's unit is the set of cases that all go red for one named missing production change, and
-the name has to be the **smallest** change that makes the case red. Two candidate names will often
-both cover a case, and the coarser one is always the more convenient: the coarser the name, the more
-cases fall under it, and the fewer whole-suite runs the unit costs. That convenience is exactly why
-the rule picks the smaller one.
+Two candidate names for the unit's production change will often both cover a case, and the coarser
+one is always the more convenient: the coarser the name, the more cases fall under it, and the fewer
+whole-suite runs the unit costs. That convenience is exactly why the skill's RED step names the
+smallest change.
 
 Read the smallest change off the diff, not off the wording. Take a payouts case: a request carries
 `acc_1 500 USD`, the account is GBP, and the stored row comes back with an empty currency field.
@@ -103,7 +102,7 @@ variable, and because the payout currency and the account currency were the same
 case, no assertion there could tell the two apart. Coverage counted the line. Mutation prices it in
 two minutes: read the currency off the account instead of the request, run the file, watch every
 case stay green. That survivor is the finding, and the case that kills it is a payout in a currency
-the account does not hold, which "Test the edges" above already asks for on money.
+the account does not hold, which "Test the edges" below already asks for on money.
 
 The arm reached the technique itself, without the word, and its two minutes are the shape to copy:
 
@@ -113,12 +112,12 @@ The arm reached the technique itself, without the word, and its two minutes are 
 
 ### Why a mutant is evidence and an argument is not
 
-That a test can fail is a claim about it; watching it go red is a measurement of it. This repository
-holds itself to the second. Of the twelve cases added by the Dart and Flutter stack detection work,
+That a test can fail is a claim about it; watching it go red is a measurement of it. keel holds its
+own tests to the second. Of the twelve cases added by keel's Dart and Flutter stack detection work,
 the record reads **"Every one of the twelve was proved able to fail, by mutation rather than by
-argument."** Twelve cases, twelve reds, and no reader has to take the author's word for any of
-them. The same work found the primary regression guard for the whole change "one placement away from
-being incapable of failing", by running it rather than by reading it.
+argument."** Twelve cases, twelve reds, and no reader has to take the author's word for any of them.
+The same work found the primary regression guard for the whole change "one placement away from being
+incapable of failing", by running it rather than by reading it.
 
 ## Assert on behaviour, never on a mock
 
@@ -209,14 +208,6 @@ the account.
   in CI; only the fast one runs on every save.
 - **Seed the minimum.** A fixture that inserts forty rows to test one behaviour hides which row
   mattered.
-
-### When a mock is still right
-
-At a boundary you do not own and cannot run: a payment processor, an SMTP server, a partner API, the
-clock. Mock those, and understand what you are replacing first. A mock returning a shape the real
-dependency never returns produces a passing test and a broken system.
-
-Never mock your own database, your own service, or a pure function.
 
 ## When the test is hard to write
 

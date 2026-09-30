@@ -14,10 +14,10 @@ Read the PRD and the stories first, as in every mode. Then:
 | No snapshot exists | The existing design, its ADRs, and the code itself |
 
 **A missing snapshot is normal, not an omission to fix first.** `repo-snapshot` is for onboarding
-onto an unfamiliar codebase. A project keel built from an idea has never needed one, so `--existing`
-on keel's own output will usually find nothing there. Do not stop, and do not run `repo-snapshot`
-just to satisfy this step: the design and the ADRs already say what a snapshot would, in more detail
-and with the reasoning attached.
+onto an unfamiliar codebase. A project keel built from an idea has never needed one, so `existing`
+mode on keel's own output will usually find nothing there. Do not stop, and do not run
+`repo-snapshot` just to satisfy this step: the design and the ADRs already say what a snapshot
+would, in more detail and with the reasoning attached.
 
 Read the code as well as the documents, whatever the documents say. In this mode the code is the
 requirement: it is what "established patterns win" actually refers to, and a pattern you have only

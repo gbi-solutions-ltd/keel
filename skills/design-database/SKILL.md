@@ -1,6 +1,6 @@
 ---
 name: design-database
-description: Use when designing a database schema, reviewing or remediating an existing one, normalising tables, choosing column types, or planning indexes and partitioning for a database.
+description: Use when designing a database schema, reviewing an existing one and proposing its remediation, normalising tables, choosing column types, or planning indexes and partitioning for a database.
 allowed-tools: [Read, Write, Edit, Bash, Grep, Glob]
 ---
 
@@ -22,8 +22,7 @@ Hand these off rather than repeating them. Each already has an owner that does i
 |---|---|
 | Which engine, and whether a database is the right store at all | `design-architecture` |
 | Query latency, N+1, a missing index on a slow query, reading a plan | `optimize-performance` |
-| Producing the document itself | `write-docs` |
-| Drawing the ERD | `design-architecture/references/mermaid-patterns.md`, section ER |
+| Drawing the ERD | [../design-architecture/references/mermaid-patterns.md](../design-architecture/references/mermaid-patterns.md), section ER |
 
 Partitioning stays here, because it is a schema decision with a retention consequence rather than a
 query fix.
@@ -32,6 +31,8 @@ Engine specifics live in [references/postgres.md](references/postgres.md) and
 [references/oracle.md](references/oracle.md). The steps below are engine-agnostic.
 
 ## Step 1: Establish what you are looking at
+
+When designing, record the expected row counts per table instead, and go to Step 2.
 
 Read the schema from the database where you can, and say plainly where you could not. A
 hand-regenerated schema file may not describe production, and a review of the wrong artifact is
@@ -71,8 +72,4 @@ recommendation nobody can act on this quarter.
 
 | Mistake | Instead |
 |---|---|
-| Reviewing the headline defect and stopping | The sections are a sweep. Fill them all |
 | An ERD left undrawn because the model seemed obvious | You reconstructed it in order to review it. Draw it |
-| `None found` written without looking | It claims a sweep happened. Do the sweep |
-| Recommending a rewrite where a constraint would do | Say what the smallest correct change is |
-| Reviewing a schema file as though it were the database | Say which one you read, and what that costs |

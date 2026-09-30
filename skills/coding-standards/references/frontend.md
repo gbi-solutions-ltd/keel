@@ -1,6 +1,7 @@
 # Frontend standard
 
-Read this when the project has a UI. `profile.stack.has_ui` says whether it does.
+Read this when the project has a browser UI: `profile.stack.has_ui` is true and
+`profile.stack.framework` is not `flutter`.
 
 ## Components: build the shared one first
 
@@ -127,7 +128,8 @@ and be sceptical of a dependency added for one function.
 
 - A component that duplicates an existing one. Name both.
 - A hex colour, a raw font, or a magic pixel value outside the token file.
-- A token in `localStorage`, or a secret in a `PUBLIC_`-prefixed variable.
+- A token in `localStorage`, or a secret in any variable the bundler exposes (`NEXT_PUBLIC_*`,
+  `VITE_*`).
 - A permission enforced only by hiding UI.
 - `dangerouslySetInnerHTML` with no sanitiser and no comment.
 - A `div` or `span` carrying a click handler where a `button` or `a` belongs.

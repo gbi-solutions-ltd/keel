@@ -5,12 +5,18 @@ on:
     branches: [main]
   pull_request:
 
+# Stated here because otherwise the token's scope is a repository setting nobody can see from this
+# file, and no job below writes to the repository.
+permissions:
+  contents: read
+
 jobs:
   validate:
     name: Validate skills and templates
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # Pinned to a commit rather than a tag, because a tag can be moved and a commit cannot.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # Every rule in the validator exists because it was violated during development.
       - name: Run tests
@@ -27,6 +33,43 @@ jobs:
           echo "running: $LINT"
           eval "$LINT"
 
+  # A separate job rather than a matrix on `validate`, so that job's required-check name does not
+  # change. Advisory until it has a week of green runs, by decision on 2026-09-25: branch
+  # protection does not list it yet. macOS is the maintainer's platform and had never run in CI.
+  # Stock macOS ships neither `timeout` nor `gtimeout`, so doctor runs verify commands unbounded
+  # there; the first step records which one this runner has, because a runner image with coreutils
+  # would not take that path. Tests only: shellcheck is not preinstalled on macOS runners, so the
+  # lint step in run-tests.sh reports SKIP here, and lint results do not depend on the platform.
+  test-macos:
+    name: Tests on macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Record which timeout binary exists
+        run: command -v timeout gtimeout || echo "neither timeout nor gtimeout"
+
+      - name: Run tests
+        run: tests/run-tests.sh
+
+  # ruff over the Python in lib/, in CI only, by decision on 2026-09-25: the local lint string stays
+  # shellcheck, so a contributor needs nothing new. Installed by hash from ruff-requirements.txt, so
+  # a ruff release cannot turn CI red on its own and a replaced file on PyPI cannot run here, and
+  # the rule set named, because ruff's defaults add a style rule with 110 findings here. --isolated
+  # keeps any ruff configuration outside the repository out of the result. It installs into a venv
+  # because the runner's system Python refuses pip installs (PEP 668).
+  python-lint:
+    name: Python lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: ruff
+        run: |
+          python3 -m venv "$RUNNER_TEMP/ruff"
+          "$RUNNER_TEMP/ruff/bin/pip" install --require-hashes --no-deps -r .github/ruff-requirements.txt
+          "$RUNNER_TEMP/ruff/bin/ruff" check --isolated --no-cache --select E4,E7,E9,F lib/
+
   # A separate job, deliberately, rather than one more line inside `validate`. This is the check that
   # decides whether code reaching other people's machines is safe, so it must be selectable as a
   # required status check on its own and must not be able to pass because an unrelated step was
@@ -35,7 +78,7 @@ jobs:
     name: Supply chain
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 

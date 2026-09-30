@@ -1,6 +1,6 @@
 # Pipeline patterns
 
-Shapes that work, and the traps found in real repositories during this work.
+Shapes that work, and the traps found in real repositories while keel was being built.
 
 ## Stage order
 
@@ -9,13 +9,13 @@ install -> lint -> typecheck -> test -> security scan -> build artifact -> push 
 ```
 
 Cheap and fast first, so a formatting error fails in thirty seconds rather than after a container
-build. Every stage fails the build.
+build.
 
 ## Traps, each found in a real repository
 
 **A test step that cannot fail.** `continue-on-error: true` on a test step means the pipeline
-reports green with a broken suite. Found on a service whose coverage was low single digits, where the
-tests also gated nothing. Read the conditions, not the step names.
+reports green with a broken suite. Found on a service whose coverage was low single digits, where
+the tests also gated nothing.
 
 **Gating the wrong branch.** A pull-request trigger scoped to the default branch, while all the
 work happens on another. The gates exist and never apply. Check which branch people actually push
@@ -42,14 +42,14 @@ rollback then restores the image and not the schema. Decide this deliberately an
 no Dockerfile. The documented "start everything" command cannot work, and nobody noticed because
 everyone runs things individually.
 
-**A pipeline command that differs from the local one.** The most self-inflicted trap here, and I
-walked into it building this repository. The lint step in CI ran `shellcheck`; everyone locally ran
+**A pipeline command that differs from the local one.** The most self-inflicted trap here, and keel
+walked into it building its own repository. Its CI lint step ran `shellcheck`; everyone locally ran
 `shellcheck -S warning`. Both looked correct in isolation. CI then failed on 52 findings that had
 never appeared on a laptop, and the natural reaction is to distrust the pipeline rather than the
 command.
 
-**Define each verify command once and have both sides read it.** In keel the pipeline reads
-`.keel/profile.json` rather than restating the string:
+**Define each verify command once and have both sides read it.** Have the pipeline read
+`.keel/profile.json` rather than restate the string, for example:
 
 ```yaml
 - name: Lint
@@ -79,7 +79,7 @@ RUN useradd --create-home app
 COPY --from=build --chown=app:app /app/node_modules ./node_modules
 COPY --from=build --chown=app:app /app/dist ./dist
 USER app
-HEALTHCHECK --interval=30s CMD node healthcheck.js
+HEALTHCHECK --interval=30s CMD node dist/healthcheck.js
 CMD ["node", "dist/main.js"]
 ```
 
@@ -103,9 +103,8 @@ must be patched. A 60MB jar in a 1.1GB image is mostly things nobody chose.
 A deleted file in a later layer is still in the image. Cleaning must happen in the layer that
 created the thing.
 
-**Measure it, do not assume.** `docker image ls` for the total, `docker history --no-trunc` for which
-layer is responsible. A layer you cannot explain is a layer to investigate. Record the size in the
-runbook so growth is visible rather than gradual.
+**Measure it, do not assume.** `docker image ls` for the total, `docker history --no-trunc` for
+which layer is responsible. A layer you cannot explain is a layer to investigate.
 
 Where the runtime supports it, a distroless or scratch final stage removes the shell and the package
 manager entirely. That is a real security gain and it makes debugging harder, so decide it
@@ -121,11 +120,10 @@ non-reproducible build makes that difference invisible.
 
 Injected at runtime, from the platform's secret store. Never in an image layer, never in a build
 argument (they persist in history), never echoed. To log presence without the value, use
-`${VAR:+SET}${VAR:-UNSET}`, which also distinguishes unset from empty. Those are different bugs.
+`[ -n "${VAR+x}" ] && { [ -n "${VAR:+x}" ] && echo SET || echo EMPTY; } || echo UNSET`, which also
+distinguishes unset from empty and never puts the value in a shell trace. Those are different bugs.
 
 ## Rollback
 
 Every pipeline needs a stated answer to: what is rolled back, what is not, and how long it takes.
 Schema is usually the part that is not, and that must be explicit rather than discovered.
-
-Then execute it once by hand and record that you did. An untested rollback is a hope.

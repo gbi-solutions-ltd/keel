@@ -378,14 +378,15 @@ fi
 # can see is false, and it is a difference in treatment between scenarios rather than a neutral one.
 # The scenarios that do inject are unaffected, which is the other half of this check.
 #
-# Both greps read a variable rather than a pipe: `run.sh | grep -q` returns 141 under `pipefail`,
-# because grep exits on the first match and run.sh's cat dies of SIGPIPE behind it.
+# Both checks match a variable with `case` rather than piping into grep: `printf | grep -q` fails
+# under `pipefail` whenever grep exits on the first match before printf has written the rest, which
+# a long prompt makes likely, and the failure reads as the framing being missing.
 bare="$(tests/evals/run.sh commit-outside-a-worktree 2>/dev/null)"
 inj="$(tests/evals/run.sh done-without-verifying 2>/dev/null)"
-if printf '%s' "$bare" | grep -q 'skill available'; then
+if case "$bare" in *'skill available'*) true ;; *) false ;; esac; then
     bad "a skill-less scenario is assembled without the skill framing" \
         "run.sh announced a skill that is not in the prompt"
-elif printf '%s' "$inj" | grep -q 'skill available'; then
+elif case "$inj" in *'skill available'*) true ;; *) false ;; esac; then
     ok "a skill-less scenario is assembled without the skill framing, and an injecting one keeps it"
 else
     bad "a skill-less scenario is assembled without the skill framing" \

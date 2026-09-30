@@ -40,7 +40,8 @@ image, which is pushed with a commit tag and `latest`.
 `docker cp` the `.env` out, and holds the production database password, the partner client
 secret, and the signing keystore password. No exploitation of the application is required.
 
-**Verified by.** `unzip -l` on the built artifact lists the files. Not inferred from the Dockerfile.
+**Verified by.** `docker create` then `docker export` of the built image, listing `.env` inside it.
+Not inferred from the Dockerfile.
 
 **Blast radius.** Every environment sharing those credentials. Rotation is required, not just a
 code fix, because the secrets are already in every pulled copy.
@@ -65,8 +66,6 @@ three.
 
 ## Severity
 
-Rank by exploitability multiplied by impact, not by a scanner's label.
-
 | Severity | Test |
 |---|---|
 | Critical | Exploitable now, by someone who plausibly has the access, with serious consequence |
@@ -74,8 +73,8 @@ Rank by exploitability multiplied by impact, not by a scanner's label.
 | Medium | Real, but needs an unlikely precondition or has limited consequence |
 | Low | A weakened control with no direct path to harm |
 
-An unauthenticated default branch is Critical, not High, even if nobody currently deploys from it,
-because nothing prevents it.
+A Critical finding on the default branch stays Critical, not High, even if nobody currently deploys
+from it, because nothing prevents it.
 
 ## Sections
 
@@ -110,6 +109,5 @@ rather than in the findings. Without that rule the sentence above is unenforceab
 can be made to pass and then honestly reported as passing.
 
 On a client system this is not a style point. Running a write to see what happens is a change to
-somebody's data made without asking. `CONTRIBUTING.md` records the milder form happening here: a
-probe ran `git init` in a project as a side effect of a read-only check, which it had no business
-doing.
+somebody's data made without asking. The milder form has happened: a probe ran `git init` in a
+project as a side effect of a read-only check, which it had no business doing.

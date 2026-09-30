@@ -55,9 +55,9 @@ six that have a language server in `claude-plugins-official`", and names Dart am
 and deferred: they have real toolchains but no LSP plugin, so they would get a test command and
 nothing else". The LSP half of that was re-checked on 2026-08-29 against the marketplace on this
 machine: it carries twelve language server ids, they are the same twelve `lang_lsp`
-(`lib/detect-stack.sh:758-773`) already maps, and **none of them is for Dart.** Nothing has changed.
-Reopening a decision that was taken on the record, with its reason intact, needs a better argument
-than a fresh instance of the same request.
+(`lib/detect-stack.sh#lang_lsp() {`) already maps, and **none of them is for Dart.** Nothing has
+changed. Reopening a decision that was taken on the record, with its reason intact, needs a better
+argument than a fresh instance of the same request.
 
 That argument is answerable, and the answer is in the second half of the deferral's own sentence
 rather than in the first. **"A test command and nothing else" is measurably false for Dart.** The
@@ -66,8 +66,9 @@ that is already on `PATH` when the project can be worked on at all, so `test`, `
 `format`, `format_fix` and `build` are all knowable with no config file and no dependency sniffing.
 That is six of the ten verify keys, unconditional, against PL/SQL's nought, and PL/SQL was built. The
 LSP finding is not a reason to decline; it is a reason for the `lang_lsp` arm not to exist, which is
-already how that function handles an unmapped language (`lib/detect-stack.sh:758-773` returns empty
-and `detect_plugins` at `:778-785` drops it) and exactly what `plsql` does today.
+already how that function handles an unmapped language (`lib/detect-stack.sh#lang_lsp() {` returns
+empty and `detect_plugins` at `lib/detect-stack.sh#detect_plugins() {` drops it) and exactly what
+`plsql` does today.
 
 **Alternatives**
 
@@ -99,7 +100,7 @@ and `detect_plugins` at `:778-785` drops it) and exactly what `plsql` does today
 | `pubspec.yaml` does not collide with another manifest | No project declares two ecosystems | Checked across all 22: none sits beside a `package.json`, `go.mod`, `Cargo.toml` or `pom.xml`. So the precedence question is untested rather than settled | Partly. No instance exists to test the ordering against |
 | `verify.test` is worth setting | A test command that runs is better than null | All 15 have a `test/` directory and at least one `*_test.dart`, so `flutter test` always runs. **But 13 of the 15 have exactly one, the generated `widget_test.dart`.** The command is real; what it exercises mostly is not | **Yes, and the caveat is real.** Open question 3 |
 | Six verify keys are fillable from the toolchain | The SDK ships runner, analyzer, formatter and builder | `dart --version` 3.12.2 and `flutter --version` 3.44.4 on this machine, one binary each, no per-project config needed | **Yes** |
-| Flutter implies a user interface | `has_ui` should be true | Follows from what Flutter is. `detect_has_ui` (`lib/detect-stack.sh:700-706`) keys on a framework list that would gain `flutter`, exactly as it already carries `apex` | **Yes** |
+| Flutter implies a user interface | `has_ui` should be true | Follows from what Flutter is. `detect_has_ui` (`lib/detect-stack.sh#detect_has_ui() {`) keys on a framework list that would gain `flutter`, exactly as it already carries `apex` | **Yes** |
 | One `build` command is knowable | Flutter builds without a target | It does not: `flutter build` requires `apk`, `ipa`, `web` and so on. The platform directories are discoverable (`android/` and `ios/` in all 15) but choosing among them is a guess | **No, and it is the one key that should stay null.** Open question 4 |
 
 ## What the system says
@@ -107,12 +108,12 @@ and `detect_plugins` at `:778-785` drops it) and exactly what `plsql` does today
 | Finding | Evidence | What it means for the idea |
 |---|---|---|
 | Dart was excluded by name, with a reason | `docs/plans/2026-08-14-multi-stack-detection.md:67-70` | This is a reversal and must argue against that sentence, not around it. The reversal is that Dart yields six verify keys, not one |
-| There is still no Dart language server | The marketplace on this machine lists twelve LSP ids, the same twelve at `lib/detect-stack.sh:758-773`. Checked 2026-08-29 | The LSP half needs no code. `lang_lsp` returns empty for an unmapped language and `detect_plugins` skips it, which is what `plsql` already relies on |
+| There is still no Dart language server | The marketplace on this machine lists twelve LSP ids, the same twelve at `lib/detect-stack.sh#lang_lsp() {`. Checked 2026-08-29 | The LSP half needs no code. `lang_lsp` returns empty for an unmapped language and `detect_plugins` skips it, which is what `plsql` already relies on |
 | Every detected language is read from a declared manifest | `lib/detect-stack.sh:306-364` | `pubspec.yaml` fits the doctrine exactly. Unlike PL/SQL, this needs no inference and no ratio test |
 | A detected language with no `tool-choices.md` row fails the build | `tests/validate-skills.sh:414-429`, which extracts the languages from `detect_languages` itself and demands a row per language | Adding `dart` requires at least one row in `skills/keel/references/tool-choices.md`. Its Test, Lint and Typecheck tables all carry a `plsql` row, so three is the shape to match |
-| `has_ui` is currently wrong, not merely empty | `detect_has_ui` (`lib/detect-stack.sh:700-706`) keys on `next react vue svelte angular apex`, then falls back to `public/` or `index.html`. A Flutter app has neither, so it returns `false` | The only field where the current behaviour actively misinforms a skill. One word in one `case` fixes it |
-| `detect_datastores` cannot see a Dart dependency | `lib/detect-stack.sh:721-753` greps a fixed list of manifest files that does not include `pubspec.yaml` | `sqflite` in 13 of 15 is invisible. Adding one filename and one token to the existing `sqlite` pair covers the fleet |
-| The verify arms are per-language `case` blocks | `detect_verify` (`lib/detect-stack.sh:456-693`), one arm per language, each gating a command on a marker before emitting it | A `dart` arm is additive and touches nothing else. The Rust and C# arms are the closest models: toolchain commands, emitted unconditionally |
+| `has_ui` is currently wrong, not merely empty | `detect_has_ui` (`lib/detect-stack.sh#detect_has_ui() {`) keys on `next react vue svelte angular apex`, then falls back to `public/` or `index.html`. A Flutter app has neither, so it returns `false` | The only field where the current behaviour actively misinforms a skill. One word in one `case` fixes it |
+| `detect_datastores` cannot see a Dart dependency | `lib/detect-stack.sh#detect_datastores() {` greps a fixed list of manifest files that does not include `pubspec.yaml` | `sqflite` in 13 of 15 is invisible. Adding one filename and one token to the existing `sqlite` pair covers the fleet |
+| The verify arms are per-language `case` blocks | `detect_verify` (`lib/detect-stack.sh#detect_verify() {`), one arm per language, each gating a command on a marker before emitting it | A `dart` arm is additive and touches nothing else. The Rust and C# arms are the closest models: toolchain commands, emitted unconditionally |
 | There is no Dart fixture anywhere in the tests | `tests/test-keel.sh:44-140` builds one fixture per ecosystem; none is Dart | The test shape is established and the work is a new `fixture_build` arm plus rows in the existing detection loop at `:174-191` |
 | PL/SQL is the precedent for the whole shape of this change | `docs/ideas/plsql-stack-detection.md`, `docs/prd/plsql-stack-detection.md`, `docs/plans/2026-08-18-plsql-stack-detection.md` | A fourteenth language has been added once, recently, through the full chain. This one is strictly easier: a declared manifest, real commands, and no language server to argue about |
 | The fleet has no wrapper scripts to read | No `Makefile`, no `justfile`, no `scripts/` directory in any of the 15 | Nothing to detect beyond the SDK commands, and nothing to prefer over them |

@@ -111,7 +111,7 @@ every skill its facts. If effort is scarce, `plsql-stack-detection.md` is worth 
 | A fresh repo gets seven plugins | Fixture, 2026-08-18; `bin/keel:563-566` | The intended behaviour works |
 | A repo with an existing settings file gets none | Fixture, 2026-08-18; `bin/keel:558-561`, `:583-606` | The gap, and it is an early return rather than a decision |
 | Not even `keel@gbi` is enabled in that case | Same fixture | The most surprising part. A repository can be initialised by keel and not have keel enabled |
-| `plugin_report` reads a key init never writes | `bin/keel:142-163`; `templates/profile.schema.json:397` declares `plugins` | The reporting machinery is built, correct, and starved of input |
+| `plugin_report` reads a key init never writes | `bin/keel:142-163`; `templates/profile.schema.json:403` declares `plugins` | The reporting machinery is built, correct, and starved of input |
 | The omission is recorded as deliberate | `tests/validate-skills.sh:358-360`, "which init never writes because a human adds them" | Writing it reverses a stated decision. Small, but it should be reversed knowingly |
 | keel already refuses to make machine-level decisions in a committed file | `bin/keel:608-614`, on permission mode | The precedent argues against the merge variant and for the report variant |
 | Marketplace absence is already handled by naming the command | `bin/keel:1407` | The pattern for "tell the user what to run" exists and is worth copying |

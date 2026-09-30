@@ -1,7 +1,6 @@
 # House defaults
 
-Conventions that apply across this organisation's repositories unless a project records a
-deliberate departure.
+Conventions every project using keel inherits unless it records a deliberate departure.
 
 **Adopters inherit it unchanged.** There is no overlay, no per-project defaults file and no profile
 key that switches a default off. A project that disagrees with a default says so in its own
@@ -11,7 +10,7 @@ deliberate: a departure a reader can see beats a default that was quietly never 
 ## The other references, and when each applies
 
 Some topics are large enough, specific enough, and got wrong often enough to carry their own file.
-This index lives here rather than in the skill body so that adding a tenth costs nothing in the
+This index lives here rather than in the skill body so that adding another costs nothing in the
 budget a skill body is held to.
 
 Read the ones that apply and fold their rules into the project's `standards.md`. Do not read them
@@ -22,10 +21,10 @@ all: most projects need four or five.
 | [observability.md](observability.md) | Always. Logging, telemetry, traces |
 | [time-and-dates.md](time-and-dates.md) | Always. Short, and the highest defect rate here |
 | [resilience.md](resilience.md) | Anything is called over a network |
-| [async-work.md](async-work.md) | There is a queue, a worker, or a scheduled job |
-| [authorisation.md](authorisation.md) | There is more than one kind of user |
+| [async-work.md](async-work.md) | There is a queue, a worker, a scheduled job, or a published event |
+| [authorisation.md](authorisation.md) | There is a UI, an API that serves one, or more than one kind of user |
 | [rate-limiting.md](rate-limiting.md) | The project exposes an API |
-| [api-contracts.md](api-contracts.md) | It has a consumer you cannot deploy: a partner, an app in the field |
+| [api-contracts.md](api-contracts.md) | It has a consumer you cannot deploy: a partner, an app in the field, another team's service |
 | [caching.md](caching.md) | Anything is cached, or somebody is proposing it |
 | [data-protection.md](data-protection.md) | Personal data is stored anywhere |
 | [frontend.md](frontend.md) | `profile.stack.has_ui` is true and `profile.stack.framework` is not `flutter` |
@@ -137,7 +136,7 @@ Detail is in [rate-limiting.md](rate-limiting.md).
   success by every client library, and a rejection with no delay produces the retry storm the limiter
   was meant to prevent.*
 
-## Money, since much of what we build moves it
+## Money
 
 - **Never a float for an amount.** Integer minor units, or a decimal type. *Why: binary floating
   point cannot represent most decimal fractions exactly, so `0.1 + 0.2` is not `0.3` and repeated

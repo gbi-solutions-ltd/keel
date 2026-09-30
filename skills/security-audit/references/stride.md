@@ -1,7 +1,9 @@
 # STRIDE
 
-A threat model over the architecture, not the code. Run it against the container diagram: for each
-component and each boundary it crosses, ask the six questions.
+A threat model over the architecture, not the code. Run it against the container diagram from
+`design-architecture` or `repo-snapshot`; with none, list the components and the boundaries between
+them first, and say so in the report. Then, for each component and each boundary it crosses, ask the
+six questions.
 
 | Threat | The question | Control |
 |---|---|---|

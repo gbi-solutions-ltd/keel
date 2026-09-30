@@ -62,18 +62,15 @@ arrival is not "watch it fail". It is not completed, and whoever ticks the box n
 Paste `git status --porcelain` as your last line. If it lists a path this task does not name, say so
 rather than staging it.
 
-Run the task's `Done when:` command last and paste its output. If you did not run it, say so in
-your first line. A report claiming completion with no command output in it is rejected and
-re-dispatched, which costs more than saying you skipped it.
+Run the task's `Done when:` command after your last code change and paste its output. If you did not
+run it, say so in your first line. A report claiming completion with no command output in it is
+rejected and re-dispatched, which costs more than saying you skipped it.
 ```
-
-Paste the constraints in full rather than summarising them. A summary is where "never start on the
-default branch" quietly disappears.
 
 Paste the standards too, and not a path to them. The review prompt below offers the path as an
 option because a reviewer goes looking for what to judge against; an implementer writes to what is
-in front of it, and by the paragraph above, this brief is all of that there is. Send the rules the
-task can actually breach, not the whole document: a paste nobody can finish reading is the same
+in front of it, and as the section opening says, this brief is all of that there is. Send the rules
+the task can actually breach, not the whole document: a paste nobody can finish reading is the same
 omission with more tokens.
 
 ## 2. Spec compliance review
@@ -88,6 +85,9 @@ asked. Ignore style, naming, and elegance entirely; a separate pass covers those
 === DIFF ===
 <paste the diff, or name the changed files>
 
+=== IMPLEMENTER REPORT ===
+<paste the implementer's report verbatim>
+
 Answer five questions:
 1. Is every step's stated outcome actually present?
 2. Is anything here that no step asked for? Name it.
@@ -100,10 +100,10 @@ Verdict: COMPLIES or DEVIATES, then the reasons. Deviating is not a failure to b
 the finding.
 ```
 
-Question five is the cheapest of the five and the only one that cannot be answered by reading the
-diff, which is exactly why a reviewer under time pressure skips it. Question three is the one that
-catches most real problems. A test that passes while asserting
-something adjacent to the requirement is the most common way a task looks done and is not.
+Questions four and five cannot be answered by reading the diff, and five is the cheapest of all,
+which is exactly why a reviewer under time pressure skips it. Question three is the one that catches
+most real problems. A test that passes while asserting something adjacent to the requirement is the
+most common way a task looks done and is not.
 
 ## 3. Code quality review
 
@@ -133,6 +133,11 @@ One task at a time, unless the plan declares a concurrent batch and every condit
 while task N is unreviewed: if task N deviated, task N+1 may have built on it, and you now have two
 problems entangled.
 
+**Find where the run stands with `keel plan status <plan>`**: its `next:` line names the first
+open step, and so the next task to dispatch; after a compaction it replaces rereading the plan.
+Where `keel` is not installed or not on PATH, or it reports the plan unaddressable, read the
+checkboxes instead.
+
 **Before the first dispatch, and again before each one, check `git status --porcelain` is empty.**
 A dirty tree is not a refusal, so it is not in step 1's table; it is handled here, because it can
 become true again halfway through a run that started clean. Stop and ask what to do with what is
@@ -140,20 +145,29 @@ there: committing, stashing and discarding are all reasonable and all the user's
 [preconditions.md](preconditions.md).
 
 After both passes, with pass one at COMPLIES and pass two carrying nothing `blocking`: tick the
-checkboxes in the plan file, **then commit**, with the paths and the message the task's hand-over
-step names, then dispatch the next.
+task's steps with `keel plan tick <plan> <id>`, **then commit**, with the paths and the message the
+task's hand-over step names, then dispatch the next. Where `keel` cannot run, or reports the plan
+unaddressable because it has no step ids, tick the checkboxes by editing the plan file.
+
+`<id>` is a step id such as `3.2`, one call per step, never a task number. The command is used
+rather than an edit because it rewrites only that step's line, in the form `keel plan status` and
+`ship`'s gate read back, and holds a lock so a batch's ticks cannot overwrite each other. In the
+fallback, "cannot run" means `keel` is not installed or not on PATH. Any other failure (exit 1)
+names what is wrong with the id or the plan, such as an id the plan does not hold, a fence that
+never closes, or a lock still held, and is fixed rather than bypassed by editing the plan by hand,
+which would reopen the race the lock closes.
 
 **You commit, not the implementer.** The implementer stages and stops, unless its task's final step
-says otherwise, which only a batched task's does. This is the order the skill
-body already states, and it is what keeps the review a gate rather than a comment on history that
-has already landed: a verdict you can only act on by rewriting a commit is not a verdict you can
-act on. `plan-template.md` carries the reasoning and the one exception, a declared concurrent batch,
-where each task commits inside its own private worktree and nothing reaches the shared tree until
-you merge it back after review.
+says otherwise, which only a batched task's does. This is the order the skill body already states,
+and it is what keeps the review a gate rather than a comment on history that has already landed: a
+verdict you can only act on by rewriting a commit is not a verdict you can act on.
+[plan-template.md](../../write-plan/references/plan-template.md) carries the reasoning and the one
+exception, a declared concurrent batch, where each task commits inside its own private worktree and
+nothing reaches the shared tree until you merge it back after review.
 
 You are ticking boxes for work you did not do, so tick on the subagent's reported output and add a
-note for every step it named as already satisfied. Nobody witnessed those, and the plan is the only
-place that can say so.
+note, `keel plan tick <plan> <id> --note <text>`, for every step it named as already satisfied.
+Nobody witnessed those, and the plan is the only place that can say so.
 
 **On a DEVIATES verdict**, re-dispatch the same task to a fresh subagent with the review attached,
 rather than asking the original to fix it. A subagent that has already justified its approach will
@@ -181,10 +195,10 @@ into the plan file beside the task before its box is ticked.
 
 ## Which model each prompt goes to
 
-**Dispatch implementation and both reviews with model `inherit`, leading its description.** These
-write code under the TDD gate and judge whether another agent's verdict is right, which is the work
-least worth making cheaper. The wide reading briefs in `repo-snapshot`, `port-assess`,
-`apex-port-plan` and `shape-idea` go to delegation profile `keel-fanout`; these do not.
+**Dispatch implementation and both reviews with model `inherit`, with each dispatch's description
+starting `inherit: `.** These write code under the TDD gate and judge whether another agent's
+verdict is right, which is the work least worth making cheaper. The wide reading briefs in other
+skills go to delegation profile `keel-fanout`; these do not.
 
 A cheaper model that silently handled something that mattered is the failure this rule exists to
 make visible, and it is invisible by construction: the output looks like output.

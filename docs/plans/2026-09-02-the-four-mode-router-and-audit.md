@@ -490,16 +490,16 @@ Correct the two documents that carry the predicted figure, using the measured on
   place in the PRD where a superseded figure sits in a table with no marker, directly above a row
   this task corrects, so a reader sees 900 and 795 side by side with no cue that the first descends
   from an estimate the second retracts.
-- `docs/prd/coding-standards-audit-and-seed.md:102-103`, which is a self-check that fails its own
-  arithmetic: "The nine rows below sum to **873**, and the three-word title above the first heading
-  brings it to **756**, so the convention is self-checking." The nine rows of the table below it are
-  37, 73, 150, 111, 133, 75, 45, 129 and 3, which sum to **756**, and the three-word title is the
-  ninth of them rather than something added to them. 873 plus 3 is 876, the body before `4889f7a`,
-  so the sentence is left over from the ten-row table that carried Step 0a's 119. Correct it to say
-  the nine rows sum to 756, the title row included. **This one is pre-existing and this task does
-  not falsify it**; it is here because it sits three lines above a line this task edits, and a
-  sentence whose whole claim is that it checks itself should not fail its own check while somebody
-  is editing around it.
+- `docs/prd/coding-standards-audit-and-seed.md#The nine rows below sum to`, which is a self-check
+  that fails its own arithmetic: "The nine rows below sum to **873**, and the three-word title above
+  the first heading brings it to **756**, so the convention is self-checking." The nine rows of the
+  table below it are 37, 73, 150, 111, 133, 75, 45, 129 and 3, which sum to **756**, and the
+  three-word title is the ninth of them rather than something added to them. 873 plus 3 is 876, the
+  body before `4889f7a`, so the sentence is left over from the ten-row table that carried Step 0a's
+  119. Correct it to say the nine rows sum to 756, the title row included. **This one is
+  pre-existing and this task does not falsify it**; it is here because it sits three lines above a
+  line this task edits, and a sentence whose whole claim is that it checks itself should not fail
+  its own check while somebody is editing around it.
 - `docs/ideas/coding-standards-audit-and-seed-modes.md`, the "Superseded by `4889f7a`" note, which
   carries 781 and 119 spare from the same prediction.
 
@@ -920,7 +920,7 @@ stands; each closes a way a later edit slips past a check that claims to catch i
   Widen to `/^[-*+] /` and `/^[0-9]+[.)] /`. A `### Seventh` heading also slips through and is
   deliberately left: a heading is visible on the page, and excluding it means teaching the `awk`
   which `#` levels close the section. **Apply the same widening to the `assessment-report.md`
-  section-order case at `tests/test-doc-claims.sh:218`**, which has the identical hole and no bullet
+  section-order case at `tests/test-doc-claims.sh:214`**, which has the identical hole and no bullet
   clause at all: a ninth section written `9) Extra` or `- Extra` walks past it exactly as a seventh
   would have walked past audit's. It needs `/^[0-9]+[.)] /` and a `/^[-*+] /` clause, and its
   `want_order` already carries the numbers, so only the awk filter changes.
@@ -929,7 +929,7 @@ stands; each closes a way a later edit slips past a check that claims to catch i
   claims they survive a re-wrap; that holds for a flush-left paragraph, which gives one space, and
   fails for an indented one, which gives several. Step 0 is flush left today, so this is defensive.
   Add `| tr -s ' '` to both.
-- **The citation in the drift check's comment is wrong.** `tests/test-doc-claims.sh:283` says
+- **The citation in the drift check's comment is wrong.** `tests/test-doc-claims.sh:279` says
   `docs/prd/standards-assessment.md:277-279` names the heredoc as the place the rule is stated. It
   is `:279-280`; `:277` is the tail of the rule sentence and `:278` is blank. Correct it.
 
@@ -959,10 +959,10 @@ backticking `audit.md`'s link, which passes the grep while the span strip stops 
 resolving it: not
 an ordinary edit, but the next reader should not have to find it.
 
-**Correct the citation this task's own edit made stale.** `tests/test-doc-claims.sh:248` says
-"validate-skills.sh:156 resolves only `](...)`". Adding the span strip moved that extraction. Cite
-it by name rather than by line, the way the other corrected citations in this file now do, so it
-cannot go stale again.
+**Correct the citation this task's own edit made stale.**
+`tests/test-doc-claims.sh#scans each SKILL.md, resolves only` says "validate-skills.sh:156 resolves
+only `](...)`". Adding the span strip moved that extraction. Cite it by name rather than by line,
+the way the other corrected citations in this file now do, so it cannot go stale again.
 
 **And trim the case's comment to what the case does.** It claims to prevent "a mode that helpfully
 writes standards.md because the user seemed to want one". It proves some literal strings are
@@ -1180,10 +1180,11 @@ If it returns 0, that plan has not landed, and step 3 below names a check that d
 and say so rather than writing the text anyway.
 
 **This task also carries decision 42, which is not part of S-11 and lands as its own commit.**
-`docs/prd/coding-standards-audit-and-seed.md:126` reads "No mode needs more than 60% of what it
-loads". Section 5.1's own table, five lines above it, gives author 756 of 756, audit 548, seed 362
-and assess 242, so the claim is false for two of the four modes. It is **amended, not departed
-from**: the union argument in the rest of that paragraph is load bearing and stays untouched.
+`docs/prd/coding-standards-audit-and-seed.md#The structural fact this section turns on` reads "No
+mode needs more than 60% of what it loads". Section 5.1's own table, five lines above it, gives
+author 756 of 756, audit 548, seed 362 and assess 242, so the claim is false for two of the four
+modes. It is **amended, not departed from**: the union argument in the rest of that paragraph is
+load bearing and stays untouched.
 
 Replace the sentence with the measured spread and name the counting convention in the same sentence,
 so the figures cannot be read against a different unit later:
@@ -1442,7 +1443,7 @@ Create `tests/evals/fixtures/audit-a-brownfield-tree/`, a Python payments servic
 f-string interpolation and four use `query_param(` with placeholders.
 
 **Not 7 to 3, and this is the change that keeps the arm honest.**
-`skills/coding-standards/SKILL.md:38-40` already tells every arm "A real run found 7 concatenated
+`skills/coding-standards/SKILL.md:39-41` already tells every arm "A real run found 7 concatenated
 SQL queries against 3 parameterised: writing the majority down as the convention would have
 sanctioned an injection vulnerability", and `SKILL.md` is injected whole. A fixture seeded at 7 to 3
 lets an arm reproduce the example's own numbers without counting anything, and whether it counted is
