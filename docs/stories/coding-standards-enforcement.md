@@ -189,11 +189,11 @@ Scenario: the user explicitly accepts a Blocking quality finding
   And the acceptance is noted in the plan file
 ```
 
-**Notes:** `skills/execute-plan/references/subagent-prompts.md:108-125` already dispatches this
-review with the `PROJECT STANDARDS` block and the `Blocking`/`Should fix`/`Consider` vocabulary on
-every task; `:145-165` only ever discusses `DEVIATES` handling. This story adds the missing branch
-to "Running the loop," not a new review pass. Confirmed by Bernard, 2026-09-21, proposed directly
-and confirmed in-scope for this PRD.
+**Notes:** `skills/execute-plan/references/subagent-prompts.md#Code quality review` already
+dispatches this review with the `PROJECT STANDARDS` block and the `Blocking`/`Should fix`/`Consider`
+vocabulary on every task; `#On a DEVIATES` only ever discusses `DEVIATES` handling. This story adds
+the missing branch to "Running the loop," not a new review pass. Confirmed by Bernard, 2026-09-21,
+proposed directly and confirmed in-scope for this PRD.
 
 ## Epic E-03: Mechanical rules shipped as config by `keel init`
 

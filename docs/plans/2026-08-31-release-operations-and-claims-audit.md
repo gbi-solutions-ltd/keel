@@ -558,10 +558,11 @@ Net: plus 12, minus 19, so 738 becomes **731**.
 
 2. **`## A finding is a contradiction`.** Every finding is a claim the repository publishes set
    against the code that fails to keep it. An absence is not a finding here.
-   - *Justification class: keel practice.* `skills/review-code/SKILL.md:72-73`: "Per finding:
-     `file:line`, what is wrong, why it matters, and what to do. Never a finding without a location,
-     and never a location without a reason." A drift finding has two locations rather than one, and
-     both are required.
+   - *Justification class: keel practice.* `skills/review-code/SKILL.md#Step 5: Report` and
+     `skills/keel/references/reporting-findings.md#Never a finding without a location, and never a location without a reason`:
+     "Per finding: `file:line`, what is wrong, why it matters, and what to do. Never a finding
+     without a location, and never a location without a reason." A drift finding has two locations
+     rather than one, and both are required.
    - **State the seam explicitly, because the rule is otherwise wrong.** keel's audits *are*
      largely lists of absences: `skills/security-audit/references/owasp-checklist.md:78-100` is a
      whole section asking what is missing, and `skills/ship/SKILL.md:21-22` treats a missing test as
@@ -611,9 +612,9 @@ Net: plus 12, minus 19, so 738 becomes **731**.
 6. **`## Reporting`.** Ranked by who is affected and how badly, capped, and closing with a named
    list of what could not be checked and why. The audit is read-only: it reports, and fixing is a
    separate explicit ask.
-   - *Justification class: keel practice.* `skills/review-code/SKILL.md:67-68` caps at "around ten
+   - *Justification class: keel practice.* `skills/review-code/SKILL.md#Blocking first. If nothing blocks, say so in the first line` caps at "around ten
      findings. More than that means the change is too large to review, and that is itself the
-     finding", and `:82` sets the read-only rule: "Rewriting it yourself in the review | Say what is
+     finding", and `skills/review-code/SKILL.md#Do not rewrite it yourself` sets the read-only rule: "Rewriting it yourself in the review | Say what is
      wrong. The author fixes it." "Say plainly" in `skills/security-audit/SKILL.md` sets the close.
 
 **What this file must not contain.** No framework, no file-naming convention from one stack, and no

@@ -162,6 +162,45 @@ run "hardcoded docs path in a template is rejected" 1 m_hardcoded_in_template
 m_em_dash() { printf '\nA sentence with an em dash \xe2\x80\x94 which is banned.\n' >> "$1/skills/example/SKILL.md"; }
 run "em dash is rejected" 1 m_em_dash
 
+# An agent file is shipped content and obeys the content rules. Proved absent by mutation on
+# 2026-10-12: an em dash appended to agents/keel-fanout.md gave 0 FAIL, because the content loop
+# reads skills, templates and output-styles, and docs has its own.
+m_agent_em_dash() {
+    mkdir -p "$1/agents"
+    printf -- '---\nname: a-profile\ndescription: Use when testing.\nmodel: sonnet\n---\n\nA body with an em dash \xe2\x80\x94 in it.\n' \
+        > "$1/agents/a-profile.md"
+}
+run "an em dash in an agent file is rejected" 1 m_agent_em_dash
+
+# The model value is the one field a dispatching skill cannot override, so a typo here routes every
+# dispatch naming this profile to nothing. The vendor set is allowed HERE and rejected in a skill
+# body: an agent file is where a harness resolves a profile to a model, which is the indirection
+# lib/harness/codex.sh:86-88 relies on to map keel-fanout to a Codex model.
+m_agent_bad_model() {
+    mkdir -p "$1/agents"
+    printf -- '---\nname: a\ndescription: Use when testing.\nmodel: gpt-4o\n---\n\nBody.\n' \
+        > "$1/agents/a.md"
+}
+run "an agent naming a model alias no harness accepts is rejected" 1 m_agent_bad_model
+
+m_agent_no_model() {
+    mkdir -p "$1/agents"
+    printf -- '---\nname: a\ndescription: Use when testing.\n---\n\nBody.\n' > "$1/agents/a.md"
+}
+run "an agent with no model is rejected" 1 m_agent_no_model
+
+# YAML allows a quoted scalar and trailing spaces, and a harness reads both as the bare value, so
+# the check must too: a check stricter than correct output teaches people to ignore it
+# (docs/standards.md, "A check is never stricter than correct output").
+m_agent_quoted_model() {
+    mkdir -p "$1/agents"
+    printf -- '---\nname: a\ndescription: Use when testing.\nmodel: "sonnet"\n---\n\nBody.\n' \
+        > "$1/agents/a.md"
+    printf -- "---\nname: b\ndescription: Use when testing.\nmodel: 'inherit'  \n---\n\nBody.\n" \
+        > "$1/agents/b.md"
+}
+run "an agent whose model is quoted or carries trailing spaces is accepted" 0 m_agent_quoted_model
+
 m_en_dash() { printf '\nA range 1\xe2\x80\x933 using an en dash.\n' >> "$1/skills/example/SKILL.md"; }
 run "en dash is rejected" 1 m_en_dash
 
@@ -1206,6 +1245,23 @@ m_delegation_healthy() {
 }
 check_reports "a delegation table with 8 documented pairs does not trip the floor" no \
   "documented delegations, against 10" m_delegation_healthy
+
+# The floor. An agents directory that exists and yields no file means the walk is reading nothing,
+# which passes every assertion above. Two rules in this repository have already passed at zero.
+m_agent_dir_empty() {
+    mkdir -p "$1/agents"
+}
+check_reports "an agents directory the walk reads nothing from is reported" yes \
+  "read no agent file" m_agent_dir_empty
+
+# And the other direction, so the floor cannot be satisfied by firing always.
+m_agent_healthy() {
+    mkdir -p "$1/agents"
+    printf -- '---\nname: a\ndescription: Use when testing.\nmodel: inherit\n---\n\nBody.\n' \
+        > "$1/agents/a.md"
+}
+check_reports "a healthy agents directory does not trip the floor" no \
+  "read no agent file" m_agent_healthy
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

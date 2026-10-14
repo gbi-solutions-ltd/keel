@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Generate a harness's hook manifest from lib/harness/capabilities.
+# Generate a harness's hook manifest and the support page from lib/harness/capabilities, and the
+# plugin settings.json (the subagent status line) from lib/subagent_statusline.py.
 #
 # Generated rather than written because four things have to agree about which gates a harness gets,
 # and a hand-maintained copy is the fourth one that goes stale. A stale file is a failing build here,
@@ -14,6 +15,8 @@
 #
 # Usage: tests/generate-harness-artifacts.sh claude > hooks/hooks.json
 #        tests/generate-harness-artifacts.sh codex  > hooks/hooks.codex.json
+#        tests/generate-harness-artifacts.sh support-page > docs/harness-support.md
+#        tests/generate-harness-artifacts.sh subagent-settings > settings.json
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source-path=SCRIPTDIR/..
@@ -86,9 +89,37 @@ one in front of you, and reports a gate its hooks are not trusted to run as dark
 PARA
 }
 
+# ---- the subagent status line registration ---------------------------------
+#
+# settings.json at the plugin root registers keel's subagent status line, and it INLINES the script
+# as a `python3 -I -c` command instead of naming a file: ${CLAUDE_PLUGIN_ROOT} does not resolve in a
+# plugin settings.json (task 1 of docs/plans/2026-10-13-harness-held-dispatch-guarantees.md), so a
+# path to lib/subagent_statusline.py would have nothing to start from. Generated for the reason the
+# manifests are: the source file is the one a person reads and edits, and a hand-kept copy of it
+# inside a JSON string is the one that goes stale. tests/test-subagent-statusline.sh diffs this
+# output against the committed file.
+#
+# The source must be ASCII. The command crosses a shell and an argument list, and what a non-ASCII
+# byte does there depends on the locale, so the generator refuses it rather than guess. Each single
+# quote in the source is closed, escaped and reopened, which is how a shell single-quotes it.
+#
+# The command is `python3 -I -c`, and the -I matters: the harness runs it with the PROJECT directory
+# as the working directory, and a plain `python3 -c` puts that directory first on the import path,
+# so a json.py in the user's project would run on every refresh tick as the user. Isolated mode
+# drops the working directory from the import path and ignores the PYTHON* environment variables.
+subagent_settings() {
+    python3 -I - "$ROOT/lib/subagent_statusline.py" <<'PY'
+import json, sys
+code = open(sys.argv[1], encoding="ascii").read()
+cmd = "python3 -I -c '" + code.replace("'", "'\\''") + "'"
+print(json.dumps({"subagentStatusLine": {"type": "command", "command": cmd}}, indent=2))
+PY
+}
+
 harness="${1:-}"
-[ -n "$harness" ] || { printf 'usage: %s <harness|support-page>\n' "$0" >&2; exit 1; }
+[ -n "$harness" ] || { printf 'usage: %s <harness|support-page|subagent-settings>\n' "$0" >&2; exit 1; }
 if [ "$harness" = support-page ]; then support_page; exit 0; fi
+if [ "$harness" = subagent-settings ]; then subagent_settings; exit 0; fi
 harness_known "$harness" || { printf 'unknown harness: %s\n' "$harness" >&2; exit 1; }
 
 active="$(harness_active_gates "$harness")"

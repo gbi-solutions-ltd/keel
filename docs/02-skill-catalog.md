@@ -366,15 +366,16 @@ the two markers is what lets the check parse every `Plugin call` without a speci
 **Trigger:** "review this", before opening a PR, after finishing a task, or on request for
 a second opinion on a diff.
 **Reads:** the diff, `<docs_root>/standards.md`, the plan if one exists.
-**Writes:** findings, ranked by severity. It does not change the code: "Say what is wrong. The author fixes it."
+**Writes:** findings, ranked by severity. It does not change the code: "Do not rewrite it yourself; the author fixes it."
 **Does:** delegates to the `code-review` plugin when installed, because its multi-agent
-confidence-scored review beats a single inline pass. Falls back to an inline rubric
-otherwise: correctness, standards conformance, test coverage and honesty, error handling,
-performance, security, simplicity.
+confidence-scored review beats a single inline pass, and dispatches its own rubric pass to a
+subagent on `inherit` either way, so that pass is not run by the context that wrote the code. Both
+passes stand and the rubric pass settles a conflict. The rubric covers correctness, standards
+conformance, test coverage and honesty, error handling, performance, security, simplicity.
 
-The house-specific additions the generic plugin will not know about: does the diff match the
-plan, does every changed line trace to the request (Karpathy's surgical-changes test), and
-were any tests written after the code.
+The house-specific additions the generic plugin will not know about: does the diff match the plan,
+does every changed line trace to the request (Karpathy's surgical-changes test), were the tests
+written first, is any accepted decision contradicted, and has a test been proved able to fail.
 
 ### `security-audit`
 

@@ -7,6 +7,55 @@ versions as each skill is tested against real repositories.
 
 Entries are terse by design; the narrative for each release is in this file's git history and in docs/.
 
+## 0.23.0 - 2026-10-13
+
+- Release gate 2026-10-13 against `bcc5aad`: **seven treatment arms, all seven pass**, $1.95 in one
+  round. No accepted failures and no new rationalisation. One shift: `debug-obvious-cause` proved
+  the cause and then applied the fix unasked, where the 0.22.0 arm asked first; the criteria pass
+  it. See `tests/evals/results.md`.
+
+- `tests/validate-skills.sh` checks `agents/` by the content rules that govern `skills/`, plus a
+  frontmatter rule (name, description, a model from `sonnet|opus|haiku|fable|inherit`) with a floor
+  so a walk that reads no agent file fails. It reads a quoted model or trailing spaces as a harness
+  does. It was unchecked, and a mutation showed the gap: an em dash appended to
+  `agents/keel-fanout.md` on 2026-10-12 gave 0 FAIL, and the file was then restored.
+- New `skills/keel/references/reporting-findings.md` states the review reporting rules with their
+  reasons once; `plan-review.md` and `subagent-prompts.md` cite it, and their prompts still state
+  the rules because a subagent reads only its prompt. `review-code` body 645 to 587 words.
+- `review-code` dispatches its rubric pass to a subagent at `inherit`, briefed by the new
+  `skills/review-code/references/rubric-pass.md`. The brief carries the five house checks and
+  defines the three severities, because the ship gate counts a standards finding only at
+  `Should fix`. The body names the five checks and says to read the brief before dispatching: 587
+  to 530 words against the 700 target. `docs/standards.md` now allows a brief in a reference on
+  those terms, which `execute-plan` and `write-plan` already relied on. **This fixes no measured
+  defect:** no review on record passed work because it ran in the authoring context. It buys
+  independence from that context and rests on an argument; the saving at dispatch is not measured.
+  The brief's known gaps are listed in the plan,
+  `docs/plans/2026-10-12-independence-of-a-delegated-review.md`. **Known gap, not closed:** the
+  validator checks that a dispatch names a model, in any skill, and never the `inherit: ` label;
+  review and the brief hold that label.
+- Rubric section 4e is new: an error-level log with no `remediation` field is a standards finding,
+  so a `required` standards gate enforces it at ship. It checks that the field is present, not what
+  it says, and no eval arm covers it.
+- The review prompts in `rubric-pass.md` and `subagent-prompts.md` forbid git commands that change
+  the author's index, tree or stash, and require removing any worktree the reviewer made, whatever
+  the outcome. Both answer incidents of 2026-10-12: a reviewer ran `git stash` on the tree it was
+  judging, and another left a worktree behind.
+- On Claude Code, `agents/keel-fanout.md` disallows the `Edit`, `Write` and `NotebookEdit` tools,
+  and `tests/test-agents.sh` pins the field. Bash stays, because fan-out reading runs `git log` and
+  `grep`, so a Bash command could still change a file. Nothing pins that a dispatch labelled
+  `keel-fanout: ` selects this agent. No Codex equivalent is claimed.
+- On Claude Code, keel's plugin `settings.json` sets a subagent status line showing each
+  keel-labelled subagent's resolved model after its label, with the agent type if unnamed. It
+  replaces the whole row for those rows only. On a narrow pane the name or type goes first, then the
+  token count, then the end of the label, never the model. Other rows keep their default row and a
+  user's own `subagentStatusLine` takes precedence, per the vendor docs, not observed. The script is
+  inlined as a generated `python3 -I -c` command, as `${CLAUDE_PLUGIN_ROOT}` does not resolve there,
+  and the supply-chain scan covers a plugin's root `settings.json`. Observed on macOS, background
+  agents only, with an earlier script (a hand run did not show it, unexplained; foreground and named
+  agents, an installed plugin and Windows unobserved). No label that lied is on record: this makes
+  the label checkable, it does not fix a recorded failure. Not available on Codex.
+
 ## 0.22.0 - 2026-09-30
 
 - Release gate 2026-09-30 against `1139527`: **seven treatment arms, all seven pass**, $1.40 in one

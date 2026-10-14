@@ -28,7 +28,7 @@ Measured on this repository on 2026-09-06, not asserted.
 
 | | Seconds |
 |---|---|
-| `tests/run-tests.sh`, whole suite | **313** (473 recorded 2026-08-16 at `docs/standards.md:147`, it is variable) |
+| `tests/run-tests.sh`, whole suite | **313** (473 recorded 2026-08-16 at `docs/standards.md:155`, it is variable) |
 | `tests/test-keel.sh` alone, the dominant file | 211 |
 | A single `test_one`, for example `tests/test-done-guard.sh` | **2** |
 

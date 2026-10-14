@@ -421,10 +421,11 @@ does not check the prose.
 
 **Status, since the item asked for confirmation first.** Built, shipped and enforced. Four skills
 name `sonnet` on their fan-out briefs; `execute-plan` keeps implementation and both reviews on
-`inherit`; the validator rejects any alias Claude Code does not accept; `docs/standards.md:303-317`
-records the rule and why `haiku` is not used yet. What was **not** built, deliberately: the
-complexity router, session-level switching (unavailable to a plugin at all), routing to third-party
-CLIs, and shipped `agents/` definitions. `docs/ideas/model-routing.md` holds the reasoning.
+`inherit`; the validator rejects any alias Claude Code does not accept;
+`docs/standards.md#A dispatch names its model, and says so` records the rule and why `haiku` is not
+used yet. What was **not** built, deliberately: the complexity router, session-level switching
+(unavailable to a plugin at all), routing to third-party CLIs, and shipped `agents/` definitions.
+`docs/ideas/model-routing.md` holds the reasoning.
 
 - [x] **Step 1: There is no test for this**
 

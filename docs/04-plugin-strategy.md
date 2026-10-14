@@ -67,7 +67,7 @@ adopt theirs, not to run both. Worth re-testing after the pilot.
 
 ## How skills call plugins
 
-The pattern, used identically in every skill that has a plugin dependency:
+The pattern, used in every skill that has a plugin dependency with one departure, described below:
 
 ```markdown
 ## Plugin: code-review
@@ -84,6 +84,10 @@ tell the user:
 Then run the inline rubric.
 ```
 
+`review-code` departs from this in one place: its house-specific checks are dispatched to a
+subagent rather than run inline, so where the plugin is absent it says so once and goes straight to
+that pass.
+
 Three properties this gives us:
 
 1. **Never a hard failure.** A missing plugin degrades the skill, it does not break it.
@@ -99,7 +103,7 @@ every run, not a statement of intent.
 
 | keel skill | Plugin it calls | What it delegates |
 | ----------------- | ----------------- | ------------------- |
-| `review-code` | `code-review` | The correctness pass |
+| `review-code` | `code-review` | The correctness pass. keel dispatches its own rubric pass beside it, and that pass settles a conflict |
 | `security-audit` | `security-guidance`, plus built-in `/security-review` | Diff-level vulnerability detection |
 | `create-skill` | `skill-creator` | Eval harness, variance benchmarking, packaging |
 | `context-budget` | `claude-md-management` | CLAUDE.md quality rubric |

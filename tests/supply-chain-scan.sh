@@ -43,7 +43,8 @@ report() { printf 'FAIL  %s\n' "$1"; errors=$((errors+1)); return 0; }
 #
 # Scopes, because a pattern that is hostile in a hook is ordinary prose in a runbook:
 #   all     every tracked text file
-#   exec    bin/, hooks/, lib/, tests/, .github/workflows/, and anything with the executable bit
+#   exec    bin/, hooks/, lib/, tests/, .github/workflows/, the root settings.json of a plugin
+#           repository only, and anything with the executable bit
 #   prompt  skills/ and templates/ markdown, which are instructions an agent will follow
 #
 # Flags: `i` for case-insensitive, `-` for case-sensitive. The agent-facing rules are insensitive
@@ -131,6 +132,12 @@ in_scope() {  # in_scope <scope> <file>
     case "$1" in
         all) return 0 ;;
         exec)
+            # A plugin's root settings.json is read by the harness and runs a command, so it is
+            # code. In any other repository it is that project's own file, and a JSON file cannot
+            # carry the line-end allow marker, so a finding there could never be suppressed. The
+            # test is the one the executable rules below use, and anything else falls through to
+            # the executable-bit check like any other file.
+            [ "$2" = settings.json ] && [ -f .claude-plugin/plugin.json ] && return 0
             case "$2" in
                 bin/*|hooks/*|lib/*|tests/*|.github/workflows/*) return 0 ;;
                 *)

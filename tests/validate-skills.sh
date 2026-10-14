@@ -204,7 +204,7 @@ while IFS= read -r f; do
         [ -e "$fdir/$target" ] || report "$f: broken link to $target"
     done < <(sed 's/``[^`]*``//g; s/`[^`]*`//g' "$f" \
         | grep -o '](\([^)]*\))' | sed 's/](\(.*\))/\1/' | grep -Ev '^(https?:|#)')
-done < <(find skills templates output-styles -name '*.md' 2>/dev/null)
+done < <(find skills agents templates output-styles -name '*.md' 2>/dev/null)
 
 # Documentation obeys the writing rules too. Everything above covers shipped content only, so every
 # plan, ADR, idea record, runbook and root document was exempt from the rules it is written under.
@@ -336,6 +336,56 @@ bad_models=$(grep -rhoiE 'model `[a-z0-9.-]+`' skills/*/SKILL.md skills/*/refere
     | grep -vxE 'inherit' || true)
 [ -z "$bad_models" ] \
   || report "a skill names a vendor model alias: $(printf '%s' "$bad_models" | tr '\n' ' '). Name a delegation profile instead; ADR-0005."
+
+# An agent file is a delegation profile: a name a skill dispatches to and a harness resolves to a
+# model. Nothing checked one until 2026-10-12, when an em dash appended to agents/keel-fanout.md
+# gave 0 FAIL. The content loop above now covers the dashes, the docs root and the links; what is
+# left is the frontmatter, and the model field is the part no dispatching skill can override, so a
+# typo there routes every dispatch naming the profile to nothing and does it silently.
+#
+# THE VENDOR SET IS ALLOWED HERE AND REJECTED IN A SKILL BODY, deliberately. The check above exists
+# so a skill names a profile rather than a model; this file is the one place the profile becomes a
+# model, which is the indirection lib/harness/codex.sh:86-88 relies on to map keel-fanout to a Codex
+# model. Forbidding the alias here would leave the mapping nowhere to live. The set is what the
+# harness accepts, not what this tree uses: nothing here names fable, and a set narrowed to current
+# usage would reject a correct file the day somebody needs one.
+#
+# THE DESCRIPTION IS CHECKED FOR PRESENCE AND NOT FOR LENGTH. The 216 character ceiling that bounds
+# a skill description is deliberately not applied: agents/keel-fanout.md's own description is 242
+# characters, so extending it here would fail the only agent file in the tree, and
+# docs/standards.md calls a check stricter than correct output the unrecoverable failure. Whether an
+# agent description belongs in the 1,320 token always-loaded total is a separate measurement nobody
+# has taken; it is not taken here, and this comment is where that is recorded.
+#
+# Guarded on the directory existing, like every other repository-only check here, because
+# tests/test-validate-skills.sh runs this validator from fixture roots that build no agents/.
+if [ -d agents ]; then
+    agents_read=0
+    for agent in agents/*.md; do
+        [ -e "$agent" ] || continue
+        agents_read=$(( agents_read + 1 ))
+        afm=$(frontmatter_of "$agent")
+        grep -q '^name:' <<<"$afm" || report "$agent: frontmatter has no name"
+        grep -q '^description:' <<<"$afm" || report "$agent: frontmatter has no description"
+        # Read the value as a harness does: YAML quotes and trailing spaces are not part of it.
+        amodel=$(printf '%s' "$afm" | sed -n 's/^model:[[:space:]]*//p' \
+            | sed -e 's/[[:space:]]*$//' -e "s/^[\"']//" -e "s/[\"']\$//")
+        if [ -z "$amodel" ]; then
+            report "$agent: frontmatter has no model. A dispatch naming this profile resolves to nothing, silently."
+        else
+            case "$amodel" in
+                sonnet|opus|haiku|fable|inherit) : ;;
+                *) report "$agent: model is \"$amodel\", which no harness accepts. Use sonnet, opus, haiku, fable or inherit." ;;
+            esac
+        fi
+    done
+    # The floor, pinned to a recorded count the way the delegation floor at :489 is. Without it this
+    # rule passes every assertion above by reading nothing, which is the failure this repository has
+    # already shipped twice: the section-10 grep that could not fail, and two spawn-count assertions
+    # that passed at zero.
+    [ "$agents_read" -ge 1 ] \
+      || report "agents/ exists and the walk read no agent file, against 1 on 2026-10-12, so this rule is checking nothing. Either the directory is empty or its files are not named *.md."
+fi
 
 # The check above rejects a model that does not exist. It says nothing about a dispatch that names
 # no model at all, so until 2026-08-20 a wrong pin was caught and a missing one was invisible, which

@@ -88,6 +88,15 @@ asked. Ignore style, naming, and elegance entirely; a separate pass covers those
 === IMPLEMENTER REPORT ===
 <paste the implementer's report verbatim>
 
+Do not change the tree you are judging. Run no git command that changes its index, working tree or
+stash: no `stash`, `checkout`, `restore`, `reset`, `commit`, or `git add` of a file. Read it with
+`diff`, `log`, `show` and `status`. If you create a worktree, make it with
+`git worktree add --detach` in a new directory under the system temp directory, so no branch or
+stray directory lands in the author's repo, and remove it with `git worktree remove --force`
+before you report, whatever the outcome; a plain remove refuses a modified worktree.
+On 2026-10-12 a spec reviewer ran `git stash` on the tree under review to measure a baseline, and a
+quality reviewer left a worktree behind.
+
 Answer five questions:
 1. Is every step's stated outcome actually present?
 2. Is anything here that no step asked for? Name it.
@@ -122,9 +131,21 @@ Look for: correctness bugs the tests would not catch, error and edge cases misse
 something that already exists in this codebase, a guard added at a leaf where the boundary was the
 right place, and anything contradicting the standards above.
 
+Do not change the tree you are judging. Run no git command that changes its index, working tree or
+stash: no `stash`, `checkout`, `restore`, `reset`, `commit`, or `git add` of a file. Read it with
+`diff`, `log`, `show` and `status`. If you create a worktree, make it with
+`git worktree add --detach` in a new directory under the system temp directory, so no branch or
+stray directory lands in the author's repo, and remove it with `git worktree remove --force`
+before you report, whatever the outcome; a plain remove refuses a modified worktree.
+On 2026-10-12 a spec reviewer ran `git stash` on the tree under review to measure a baseline, and a
+quality reviewer left a worktree behind.
+
 Rank findings: blocking, should fix, consider. Cap at ten. If nothing blocks, say so in the first
 line.
 ```
+
+[../../keel/references/reporting-findings.md](../../keel/references/reporting-findings.md) carries
+the reason behind the ranking, cap and first-line rules the prompt above states.
 
 ## Running the loop
 

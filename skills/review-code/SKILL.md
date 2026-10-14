@@ -29,34 +29,27 @@ contract.
 If the `code-review` plugin is installed, invoke `/code-review` and use its findings as the
 correctness pass. Its multi-agent confidence scoring catches more than one inline read.
 
-Not installed? Say so once, then do the inline pass:
+Not installed? Say so once, then go straight to step 3, which is then the whole review:
 
 > The `code-review` plugin runs several reviewers with confidence scoring, which catches more than
 > a single pass. Install with `/plugin install code-review@claude-plugins-official`. Continuing
-> inline.
+> without it.
 
-Either way, add the checks in step 3. A generic reviewer does not know this project's intent.
+Either way, run step 3. A generic reviewer does not know this project's intent.
 
-## Step 3: The passes that only we can do
+## Step 3: The pass that only we can do
 
 Run `profile.verify.test` yourself first. `keel:tdd` runs it once at a unit boundary, so review
 is where the suite result is established rather than inherited.
 
-Read [references/rubric.md](references/rubric.md) for the full checklist. The five that a generic
-reviewer cannot run:
-
-1. **Does the diff match the plan?** Anything implemented that no task asked for is unplanned
-   scope. Anything a task asked for and is absent is an incomplete claim.
-2. **Does every changed line trace to the request?** Adjacent improvements, reformatting, and
-   drive-by refactoring belong in their own change. This is the surgical-changes test.
-3. **Were the tests written first?** A test committed after its implementation never ran red, so it
-   is unproven until item 5's revert check. Commit order shows this across commits; within one
-   commit, only the revert check can.
-4. **Does it contradict an accepted decision?** Check `artifacts.decisions` in `.keel/profile.json`,
-   else `<docs_root>/decisions/`, else a decision log. Not every project uses ADRs, and an empty
-   directory means look elsewhere before concluding there are none.
-5. **Has any test in the diff been proved able to fail?** A case nobody watched go red is
-   unproven. Revert the line it covers, run it, restore it. A suite that cannot fail is a finding.
+**Dispatch this pass; do not run it inline.** A reviewer that watched the code being written is
+anchored on it. Read [references/rubric-pass.md](references/rubric-pass.md) now, and brief a
+subagent as it says, with model `inherit` and a description starting `inherit: `. The brief carries
+the rubric and five checks a generic reviewer lacks: the diff matches the plan, every changed line
+traces to the request, the tests came first, no accepted decision is contradicted, and a test was
+proved able to fail. A dispatch without them reviews none of these. Where step 2's plugin ran, both
+stand: it is the correctness pass, and this one settles a conflict, having read the plan, the
+decisions and the standards.
 
 ## Step 4: Rank, and say what blocks
 
@@ -66,16 +59,16 @@ reviewer cannot run:
 | **Should fix** | Will cost real time later, or violates a standard | Fix now or file it with an owner |
 | **Consider** | A genuine preference | Say it once, do not insist |
 
-Put blocking findings first. If nothing blocks, say so in the first line: a reviewer who buries
-approval under nine nitpicks trains people to skim reviews.
-
-Cap it at around ten findings. More than that means the change is too large to review, and that
-is itself the finding.
+Blocking first. If nothing blocks, say so in the first line and name what you checked. Cap at
+around ten.
 
 ## Step 5: Report
 
-Per finding: `file:line`, what is wrong, why it matters, and what to do. Never a finding without a
-location, and never a location without a reason.
+Per finding: `file:line`, what is wrong, why it matters, and what to do. Do not rewrite it yourself;
+the author fixes it.
+
+Read [../keel/references/reporting-findings.md](../keel/references/reporting-findings.md) once: it
+carries the reason behind each rule.
 
 Then name `security-audit` and `ship` as next. Do not start them.
 
@@ -84,6 +77,4 @@ Then name `security-audit` and `ship` as next. Do not start them.
 | Mistake | Instead |
 |---|---|
 | Style comments a formatter should make | Fix the tooling instead, once |
-| "Looks good" with no evidence of reading | Name what you checked, including what was fine |
-| Rewriting it yourself in the review | Say what is wrong. The author fixes it |
 | Passing a behaviour change with stale docs | Documentation is part of the gate, not a follow-up |

@@ -2424,7 +2424,7 @@ case "$out" in
 esac
 # null reports as ok, not WARN. keel detects security only from an npm, pnpm or yarn 2+ lockfile and
 # e2e only from a node test:e2e script, so a warning here fires on nearly every project and no keel
-# command can clear it; docs/standards.md:79 calls that the unrecoverable kind of wrong. Asserting
+# command can clear it; docs/standards.md:87 calls that the unrecoverable kind of wrong. Asserting
 # the `ok` prefix, because asserting the bare sentence would pass a WARN too and that is the whole
 # distinction this case exists to hold.
 case "$out" in

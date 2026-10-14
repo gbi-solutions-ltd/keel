@@ -835,3 +835,31 @@ document the fix each implies in its reference file where not already stated.
 **Not decided here:** whether the rubric widening should be gated on diff content the way sections
 4b and 4c already are (e.g. only checked when a diff touches async work or resilience-relevant
 code), or apply unconditionally like sections 1 and 2. Belongs with the work that implements this.
+
+## Finding, 2026-10-12: the delegated-implementer case is parked here
+
+`docs/ideas/independence-of-a-delegated-review.md` shaped a question about delegation profiles and
+sent one part of it here, as its open question 5, answered by Bernard the same day.
+
+The part that belongs here: **a rule reaches a delegated implementer only if the dispatcher pastes
+it.** `skills/execute-plan/references/subagent-prompts.md`'s implementer prompt carries a
+`=== PROJECT STANDARDS ===` block whose instruction is to paste "the rules from standards.md this
+task could breach", so a rule the dispatcher does not think of is absent rather than merely
+unmentioned, and the subagent that writes the code has never read the standards document. That is
+problem B's mechanism appearing one layer down, inside a dispatch rather than inside a session.
+
+A delegation profile at `agents/`, always present in the subagent's system prompt, is the one
+mechanism that does not depend on that selection. The other record declined to build it, and the
+reason is this record's own standard: **no named instance exists.** Nothing in `tests/evals/results.md`
+or under `docs/audits/` records a delegated implementer omitting a standard the dispatcher failed to
+paste. `docs/ideas/lint-after-each-edit.md` was declined on those terms and ADR-0007 was rejected
+with "the laundering risk is unmeasured, not cleared".
+
+**Parked, on a named instance**, alongside A. The thing to watch for is a review finding that names
+a standard the implementer's brief never carried. The draft profile is at
+`scratchpad/keel-adjudicate.md` in the shape a judging profile would take; a writing profile would
+differ in carrying the non-negotiables rather than the reporting rules.
+
+The `remediation` field is the worked example and is being handled separately, at level 3: the other
+record's change 4 adds it to `review-code`'s rubric, which binds under a `required`
+`gates.coding_standards` without needing any profile.

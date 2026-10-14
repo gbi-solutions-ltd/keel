@@ -97,10 +97,11 @@ through:
 - **A suite that cannot fail is a finding, and it outranks a missing case.** Read what the added
   cases hold constant. Where every case passes the same value on both sides of the distinction the
   change turns on, `GBP GBP` where the bug is a payout currency read from the wrong variable, every
-  case is correct, every case is green, and none of them could have caught it. `verify.test` already
-  ran in SKILL.md step 3, so this costs two minutes: revert the line, run the file, restore it. A
-  green run is the finding, and the fix is the case that would kill it. The recipe and the worked
-  example are in
+  case is correct, every case is green, and none of them could have caught it. The suite result is
+  in the brief, so this costs one more run of the file: revert the line in the throwaway worktree
+  the brief describes, never in the working tree, which is the author's to keep, and run the file
+  there. A green run is the finding, and the fix is the case that would kill it. The recipe and the
+  worked example are in
   [../../tdd/references/writing-good-tests.md](../../tdd/references/writing-good-tests.md).
 - Does the test assert on observable behaviour, or on a mock having been called?
 - Is the failure path tested, or only the happy path?
@@ -181,6 +182,11 @@ path. This section catches what section 1 does not.
   expiry, or can two instances run it at once? See `async-work.md`, "Scheduled jobs."
 - A new message schema: does it carry trace context, so a job's trace joins the request that
   caused it? See `async-work.md`, "Observability."
+
+## 4e. Error logs, where the diff adds or changes one
+
+- An error-level log with no `remediation` field, so whoever is paged learns what broke and not
+  what to do about it. See `observability.md`, "Error logs that trigger the right remediation."
 
 ## 5. Reuse and simplification
 

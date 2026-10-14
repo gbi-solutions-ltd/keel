@@ -9,10 +9,10 @@ be asked for.
 Every finding is a claim the repository publishes, set against the code that fails to keep it. Two
 things, both quoted, both located. Neither one on its own will do.
 
-`review-code` already sets the shape for a single location: never a finding without a location, and
-never a location without a reason. A drift finding has two locations rather than one, and both are
-required, because the interesting question is which of the two is wrong. Often it is the code, and
-the document was right all along.
+[../../keel/references/reporting-findings.md](../../keel/references/reporting-findings.md) sets the
+shape for a single location: never a finding without a location, and never a location without a
+reason. A drift finding has two locations, and both are required, because the interesting question
+is which of the two is wrong. Often it is the code, and the document was right all along.
 
 **What is missing does not belong in this report, and that limit holds here and nowhere else.**
 Elsewhere in keel a gap is very much a finding: `security-audit`'s OWASP checklist spends a whole
@@ -101,10 +101,11 @@ is precisely what this audit measures. Record it as consistent and move on.
 Rank by who is affected and how badly. A quickstart that fails for every new joiner outranks a
 stale sentence in an internal document, whatever the size of the contradiction.
 
-**Cap it.** `review-code` caps at around ten findings, on the reasoning that more than that means
-the change is too large to review and that is itself the finding. The same applies here: a
-repository with forty drift findings has a documentation practice that is not working, and that
-sentence is more useful than findings eleven through forty.
+**Cap it.** `review-code` caps at around ten findings, and
+[../../keel/references/reporting-findings.md](../../keel/references/reporting-findings.md) gives the
+reason: more than that means the change is too large to review, and that is itself the finding. The
+same applies here: a repository with forty drift findings has a documentation practice that is not
+working, and that sentence is more useful than findings eleven through forty.
 
 **Close with what could not be checked, and why**, named rather than omitted. `security-audit`
 requires exactly this: an audit that implies completeness it does not have is worse than a narrow

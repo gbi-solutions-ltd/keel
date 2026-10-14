@@ -66,15 +66,23 @@ floor: `coding-standards` carried 12 reference files and 17,816 words against a 
 ADR-0001 measured it, and carries 17 and 22,726 against 726 today. Reach for a reference
 because a reader needs it at one step, not as a way to buy words.
 
-## Subagent briefs stay in the body; everything else can move
+## Subagent briefs stay in the body, or the dispatching step says to read them
 
-**Rule:** detail belongs in `references/`, except a brief the skill dispatches to a subagent.
+**Rule:** detail belongs in `references/`, except a brief the skill dispatches to a subagent. That
+stays in the body unless it would push the body past ADR-0001's target. Then the step that
+dispatches links the brief and says to read it before building the call, and where the brief
+carries checks the skill exists for, the body names them too.
 
 **Why:** a brief in a reference file is one the model may not have loaded at the moment it builds
-the dispatch. Progressive disclosure is right for reading and wrong for constructing a call.
+the dispatch. Progressive disclosure is right for reading and wrong for constructing a call. Three
+briefs do not fit their bodies: `execute-plan`'s three prompts, `write-plan`'s plan review, and
+`review-code`'s rubric pass, over 1,000 words against a body held under 700 because no eval arm
+injects it. For those, the instruction at the step stands in for the brief being there, and the
+named checks let a driver that skipped the brief see what its dispatch left out.
 
 **Example:** `skills/repo-snapshot/SKILL.md` keeps its agent table inline and moves the eleven
-output sections to `references/section-templates.md`.
+output sections to `references/section-templates.md`. `skills/review-code/SKILL.md` step 3 says to
+read `references/rubric-pass.md` before dispatching and names the five checks it carries.
 
 ## A check is never stricter than correct output
 
@@ -288,7 +296,10 @@ change even when it is a one-line change.
 
 The eval gap is temporary and has an end condition, tracked in `CHANGELOG.md`. The `python3`
 departure is permanent and scoped to one command; nothing else in `bin/keel` gained a hard
-dependency.
+dependency. The subagent status line, inlined from `lib/subagent_statusline.py` into
+`settings.json`, also runs on `python3` and is not a hard dependency: without it the command exits
+non-zero, and the 2.1.296 client answers by showing the default rows (read from its source, not
+probed).
 
 **The template is no longer the reason, and the original reasoning was wrong.** Task 7.5 recorded
 this on the argument that closing the gap "means removing about a quarter of the block, and the block
@@ -380,9 +391,50 @@ rather than trailing it matters for the same reason a trailing tag would fail: a
 truncates the end of a label first, which is exactly when the model name matters most.
 **Confirmed on Claude Code**, where `description` is the exact string the harness renders. **Not
 checked on Codex:** this repository has not probed whether Codex renders a dispatch label at all, so
-nothing is claimed there either way, per ADR-0004. Landed in all seven delegating skills:
-`apex-port-plan`, `shape-idea`, `write-plan`, `security-audit`, `repo-snapshot`, `port-assess` and
-`write-docs`, plus `execute-plan`'s `references/subagent-prompts.md` and `references/parallel-batches.md`.
+nothing is claimed there either way, per ADR-0004. Landed in all eight delegating skills:
+`apex-port-plan`, `shape-idea`, `write-plan`, `security-audit`, `repo-snapshot`, `port-assess`,
+`review-code` and `write-docs`, plus `execute-plan`'s `references/subagent-prompts.md` and `references/parallel-batches.md`.
+
+**On Claude Code the model is shown as well as stated, since 2026-10-13.** <!-- keel:claim property=subagent_row_model harness=claude -->
+keel's `settings.json` sets a subagent status line that writes each running subagent's resolved
+model after its description, when the description starts with a label keel's dispatches write:
+`inherit: ` or `keel-fanout: `, as written above. A row labelled `keel-fanout: ` that runs on the
+main model is then visible to the person the label is for. Only those rows are overridden, because a
+status line replaces the whole row: another plugin's subagent, or one the user started, keeps its
+default row (per the vendor docs, not observed: "omit a task's id to keep the default rendering",
+and every probed row was labelled or overridden). The label is matched at the start of the
+description once control characters are dropped from it, because that is the text drawn; label text
+later in a description, or a label missing its space, does not count. `LABELS` in
+`lib/subagent_statusline.py` must name each dispatch profile the standard defines, so a new profile
+needs an entry there or its rows keep the default rendering. As read from the client's source, the
+row leads with the agent's name, or its type when it has no name, so for an unnamed agent the same
+row shows whether a `keel-fanout: ` dispatch ran as the `keel-fanout` agent, but only while the lead
+is shown, and the lead is the first thing a narrow pane takes away. On a narrow pane a row gives way
+in this order: the lead is shortened with an ellipsis if the room left keeps at least three of its
+characters, and dropped otherwise; then the token count is dropped; then the end of the label is cut
+with an ellipsis, and only when no form of the row holds the whole label; the model is never cut. So
+a label that fits whole is never cut, and a wider pane never shortens it. It shows and does not
+judge: a flag would have to know how each harness resolves a profile. A row it overrides loses the
+default row's live progress summary, elapsed time and queued count. The command is the script
+inlined, generated from `lib/subagent_statusline.py` by
+`tests/generate-harness-artifacts.sh subagent-settings`, because `${CLAUDE_PLUGIN_ROOT}` does not
+resolve in a plugin `settings.json` and a path to the script would have nothing to start from. A
+user's own `subagentStatusLine` taking precedence over the plugin's is from the vendor docs and was
+not probed. Observed on macOS with `--plugin-dir`, in a captured pseudo-terminal session, for
+background agents. A run by hand did not show the model while the agents ran, and why is
+unexplained; foreground agents, a named agent, an installed plugin and Windows were not observed.
+The probe ran an earlier version of the script as a plain `python3 -c` command with a logging
+prelude; the shipped command adds `-I`, the text cleaning (of the description, name, agent type and
+model), the label gate and the narrow-pane order, which have run only under `sh -c` in the test
+suite. Nothing is shown on Codex.
+
+**On Claude Code the `keel-fanout` agent file denies the `Edit`, `Write` and `NotebookEdit` tools, since 2026-10-13.** <!-- keel:claim property=agent_tool_denylist harness=claude -->
+Its agent file sets `disallowedTools: Edit, Write, NotebookEdit`, because a fan-out reports leads
+and a reader that edits is a writer nobody reviewed. A tool not named there, such as an MCP write
+tool, stays available to it. Bash stays too, because fan-out reading runs `git log` and `grep`, so
+a Bash command could still change a file. Nothing pins that a dispatch whose description starts
+`keel-fanout: ` selects this agent, so one that falls back to another agent type is not restricted.
+Codex's agent file carries no equivalent, and nothing claims one.
 
 **The vocabulary changed on 2026-09-06 and the reason is ADR-0005.** It used to be an alias:
 `sonnet` for the fan-outs, `inherit` for judgement. Four of the five accepted words were Anthropic
@@ -414,7 +466,7 @@ is a departure, listed in the departures table with its end condition.
 **Where the words came from.** `repo-snapshot` and `port-assess` had one and three words of
 headroom under ADR-0001's 700-word warning, so the dispatch sentences were tightened to fit the pin
 rather than the pin being dropped or the ceiling crossed. The announcement clause, in its
-2026-09-19 label form, now appears in all seven delegating skills and in
+2026-09-19 label form, now appears in all eight delegating skills and in
 `skills/execute-plan/references/subagent-prompts.md` and `parallel-batches.md`.
 **Corrected 2026-08-20:** this paragraph said two skills and did not name them, and the count was
 checkable in one grep. The three that lacked it, `repo-snapshot`, `port-assess` and `write-docs`,
@@ -427,8 +479,11 @@ than the dispatcher. So the routing half of this rule is verified rather than as
 never been. Detail in `tests/evals/results.md`, 2026-08-20.
 
 **The stream does not replace the announcement, and the reason is who reads each.** `stream-json` is
-available to whoever runs an eval arm. It is not available to a developer in an interactive session,
-who has no way to see which model a dispatch went to except by being told. That line is their only
-cost signal, and routing cheap work to a cheap model is worth little to a team that cannot see it
-happening. The measurement above therefore closes an open question about the pin; it buys no relief
-from the announcement, and the shortfall below is a departure rather than a design.
+available to whoever runs an eval arm. It is not available to a developer in an interactive session.
+On Claude Code, since 2026-10-13, the subagent status line shows the resolved model of each running
+row that carries a keel label (observed for background agents, as set out above); on any other
+harness the developer has no way to see which model a dispatch went to except by being told. There
+that line is their only cost signal, and routing cheap work to a cheap model is worth little to a
+team that cannot see it happening. The measurement above therefore closes an open question about the
+pin; it buys no relief from the announcement, and the shortfall below is a departure rather than a
+design.

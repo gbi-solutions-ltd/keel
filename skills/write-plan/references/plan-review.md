@@ -75,3 +75,6 @@ you may not have.
 
 **Do not dispatch this to the same context that wrote the plan.** The point is a reader who has no
 memory of deciding any of it, and who will therefore ask why rather than remembering why.
+
+[../../keel/references/reporting-findings.md](../../keel/references/reporting-findings.md) carries
+the reason behind the location and first-line rules the prompt above states.

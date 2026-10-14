@@ -100,6 +100,8 @@ provides|claude|permission_rules_command_patterns|probe:lib/harness/claude.sh:24
 provides|claude|permission_rules_path_globs|probe:lib/harness/claude.sh:235-239 path-glob rules, held under bypassPermissions in the live session at lib/harness/claude.sh:216-219|2.1.261|2026-09-05
 provides|claude|plugin_marketplace|probe:~/.claude/plugins/known_marketplaces.json lists gbi and keel is installed from it|2.1.261|2026-09-05
 provides|claude|validated_word_ceiling|probe:ADR-0001 calibrated the 900 word ceiling against Claude Code's preload, and tests/evals/results.md, at "Both bodies over the 700 word target carry a passing arm at their length", measures the corpus against it with a passing arm per body over the target|2.1.261|2026-09-05
+provides|claude|agent_tool_denylist|probe:a plugin agent with disallowedTools Edit, Write, NotebookEdit reported no Write tool and created no file, task 1 of docs/plans/2026-10-13-harness-held-dispatch-guarantees.md|2.1.296|2026-10-13
+provides|claude|subagent_row_model|probe:a plugin settings.json subagentStatusLine, written as an inline python3 -c command because CLAUDE_PLUGIN_ROOT does not resolve there and loaded with --plugin-dir on macOS, ran for two plugin agents under a parent on claude-haiku-5-5, showed claude-sonnet-5-5 on the sonnet agent's row and had both rows overridden in a captured interactive session of background agents, step 2.1 of docs/plans/2026-10-13-harness-held-dispatch-guarantees.md|2.1.296|2026-10-13
 
 provides|codex|session_context_injection|vendor:openai/codex@rust-v0.153.4 codex-rs/hooks/schema/generated/session-start.command.output.schema.json|0.153.4|2026-09-05
 provides|codex|stop_blocking|vendor:openai/codex@rust-v0.153.4 codex-rs/hooks/src/events/stop.rs:295|0.153.4|2026-09-05

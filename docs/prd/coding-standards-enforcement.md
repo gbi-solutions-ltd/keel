@@ -42,7 +42,7 @@ the *value* from being silently weakened on a push, and it never gates the code'
 
 `skills/ship/SKILL.md:29` already says "`review-code` has run and nothing blocking remains," and
 `review-code` already runs unconditionally inside `ship` (schema 4 retired the standalone
-`gates.review` flag for exactly this reason). But `skills/review-code/SKILL.md:65-67` defines
+`gates.review` flag for exactly this reason). But `skills/review-code/SKILL.md#Step 4: Rank, and say what blocks` defines
 `Should fix` to explicitly include "violates a standard," separately from `Blocking` ("wrong
 behaviour, a security defect, data loss, or an unmet requirement"). So a pure standards violation
 that `review-code`'s rubric catches is reported, never blocking, regardless of what
@@ -52,12 +52,13 @@ reported a hand-rolled-rate-limiter-instead-of-reusing-the-existing-store findin
 `Should-fix`, not `Blocking`.
 
 The same shape recurs one level earlier, inside `execute-plan`'s own delegated loop.
-`skills/execute-plan/references/subagent-prompts.md:108-125` already dispatches a per-task code
-quality review carrying the same `PROJECT STANDARDS` block and the same
+`skills/execute-plan/references/subagent-prompts.md#Code quality review` already dispatches a
+per-task code quality review carrying the same `PROJECT STANDARDS` block and the same
 `Blocking`/`Should fix`/`Consider` vocabulary, on every task, not only at final ship. But
-`:145-165` ("Running the loop") states in full what a `DEVIATES` verdict from the *other* review
-pass requires (discard, re-dispatch, never tick) and says nothing about what a `Blocking` quality
-finding requires before the coordinator ticks the box and commits.
+`skills/execute-plan/references/subagent-prompts.md#On a DEVIATES` (in "Running the loop") states
+in full what a `DEVIATES` verdict from the *other* review pass requires (discard, re-dispatch,
+never tick) and says nothing about what a `Blocking` quality finding requires before the
+coordinator ticks the box and commits.
 
 Separately, `skills/coding-standards/SKILL.md:16-24` already has a working "assess" mode
 (`references/assess.md`) for checking code against an existing `standards.md`, built and shipped
@@ -109,7 +110,7 @@ Three, all people already using keel-managed projects:
 
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
-| FR-01 | When `gates.coding_standards` is `required`, `keel:ship`'s Step 5 must refuse to complete while `review-code` has reported an unaddressed finding tagged as a standards violation, in addition to its existing refusal on `Blocking` findings. | author-added | `skills/ship/SKILL.md:29`, `skills/review-code/SKILL.md:65-67`; confirmed by this session's dispatch that a standards-only finding is classified `Should-fix` today and does not block |
+| FR-01 | When `gates.coding_standards` is `required`, `keel:ship`'s Step 5 must refuse to complete while `review-code` has reported an unaddressed finding tagged as a standards violation, in addition to its existing refusal on `Blocking` findings. | author-added | `skills/ship/SKILL.md:29`, `skills/review-code/SKILL.md#Step 4: Rank, and say what blocks`; confirmed by this session's dispatch that a standards-only finding is classified `Should-fix` today and does not block |
 | FR-02 | When `gates.coding_standards` is `warn`, `ship` must report an unaddressed standards-violation finding without refusing. | inferred | Matches the `required`/`warn`/`off` vocabulary every other gate in `templates/profile.schema.json` already uses (e.g. `security_audit`, `commit_guard`) |
 | FR-03 | When `gates.coding_standards` is `off`, `ship`'s gate behaves exactly as it does today: no additional check. | inferred | Same vocabulary; `off` already means "skip" for every existing gate |
 | FR-04 | A `Should fix` finding from `review-code` counts as a standards violation for FR-01/FR-02 when its citation names a file under `skills/coding-standards/references/`. No new field on the finding; inferred from the citation at `ship` time. | confirmed | Bernard, 2026-09-21 (Q2). This session's own dispatched review already cited the specific reference file per rubric-sourced finding (e.g. "See `caching.md`"), so the information already exists in the finding's prose |
@@ -118,7 +119,7 @@ Three, all people already using keel-managed projects:
 
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
-| FR-11 | `execute-plan`'s delegated loop must treat a `Blocking` finding from the per-task code-quality review the same way it already treats a `DEVIATES` verdict from the spec-compliance review: the task is not ticked or committed until the finding is resolved, or the user explicitly accepts it. | confirmed | Bernard, 2026-09-21, proposing plan-time enforcement directly, confirmed as in-scope for this PRD. `skills/execute-plan/references/subagent-prompts.md:108-125` (the quality review already receives the `PROJECT STANDARDS` block and produces `Blocking`/`Should fix`/`Consider` findings, on every task); `:145-165` ("Running the loop") states the `DEVIATES` handling in full and says nothing about what a `Blocking` quality finding requires before ticking |
+| FR-11 | `execute-plan`'s delegated loop must treat a `Blocking` finding from the per-task code-quality review the same way it already treats a `DEVIATES` verdict from the spec-compliance review: the task is not ticked or committed until the finding is resolved, or the user explicitly accepts it. | confirmed | Bernard, 2026-09-21, proposing plan-time enforcement directly, confirmed as in-scope for this PRD. `skills/execute-plan/references/subagent-prompts.md#Code quality review` (the quality review already receives the `PROJECT STANDARDS` block and produces `Blocking`/`Should fix`/`Consider` findings, on every task); `skills/execute-plan/references/subagent-prompts.md#On a DEVIATES` (in "Running the loop") states the `DEVIATES` handling in full and says nothing about what a `Blocking` quality finding requires before ticking |
 
 This is the cheapest of the three enforcement points in this PRD: the review dispatch, the
 standards block, and the severity vocabulary all already exist per-task; only the *handling* of a
@@ -165,8 +166,8 @@ through a formal plan (a direct edit, a small fix) still only meets `gates.codin
 | Behaviour | Kind | Evidence | What to do |
 |---|---|---|---|
 | `gates.coding_standards` accepted and stored by `keel init`/`keel profile set` with no effect elsewhere | deliberate deferral | `templates/profile.schema.json:286`, `docs/profile-keys.md:54` | Addressed by FR-01 through FR-03; not a bug, a known and named gap |
-| `review-code` classifies every standards violation as `Should fix`, never `Blocking` | deliberate consequence of `review-code`'s own general-purpose design | `skills/review-code/SKILL.md:65-67` | Not to be changed generally. FR-01 adds a second, `gates.coding_standards`-specific check in `ship`, rather than reclassifying `review-code`'s severity table, which serves every review, not only standards |
-| `execute-plan`'s per-task quality review already produces `Blocking` findings against the standards block, and nothing requires acting on one before the coordinator ticks and commits | accident | `skills/execute-plan/references/subagent-prompts.md:108-165` | Addressed by FR-11 |
+| `review-code` classifies every standards violation as `Should fix`, never `Blocking` | deliberate consequence of `review-code`'s own general-purpose design | `skills/review-code/SKILL.md#Step 4: Rank, and say what blocks` | Not to be changed generally. FR-01 adds a second, `gates.coding_standards`-specific check in `ship`, rather than reclassifying `review-code`'s severity table, which serves every review, not only standards |
+| `execute-plan`'s per-task quality review already produces `Blocking` findings against the standards block, and nothing requires acting on one before the coordinator ticks and commits | accident | `skills/execute-plan/references/subagent-prompts.md#Code quality review` through `#Running the loop` | Addressed by FR-11 |
 | `repo-snapshot`'s six fan-out agents (Boot/Data/Surface/Quality/Delivery/Docs) never read the project's `standards.md` | accident | `skills/repo-snapshot/SKILL.md`, grepped for any mention | Addressed by FR-08 |
 
 ## 9. Success metrics

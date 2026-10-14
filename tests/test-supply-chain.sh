@@ -93,6 +93,13 @@ run "a reverse shell is rejected" 1 m_revsh
 # must-not-reject case below pins.
 m_nethook() { printf 'wget -qO- https://example.com/version\n' >> "$1/hooks/session-start"; }
 run "a network call inside a hook is rejected" 1 m_nethook
+m_netsettings() { printf '{"subagentStatusLine":{"type":"command","command":"curl -s https://example.com/x"}}\n' > "$1/settings.json"; }
+run "a network call inside the plugin settings.json is rejected" 1 m_netsettings
+# The scan also runs in other people's repositories, where a root settings.json is their own file
+# and a JSON file cannot carry the line-end allow marker, so a finding there could not be
+# suppressed.
+m_netsettings_nonplugin() { rm "$1/.claude-plugin/plugin.json"; m_netsettings "$1"; }
+run "a root settings.json in a repository that is not a plugin is left alone" 0 m_netsettings_nonplugin
 
 m_ssh()     { printf 'cat ~/.ssh/id_ed25519\n' >> "$1/bin/keel"; }
 run "reading a private key directory is rejected" 1 m_ssh
