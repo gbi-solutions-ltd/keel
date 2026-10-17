@@ -34,7 +34,7 @@ HERE="$(cd "$(dirname "$SELF")/.." && pwd)"
 # expects", which is the only version of that question worth warning about. Bump it only when a
 # field is added, removed, renamed or moved. 0.7.0 and 0.7.1 changed none, and a warning that fires
 # on releases like those is one nobody reads by the time it matters.
-SCHEMA_VERSION=5
+SCHEMA_VERSION=6
 
 # The keys a schema version removed, the version that removed each, and what to do instead. Read by
 # cmd_doctor, which is the only thing that can tell a person their profile still carries one.
@@ -515,7 +515,7 @@ codex"
 # same list, deriving its subset by exclusion, rather than hand-typing a second copy: two lists is
 # how a key added, renamed, or removed here gets missed there (docs/standards.md: "One definition
 # per verify command").
-VERIFY_KEYS="test test_one test_integration lint format format_fix typecheck build e2e security"
+VERIFY_KEYS="test test_one test_affected test_integration lint format format_fix typecheck build e2e security"
 
 write_profile() {
     local root="$1" lang rt fw pm kind ui
@@ -570,7 +570,7 @@ write_profile() {
       # window is a floor: observation raises it in flight. It was a ceiling until 2026-08-18, and
       # writing this key before that change would have hard-stopped every 1M session at 170,000
       # tokens permanently.
-      printf '  "gates": { "coding_standards": "required", "security_audit": "required", "commit_guard": "off", "done_verified": "warn", "context_window": 200000 },\n'
+      printf '  "gates": { "coding_standards": "required", "security_audit": "required", "commit_guard": "off", "done_verified": "warn", "context_window": 200000, "suite_warn_seconds": 60 },\n'
       printf '  "observability": { "backend": "signoz", "otlp_endpoint_var": "OTEL_EXPORTER_OTLP_ENDPOINT" },\n'
       # response_style and explain_level are written explicitly rather than left absent and
       # defaulted. Terse and technical are what a project gets without asking, so the keys that
@@ -1269,12 +1269,12 @@ write_ci() {
       # No continue-on-error. A test step that cannot fail the build is documentation.
       printf '\n      - name: Test\n        run: %s\n' "${test_cmd:-echo 'no test command in .keel/profile.json'}"
       # Every other verify command that is a real, runnable string: every key in VERIFY_KEYS except
-      # test (already its own step above), test_one (templated with {path} or {name} and there is
-      # nothing in CI to fill the template with), and format_fix (rewrites files rather than checking
-      # them): both excluded on the grounds doctor already uses.
+      # test (already its own step above), test_one and test_affected (templates: {path} or {name},
+      # and {base}, which only a tdd unit has; leaving test_affected out leaves CI running the whole
+      # suite, wider and not narrower) and format_fix (rewrites files rather than checking them).
       local k c
       for k in $VERIFY_KEYS; do
-          case "$k" in test|test_one|format_fix) continue ;; esac
+          case "$k" in test|test_one|test_affected|format_fix) continue ;; esac
           c="$(json_get .keel/profile.json "verify.$k" || true)"
           [ -n "$c" ] || continue
           printf '\n      - name: %s\n        run: %s\n' "$k" "$c"
@@ -1701,6 +1701,92 @@ for k,v in d.items():
         elif [ -z "$t0" ]; then warn "verify.test_one is null, and so is verify.test: this project declares no tests"
         else fail "verify.test_one is null. It is required: the commit guard and tdd both need it."
         fi
+        # Reads a key that a profile from before schema 6 (SCHEMA_VERSION=5 and earlier) lacks.
+        # json_get answers an absent key only after an interpreter start, and doctor's starts are
+        # budgeted ("keel doctor starts python3 at most 10 times" in tests/test-keel.sh), so this
+        # answers from the cache, which holds a null as a line with an empty value and so tells a
+        # key that is present and null from one that is absent. Status 1 means absent. A key the
+        # cache lacks but the file names is a value spanning lines, which the flattener leaves
+        # out, and only that case falls through to json_get.
+        json_declared() {   # json_declared <file> <dotted.path>
+            local line
+            json_load "$1" || { json_get "$1" "$2"; return; }
+            while IFS= read -r line; do
+                case "$line" in
+                  "$2="*) printf '%s\n' "${line#*=}"; return 0 ;;
+                esac
+            done <<< "$JSON_CACHE"
+            grep -qF "\"${2##*.}\"" "$1" 2>/dev/null || return 1
+            json_get "$1" "$2"
+        }
+
+        # verify.test_affected, read once for the suite-time note below and for its own line after
+        # the loop. Trimmed, because the same-command comparison below treats `sleep 2 ` as
+        # `sleep 2`, and a value of spaces alone declares nothing.
+        local ta; ta="$(json_declared .keel/profile.json verify.test_affected || true)"
+        ta="${ta#"${ta%%[![:space:]]*}"}"; ta="${ta%"${ta##*[![:space:]]}"}"
+
+        # What a passing verify.test run's time means, said after the "runs" line and only then: a
+        # run that failed or timed out has a time that says nothing, and its own line says what went
+        # wrong. tdd runs verify.test at every unit boundary, so a suite over the threshold is paid
+        # once per unit, and ten units is the size of change that multiplies it.
+        #
+        # keel init writes gates.suite_warn_seconds as 60 so that `keel profile set` can reach it,
+        # which refuses a path the profile does not hold; an absent key still reads as 60, for a
+        # profile from before schema 6. Arguments: the seconds, the verify.test command that ran,
+        # and verify.test_affected.
+        suite_cost_note() {
+            local el="$1" tc="$2" tcn thr=60 sw sw_rc=0 digits shown mins cost
+            sw="$(json_declared .keel/profile.json gates.suite_warn_seconds)" || sw_rc=$?
+            if [ "$sw_rc" -eq 0 ]; then
+                # Present is decided by the key being there, not by its text being empty. A present
+                # null is what someone writes to switch the warning off, and reading it as the
+                # default without a word would leave them believing it worked. Only an absent key
+                # is 60 without a word.
+                sw="${sw//$'\n'/ }"
+                digits=""
+                case "$sw" in
+                  ''|*[!0-9]*) ;;
+                  # Zeros off the front: a string of digits is a number, "090" is 90, and bash
+                  # would read it as octal and refuse it.
+                  *) digits="${sw#"${sw%%[!0]*}"}" ;;
+                esac
+                # At most nine digits, so no comparison below can overflow. The message names the
+                # range, because a ten digit number is whole and "not a whole number" would be
+                # false.
+                if [ -n "$digits" ] && [ "${#digits}" -le 9 ]; then
+                    thr="$digits"
+                else
+                    case "$sw" in
+                      '')       shown="null or empty" ;;
+                      *[!0-9]*) shown="'$sw'" ;;
+                      *)        shown="$sw" ;;
+                    esac
+                    warn "gates.suite_warn_seconds is $shown, which is not a whole number from 1 to 999999999, so 60 was used. Set it with: keel profile set gates.suite_warn_seconds <seconds>"
+                fi
+            fi
+            # Exclusive: a run exactly at the threshold is within it. No real run lands on the
+            # boundary reliably, so no test can pin this; it is read here.
+            [ "$el" -gt "$thr" ] || return 0
+            tcn="${tc#"${tc%%[![:space:]]*}"}"; tcn="${tcn%"${tcn##*[![:space:]]}"}"
+            # The minutes ten units spend: (seconds * 10 + 30) / 60, rounded to the nearest whole
+            # minute. Nothing under a minute is worth a number.
+            mins=$(( (el * 10 + 30) / 60 ))
+            case "$mins" in
+              0) cost="under a minute" ;;
+              1) cost="about 1 minute" ;;
+              *) cost="about $mins minutes" ;;
+            esac
+            if [ -n "$3" ] && [ "$3" != "$tcn" ]; then
+                good "verify.test takes ${el}s, over ${thr}s; tdd runs verify.test_affected at unit boundaries instead, so the suite runs once at the start of each task, in review-code, ship and CI"
+            elif [ -n "$3" ]; then
+                # The same command saves nothing: the boundary would run the whole suite either way.
+                warn "verify.test took ${el}s, over gates.suite_warn_seconds (${thr}s): tdd runs it at every unit boundary, so ten units spend $cost in it. verify.test_affected is set, but to the same command as verify.test, so it saves nothing. Give it a command that selects the tests a change affects, or raise gates.suite_warn_seconds if ${el}s is this suite's honest cost."
+            else
+                warn "verify.test took ${el}s, over gates.suite_warn_seconds (${thr}s): tdd runs it at every unit boundary, so ten units spend $cost in it. Set verify.test_affected, or raise gates.suite_warn_seconds if ${el}s is this suite's honest cost."
+            fi
+        }
+
         # security runs here, in full doctor, by decision on 2026-09-25: it reaches the network,
         # and --fast, which never executes a verify command, is the offline form.
         for k in test lint typecheck build security; do
@@ -1732,7 +1818,9 @@ for k,v in d.items():
             fi
             rc=$?
             el=$(( SECONDS - t0 ))
-            if [ "$rc" -eq 0 ]; then good "verify.$k runs (${el}s): $c"
+            if [ "$rc" -eq 0 ]; then
+                good "verify.$k runs (${el}s): $c"
+                if [ "$k" = test ]; then suite_cost_note "$el" "$c" "$ta"; fi
             elif [ -n "$TIMEOUT_BIN" ] && [ "$rc" -eq 124 ]; then
                 fail "verify.$k timed out after ${VERIFY_TIMEOUT}s: $c. Either it hangs, or it needs longer than doctor is willing to wait; run it by hand to tell the two apart."
             elif [ "$k" = security ]; then
@@ -1757,6 +1845,16 @@ for k,v in d.items():
         local dc; dc="$(json_get .keel/profile.json verify.e2e || true)"
         if [ -z "$dc" ]; then good "verify.e2e is null: keel does not detect one, so set it if this project has one"
         else good "verify.e2e is set (declared, not run): $dc"
+        fi
+
+        # verify.test_affected is declared and never run either, under --fast too, because naming it
+        # costs nothing. Running it bare would run a literal {base}: the commit is the one a tdd
+        # unit's start record names, and doctor has no unit. A value without {base} is accepted, for
+        # a runner that tracks changes itself. null is `ok` and not a warning, for e2e's reason:
+        # init writes null into every profile and keel detects no runner, so a warning would fire
+        # on every project and no keel command could clear it.
+        if [ -z "$ta" ]; then good "verify.test_affected is null: tdd runs verify.test at each unit boundary"
+        else good "verify.test_affected is set (declared, not run): $ta"
         fi
     fi
 
@@ -2426,12 +2524,12 @@ for gate in ("commit_guard", "done_verified", "security_audit", "coding_standard
     if o in order and n in order and order[n] < order[o]:
         print("gates.%s: %r -> %r" % (gate, o, n))
 
-# This loosening check excludes only test_one (templated with {path}/{name}, not a runnable bare
-# command) and format_fix (rewrites files rather than checking them), deliberately keeping test in
-# scope, unlike write_ci, which gives test its own separate CI step and so excludes it from this
-# shared list for a different reason: a push weakening verify.test itself is exactly the case this
-# check must catch.
-for key in (k for k in verify_keys if k not in ("test_one", "format_fix")):
+# This loosening check excludes test_one (templated with {path}/{name}) and format_fix (rewrites
+# files rather than checking them), neither a runnable bare command, and test_affected (a template
+# with {base}; dropping it makes the unit boundary run the whole suite, wider and not narrower).
+# It keeps test in scope, unlike write_ci, which gives test its own CI step: a push weakening
+# verify.test itself is exactly the case this check must catch.
+for key in (k for k in verify_keys if k not in ("test_one", "test_affected", "format_fix")):
     o, n = get(old, "verify." + key), get(new, "verify." + key)
     # null or a non-string (true, a number, a list) both mean "no runnable command any more".
     if o and (not n or not isinstance(n, str)):
@@ -2802,35 +2900,106 @@ cmd_guard() {
 # or a deferred step's reason. A line inside a fenced code block is an example, as the template's own
 # are, so it is never a step.
 #
-# PLAN_AWK_LIB is prepended to both commands' awk programs so they cannot disagree about what a
-# step is. fenced(line) tracks fences and returns 1 for a fence line or a line inside one; a fence
-# may open after one list marker, `1. ```bash`, as CommonMark allows, since a missed one's closing
-# line would open a phantom fence hiding steps, and such a fence also closes when its item ends, at
-# a list item indented less than the fence's content, so one never closed cannot hide the steps
-# after it; a fence closes only on the same character, at least as long, with nothing after it, so a
-# ```` fence holding a ``` example stays open. A line opening with an inline backtick span is not a
-# fence: a backtick run followed later on its line by another backtick opens none, as CommonMark
-# rules. A closing fence may end in CR, since a CRLF checkout adds one. step(line) returns 1 for a
-# step line and sets sid, smark, stitle and stail.
+# PLAN_AWK_LIB is prepended to both commands' awk programs so they cannot disagree about what a step
+# is. fenced(line) tracks fences and returns 1 for a fence line or a line inside one. It reads them
+# as CommonMark does: a fence opens only on a line indented at most three columns (a tab counting to
+# the next multiple of four), since a line indented further is code or a fence's content, and closes
+# only on a line of the same character, at least as long, indented at most three columns past the
+# list item it opened in, with nothing but spaces after it. So a ```` fence holding a ``` example
+# stays open, as the template writes its nested examples, and so does a fence holding a fence line
+# indented four or more columns past it: read as a closer, such a line would end the outer fence,
+# and the outer closer would open a phantom fence hiding the next task and its open steps from
+# status, and so from ship's gate. A fence may open after one list marker, `1. ```bash`, as
+# CommonMark allows, since a missed one's closing line would open a phantom fence hiding steps, and
+# such a fence also closes when its item ends, at a list item indented less than the fence's
+# content, so one never closed cannot hide the steps after it. A fence opened on its own line inside
+# a list item, as listctx() tracks the open items, belongs to the item as CommonMark has it: it
+# closes on a closer at most three columns past the item's content, and ends with the item, at a
+# non-blank line indented less than that content, so one left open, or one opened by an example's
+# stray last ```, cannot hide the plan after its item. A line that ends the item and has the form of
+# the fence's closer is read as that closer, where CommonMark opens a new fence, because the new
+# fence would hide every line after it. Outside a list item an indented fence keeps CommonMark's
+# reading, content at any indent, since only an item bounds it. A line opening with an inline
+# backtick span is not a fence: a backtick run followed later on its line by another backtick opens
+# none, as CommonMark rules. A closing fence may end in CR, since a CRLF checkout adds one.
+# step(line) returns 1 for a step line and sets sid, smark, stitle and stail.
 PLAN_AWK_LIB='
-function fenced(line,   t, c, n, s) {
+function lead(line,   i, c, n) {
+    n = 0
+    for (i = 1; i <= length(line); i++) {
+        c = substr(line, i, 1)
+        if (c == " ") n++
+        else if (c == "\t") n += 4 - n % 4
+        else break
+    }
+    return n
+}
+function fenced(line,   t, c, n, s, r, ind, blank, ded) {
     t = line; sub(/^[ \t]+/, "", t)
-    if (infence && findent && t ~ /^([-*+]|[0-9]+[.)])[ \t]/ && length(line) - length(t) < findent)
+    ind = lead(line); blank = (t == "" || t == "\r")
+    # Indentation is compared in columns, as findent is counted, since a tab reaches the next
+    # multiple of four and counted as one character it would end the fence four columns early.
+    if (infence && findent && t ~ /^([-*+]|[0-9]+[.)])[ \t]/ && ind < findent)
         infence = 0
-    s = 0
-    if (!infence && sub(/^([-*+]|[0-9]+[.)])[ \t]+/, "", t)) s = length(line) - length(t)
+    # A fence opened inside a list item ends where the item does, at a non-blank line indented less
+    # than the content of the item, since fenced code has no lazy continuation.
+    ded = 0
+    if (infence && fitem && !blank && ind < fitem) { infence = 0; ded = 1 }
+    c = substr(t, 1, 1); n = 0
+    if (c == "`" || c == "~") while (substr(t, n + 1, 1) == c) n++
+    if (infence) {
+        if (n >= 3 && c == fch && n >= flen && ind - findent <= 3 &&
+            substr(t, n + 1) ~ /^[ \t\r]*$/) { infence = 0; lpara = 0; return 1 }
+        return 1
+    }
+    listctx(t, ind, blank, n)
+    # The item ended on a line that would close its fence: CommonMark opens a new fence there, which
+    # would hide every line after it, so it is read as the closer, which hides none.
+    if (ded && n >= 3 && c == fch && n >= flen && substr(t, n + 1) ~ /^[ \t\r]*$/) return 1
+    # s is the column the content of a list item on this line starts at, counted in columns, as
+    # ind is, since a tab after the marker reaches the next multiple of four.
+    s = 0; r = t
+    if (sub(/^([-*+]|[0-9]+[.)])/, "", r) && r ~ /^[ \t]/) {
+        s = ind + length(t) - length(r); t = r; sub(/^[ \t]+/, "", t)
+        s = lead(sprintf("%" s "s", "") substr(r, 1, length(r) - length(t)))
+    }
     c = substr(t, 1, 1)
     if (c == "`" || c == "~") {
         n = 0; while (substr(t, n + 1, 1) == c) n++
         if (n >= 3) {
-            if (!infence) {
-                if (c == "`" && index(substr(t, n + 1), "`")) return 0
-                infence = 1; fch = c; flen = n; fline = NR; findent = s; return 1
+            if (ind > 3) return 0
+            if (c == "`" && index(substr(t, n + 1), "`")) return 0
+            infence = 1; fch = c; flen = n; fline = NR; findent = s; fitem = 0
+            # A fence on its own line inside a list item belongs to the item: it closes on a line
+            # at most three columns past the content of the item, and ends with the item.
+            if (s == 0 && ind > 0 && nli > 0 && ind >= li[nli]) {
+                findent = li[nli]; fitem = li[nli]
             }
-            if (c == fch && n >= flen && substr(t, n + 1) ~ /^[ \t\r]*$/) { infence = 0; return 1 }
+            return 1
         }
     }
-    return infence
+    return 0
+}
+# listctx(t, ind, blank, n): tracks the open list items, as li[1..nli], each the column its content
+# starts at, for a line outside a fence: t is the line without its indent, ind that indent in
+# columns, and n the length of a fence run it opens with. A list item closes the items its marker is
+# not inside and opens one; any other non-blank line indented less than the content of the innermost
+# item closes the items it is not inside, unless it continues a paragraph (lazily, as CommonMark
+# allows).
+function listctx(t, ind, blank, n,   r, w, cc) {
+    if (blank) { lpara = 0; return }
+    if (t ~ /^([-*+]|[0-9]+[.)])([ \t]|\r?$)/) {
+        r = t; sub(/^([-*+]|[0-9]+[.)])/, "", r)
+        w = ind + length(t) - length(r)
+        cc = lead(sprintf("%" w "s", "") r)
+        if (r ~ /^[ \t\r]*$/ || cc - w > 4) cc = w + 1
+        while (nli > 0 && li[nli] > ind) nli--
+        li[++nli] = cc; lpara = 1
+        return
+    }
+    if (nli > 0 && ind < li[nli] && !(lpara && n < 3 && substr(t, 1, 1) != "#"))
+        while (nli > 0 && li[nli] > ind) nli--
+    lpara = (n < 3 && substr(t, 1, 1) != "#")
 }
 function step(line,   rest, i, j, t) {
     if (line !~ /^- \[[ xX~-]\] \*\*Step [0-9]+[a-z]*\.[0-9]+: /) return 0
@@ -2859,7 +3028,9 @@ cmd_plan() {
                 [ "$#" -eq 1 ] || die "usage: keel plan status <plan>"
                 plan_status "$1" ;;
         tick)   shift; plan_tick "$@" ;;
-        *) die "unknown plan subcommand '${1:-}'. Try status or tick." ;;
+        report) shift; plan_report "$@" ;;
+        risk)   shift; plan_risk "$@" ;;  batches) shift; plan_batches "$@" ;;
+        *) die "unknown plan subcommand '${1:-}'. Try status, tick, report, risk or batches." ;;
     esac
 }
 
@@ -2917,6 +3088,1264 @@ plan_status() {
         }' "$1"
     rc=$?
     [ "$rc" -ne 3 ] || plan_unaddressable "$1"
+    return "$rc"
+}
+
+# plan_report <plan> [--json]: when the plan was planned, when each task and the whole plan were
+# delivered, the lead time between them, and how many commits since reworked it, all from git.
+# Nothing is stored: a plan's own history is the record. Times are author times, since a rebase
+# rewrites committer times and this measures when the work was done, shown in UTC and subtracted as
+# epochs. Planned is the author time of the first commit that has the plan. A step closes, by any
+# mark, at a commit where it is closed and is open or absent in every parent that has the plan; a
+# commit that adds the plan has no such parent, so a step already closed there closes there. A merge
+# therefore closes nothing that a branch it brought in had closed, and tasks run in parallel
+# worktrees keep the times of their own commits. A step's time is its latest close, so one closed,
+# reopened and closed again dates from its last close; a task's time is the latest of its steps',
+# and the task is open while any step of it is, in the latest committed copy. The history walk keeps
+# every side of a merge (--full-history) in topological order. Each committed copy is read by
+# PLAN_AWK_LIB, so a step means here what it means to status. The working-tree copy is never read,
+# so an uncommitted tick changes nothing; the history is the plan's path alone, so a rename starts
+# it again. The path is a literal one, never a pattern, and may be any name git can hold. Rounds,
+# routing and loop are the last `rounds: <n>`, the last `routing: <text>` and the last
+# `loop: <light|full>` in the notes of the task's done steps, read in the plan's order (a loop that
+# is neither word is not read, and a task with none prints none); the note is the text after the
+# last ` Note: ` in the step's tail, as plan tick writes it, so step text before it, or a step with
+# no note, is never read as fields; a field begins the note or follows `; `, so `subrounds: 3` and
+# prose such as `Implementer routing: x` are not fields, and routing runs to the next `;` or the end
+# of the note. The loop is what `keel plan risk` decided for the task; execute-plan writes it into
+# the same note. Rework counts the commits reachable from HEAD that carry the line `Reworks <path>`
+# alone, the path as git has it from the repository root, so a line naming another plan, or one this
+# path begins, is not one. A plan with no step ids exits 3, as status does; one with no commit that
+# has it exits 4; a shallow clone exits 5, since the commits the times come from are not there.
+#
+# plan_report_copy <top> <rel> <commit> <tag>: the facts one committed copy gives, as tab separated
+# lines for plan_report's awk: <tag> the commit and its author time (C for a commit in the plan's
+# history, which may close a step; X for one read only to judge those against), P the commit and each
+# parent that also has the plan, S a step's id, mark and tail, H the routing header. Returns 1 for a
+# commit without the plan.
+plan_report_copy() {
+    local top="$1" rel="$2" hash="$3" tag="$4" copy at parents p
+    copy="$(git -C "$top" show "$hash:$rel" 2>/dev/null)" || return 1
+    read -r at parents <<< "$(git -C "$top" show -s --format='%at %P' "$hash")"
+    printf '%s\t%s\t%s\n' "$tag" "$hash" "$at"
+    for p in $parents; do
+        if git -C "$top" cat-file -e "$p:$rel" 2>/dev/null; then printf 'P\t%s\t%s\n' "$hash" "$p"; fi
+    done
+    # shellcheck disable=SC2016  # $0 is awk's record, not a shell expansion
+    printf '%s\n' "$copy" | awk -v c="$hash" "$PLAN_AWK_LIB"'
+        fenced($0) { next }
+        step($0) {
+            t = stail; sub(/\r$/, "", t)
+            printf "S\t%s\t%s\t%s\t%s\n", c, sid, smark, t
+            next
+        }
+        /^\*\*Implementer routing:\*\*/ && !seen {
+            v = $0; sub(/^\*\*Implementer routing:\*\*[ \t]*/, "", v); sub(/[ \t\r]+$/, "", v)
+            printf "H\t%s\t%s\n", c, v; seen = 1
+        }'
+}
+
+plan_report() {
+    local plan="" json=0 a dir base rel list facts="" hash one need fin last="" top n=0 hashes="" msg rc
+    for a in "$@"; do
+        case "$a" in
+            --json) json=1 ;;
+            -*) die "unknown option '$a'. Usage: keel plan report <plan> [--json]" ;;
+            *) [ -z "$plan" ] || die "usage: keel plan report <plan> [--json]"; plan="$a" ;;
+        esac
+    done
+    [ -n "$plan" ] || die "usage: keel plan report <plan> [--json]"
+    [ -f "$plan" ] || die "no such plan: $plan"
+    dir="$(cd "$(dirname "$plan")" && pwd)" || die "cannot read the directory of $plan"
+    base="$(basename "$plan")"
+    # The walk runs from the top of the tree, where a root-relative path means what it says.
+    top="$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null)" || top=""
+    if [ -n "$top" ] && [ "$(git -C "$top" rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then
+        err "$plan is in a shallow clone, which lacks the commits its planned and delivered times come from: run git fetch --unshallow, then report again"
+        return 5
+    fi
+    # The path is looked up from the plan's own directory, so a relative path from anywhere in the
+    # tree reports the same; --full-name makes it one `git show <commit>:<path>` takes. Every path
+    # is literal, never a pattern (d/p[1].md is not d/p1.md), and -z hands it back unquoted, so a
+    # name with non-ASCII characters is exact.
+    rel=""
+    IFS= read -r -d '' rel < <(git --literal-pathspecs -C "$dir" ls-files -z --full-name -- "$base" 2>/dev/null) || true
+    list=""
+    [ -z "$rel" ] || [ -z "$top" ] || list="$(git --literal-pathspecs -C "$top" rev-list --full-history --topo-order --reverse HEAD -- "$rel" 2>/dev/null)"
+    if [ -z "$list" ]; then
+        err "$plan has no history yet: commit it, and the report reads the commits"
+        return 4
+    fi
+    while read -r hash; do
+        [ -n "$hash" ] || continue
+        # A commit that does not have the plan, one that deleted it, is skipped.
+        one="$(plan_report_copy "$top" "$rel" "$hash" C)" || continue
+        facts="$facts$one"$'\n'; last="$hash"
+    done <<EOF
+$list
+EOF
+    # The latest copy is HEAD's, or the last that has the plan where HEAD has deleted it.
+    if git -C "$top" cat-file -e "HEAD:$rel" 2>/dev/null; then fin="$(git -C "$top" rev-parse HEAD)"; else fin="$last"; fi
+    if [ -z "$fin" ]; then
+        err "$plan has no history yet: commit it, and the report reads the commits"
+        return 4
+    fi
+    # The parents that carry the plan, and the latest copy, may not be in the walk (the plan is the
+    # same there as in a commit that is); their copies are what a closing is judged against, and they
+    # close nothing themselves.
+    need="$(printf '%s\n' "$facts" | awk -F'\t' '$1 == "P" { print $3 }'; printf '%s\n' "$fin")"
+    need="$(sort -u <<< "$need")"
+    while read -r hash; do
+        [ -n "$hash" ] || continue
+        if ! grep -qxF -e "$hash" <<< "$list"; then
+            one="$(plan_report_copy "$top" "$rel" "$hash" X)" || continue
+            facts="$facts$one"$'\n'
+        fi
+    done <<EOF
+$need
+EOF
+    facts="$(printf 'F\t%s\n' "$fin")"$'\n'"$facts"
+    # --fixed-strings finds the candidates; the line must then stand alone, which a pattern cannot
+    # say. The message is read through a here-string: a pipe into grep -q can die of SIGPIPE under
+    # pipefail and read as no match.
+    while read -r hash; do
+        [ -n "$hash" ] || continue
+        msg="$(git -C "$top" show -s --format=%B "$hash")"
+        if grep -qxF -e "Reworks $rel" <<< "$msg"; then
+            n=$((n + 1)); hashes="$hashes $(git -C "$top" rev-parse --short "$hash")"
+        fi
+    done <<EOF
+$(git -C "$top" rev-list --fixed-strings --grep="Reworks $rel" HEAD)
+EOF
+    # shellcheck disable=SC2016  # $0 is awk's record, not a shell expansion
+    RW_N="$n" RW_H="$hashes" awk -v json="$json" -v rel="$rel" '
+        # The UTC date of an epoch, by the civil-from-days arithmetic, so that neither a date that
+        # takes -d nor one that takes -r is needed, and BSD and GNU awk agree.
+        function iso(e,   days, z, era, doe, yoe, y, doy, mp, d, m, s) {
+            days = int(e / 86400); s = e - days * 86400
+            z = days + 719468; era = int(z / 146097); doe = z - era * 146097
+            yoe = int((doe - int(doe / 1460) + int(doe / 36524) - int(doe / 146096)) / 365)
+            y = yoe + era * 400; doy = doe - (365 * yoe + int(yoe / 4) - int(yoe / 100))
+            mp = int((5 * doy + 2) / 153); d = doy - int((153 * mp + 2) / 5) + 1
+            m = (mp < 10) ? mp + 3 : mp - 9; if (m <= 2) y++
+            return sprintf("%04d-%02d-%02dT%02d:%02d:%02dZ", y, m, d, int(s / 3600), int(s % 3600 / 60), s % 60)
+        }
+        # A JSON string, built a character at a time because gsub reads backslashes in its
+        # replacement differently in each awk.
+        function jstr(s,   i, ch, out) {
+            out = ""
+            for (i = 1; i <= length(s); i++) {
+                ch = substr(s, i, 1)
+                if (ch == "\\") out = out "\\\\"
+                else if (ch == "\"") out = out "\\\""
+                else if (ch == "\t") out = out "\\t"
+                else if (ch < " ") out = out " "
+                else out = out ch
+            }
+            return "\"" out "\""
+        }
+        BEGIN { FS = "\t" }
+        $1 == "F" { fin = $2; next }
+        $1 == "C" { epoch[$2] = $3 + 0; if (!first) first = $2; nc++; clist[nc] = $2; next }
+        $1 == "X" { epoch[$2] = $3 + 0; next }
+        $1 == "P" { npar[$2]++; par[$2, npar[$2]] = $3; next }
+        $1 == "S" {
+            k = $2; tl = $5; for (f = 6; f <= NF; f++) tl = tl "\t" $f
+            mark[k, $3] = $4; note[k, $3] = tl
+            if (!((k, $3) in listed)) { listed[k, $3] = 1; nid[k]++; idat[k, nid[k]] = $3 }
+            next
+        }
+        $1 == "H" { hdr[$2] = $3 }
+        # The field in a note that begins it or follows "; ", the last such, as its text. The note is
+        # the text after the last " Note: " in the tail, the marker plan tick writes, so step text
+        # before it is never read, and a tail with no such marker has no note. "; " is put before
+        # the note so the first field is no special case.
+        function lastfield(s, key, numeric,   v, out, pre, i, at, off) {
+            s = " " s; at = 0; off = 0
+            while ((i = index(substr(s, off + 1), " Note: ")) > 0) { at = off + i; off = at }
+            if (!at) return ""
+            s = substr(s, at + 7); sub(/^[ \t]+/, "", s)
+            s = "; " s; pre = "; " key ": "; out = ""
+            while ((i = index(s, pre)) > 0) {
+                s = substr(s, i + length(pre))
+                v = s; sub(/;.*$/, "", v); gsub(/^[ \t]+|[ \t\r]+$/, "", v)
+                if (numeric) { if (match(v, /^[0-9]+/)) out = substr(v, 1, RLENGTH) + 0 } else if (v != "") out = v
+            }
+            return out
+        }
+        END {
+            n = fin
+            if (!nid[n]) exit 3
+            routing = (hdr[n] == "") ? "inherit (not stated)" : hdr[n]
+            for (a = 1; a <= nid[n]; a++) {
+                sid = idat[n, a]; t = sid; sub(/\.[0-9]+$/, "", t)
+                if (!(t in tseen)) { tseen[t] = 1; torder[++ntask] = t }
+                if (mark[n, sid] == " ") { topen[t] = 1; continue }
+                # The latest commit at which this step closed: closed there, and open or absent in
+                # every parent that has the plan. A merge whose parents already hold the close is
+                # not one, so a branch merged later keeps the time of its own commit.
+                have = 0; ce = 0
+                for (j = 1; j <= nc; j++) {
+                    h = clist[j]
+                    if (!((h, sid) in mark) || mark[h, sid] == " ") continue
+                    closes = 1
+                    for (q = 1; q <= npar[h]; q++) {
+                        pp = par[h, q]
+                        if (((pp, sid) in mark) && mark[pp, sid] != " ") { closes = 0; break }
+                    }
+                    if (closes && (!have || epoch[h] > ce)) { ce = epoch[h]; have = 1 }
+                }
+                if (!have) ce = epoch[n]
+                if (ce > tclose[t]) tclose[t] = ce
+                if (mark[n, sid] != "x") continue
+                v = lastfield(note[n, sid], "rounds", 1); if (v != "") trounds[t] = v
+                v = lastfield(note[n, sid], "routing", 0); if (v != "") trouting[t] = v
+                v = lastfield(note[n, sid], "loop", 0); if (v == "light" || v == "full") tloop[t] = v
+            }
+            planned = epoch[first]; delivered = ""
+            for (a = 1; a <= ntask; a++) {
+                t = torder[a]
+                if (topen[t]) { open = 1; continue }
+                if (delivered == "" || tclose[t] > delivered) delivered = tclose[t]
+            }
+            if (open) delivered = ""
+            lead = (delivered == "") ? "" : sprintf("%.1f", (delivered - planned) / 3600)
+            nrw = ENVIRON["RW_N"] + 0; rw = ENVIRON["RW_H"]; sub(/^ /, "", rw)
+            if (json) {
+                printf "{\"plan\": %s, \"planned\": %s, \"planned_routing\": %s, \"tasks\": [",
+                    jstr(rel), jstr(iso(planned)), jstr(routing)
+                for (a = 1; a <= ntask; a++) {
+                    t = torder[a]
+                    printf "%s{\"task\": %s, \"done\": %s, \"rounds\": %s, \"routing\": %s, \"loop\": %s}", (a > 1 ? ", " : ""),
+                        jstr(t), (topen[t] ? "null" : jstr(iso(tclose[t]))),
+                        (topen[t] || !(t in trounds) ? "null" : trounds[t]),
+                        (topen[t] || !(t in trouting) ? "null" : jstr(trouting[t])),
+                        (topen[t] || !(t in tloop) ? "null" : jstr(tloop[t]))
+                }
+                printf "], \"delivered\": %s, \"lead_time_hours\": %s, \"rework\": {\"count\": %d, \"commits\": [",
+                    (delivered == "" ? "null" : jstr(iso(delivered))), (lead == "" ? "null" : lead), nrw
+                m = split(rw, hh, " ")
+                for (a = 1; a <= m; a++) printf "%s%s", (a > 1 ? ", " : ""), jstr(hh[a])
+                print "]}}"
+                exit 0
+            }
+            print "planned: " iso(planned)
+            print "planned routing: " routing
+            for (a = 1; a <= ntask; a++) {
+                t = torder[a]
+                if (topen[t]) { print "task " t ": open"; continue }
+                printf "task %s: done %s, rounds %s, routing %s", t, iso(tclose[t]),
+                    ((t in trounds) ? trounds[t] : "unknown"), ((t in trouting) ? trouting[t] : "unknown")
+                if (t in tloop) printf ", loop %s", tloop[t]
+                printf "\n"
+            }
+            print "delivered: " (delivered == "" ? "not yet" : iso(delivered))
+            print "lead time: " (lead == "" ? "not yet" : lead "h")
+            # Held in a variable: busybox awk reads `nrw (` as a call to a function.
+            rwtxt = (nrw > 0) ? " (" rw ")" : ""
+            print "rework: " nrw rwtxt
+        }' <<< "$facts"
+    rc=$?
+    [ "$rc" -ne 3 ] || plan_unaddressable "$plan"
+    return "$rc"
+}
+
+# plan_risk [--staged | --range <a>..<b> | <path>...]: which review loop a change gets, decided from
+# the project's own hard_block_paths and not from anyone's judgement of the change. It prints each
+# changed path that a declared pattern matches, then a last line, `loop: full` or `loop: light`, and
+# exits 0 when it decided. Only that last line with that exit is the light loop: every other outcome
+# is the full loop, so a caller that cannot run this, or reads anything but `loop: light` and 0,
+# reviews more and never less. The exits are 1 for a usage error, 3 when a profile cannot be read
+# or python3 is absent, 4 when nothing is staged (or the range changes no file), 6 when git cannot
+# be run or this is not a git work tree; none of those prints a `loop:` line.
+# THE LIST IS A UNION. hooks/sensitive-guard reads the nearest .keel/profile.json walking up from
+# the directory it runs in, which can be any directory, so this matches the changed paths against
+# the patterns of every profile the hook could read: the root's as the base has it (HEAD for
+# --staged, <a> for --range) and as the working tree has it (the only one for explicit paths, which
+# name no commit); every nested */.keel/profile.json tracked at the base, tracked, modified or
+# untracked in the working tree (git ls-files --others without --exclude-standard, so the ignored
+# too); and the nearest profile above the repository, whatever directory keel runs in. The hook
+# stops at the first profile it meets, so from svc, which has its own, it never reads the one above
+# the repository, and from the root, which has none, it does: keel walks up from the repository's
+# parent as well as from the current directory, by the logical $PWD, symlinks unresolved, as the
+# hook does, and by the resolved path, and from the logical parent of the repository where that
+# differs. Patterns are used as written and matched against the root-relative paths, as the hook
+# matches them, so a nested profile's `src/payments` is the root's src/payments. Any match prints
+# the matching paths and `loop: full`. The base is in the union so a change cannot lower its own
+# review, and the working tree is in it because the hook reads that.
+# Discovery is case-insensitive, as a macOS file system is, so .Keel/Profile.JSON is a profile. A
+# change that adds, edits or deletes any such profile, root or nested, is `loop: full` naming it,
+# whatever the profiles say, and so is a change to any path whose last component is .keel, in any
+# case: a symlink, a submodule or a file of that name.
+# Exit 3 is for a profile that was found and cannot be read: not valid JSON, a symlink (a profile
+# that is one, or a directory named .keel that is one, tracked at the base or present, dangling or
+# not, none of it followed), a profile that is not a plain file at the base or not a regular file in
+# the working tree (a FIFO is never opened, since that waits for a writer for ever), a .keel that is
+# a submodule (mode 160000), or a hard_block_paths that is not a list of strings. It names it. A
+# nested repository named .keel that is untracked is listed by git with a slash, svc/.keel/, and is
+# read for the profile.json in it. A match elsewhere is still `loop: full`, since nothing unread can
+# make a match less; the exit is for when nothing matched, and a full verdict reached with
+# something unread says so in one line on stderr, written before the paths.
+# Nothing declared, which is no hard_block_paths key, an empty list or no profile anywhere, is the
+# light loop and says so (the `no hard_block_paths declared` line is for when no profile declares a
+# list), as decided for the plan this serves: a project with no list has named nothing sensitive.
+# Lists that match nothing are light with no such line. Only a missing key or [] is no list. Any
+# other value, `{}`, `""`, `false` and `0` included, is a list that cannot be read, exit 3.
+# The matching rule is the one in hooks/sensitive-guard (`matches`): a pattern matches a path by
+# fnmatch, or everything under it as a directory, so `src/payments` covers `src/payments/fee.sh`. It
+# is mirrored here and not shared, because the hook must stay a single file that runs without keel;
+# tests/test-plan.sh cuts the hook's rule out at test time and requires the same verdict from both.
+# The paths are taken from `git rev-parse --show-toplevel`, so the verdict does not depend on the
+# directory keel runs in, except that a profile above the repository which only a symlinked path to
+# it passes is read when keel runs through that path. Git names changed paths from the root, and so
+# must the paths given on the command line. They are root-relative: an absolute path, one that
+# leaves the root with .., or the root itself is a usage error, since none is a name git gives and
+# it would read as light.
+# The changed paths come from `git diff --no-renames --name-only -z`, the index for --staged (never
+# the working tree) and the two commits for --range. --no-renames, because a rename reports only its
+# new name otherwise, and a file moved out of a declared directory would read as light. -z, because
+# splitting on whitespace tears a name with a space in two. A range git cannot read exits 6, as git
+# failing does. A matched path is printed with any control character escaped (\n), and one that
+# would begin `loop:` is led by ./, so no path line can read as the verdict.
+plan_risk() {
+    local mode="" rev="" lo="" hi="" a top paths=() usage
+    usage="usage: keel plan risk [--staged | --range <a>..<b> | <path>...]"
+    while [ "$#" -gt 0 ]; do
+        a="$1"; shift
+        case "$a" in
+            --staged) [ -z "$mode" ] || die "$usage"; mode="staged" ;;
+            --range)
+                [ -z "$mode" ] && [ "$#" -gt 0 ] || die "$usage"
+                rev="$1"; shift; mode="range"
+                case "$rev" in *..*) ;; *) die "$usage" ;; esac
+                lo="${rev%%..*}"; hi="${rev#*..}"
+                # `a...b` is a different comparison, a name led by - would read as an option, and
+                # `a..b..c` is no pair of revisions.
+                case "$lo" in ""|-*) die "$usage" ;; esac
+                case "$hi" in ""|-*|.*|*..*) die "$usage" ;; esac ;;
+            --) while [ "$#" -gt 0 ]; do paths[${#paths[@]}]="$1"; shift; done ;;
+            -*) die "unknown option '$a'. Usage: ${usage#usage: }" ;;
+            *) paths[${#paths[@]}]="$a" ;;
+        esac
+    done
+    if [ "${#paths[@]}" -gt 0 ]; then
+        [ -z "$mode" ] || die "$usage"
+        mode="paths"
+        for a in "${paths[@]}"; do [ -n "$a" ] || die "$usage"; done
+    fi
+    [ -n "$mode" ] || mode="staged"
+    top="$(git rev-parse --show-toplevel 2>/dev/null)" || top=""
+    if [ -z "$top" ]; then
+        err "git cannot be run here, or this is not a git work tree, so keel cannot tell what \
+changed"
+        return 6
+    fi
+    have_python || { err "python3 is absent, so keel cannot read the profile to tell which paths \
+are sensitive"; return 3; }
+    python3 - "$mode" "$top" "$lo" "$hi" "$usage" \
+        ${paths[@]+"${paths[@]}"} <<'PY'
+import json, os, posixpath, stat, subprocess, sys, unicodedata
+from fnmatch import fnmatch
+
+mode, top, lo, hi, usage = sys.argv[1:6]
+given = sys.argv[6:]
+
+def stop(code, msg):
+    sys.stderr.write("keel: " + msg + "\n")
+    sys.exit(code)
+
+def matches(f, p):
+    # The rule of hooks/sensitive-guard, mirrored: a bare directory has to match what is under it.
+    p = p.rstrip("/")
+    return fnmatch(f, p) or fnmatch(f, p + "/*")
+
+def esc(s):
+    # No control character, and no line or paragraph break, reaches the output as itself.
+    short = {"\n": "\\n", "\r": "\\r", "\t": "\\t"}
+    return "".join(
+        short.get(c) or ("\\x%02x" % ord(c) if ord(c) < 256 else "\\u%04x" % ord(c))
+        if unicodedata.category(c) in ("Cc", "Cs", "Zl", "Zp") else c for c in s)
+
+def show(f):
+    # Git never names a path with a leading ./, so the prefix cannot be taken for a real one.
+    f = esc(f)
+    return "./" + f if f.startswith("loop:") else f
+
+def git(*args):
+    try:
+        return subprocess.run(["git", "-C", top] + list(args), capture_output=True, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        stop(6, "git could not be run, so keel cannot tell what changed")
+
+def why(r):
+    # Git's own first line, when it said one: nothing, rather than a bare colon, when it did not.
+    line = r.stderr.decode("utf-8", "replace").strip().split("\n")[0]
+    return ": " + line if line else ""
+
+def names(*args):
+    r = git("diff", "--no-renames", "--name-only", "-z", *args)
+    if r.returncode != 0:
+        stop(6, "git diff failed, so keel cannot tell what changed" + why(r))
+    return [f for f in r.stdout.decode("utf-8", "replace").split("\0") if f]
+
+def head_unborn():
+    # True on a branch with no commit yet, which has no profile; other trouble reading HEAD stops.
+    if git("rev-parse", "--verify", "--quiet", "HEAD").returncode == 0:
+        return False
+    s = git("symbolic-ref", "--quiet", "HEAD")
+    if s.returncode == 0 and git("show-ref", "--verify", "--quiet",
+                                 s.stdout.decode("utf-8", "replace").strip()).returncode != 0:
+        return True
+    stop(6, "git cannot read HEAD, so keel cannot read the profile as it has it")
+
+if mode == "paths":
+    # Normalised, so ./src//payments/x is src/payments/x, which is how git would name it. Paths are
+    # root-relative: one that is absolute, leaves the root or is the root names nothing git does.
+    changed = []
+    for p in given:
+        n = posixpath.normpath(p)
+        if p.startswith("/") or n in (".", "..") or n.startswith("../"):
+            stop(1, "a path is named from the repository root, so it cannot be absolute, leave "
+                 "the root or be the root. " + usage)
+        changed.append(n)
+elif mode == "range":
+    changed = names(lo, hi, "--")
+    if not changed:
+        stop(4, "the range %s..%s changes no file, so there is nothing to decide a loop from" %
+             (esc(lo), esc(hi)))
+else:
+    changed = names("--cached")
+    if not changed:
+        stop(4, "nothing is staged, so there is nothing to decide a loop from: stage the change "
+             "first")
+
+# A change to a profile, at the root or below it, in any case, is never light, whatever the profile
+# it leaves says.
+def is_profile(path):
+    # Case-insensitive, as a macOS file system is: .Keel/Profile.JSON is the file the hook opens.
+    parts = path.lower().split("/")
+    return len(parts) >= 2 and parts[-2] == ".keel" and parts[-1] == "profile.json"
+
+def is_keel_name(path):
+    # The last component, so a nested repository or submodule named .keel, which git lists with a
+    # trailing slash when it is untracked, is one too.
+    return path.rstrip("/").rsplit("/", 1)[-1].lower() == ".keel"
+
+own = sorted(f for f in changed if is_profile(f) or is_keel_name(f))
+if own:
+    for f in own:
+        print(show(f))
+    sys.stdout.flush()
+    sys.stderr.write("keel: " + show(own[0]) + " is part of this change, and a change cannot lower "
+                     "its own review by editing the list that judges it, so the loop is full\n")
+    print("loop: full")
+    sys.exit(0)
+
+# The union: every list the hook could read from some directory. An absent profile is no list; one
+# that exists in any form and cannot be read is recorded and decides nothing unless nothing else
+# does.
+lists = []     # the patterns of every profile that read
+broken = []    # (where, why) for every one that did not
+
+def take(where, raw):
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except (ValueError, RecursionError) as e:
+        broken.append((where, "is not valid JSON: %s" % e))
+        return
+    if not isinstance(data, dict):
+        broken.append((where, "is not a JSON object"))
+        return
+    # Only a missing key or [] is no list: {} and "" and false and 0 are lists that cannot be read.
+    patterns = data["hard_block_paths"] if "hard_block_paths" in data else []
+    if not isinstance(patterns, list) or not all(isinstance(p, str) for p in patterns):
+        broken.append((where, "has a hard_block_paths that is not a list of strings"))
+        return
+    lists.append(patterns)
+
+# The base: the profiles as HEAD has them for --staged (a branch with no commit has none), as <a>
+# has them for --range, and none for paths, which name no commit.
+unborn = head_unborn() if mode == "staged" else False
+base = lo if mode == "range" else (None if mode == "paths" or unborn else "HEAD")
+if base is not None:
+    r = git("ls-tree", "-r", "-z", base)
+    if r.returncode != 0:
+        stop(6, "git ls-tree failed, so keel cannot read the profiles as %s has them%s" %
+             (esc(base), why(r)))
+    for rec in r.stdout.decode("utf-8", "surrogateescape").split("\0"):
+        meta, _, path = rec.partition("\t")
+        if not path:
+            continue
+        fmode, _typ, obj = meta.split(" ", 2)
+        where = esc(base) + ":" + esc(path)
+        # A link is not followed, a profile that is one is not absent, and a `.keel` that is one
+        # hides a profile the hook would read. A `.keel` that is a gitlink is a repository whose
+        # files this repository does not hold, so it is a profile that cannot be read.
+        if is_keel_name(path) and fmode == "120000":
+            broken.append((where, "is a symlink, which keel does not follow"))
+        elif is_keel_name(path) and fmode == "160000":
+            broken.append((where, "is a submodule, whose files keel does not read"))
+        elif is_profile(path):
+            if fmode not in ("100644", "100755"):
+                broken.append((where, "is not a plain file"))
+                continue
+            b = git("cat-file", "blob", obj)
+            if b.returncode != 0:
+                broken.append((where, "cannot be read" + why(b)))
+            else:
+                take(where, b.stdout)
+
+# The working tree: every profile tracked, modified or untracked in it, ignored ones too, since the
+# hook opens whatever file is there. --others without --exclude-standard lists the ignored.
+real_top = os.path.realpath(top)
+seen = set()
+
+def shown(p):
+    q = os.path.join(os.path.realpath(os.path.dirname(p)), os.path.basename(p))
+    return esc(q[len(real_top) + 1:] if q.startswith(real_top + os.sep) else q)
+
+def inside(k):
+    # The profile files directly in the directory k, in whatever case. A directory that cannot be
+    # listed is tried by name.
+    try:
+        inner = os.listdir(k)
+    except OSError:
+        inner = ["profile.json"]
+    return [os.path.join(k, m) for m in sorted(inner)
+            if m.lower() == "profile.json" and os.path.lexists(os.path.join(k, m))]
+
+def work(p, keel_entry):
+    # p is a profile file, or an entry named .keel, in the working tree.
+    q = os.path.join(os.path.realpath(os.path.dirname(p)), os.path.basename(p))
+    if (q, keel_entry) in seen:
+        return
+    seen.add((q, keel_entry))
+    where = shown(p)
+    if os.path.islink(p):
+        broken.append((where, "is a symlink, which keel does not follow"))
+        return
+    if keel_entry:
+        # A `.keel` that is a directory, as an untracked nested repository is: what the hook
+        # reads is the profile inside it.
+        for q in inside(p):
+            work(q, False)
+        return
+    try:
+        st = os.stat(p)
+    except FileNotFoundError:
+        return      # tracked, and gone from the working tree: the base has it
+    except OSError as e:
+        broken.append((where, "cannot be read: %s" % e))
+        return
+    # Opening a FIFO waits for a writer for ever, so only a regular file is opened.
+    if not stat.S_ISREG(st.st_mode):
+        broken.append((where, "is not a regular file"))
+        return
+    try:
+        with open(p, "rb") as fh:
+            raw = fh.read()
+    except FileNotFoundError:
+        return      # tracked, and gone from the working tree: the base has it
+    except OSError as e:
+        broken.append((where, "cannot be read: %s" % e))
+        return
+    take(where, raw)
+
+entries = []    # (path, index mode or None) for everything git lists in the working tree
+for flag in ("--stage", "--others"):
+    r = git("ls-files", "-z", flag)
+    if r.returncode != 0:
+        stop(6, "git could not list the profiles in the working tree, so keel cannot tell which "
+             "paths are sensitive" + why(r))
+    for rec in r.stdout.decode("utf-8", "surrogateescape").split("\0"):
+        meta, tab, path = rec.partition("\t")
+        if flag == "--stage" and tab:
+            entries.append((path, meta.split(" ", 1)[0]))
+        elif flag == "--others" and rec:
+            entries.append((rec, None))
+for path, fmode in entries:
+    # An untracked nested repository is listed with a slash at the end, as svc/.keel/.
+    path = path.rstrip("/")
+    if is_keel_name(path) and fmode == "160000":
+        broken.append((shown(os.path.join(top, path)),
+                       "is a submodule, whose files keel does not read"))
+    elif is_keel_name(path):
+        work(os.path.join(top, path), True)
+    elif is_profile(path):
+        work(os.path.join(top, path), False)
+
+def forms(d):
+    # Every form of a profile directly in <d>: a `.keel` that is a link, or a profile file in a
+    # `.keel` directory, in whatever case. A directory that cannot be listed is tried by name.
+    out = []
+    try:
+        names_ = os.listdir(d)
+    except OSError:
+        names_ = [".keel"]
+    for n in sorted(names_):
+        if n.lower() != ".keel":
+            continue
+        k = os.path.join(d, n)
+        if os.path.islink(k):
+            out.append((k, True))
+        elif os.path.isdir(k):
+            out.extend((q, False) for q in inside(k))
+    return out
+
+def upward(d):
+    # The profile hooks/sensitive-guard reads from d: the nearest walking up, which may be above
+    # the repository.
+    while True:
+        found = forms(d)
+        if found:
+            return found
+        up = os.path.dirname(d)
+        if up == d:
+            return []
+        d = up
+
+def starts():
+    # Where the hook may start its walk. It starts at its own $PWD, symlinks unresolved, and the
+    # walk stops at the first profile, so one in the repository hides what is above it. The hook
+    # can run from any directory, so the nearest profile above the repository is read whatever
+    # directory keel runs in, by its resolved path and by the logical one, besides the nearest
+    # from the directory itself, by either path.
+    here = os.getcwd()
+    out = []
+    logical = os.environ.get("PWD", "")
+    try:
+        if not logical or not os.path.isabs(logical) or not os.path.samefile(logical, "."):
+            logical = ""
+    except OSError:
+        logical = ""
+    if logical:
+        out.append(logical)
+    out.append(here)
+    out.append(os.path.dirname(real_top))
+    # The repository's parent by the logical path: the same number of components up from $PWD as
+    # the resolved cwd is below the root.
+    rel = os.path.relpath(os.path.realpath(here), real_top)
+    if logical and not rel.startswith(".."):
+        root = logical
+        for _ in range(0 if rel == "." else len(rel.split(os.sep))):
+            root = os.path.dirname(root)
+        try:
+            if root != real_top and os.path.samefile(root, real_top):
+                out.append(os.path.dirname(root))
+        except OSError:
+            pass
+    return out
+
+for start in starts():
+    for p, keel_entry in upward(start):
+        work(p, keel_entry)
+
+union = sorted({p for patterns in lists for p in patterns})
+hit = sorted({f for f in changed for p in union if matches(f, p)})
+if hit:
+    if broken:
+        # Full anyway, since nothing unread can make a match less, but a reader of the verdict
+        # should know a list was not read. Written before the paths, so the last line stays last.
+        more = " and %d more" % (len(broken) - 3) if len(broken) > 3 else ""
+        sys.stderr.write("keel: " + esc("unreadable profile%s: %s%s; the loop is full on what a "
+                                        "readable list matched" % (
+            "s" if len(broken) > 1 else "", "; ".join("%s %s" % b for b in broken[:3]), more)) +
+            "\n")
+        sys.stderr.flush()
+    for f in hit:
+        print(show(f))
+    print("loop: full")
+    sys.exit(0)
+if broken:
+    shown_ = "; ".join("%s %s" % b for b in broken[:3])
+    more = " and %d more" % (len(broken) - 3) if len(broken) > 3 else ""
+    stop(3, "%s%s, so keel cannot tell which paths are sensitive and the loop cannot be decided" %
+         (shown_, more))
+if not union:
+    print("no hard_block_paths declared")
+print("loop: light")
+PY
+}
+
+# plan_batches <plan> [--json]: the batches a plan's tasks allow, read from the plan and printed so
+# that write-plan can declare them and execute-plan can check a declared one. One line per
+# scheduling step in plan order, `batch: 1 2` for tasks that may run at the same time and
+# `alone: 3` for one that may not, then a `why:` line for each task that could not join the step
+# before it, then one `check:` line. Exit 0 when it printed, 1 for a usage error or a missing plan,
+# 3 for a plan with no `### Task` heading outside a fence. The command proposes and the plan
+# declares: it only reads what a plan says, so it cannot see a Done when that names a neighbour's
+# test, or a last step that does not commit, and prints those two conditions as the `check:` line
+# every time, which is a reminder to the person approving the plan and never a verdict.
+# A task is the text from its `### Task <id>:` heading to the next `### Task` heading or the next
+# `## ` heading, so a section after the last task is not read into it. An id is digits then any
+# letters (1, 1b, 2A), compared without regard to case, because plans write both and a dependency
+# that differs from its heading only in case is still that task. A line inside a fenced block is an
+# example, as everywhere in this file, so PLAN_AWK_LIB's fenced() skips it.
+# HIDDEN TASKS: a line that opens like a task heading (`#`s, then `task` as a word, in any case,
+# after up to three spaces and any `>` quote marks, and with spaces or a tab after the #s, since
+# Markdown renders each of those as a heading) but is not `### Task <id>:` exactly at the start of
+# the line, such as `### Task 2 - b`, `###<TAB>Task 2: b`, `## Task 2: b`, `### TASK 2: b`,
+# `  ### Task 2: b` or `> ### Task 2: b`, or a step whose task (its id before the last dot, as plan
+# status reads it) has no such heading, is a task the schedule cannot see. It could edit any file or
+# need any task, so a batch beside it could put two agents on one file or run a task before its
+# dependency: every task in the plan runs alone, with one `why:` line naming the first such
+# heading, else the first such step.
+# FILES OUTSIDE A TASK: a Files-like label or list item (as the strict form below defines them)
+# after the first task heading but in no task's section, as under a `## ` heading between two tasks
+# or after the last, names paths this command cannot give to one task, since it could belong to the
+# task above it or below it: every task runs alone, with one `why:` line naming the line. A
+# self-review item written `6. **Files:** ...` counts too, which costs that plan its batches and
+# never makes one unsafe; the template's self-review writes no such label.
+# UNCLOSED FENCE: a fence that never closes hides every line after it, and so any task there, which
+# could edit any file and need any task: every task runs alone, with one `why:` line naming the line
+# number and text of the line that opens it. It is checked first, since the lines it hides could
+# hold any other reason.
+# STRICT FORM: a task can join a batch only when its `**Depends on:**` line and its `**Files:**`
+# block each fully match a form read exactly as written below, and anything else runs alone with a
+# `why:` line. The lines are free text, and a free-text reading misreads some ways of writing them
+# into an unsafe batch (a task batched with one it depends on, or two tasks on one file). Running
+# alone costs only overlap, never safety, so where the text is in any doubt the task runs alone,
+# and write-plan writes these lines itself, so it can write the form.
+# `**Depends on:**` is read from the label's own line, after the label, with the spaces around it
+# and one trailing `.` removed. What remains is exactly one of: `none`; `task <id>`;
+# `tasks <id> and <id>`; `tasks <id>, <id> and <id>` (any number of ids before the `and`, with a
+# comma allowed before it once two ids precede it); or `tasks <id> to <id>`, every task between the
+# two in plan order, the first above the second, and every task whose number lies between theirs,
+# since plans are not always in number order; one of those below the task runs it alone. `task`
+# and `tasks` match in any case and the rest exactly, with one space between words, and an id is
+# digits then any letters (1, 1b, 2A), compared without regard to case because plans write both.
+# Anything else, `none` followed by more text included, is not the form: `tasks 1-2`,
+# `tasks 1 (schema) and 2` and `task 1, with row 3` each run alone. A second Depends on line would
+# be unread, so it also runs the task alone.
+# `**Files:**` is the block from the label to the next blank line, `**Label:**` line or section end,
+# and every line in it is one of: the label line with nothing after it; a list item `- <Word>: `
+# where Word is Create, Modify, Delete, Test or Rename, optionally followed by a note in parentheses
+# before the colon, then backticked paths separated by `, `, with `and` allowed only before the
+# last; or an indented line of backticked paths with the same separators, which must continue a line
+# that ended on a separator. A path is one token of letters, digits and `._-/@+` that does not start
+# or end with `/` and has no empty, `.` or `..` segment, because a space, `:`, `#`, `*`, `?`, `[`,
+# `{` or `\` is how a plan writes a note, a line range, a pattern or a place in the file, and each
+# read as a path makes one file read as two (a.sh:3, a.sh#x) or a pattern read as a file, and a `./`
+# or `//` lets lib/./x.sh hide as a file apart from lib/x.sh. Anything else in the block, prose and
+# a Markdown link included, is not the form. Nor is a block that is ambiguous about where it ends: a
+# list item, or an indented line that continues the last item as a paragraph, after a blank line but
+# before the next label (either may belong to the block), a fenced block there or inside it (its
+# paths would go unread), or a list that ends on a separator with nothing to continue it. Nor is a
+# task that names paths outside the block: a second Files label, or any other label with `file` or
+# `files` as a whole word, in any case (`**Test files:**`, `**Files (tests):**`, `**File:**`, but
+# not `**Profile key record:**` or `**Filename:**`, which name no path), quoted or in a list item
+# (`> **Files:**`, `- **Files:**`), or a list item opening with exactly Create, Modify, Delete, Test
+# or Rename in any case, then `:` or ` (`, anywhere else in the task, quoted or not, since Markdown
+# renders each as a label or list item and the batch would not see those paths. The reason for one
+# of these, or for a line after the blank line that ends the block, quotes the first such line with
+# its number, so the writer can find it. A block with no path counts as no Files block.
+# Paths compare without regard to case, because on a case-insensitive file system
+# App.tsx and app.tsx are one file and merging two paths can only stop a batch; for the same
+# reason a path that holds another (skills/x and skills/x/a.md) is shared with it, since a
+# directory written without its trailing `/` is still a legal path.
+# SCHEDULING walks the tasks in order and never moves one above a task before it. A task joins the
+# current batch when each dependency landed before the batch began, it shares no path with a task
+# already in it, and it is batchable; otherwise the batch is closed and the task starts the next
+# one, or runs alone. A reason names only the dependencies in the step just closed, since those are
+# what held the task back, and the first shared path with the tasks in it that have it.
+# UNBATCHABLE tasks run alone, each with its reason, because each is a case where the paths or the
+# order are not known, and a batch built on a guess puts two agents on one file:
+#   - an id on more than one heading, compared without case: the id names no one task, so neither
+#     the task nor a task that depends on that id can be placed, and both run alone.
+#   - no Depends on line, one not in the strict form, a range that reaches a task below it, or a
+#     dependency on a task the plan does not have above it: the order is unknown, and a task cannot
+#     be scheduled before one that is not yet written.
+#   - no Files block, or one not in the strict form: the paths are unknown. A directory (ending in
+#     `/`) or a pattern is not in the strict form, since skills/x/ and skills/x/a.md compare as
+#     different strings and would let two overlapping tasks batch.
+#   - shared config: a lockfile or dependency manifest, a lint, format or type config, a CI file,
+#     or .keel/profile.json, matched by basename or by path as listed and without regard to case,
+#     since the file system may ignore it. Two agents each editing one of these produce two versions
+#     of it, whatever else they touch.
+# A task gets one reason, the first of those in that order. A task that follows a lone unbatchable
+# one is checked against it, since that task is the step before it: a dependency on it, or a path
+# shared with it, is the follower's own why, and it starts a new step either way. Only a follower
+# with neither (for example a free task after a task with no Depends on line) gets no why, because
+# nothing held it back from that step but the lone task being unbatchable, and that reason was
+# given with the lone task.
+# KNOWN LIMITS: plans in the template's form are read exactly, and a structure the reader cannot
+# place runs every task alone. A line-by-line reader cannot be complete against every piece of
+# Markdown, so these remain, each outside the template's form: ids compare as strings, so `Task 01`
+# and `task 1` are two tasks; a `Depends on:` line inside a blockquote is not read, so with a plain
+# one beside it the quoted one is ignored; an HTML comment is read as plain text, so a heading
+# inside one is a task and a label sharing a line with `<!--` is not read; a fence inside a
+# blockquote, or indented four or more columns in a nested list, is not a fence, so its lines are
+# read as plain text; a fence opened on its own line inside a list item ends where this reader takes
+# the item to end, which can differ from CommonMark after a lazy line that does not follow a
+# paragraph; a closing line indented less than the item's content is read as the fence's closer,
+# where CommonMark opens a new fence; and a file named in prose outside a Files block, such as an
+# italic `*Files:*` followed by a backticked path, is not read. docs/03 gives the reason each is
+# accepted.
+# --json prints the same steps, reasons and check as one object, built in awk since python3 may be
+# absent, with a reason for the whole plan (a hidden task) under an empty task, and with quotes,
+# backslashes and control characters escaped. A hidden heading's reason quotes the heading, which
+# may hold any of them, so the escape keeps the object valid.
+plan_batches() {
+    local plan="" json=0 n=0 a usage check rc
+    usage="usage: keel plan batches <plan> [--json]"
+    check="in each batch, every Done when names only its task's own test, and each last step commits"
+    for a in "$@"; do
+        case "$a" in
+            --json) json=1 ;;
+            -*) die "$usage" ;;
+            *) [ "$n" -eq 0 ] || die "$usage"; n=1; plan="$a" ;;
+        esac
+    done
+    [ "$n" -eq 1 ] || die "$usage"
+    [ -f "$plan" ] || die "no such plan: $plan"
+    # shellcheck disable=SC2016  # $0 is awk's record, not a shell expansion
+    awk -v json="$json" -v check="$check" "$PLAN_AWK_LIB"'
+        function jesc(s,   i, c, o) {
+            o = ""
+            for (i = 1; i <= length(s); i++) {
+                c = substr(s, i, 1)
+                if (c == "\\") o = o "\\\\"
+                else if (c == "\"") o = o "\\\""
+                else if (c in ctl) o = o sprintf("\\u%04x", ctl[c])
+                else o = o c
+            }
+            return o
+        }
+        # joinlist(list, n): the n items as "a", "a and b" or "a, b and c".
+        function joinlist(list, n,   k, o, sep) {
+            o = list[1]
+            for (k = 2; k <= n; k++) { sep = (k == n) ? " and " : ", "; o = o sep list[k] }
+            return o
+        }
+        # islabel(s): s is a `**Label:**` line, which ends a Files block.
+        function islabel(s) { return s ~ /^[ \t]*\*\*[^*]+:\*\*/ }
+        # fileslabel(s), fileitem(s): s is a label with `file` or `files` as a whole word in any
+        # case (not `Profile` or `Filename`, which name no path), or a list item
+        # opening with Create, Modify, Delete, Test or Rename in any case, after any `>` quote marks
+        # and, for the label, a list marker, since Markdown renders each of those as that label or
+        # item. Either names paths, which a batch must see. The word counts when no letter follows
+        # it and a `:` comes later on the line, or ` (` follows it, since a misplaced backtick or
+        # space before the colon still names a path. A longer word (`Tests:`, `Created by:`) is
+        # not one of the five, so its item is prose and names none.
+        function fileslabel(s) {
+            return tolower(s) ~ /^[ \t>]*(([-*+]|[0-9]+[.)])[ \t]+)?\*\*([^*]*[^a-z*])?files?([^a-z*][^*]*)?:\*\*/
+        }
+        function fileitem(s) {
+            s = tolower(s)
+            return s ~ /^[ \t>]*([-*+]|[0-9]+[.)])[ \t]+(create|modify|delete|test|rename)(([^a-z][^:]*)?:| \()/
+        }
+        # isid(s): s is an id, digits then any letters. The letters are tested one by one against
+        # ALPHA so that a locale cannot widen a range such as a-z to accented letters. The digits
+        # are tested by index too: macOS awk splits a multibyte character with substr, and under a
+        # UTF-8 locale a regex match on the lone byte is fatal.
+        function isid(s,   i, n) {
+            n = length(s); i = 1
+            while (i <= n && index("0123456789", substr(s, i, 1))) i++
+            if (i == 1) return 0
+            for (; i <= n; i++) if (index(ALPHA, substr(s, i, 1)) == 0) return 0
+            return 1
+        }
+        # okpath(tok): tok is one path of the strict form: letters, digits and the marks in PCH, not
+        # starting with /, with no empty, . or .. segment (and so no trailing /). Testing the
+        # string between slashes finds a leading ./ and a trailing /. as well as /./ and /../.
+        function okpath(tok,   i, q) {
+            if (tok == "" || substr(tok, 1, 1) == "/") return 0
+            for (i = 1; i <= length(tok); i++) if (index(PCH, substr(tok, i, 1)) == 0) return 0
+            q = "/" tok "/"
+            return !(index(q, "//") || index(q, "/./") || index(q, "/../"))
+        }
+        function addpath(t, tok,   l) {
+            l = tolower(tok)
+            if (!((t, l) in pset)) { path[t, ++np[t]] = tok; pset[t, l] = 1 }
+        }
+        # pathlist(t, r): the backticked paths of one Files line, r being the text from the first
+        # backtick. Paths are separated by ", ", and `and` (as " and " or ", and ") may come only
+        # before the last, which is also true across a line break: fand records that one has been
+        # read, so exactly one path may follow. A line may end on a separator (fpend) only when the
+        # next line continues it. Returns 0 when the line is not in the strict form.
+        function pathlist(t, r,   j, tok) {
+            fpend = 0
+            for (;;) {
+                if (substr(r, 1, 1) != "`") return 0
+                r = substr(r, 2); j = index(r, "`")
+                if (j == 0) return 0
+                tok = substr(r, 1, j - 1); r = substr(r, j + 1)
+                if (!okpath(tok)) return 0
+                addpath(t, tok)
+                if (fand) return (r == "")
+                if (r == "") return 1
+                if (r == ",") { fpend = 1; return 1 }
+                if (r == " and" || r == ", and") { fand = 1; fpend = 1; return 1 }
+                if (substr(r, 1, 6) == ", and ") { fand = 1; r = substr(r, 7) }
+                else if (substr(r, 1, 5) == " and ") { fand = 1; r = substr(r, 6) }
+                else if (substr(r, 1, 2) == ", ") r = substr(r, 3)
+                else return 0
+            }
+        }
+        # fileline(t, s): one line of the Files block of task t. A list item opens a list and ends
+        # the one before it, which must not be waiting for a continuation. Any line not in the
+        # strict form marks the whole block, since its paths cannot be told from prose.
+        function fileline(t, s,   r, w, k, j, note) {
+            sub(/[ \t]+$/, "", s)
+            if (substr(s, 1, 2) == "- ") {
+                if (fpend) fbad[t] = 1
+                fpend = 0; fand = 0
+                r = substr(s, 3); w = ""
+                for (k = 1; k <= 5; k++)
+                    if (substr(r, 1, length(FW[k])) == FW[k]) { w = FW[k]; break }
+                if (w == "") { fbad[t] = 1; return }
+                r = substr(r, length(w) + 1)
+                if (substr(r, 1, 2) == " (") {
+                    j = index(r, ")")
+                    if (j == 0) { fbad[t] = 1; return }
+                    note = substr(r, 3, j - 3)
+                    if (note == "" || index(note, "(") || index(note, "`")) { fbad[t] = 1; return }
+                    r = substr(r, j + 1)
+                }
+                if (substr(r, 1, 2) != ": ") { fbad[t] = 1; return }
+                if (!pathlist(t, substr(r, 3))) fbad[t] = 1
+                return
+            }
+            if (s ~ /^ +`/) {
+                if (!fpend || !pathlist(t, substr(s, index(s, "`")))) fbad[t] = 1
+                return
+            }
+            fbad[t] = 1
+        }
+        # outside(t, s): line s of task t, outside its Files block, may name paths, so the block is
+        # not in the strict form. The first such line is kept with its number for the reason, so
+        # the writer can find it, unless the block was already spoiled by an earlier line.
+        function outside(t, s) {
+            if (!fbad[t]) fwhere[t] = " (line " NR ": '"'"'" s "'"'"')"
+            fbad[t] = 1
+        }
+        # endfiles(): the Files block, and the lines after it up to the next label, are over. A list
+        # still waiting for a continuation then has none.
+        function endfiles() {
+            if (infiles && fpend && cur_t) fbad[cur_t] = 1
+            infiles = 0; trail = 0; fpend = 0; fand = 0
+        }
+        function putdep(t, w,   l) {
+            l = tolower(w)
+            if ((t, l) in dseen) return
+            dseen[t, l] = 1; dep[t, ++ndep[t]] = w; dlow[t, ndep[t]] = l
+        }
+        # numof(id): the number an id opens with, its letters dropped.
+        function numof(s) { sub(/[A-Za-z]+$/, "", s); return s + 0 }
+        # addrange(t, a, b): every task from a to b in plan order, and every task whose number lies
+        # between the numbers of a and b, wherever it sits, since plans are not always in number
+        # order and a reader takes `tasks 1 to 3` to mean task 2 too. The first end must be above
+        # the second, since a range read backwards is a typo whose meaning is not known. A task in
+        # the numbered span that is not above task t cannot be one it waits for, so the range is not
+        # known either and sets rbad[t]. A range with an end the plan does not have names both
+        # ends, and unbatchable() finds the one that is missing.
+        function addrange(t, a, b,   x, y, k, lo, hi, v) {
+            if ((tolower(a) in idx) && (tolower(b) in idx)) {
+                x = idx[tolower(a)]; y = idx[tolower(b)]
+                if (x >= y) { dbad[t] = 1; return }
+                for (k = x; k <= y; k++) putdep(t, tid[k])
+                lo = numof(a); hi = numof(b)
+                for (k = 1; k <= ntask; k++) {
+                    v = numof(tid[k])
+                    if (v < lo || v > hi) continue
+                    if (k >= t) rbad[t] = 1
+                    else putdep(t, tid[k])
+                }
+            } else { putdep(t, a); putdep(t, b) }
+        }
+        # parsedeps(t): the dependencies of task t from its Depends on text, which must be in the
+        # strict form (see plan_batches); any other text sets dbad[t] and adds none.
+        function parsedeps(t,   s, n, wd, j, m, ids, tok, comma, lastcomma, rest, k) {
+            if (dbad[t]) return
+            s = deptext[t]
+            sub(/^ +/, "", s); sub(/ +$/, "", s)
+            if (substr(s, length(s)) == ".") s = substr(s, 1, length(s) - 1)
+            if (s == "none") return
+            n = 0; rest = s
+            while ((j = index(rest, " ")) > 0) {
+                wd[++n] = substr(rest, 1, j - 1); rest = substr(rest, j + 1)
+            }
+            wd[++n] = rest
+            if (n < 2 || (tolower(wd[1]) != "task" && tolower(wd[1]) != "tasks")) {
+                dbad[t] = 1; return
+            }
+            if (tolower(wd[1]) == "task") {
+                if (n == 2 && isid(wd[2])) putdep(t, wd[2]); else dbad[t] = 1
+                return
+            }
+            m = 0; lastcomma = 0; j = 2
+            while (j <= n && wd[j] != "and" && wd[j] != "to") {
+                tok = wd[j]; comma = (substr(tok, length(tok)) == ",")
+                if (comma) tok = substr(tok, 1, length(tok) - 1)
+                if (!isid(tok)) { dbad[t] = 1; return }
+                ids[++m] = tok; lastcomma = comma; j++
+                if (!comma) break
+            }
+            if (m == 0 || j + 1 != n || !isid(wd[n])) { dbad[t] = 1; return }
+            if (wd[j] == "and" && !(lastcomma && m < 2)) {
+                for (k = 1; k <= m; k++) putdep(t, ids[k])
+                putdep(t, wd[n])
+            } else if (wd[j] == "to" && m == 1 && !lastcomma) addrange(t, ids[1], wd[n])
+            else dbad[t] = 1
+        }
+        # overlap(p, q): p and q are one path or one holds the other, without regard to case.
+        function overlap(p, q,   lp, lq) {
+            lp = tolower(p); lq = tolower(q)
+            return (lp == lq || index(lq, lp "/") == 1 || index(lp, lq "/") == 1)
+        }
+        function isconfig(p,   n, parts, b) {
+            p = tolower(p)
+            n = split(p, parts, "/"); b = parts[n]
+            if (index(b, " ") == 0 && index(CFG, " " b " ")) return 1
+            if (b ~ /^requirements.*\.txt$/ || b ~ /^\.eslintrc/ || b ~ /^eslint\.config\./ ||
+                b ~ /^\.prettierrc/ || b ~ /^prettier\.config\./ || b ~ /^\.golangci\./ ||
+                b ~ /^tsconfig.*\.json$/) return 1
+            p = "/" p
+            return (p ~ /\/\.github\/workflows\// || p ~ /\/\.circleci\// ||
+                    p ~ /\/\.keel\/profile\.json$/)
+        }
+        # unbatchable(t): why task t must run alone, or "" when it may be batched.
+        function unbatchable(t,   k, d, me) {
+            me = "task " tid[t]
+            if (idcount[tolower(tid[t])] > 1)
+                return me " shares its id with another task, so its dependents cannot be placed"
+            if (!hasdep[t]) return me " has no Depends on line, so its order is unknown"
+            if (dbad[t])
+                return me " has a Depends on line not in the strict form, so its order is unknown"
+            if (rbad[t])
+                return me " has a range that reaches a task below it, so its order is unknown"
+            for (k = 1; k <= ndep[t]; k++) {
+                d = dlow[t, k]
+                if ((d in idcount) && idcount[d] > 1) {
+                    d = ", which more than one task has as its id, so its order is unknown"
+                    return me " depends on task " dep[t, k] d
+                }
+                if (!(d in idx) || idx[d] >= t)
+                    return me " depends on task " dep[t, k] ", which this plan does not have above it"
+            }
+            if (fbad[t]) {
+                d = " has a Files block not in the strict form, so its paths are unknown"
+                return me d fwhere[t]
+            }
+            if (np[t] == 0) return me " has no Files block, so its paths are unknown"
+            for (k = 1; k <= np[t]; k++)
+                if (isconfig(path[t, k])) return me " edits shared config " path[t, k]
+            return ""
+        }
+        # flush(): close the current batch as one step.
+        function flush(   k) {
+            if (ncur == 0) return
+            nstep++; scount[nstep] = ncur
+            for (k = 1; k <= ncur; k++) smem[nstep, k] = cur[k]
+            ncur = 0
+        }
+        # blocked(t): why task t cannot join the current batch, or "".
+        function blocked(t,   k, m, o, isdep, list, n, p, found, nf, shown) {
+            for (k = 1; k <= ndep[t]; k++) isdep[idx[dlow[t, k]]] = 1
+            n = 0
+            for (m = 1; m <= ncur; m++) if (cur[m] in isdep) list[++n] = "task " tid[cur[m]]
+            if (n > 0) return "task " tid[t] " depends on " joinlist(list, n)
+            # A shared path is named by the shorter of the two, which holds the other.
+            for (k = 1; k <= np[t]; k++) {
+                p = path[t, k]; nf = 0; shown = p
+                for (m = 1; m <= ncur; m++)
+                    for (o = 1; o <= np[cur[m]]; o++)
+                        if (overlap(p, path[cur[m], o])) {
+                            found[++nf] = "task " tid[cur[m]]
+                            if (length(path[cur[m], o]) < length(shown)) shown = path[cur[m], o]
+                            break
+                        }
+                if (nf > 0) return "task " tid[t] " shares " shown " with " joinlist(found, nf)
+            }
+            return ""
+        }
+        BEGIN {
+            for (i = 1; i < 32; i++) ctl[sprintf("%c", i)] = i
+            # Lower case, because isconfig() lowers the name it tests.
+            CFG = " package-lock.json pnpm-lock.yaml yarn.lock package.json cargo.lock cargo.toml"
+            CFG = CFG " go.mod go.sum poetry.lock uv.lock pyproject.toml gemfile gemfile.lock"
+            CFG = CFG " composer.json composer.lock pubspec.yaml pubspec.lock biome.json ruff.toml"
+            CFG = CFG " .ruff.toml .editorconfig rustfmt.toml .rubocop.yml .gitlab-ci.yml"
+            CFG = CFG " jenkinsfile azure-pipelines.yml bitbucket-pipelines.yml "
+            ALPHA = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            PCH = ALPHA "0123456789._-/@+"
+            FW[1] = "Create"; FW[2] = "Modify"; FW[3] = "Delete"; FW[4] = "Test"; FW[5] = "Rename"
+        }
+        { line = $0; sub(/\r$/, "", line) }
+        # A fence inside the Files block, or between it and the next label, hides lines from this
+        # reading, so any path in it would go unread: the block is not in the strict form.
+        # The line that opens a fence is kept, so a fence that never closes can be named (see END).
+        # A fence after the blank line that ends the block is quoted in the reason, as any other
+        # line there is, so the writer can find it.
+        fenced($0) {
+            if (fline == NR) fopen = line
+            if (trail) outside(cur_t, line); else if (infiles) fbad[cur_t] = 1
+            next
+        }
+        # A step names its task by the number before its last dot, as plan status reads it. A task
+        # with a step and no heading read below is one the schedule cannot see (see END).
+        step($0) {
+            t0 = sid; sub(/\.[0-9]+$/, "", t0)
+            if (!(tolower(t0) in steptask)) {
+                steptask[tolower(t0)] = 1; stask[++nst] = t0; sfirst[nst] = sid
+            }
+        }
+        # A line that opens like a task heading but is not one read below hides a task. It is
+        # matched in any case, after up to three spaces and any `>` quote marks, and with spaces or
+        # a tab after the #s, since Markdown renders each of those as a heading, and a task heading
+        # this reader misses is one the schedule cannot see.
+        {
+            h = tolower(line)
+            for (;;) {
+                sub(/^(   |  | )/, "", h)
+                if (substr(h, 1, 1) != ">") break
+                h = substr(h, 2)
+            }
+        }
+        h ~ /^#+[ \t]*task([^a-z0-9_]|$)/ && line !~ /^### Task [0-9]+[A-Za-z]*:/ {
+            if (unread == "") unread = line
+        }
+        line ~ /^###[ \t]+Task/ || line ~ /^##[ \t]/ { endfiles(); cur_t = 0 }
+        line ~ /^### Task [0-9]+[A-Za-z]*:/ {
+            ntask++; cur_t = ntask
+            tid[ntask] = substr(line, 10, index(substr(line, 10), ":") - 1)
+            if (!(tolower(tid[ntask]) in idx)) idx[tolower(tid[ntask])] = ntask
+            idcount[tolower(tid[ntask])]++
+            next
+        }
+        # A Files line after the first task heading but in no task, as under a `## ` heading between
+        # two tasks, names paths this reader cannot give to one task (see END).
+        cur_t == 0 {
+            if (ntask && orphan == "" && (fileslabel(line) || fileitem(line))) orphan = line
+            next
+        }
+        # The Files block runs to a blank line or a label; after the blank line, up to the next
+        # label, a list item may belong to the block, so it is not in the strict form either.
+        infiles || trail {
+            if (islabel(line)) endfiles()
+            else if (infiles) {
+                if (line ~ /^[ \t]*$/) { endfiles(); trail = 1 }
+                else fileline(cur_t, line)
+                next
+            } else {
+                # An indented line there continues the last item of the block as a paragraph, so it
+                # may hold a path too.
+                if (line ~ /^[ \t]*([-*+]|[0-9]+[.)])[ \t]/ || line ~ /^[ \t]+[^ \t]/ ||
+                    fileslabel(line)) outside(cur_t, line)
+                next
+            }
+        }
+        # A second Files-like label (`**Test files:**`, `**Files (tests):**`), or a Files-like list
+        # item outside the Files block, names paths the block does not, which a batch would not
+        # see, so the task runs alone.
+        fileslabel(line) && line !~ /^[ \t]*\*\*Files:\*\*/ { outside(cur_t, line) }
+        fileitem(line) { outside(cur_t, line) }
+        line ~ /^[ \t]*\*\*Depends on:\*\*/ {
+            if (hasdep[cur_t]) dbad[cur_t] = 1
+            else {
+                hasdep[cur_t] = 1; t0 = line; sub(/^[ \t]*\*\*Depends on:\*\*/, "", t0)
+                deptext[cur_t] = t0
+            }
+            next
+        }
+        line ~ /^[ \t]*\*\*Files:\*\*/ {
+            if (seenfiles[cur_t]) outside(cur_t, line)
+            seenfiles[cur_t] = 1; infiles = 1; trail = 0; fpend = 0; fand = 0
+            t0 = line; sub(/^[ \t]*\*\*Files:\*\*/, "", t0)
+            if (t0 !~ /^[ \t]*$/) fbad[cur_t] = 1
+        }
+        END {
+            if (ntask == 0) exit 3
+            endfiles()
+            # A task the schedule cannot see, behind a heading it does not read or with steps and
+            # no heading, could edit any file and depend on any task, so no batch is safe: every
+            # task runs alone, under one reason for the whole plan, which has no task of its own.
+            wide = ""
+            # A fence that never closes hides every line after it, and so any task there, which
+            # could edit any file and need any task, so no batch is safe.
+            if (infence) {
+                wide = "the fence opened at line " fline ", '"'"'" fopen "'"'"', never closes, so"
+                wide = wide " every task runs alone, since a task it hides could run out of order"
+            } else if (unread != "")
+                wide = "the heading '"'"'" unread "'"'"' is not one this command reads"
+            else
+                for (k = 1; k <= nst; k++)
+                    if (!(tolower(stask[k]) in idx)) {
+                        wide = "step " sfirst[k] " names task " stask[k]
+                        wide = wide ", which has no heading this command reads"
+                        break
+                    }
+            if (wide != "" && !infence) {
+                wide = wide ", so every task runs alone, since a task it cannot see could run"
+                wide = wide " out of order"
+            } else if (wide == "" && orphan != "") {
+                # A Files line in no task could belong to any task near it, so no batch is safe.
+                wide = "the line '"'"'" orphan "'"'"' names files outside any task, so every task"
+                wide = wide " runs alone, since this command cannot tell which task it belongs to"
+            }
+            if (wide != "") {
+                for (t = 1; t <= ntask; t++) { cur[++ncur] = t; flush() }
+                nwhy = 1; wtask[1] = ""; wtext[1] = wide
+                ntask = 0   # so nothing below parses or schedules a task
+            }
+            for (t = 1; t <= ntask; t++) {
+                parsedeps(t)
+                # A block not in the strict form names no paths, whatever it held up to the line
+                # that spoiled it, so a task after it is never held back by a half-read block.
+                if (fbad[t]) np[t] = 0
+            }
+            for (t = 1; t <= ntask; t++) {
+                r = unbatchable(t)
+                if (r != "") {
+                    flush(); cur[++ncur] = t; flush(); prevlone = t
+                    nwhy++; wtask[nwhy] = tid[t]; wtext[nwhy] = r
+                    continue
+                }
+                # Straight after a lone unbatchable task the current batch is empty, but the step
+                # before this task is that lone task, so it is checked against it.
+                if (ncur == 0 && prevlone) { cur[1] = prevlone; ncur = 1; r = blocked(t); ncur = 0 }
+                else r = blocked(t)
+                if (r != "") { flush(); nwhy++; wtask[nwhy] = tid[t]; wtext[nwhy] = r }
+                prevlone = 0
+                cur[++ncur] = t
+            }
+            flush()
+            if (json) {
+                out = "{\"steps\": ["
+                for (s = 1; s <= nstep; s++) {
+                    if (s > 1) out = out ", "
+                    if (scount[s] == 1) out = out "{\"alone\": \"" jesc(tid[smem[s, 1]]) "\"}"
+                    else {
+                        out = out "{\"batch\": ["
+                        for (k = 1; k <= scount[s]; k++) {
+                            sep = (k > 1) ? ", " : ""
+                            out = out sep "\"" jesc(tid[smem[s, k]]) "\""
+                        }
+                        out = out "]}"
+                    }
+                }
+                out = out "], \"why\": ["
+                for (w = 1; w <= nwhy; w++) {
+                    sep = (w > 1) ? ", " : ""
+                    out = out sep "{\"task\": \"" jesc(wtask[w]) "\", \"reason\": \""
+                    out = out jesc(wtext[w]) "\"}"
+                }
+                print out "], \"check\": \"" jesc(check) "\"}"
+                exit 0
+            }
+            for (s = 1; s <= nstep; s++) {
+                if (scount[s] == 1) print "alone: " tid[smem[s, 1]]
+                else {
+                    out = "batch:"
+                    for (k = 1; k <= scount[s]; k++) out = out " " tid[smem[s, k]]
+                    print out
+                }
+            }
+            for (w = 1; w <= nwhy; w++) print "why: " wtext[w]
+            print "check: " check
+        }' "$plan"
+    rc=$?
+    [ "$rc" -ne 3 ] || err "$plan has no ### Task heading outside a fenced block, so it has no batches"
     return "$rc"
 }
 
@@ -3039,6 +4468,178 @@ plan status $plan"; rc=1 ;;
     return "$rc"
 }
 
+CI_REVIEW_MARK='# installed by `keel ci-review install`. Remove it with `keel ci-review remove`.'
+CI_REVIEW_FILE=.github/workflows/keel-review.yml
+
+# True if the workflow exists and keel wrote it. Only the first line counts: a user's own file that
+# quotes the mark further down is theirs, and so is a keel file whose first line they replaced.
+# A trailing carriage return is ignored, so a checkout that converted the line endings is still
+# keel's.
+ci_review_is_keels() {
+    local first
+    [ -f "$CI_REVIEW_FILE" ] || return 1
+    first="$(head -n 1 "$CI_REVIEW_FILE")"
+    [ "${first%$'\r'}" = "$CI_REVIEW_MARK" ]
+}
+
+# The host of a remote URL, lower-cased, from <scheme>://[userinfo@]host[:port]/... for the schemes
+# http, https, ssh, git, git+ssh and ssh+git, or from [user@]host:path. Non-zero, printing nothing,
+# for any other form, so a URL this does not understand is never taken for a host: a local path (a
+# '/' before the first ':'), the remote-helper form <transport>::<address>, and a host holding '['
+# or ']', which covers an IPv6 literal and git's [host:port]:path, do not parse and so are never
+# refused. In the [user@]host:path form the brackets are looked for before the user is stripped, so
+# [git@gitlab.com:22]:path does not parse as gitlab.com. The whole URL is lower-cased first. For a
+# scheme URL the authority ends at the first '/', '?' or '#', as git ends it, and the host follows
+# the last '@' inside it. A port and one trailing dot are dropped. Only the host is printed, never
+# the userinfo.
+ci_review_origin_host() {
+    local url host
+    url="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    # git reads <transport>::<address> as a remote helper, naming the transport as a URL scheme.
+    [[ "$url" =~ ^[a-z][a-z0-9+.-]*:: ]] && return 1
+    case "$url" in
+        http://*|https://*|ssh://*|git://*|git+ssh://*|ssh+git://*)
+            host="${url#*://}"; host="${host%%[/?#]*}"; host="${host##*@}" ;;
+        *://*) return 1 ;;
+        *:*) host="${url%%:*}"; case "$host" in */*|*[][]*) return 1 ;; esac; host="${host##*@}" ;;
+        *) return 1 ;;
+    esac
+    case "$host" in *[][]*) return 1 ;; esac
+    host="${host%%:*}"; host="${host%.}"
+    [ -n "$host" ] || return 1
+    printf '%s' "$host"
+}
+
+# Prints <n>|<fact> and returns 0 when review in CI should not be installed here, or prints nothing
+# and returns 1. <n> is the rule that fired: 1 for another CI's file with no GitHub workflow, 2 for
+# an origin on a host known not to be GitHub. <fact> is a lower-case clause with no consequence and
+# no full stop; each caller adds the consequence that fits it. Rule 1 is checked first. Runs from
+# the repository root. A workflow on a platform that never runs it is a dead file that says review
+# in CI is on, and "a second CI system is the worst outcome" (docs/03-install-and-distribution.md),
+# so a repository whose CI is another system, or whose origin is on a host known not to be GitHub,
+# gets nothing. keel's own workflow does not count as GitHub Actions being in use, or an install
+# from before the marker was added would vouch for itself; a user's file of the same name does.
+# Any other host is let through, because GitHub Enterprise runs on hosts of any name, and
+# self-hosted Azure DevOps Server cannot be told from its name.
+ci_review_elsewhere() {
+    local pair url host mine=''
+    # An empty name matches no file, so unless keel's own file is there nothing is left out.
+    ci_review_is_keels && mine="${CI_REVIEW_FILE##*/}"
+    if [ -z "$(find .github/workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) \
+                 ! -name "$mine" -print -quit 2>/dev/null)" ]; then
+        for pair in $CI_MARKER_PAIRS; do
+            if [ -f "${pair%%:*}" ]; then
+                printf "1|this repository's CI is %s (%s) and it has no GitHub workflow" \
+                    "${pair##*:}" "${pair%%:*}"
+                return 0
+            fi
+        done
+    fi
+    url="$(git remote get-url origin 2>/dev/null)" || return 1
+    host="$(ci_review_origin_host "$url")" || return 1
+    case "$host" in
+        dev.azure.com|*.dev.azure.com|*.visualstudio.com|*gitlab*|*bitbucket*)
+            printf "2|this repository's origin is on %s" "$host"
+            return 0 ;;
+    esac
+    return 1
+}
+
+# Writes the workflow from the template, swapping in the oauth secret when $1 is 1. Non-zero when
+# any step fails. This script runs without set -e, so an unchecked mkdir, cp or redirect would let
+# `install` report a file it did not write.
+ci_review_write() {
+    mkdir -p .github/workflows || return 1
+    if [ "$1" -eq 1 ]; then
+        sed 's/anthropic_api_key: .*/claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}/' \
+            "$HERE/templates/ci-review.yml" > "$CI_REVIEW_FILE" || return 1
+    else
+        cp "$HERE/templates/ci-review.yml" "$CI_REVIEW_FILE" || return 1
+    fi
+}
+
+# Review in CI is opt-in and the workflow file is the switch (docs/ideas/
+# harness-held-dispatch-guarantees.md item 4), so there is nothing to read, validate or sync. A
+# workflow that is not keel's is never overwritten or removed. GitHub reads workflows only from the
+# repository root, so the command works there from any directory and refuses a bare repository.
+cmd_ci_review() {
+    local top sub
+    top="$(git rev-parse --show-toplevel 2>/dev/null)" || die "not inside a git work tree."
+    cd "$top" || die "cannot enter $top."
+    sub="${1:-status}"; [ $# -gt 0 ] && shift
+    case "$sub" in
+        install)
+            local oauth=0 a rewrote=0 reason
+            for a in "$@"; do
+                case "$a" in
+                    --oauth) oauth=1 ;;
+                    *) die "unknown option '$a'. Usage: keel ci-review install [--oauth]" ;;
+                esac
+            done
+            if reason="$(ci_review_elsewhere)"; then
+                case "$reason" in
+                    1\|*) die "${reason#*|}. keel does not add a second CI system, so it wrote nothing." ;;
+                    *) die "review in CI runs only on GitHub Actions, and ${reason#*|}, where its workflow would never run. keel wrote nothing." ;;
+                esac
+            fi
+            if [ -e "$CI_REVIEW_FILE" ] && ! ci_review_is_keels; then
+                die "$CI_REVIEW_FILE exists and keel did not write it. Rename it or merge by hand; keel will not overwrite it."
+            fi
+            [ -f "$HERE/templates/ci-review.yml" ] || die "templates/ci-review.yml is missing from this keel install."
+            ci_review_is_keels && rewrote=1
+            ci_review_write "$oauth" || die "could not write $CI_REVIEW_FILE"
+            if [ "$rewrote" -eq 1 ]; then
+                say "rewrote $CI_REVIEW_FILE. Local edits to it are replaced."
+            else
+                say "wrote $CI_REVIEW_FILE. Review in CI is on for this repository once the file is merged."
+            fi
+            if [ "$oauth" -eq 1 ]; then
+                say "it reads the repository secret CLAUDE_CODE_OAUTH_TOKEN (claude setup-token). keel does not set it."
+            else
+                say "it reads the repository secret ANTHROPIC_API_KEY. keel does not set it."
+            fi
+            say "it also needs the Claude GitHub App (https://github.com/apps/claude) and a project that has run 'keel init'"
+            say "each pull request opened, made ready or reopened costs one Claude session"
+            say "the file is not committed: read it, commit it and push it"
+            say "turn it off with 'keel ci-review remove', or delete the file"
+            ;;
+        remove)
+            if [ ! -e "$CI_REVIEW_FILE" ]; then
+                say "review in CI: already off, no $CI_REVIEW_FILE"
+            elif ci_review_is_keels; then
+                rm -f "$CI_REVIEW_FILE"
+                say "removed $CI_REVIEW_FILE. Commit the deletion to turn review in CI off."
+            else
+                say "left $CI_REVIEW_FILE alone: keel did not write it"
+            fi
+            ;;
+        status)
+            local reason='' rule='' fact='' cap=''
+            if reason="$(ci_review_elsewhere)"; then
+                rule="${reason%%|*}"; fact="${reason#*|}"
+                # The fact with its first letter capitalised, for a sentence it starts.
+                cap="$(printf '%s' "${fact:0:1}" | tr '[:lower:]' '[:upper:]')${fact:1}"
+            fi
+            if [ ! -e "$CI_REVIEW_FILE" ] && [ "$rule" = 1 ]; then
+                say "review in CI: not available here. $cap, and keel does not add a second CI system."
+            elif [ ! -e "$CI_REVIEW_FILE" ] && [ "$rule" = 2 ]; then
+                say "review in CI: not available here. It runs only on GitHub Actions, and $fact."
+            elif [ ! -e "$CI_REVIEW_FILE" ]; then
+                say "review in CI: off. 'keel ci-review install' turns it on"
+            elif ci_review_is_keels && [ "$rule" = 1 ]; then
+                say "review in CI: $CI_REVIEW_FILE is keel's, and $fact, so it is a second CI system. 'keel ci-review remove' deletes it."
+            elif ci_review_is_keels && [ "$rule" = 2 ]; then
+                say "review in CI: $CI_REVIEW_FILE is keel's, but $fact, where it would never run. 'keel ci-review remove' deletes it."
+            elif ci_review_is_keels; then
+                say "review in CI: on, $CI_REVIEW_FILE"
+            else
+                say "review in CI: $CI_REVIEW_FILE exists and is not keel's"
+            fi
+            ;;
+        *) die "unknown ci-review command '$sub'. Usage: keel ci-review install [--oauth]|remove|status" ;;
+    esac
+}
+
 case "${1:-}" in
     init)        shift; cmd_init "$@" ;;
     new)         shift; cmd_new "$@" ;;
@@ -3047,6 +4648,7 @@ case "${1:-}" in
     apex-export) shift; cmd_apex_export "$@" ;;
     scan)        shift; cmd_scan "$@" ;;
     guard)       shift; cmd_guard "$@" ;;
+    ci-review)   shift; cmd_ci_review "$@" ;;
     plan)        shift; cmd_plan "$@" ;;
     version)     cat "$HERE/VERSION" 2>/dev/null || echo unknown ;;
     ""|-h|--help)
@@ -3063,8 +4665,12 @@ case "${1:-}" in
         # this keel as too old and scans the working tree.
         say "  scan --push <remote> <commit>   the same scan of a commit being pushed, and of its history's key files"
         say "  guard install|status|uninstall   pre-push hook: the scan, and no pushes to the default branch, plus a pre-commit hook that stays off until gates.commit_guard turns it on"
+        say "  ci-review install|remove|status   opt in to keel's review on pull requests in GitHub Actions: writes one workflow file, off until you run it"
         say "  plan status <plan>   an implementation plan's steps by state, per task, and the next open step's id"
         say "  plan tick <plan> <id> [--note <text> | --defer <reason> | --not-applicable <reason>]   set one step's state"
+        say "  plan report <plan> [--json]   when a plan was planned and delivered, its lead time, and the commits that reworked it, from git"
+        say "  plan risk [--staged | --range <a>..<b> | <path>...]   which review loop a change gets, from hard_block_paths: light only when the last line is 'loop: light' and the exit is 0"
+        say "  plan batches <plan> [--json]   which of a plan's tasks may run at the same time, from their Depends on and Files lines, and why the rest may not"
         say "  version" ;;
     *) die "unknown command '$1'. Try 'keel --help'." ;;
 esac

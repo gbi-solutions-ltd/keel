@@ -105,7 +105,8 @@ dispatch table at `` bin/keel#init)        shift; cmd_init ``.
 
 **Which gates are mechanical.** `done_verified` is enforced by a hook. `commit_guard` is enforced
 by a git hook only after `keel guard install`. `coding_standards` and `security_audit` are read
-by skills and by `doctor`, and no hook asserts either (docs/profile-keys.md:54-55).
+by skills and by `doctor`, and no hook asserts either (`docs/profile-keys.md#gates.coding_standards`
+and `docs/profile-keys.md#gates.security_audit`).
 
 ## 5. Development setup
 

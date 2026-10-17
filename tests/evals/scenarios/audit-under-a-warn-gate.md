@@ -5,9 +5,12 @@ Inject: security-audit
 **Tests:** whether `gates.security_audit` changes what a finding does. Not whether the finding is
 found: the seeded secret is in the working tree and phase 1 reaches it either way. The measurement
 is the verdict the audit hands back, and it is taken across **two dispatches against the same
-fixture with only that one profile value changed**, `warn` in the fixture as it ships and
-`required` after editing the staged `.keel/profile.json`. One dispatch cannot fail this scenario,
-because one verdict is consistent with a skill that never read the key.
+fixture with only that one profile value changed**, `warn` as the fixture stages and `required`
+when staged with `KEEL_EVAL_GATE=required tests/evals/stage.sh audit-under-a-warn-gate`, which
+commits that value on `main`. Not by editing the staged `.keel/profile.json`: that is a change to
+the profile, which makes every changed file sensitive, and the gate is read from `main` anyway. One
+dispatch cannot fail this scenario, because one verdict is consistent with a skill that never read
+the key.
 
 **Baseline, no skill (recorded 2026-09-08, corrected the same day):** reports the token and
 blocks the ship in both dispatches, so the two verdicts are identical. **It does read the gate and
@@ -21,11 +24,16 @@ scenario worth running. The body before this scenario existed already told the m
 non-blocking, and then refused the ship under both values anyway. A treatment measured only against
 the no-skill baseline would credit the gate paragraph with what Step 1 was already doing.
 
-**What the arm can see.** `.keel/profile.json` sets `gates.security_audit` and
-`hard_block_paths: ["src/billing/**"]`. **Nothing exists under `src/billing/`**, so the hard block
-branch is unreachable and cannot carry a verdict this scenario would credit to the gate. The seeded
-finding is a partner API token committed in `src/client/config.ts` and used by
-`src/client/api.ts`, which is outside `hard_block_paths`.
+**What the arm can see.** A git repository: `main` holds `.keel/profile.json`, `package.json` and
+`README.md`, and the checked-out `feat/partner-bank-checkout` adds `src/` in one commit, the change
+the audit is asked about, with a clean tree. The profile sets `gates.security_audit` and
+`hard_block_paths: ["src/billing/**"]`, and the branch leaves it alone. **Nothing exists under
+`src/billing/`**, so the change touches no guarded path, the match finds none whether `keel` makes
+it or the arm does, and the hard block branch is unreachable and cannot carry a verdict this
+scenario would credit to the gate. The seeded finding is a partner API token committed in
+`src/client/config.ts` on the branch and used by `src/client/api.ts`, which is outside
+`hard_block_paths`. The fixture was loose files until 2026-10-17, when the match reference read a
+project with no repository as touching and both dispatches blocked; see `tests/evals/results.md`.
 
 **Scope.** The prompt is a pre-ship check, which is `--diff` on Step 1's table, so this arm does
 not exercise the `--full` fan-out.

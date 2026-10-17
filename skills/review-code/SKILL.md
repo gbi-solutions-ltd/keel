@@ -39,17 +39,25 @@ Either way, run step 3. A generic reviewer does not know this project's intent.
 
 ## Step 3: The pass that only we can do
 
-Run `profile.verify.test` yourself first. `keel:tdd` runs it once at a unit boundary, so review
-is where the suite result is established rather than inherited.
+Run `profile.verify.test` yourself first. `keel:tdd` runs it once at a unit boundary, and may run
+only the affected tests, so review is where the suite result is established rather than inherited.
+
+**Find the sensitive files before dispatching.** A sentence in chat is not a decision, and
+`keel plan risk` is what the review loop already uses. Run the command in
+[../security-audit/references/sensitive-match.md](../security-audit/references/sensitive-match.md)
+with the review's base and read the result by its rules. Where they make every changed file
+sensitive, or read the result as touching without naming paths, count every changed production
+file and say so in the report, since item 6 mutates only production code.
 
 **Dispatch this pass; do not run it inline.** A reviewer that watched the code being written is
 anchored on it. Read [references/rubric-pass.md](references/rubric-pass.md) now, and brief a
 subagent as it says, with model `inherit` and a description starting `inherit: `. The brief carries
-the rubric and five checks a generic reviewer lacks: the diff matches the plan, every changed line
-traces to the request, the tests came first, no accepted decision is contradicted, and a test was
-proved able to fail. A dispatch without them reviews none of these. Where step 2's plugin ran, both
-stand: it is the correctness pass, and this one settles a conflict, having read the plan, the
-decisions and the standards.
+the rubric, the sensitive files and six checks a generic reviewer lacks: the diff matches the plan,
+every changed line traces to the request, the tests came first, no accepted decision is
+contradicted, a test was proved able to fail, and every changed decision line on a sensitive path
+was mutated, because those paths cost most when a mistake lands. A dispatch without them reviews
+none of these. Where step 2's plugin ran, both stand: it is the correctness pass, and this one
+settles a conflict, having read the plan, the decisions and the standards.
 
 ## Step 4: Rank, and say what blocks
 
@@ -67,10 +75,17 @@ around ten.
 Per finding: `file:line`, what is wrong, why it matters, and what to do. Do not rewrite it yourself;
 the author fixes it.
 
+When the author's fix for a blocking finding comes back, re-review once: dispatch step 3's pass
+again with the last round's item 6 survivors, because a fix for a survivor is a new test whose power
+to fail is the whole point. If the re-review still finds anything blocking, take both reports to the
+person rather than start another round.
+
 Read [../keel/references/reporting-findings.md](../keel/references/reporting-findings.md) once: it
 carries the reason behind each rule.
 
-Then name `security-audit` and `ship` as next. Do not start them.
+Then name `security-audit` and `ship` as next. Do not start them, unless `execute-plan` started
+this review in a delivery run, in which case `ship` follows as `execute-plan`'s delivery reference
+says, because the person chose the pull request as the gate when they approved the plan.
 
 ## Common mistakes
 

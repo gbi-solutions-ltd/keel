@@ -1,8 +1,8 @@
 # Plan template
 
-The structure of `<docs_root>/plans/YYYY-MM-DD-<slug>.md`. Adapted closely from superpowers'
+The structure of `<docs_root>/plans/YYYY-MM-DD-<slug>.md`. Drawn from superpowers'
 `writing-plans`, with the verify commands read from `.keel/profile.json` and tasks traced to
-story IDs.
+story IDs. The task shape, behaviours with examples in place of test code, is keel's own.
 
 ## Header
 
@@ -24,6 +24,8 @@ that has loaded nothing else.
 **Stories:** S-08, S-14
 **ADRs:** ADR-0003
 **Architecture:** two or three sentences on the approach.
+**Implementer routing:** inherit
+**Delivery:** hand-off
 
 ## Global constraints
 
@@ -42,6 +44,17 @@ these.
 Copy the constraints in full rather than linking. A task executed by a fresh agent that reads
 only its own section must still obey them.
 
+**The routing line** takes `inherit` or `keel-implementer`, and the person approving the plan can
+change it before `execute-plan` runs. `keel-implementer` fits where every task has a `Done when:`
+command and concrete behaviours. A plan with any task touching `hard_block_paths` names `inherit`,
+unless the person approving says otherwise.
+
+**The delivery line** takes `hand-off` or `pull-request`. `hand-off` stops after each skill, as
+before. `pull-request` runs through to an open pull request, stopping wherever
+`skills/execute-plan/references/delivery.md` says. The person approving the plan chooses, and can
+change the line before `execute-plan` runs: `execute-plan` reads the line from the plan and not from
+the request, so the choice made at approval is the one a later session finds.
+
 ## Task shape
 
 ````markdown
@@ -58,40 +71,41 @@ only its own section must still obey them.
 
 **Depends on:** task 2
 
+**Behaviours:**
+
+1. An empty `apiKeys` list fails startup with a message naming `apiKeys`. Example: a context
+   configured with `apiKeys: []` fails to start, and the message contains "apiKeys".
+
 **Done when:** `./gradlew test --tests '*SecurityPropertiesTest'` passes.
 
 - [ ] **Step 3.1: Write the failing test**
 
-```java
-@Test
-void emptyApiKeysFailsStartup() {
-    assertThatThrownBy(() -> context.getBean(SecurityProperties.class))
-        .hasMessageContaining("apiKeys");
-}
-```
+Write the test for behaviour 1 from its example, in `SecurityPropertiesTest`.
 
 - [ ] **Step 3.2: Run it and watch it fail**
 
 Run: `./gradlew test --tests '*SecurityPropertiesTest'`
-Expected: FAIL, "expected an exception but none was thrown"
+Expected: FAIL, the case for behaviour 1 fails because startup succeeds
 
 - [ ] **Step 3.3: Write the minimal implementation**
 
-```java
-@NotEmpty(message = "apiKeys must not be empty")
-private List<String> apiKeys;
-```
+Make behaviour 1 pass: validate `apiKeys` in `SecurityProperties` so that an empty list fails
+startup with a message naming `apiKeys`.
 
 - [ ] **Step 3.4: Run it and watch it pass**
 
 Run: `./gradlew test --tests '*SecurityPropertiesTest'`
-Expected: PASS. The suite runs at the unit boundary, not per step.
+Expected: PASS. The tests run at the unit boundary, not per step.
 
-- [ ] **Step 3.5: Run the suite at the unit boundary, then hand over**
+- [ ] **Step 3.5: Run the tests at the unit boundary, then hand over**
 
-Run: `./gradlew test`
+Run: `./gradlew test`. Where the profile sets `verify.test_affected`, run that instead, with
+`{base}` filled with the start record's commit, or `verify.test` where `keel:tdd`'s affected-tests
+reference says to. The task text overrides the skill, so a step naming only the suite would
+schedule it for every task, and an affected run that never selected the unit's new test would pass
+this step.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
-This is the one suite run the task schedules.
+This is the one boundary run the task schedules.
 
 ```bash
 git add src/main/java/com/example/config/SecurityProperties.java \
@@ -145,13 +159,39 @@ A task's implementer may see only their own section. `Consumes` tells them the e
 earlier tasks produced; `Produces` tells later tasks what to expect. Without it, task 7 invents
 a name for something task 3 already built, and the two never meet.
 
+**It is the one place a plan carries verbatim form.** Code, a signature or a data shape that
+another task consumes goes here and nowhere else; the rest of a task says what it must do as
+behaviours with examples.
+
 Omit the block only when a task genuinely touches nothing shared.
+
+### Why the Behaviours list exists
+
+A plan that carried each task's test and implementation verbatim was a second copy of the code,
+which the implementer then wrote again. Behaviours with examples say what must be true. The
+implementer writes the tests from them, and the spec review checks that every example has its case.
+
+**The risk taken is drift.** With no code to copy, an implementer can build something the plan did
+not mean. Watch it as `rounds` and `rework` in `keel plan report`.
 
 ### Why the Depends on line exists
 
 It is what lets `execute-plan` run tasks concurrently, and it is required on every task. Write
 `none` where a task depends on nothing; an absent line is not the same as `none`: it is read as
 unknown, and the task runs alone.
+
+`keel plan batches` batches a task only when it can read this line exactly, so write it in one of
+these forms and nothing else, bar an optional period at the end: `none`; `task 2`; `tasks 1 and 2`;
+`tasks 1, 2 and 3` (any number of ids, with an optional comma before the `and`); or `tasks 1 to 3`
+(every task from 1 to 3). For example:
+
+```markdown
+**Depends on:** tasks 1, 2 and 3
+```
+
+A task whose line is written another way, with a reason after it, a range as `1-3`, or a note in
+parentheses, still runs, alone, because a guess at what it meant could put it beside a task it
+depends on. Put the reason in the task's `Behaviours`, not on the line.
 
 The line is not redundant with `Consumes`. A run asked to execute a five-task plan as fast as it
 reasonably could worked out for itself that three leaf tasks had disjoint `Files` and no
@@ -168,9 +208,55 @@ credential exists.
 
 ### Tasks that run concurrently
 
-Where a plan has a batch of tasks that all say `Depends on: none`, or whose dependencies are all
-already complete, and no two of them name the same file anywhere in their `Files` blocks, say so
-in the header:
+Write the plan in this order, because `keel plan batches` can only read tasks that are already
+written, and a record that every task writes is what hides a batch from it:
+
+1. Write the tasks with the shared records (`CHANGELOG.md`, `README.md`, the skill catalog) left out
+   of any task that could run beside another, and a records task after them that depends on them.
+   Every task writing the same record is what makes no two tasks disjoint: code tasks that each end
+   in a `CHANGELOG.md` entry never batch, and one records task after them lets them. Write each
+   task's `Depends on:` line and `Files` block in the strict form below, because a task written
+   another way still runs, but alone.
+2. Run `keel plan batches <plan>`. It reads each task's `Depends on:` and `Files` lines, prints the
+   batches they allow, and gives a `why:` line for each task that could not join the step before it.
+3. Declare in the header's `**Concurrent batches:**` line every batch it prints, unless a task in it
+   cannot meet rules 1 and 2 below, in which case say which task; or write `none` followed by its
+   `why:` lines. A batch it does not print is not declared, because it reads the same lines the
+   batch rests on; a declared batch may be part of a printed one. The approver can only approve
+   overlap they can see.
+4. For each declared batch, scope each task's `Done when:` (rule 1), make its last step a commit
+   (rule 2) and add the `**Batch gate:**` line, because the command cannot judge either and prints
+   them only as a reminder.
+
+The command batches a task only when both lines match their strict form exactly. For example:
+
+```markdown
+**Depends on:** tasks 1 and 2
+**Files:**
+- Create: `src/format.js` and `src/util.js`
+- Modify (the export line only): `src/index.js`
+- Test: `test/format.test.js`
+```
+
+`Depends on:` is `none`, `task 2`, `tasks 1 and 2`, `tasks 1, 2 and 3` or `tasks 1 to 3`. `Files` is
+the label alone on its line, then one list item per action, `Create`, `Modify`, `Delete`, `Test` or
+`Rename` (optionally with a note in parentheses before the colon, which must not name a file,
+because the command cannot see a file named in prose), each followed by backticked paths separated
+by commas with an optional final `and`. A long list may continue on an indented line when the line
+before it ends in a comma or `and`. A path has letters, digits and `._-/@+` only: no space, `:`,
+`#`, `*` or trailing `/`, and it does not start with `/` or `./` or hold `//`, since each of those
+spells one file two ways. A rename names both paths, as
+`` - Rename: `src/old.js` and `src/new.js` ``, and both count; written with ` to ` the task runs
+alone, since only `and` is in the strict form. The block ends at the first blank line, and no list
+item may follow that blank line before the next `**Label:**` line, nor an indented line, which would
+continue the last item. A task written another way, with prose in the block, a note after a path, a
+directory or a pattern, or a reason after the dependencies, still runs, alone, with a `why:` line
+naming the label; to batch it, put the note in `Behaviours` and list the files. A list item
+elsewhere in a task (a `Behaviours` or step item) whose first word is one of the five action words,
+followed by ` (` or by a `:` later on the line, counts too and runs the task alone, so word those
+another way; `Tests:` and `Created by:` are other words.
+
+The header then reads:
 
 ```markdown
 **Concurrent batches:** tasks 1, 2 and 3 may run at the same time. Task 4 requires all three.
@@ -178,8 +264,8 @@ Task 5 requires task 4.
 ```
 
 **Disjoint files and declared dependencies are necessary and not sufficient.** Three more rules
-apply to every task in a concurrent batch, and each exists because the same baseline run predicted
-the failure in concrete terms:
+apply to every task in a concurrent batch, because the same baseline run predicted the failure in
+concrete terms, and a fourth keeps the files disjoint:
 
 1. **Scope the `Done when:` to the task's own test.**
    `**Done when:** node --test test/format.test.js passes.` and nothing about the full suite. The
@@ -195,7 +281,7 @@ the failure in concrete terms:
    not commit" and then appends a rule saying "do commit" has given the implementer two orders, and
    [subagent-prompts.md](../../execute-plan/references/subagent-prompts.md) tells it the task wins.
 
-   ```markdown
+   ````markdown
    - [ ] **Step 1.5: Commit**
 
    You are in your own worktree, so this task commits rather than handing over.
@@ -204,7 +290,7 @@ the failure in concrete terms:
    git add src/format.js test/format.test.js
    git commit -m "feat(format): normalise whitespace"
    ```
-   ```
+   ````
 
    The named-paths rule above still applies: a worktree keeps a sibling's files out, but not
    whatever else is in this one.
@@ -216,13 +302,18 @@ the failure in concrete terms:
 3. **Touch no shared config.** A task in a batch that would create or edit a lockfile, a linter
    config, a CI file, or the profile is not eligible for the batch. Two agents each deciding the
    lint command needs a config file will each write one.
+4. **Leave the shared records to a records task after the batch.** `CHANGELOG.md`, `README.md` and
+   the skill catalog are written once, by a task that depends on every task in the batch, because
+   two tasks that each add to the same record name the same file and meet in a conflict in the one
+   place both edit. The documentation still lands in the same pull request; only the commit that
+   carries it moves to the join.
 
-The failure these prevent is quieter than a lost race, and it is what a batch run in one shared tree
-produces: with a sibling's failing test in the suite, every agent's step 2 sees red for the wrong
-reason and ticks the box, so *"the TDD gate silently stops proving anything"*. A worktree per task
-is what keeps each suite to its own task.
+The failure the first three prevent is quieter than a lost race, and it is what a batch run in one
+shared tree produces: with a sibling's failing test in the suite, every agent's step 2 sees red for
+the wrong reason and ticks the box, so *"the TDD gate silently stops proving anything"*. A worktree
+per task is what keeps each suite to its own task.
 
-Where any of the three cannot hold, the tasks are sequential. Say so rather than declaring a batch
+Where any of the four cannot hold, the tasks are sequential. Say so rather than declaring a batch
 and hoping.
 
 ### Why the Done when line exists
@@ -239,7 +330,7 @@ Rules:
   tasks below do: `**Done when:** there is no command. This is a human check against the staging
   environment.` An honest gap reads as a gap. An invented command reads as coverage.
 - It is **scoped to the task's own test, never the full suite**, in every plan and not only in a
-  concurrent batch. The suite runs once at the unit boundary, which for a sequential task is its
+  concurrent batch. The tests run once at the unit boundary, which for a sequential task is its
   hand-over step and for a batched one is the `Batch gate:` line at the join. A whole-suite `Done
   when:` puts the suite back inside the cycle it was moved out of, and in a batch it also proves
   nothing, for the reason under "Tasks that run concurrently" above.
@@ -254,7 +345,7 @@ Each step is one action, two to five minutes:
 - Run it and watch it fail
 - Write the minimal code
 - Run it and watch it pass
-- Run the suite at the unit boundary, then hand over: stage the named paths, do not commit
+- Run the tests at the unit boundary, then hand over: stage the named paths, do not commit
 
 Steps 2 and 4 are not ceremony. A test you did not watch fail may be asserting nothing, and a
 plan that omits the failure check produces suites that are green because they test nothing.
@@ -312,8 +403,8 @@ The `verify` row matters most in an existing codebase. Planning a `verify` story
 Step 4 of the skill lists them. Every one moves a decision from the planner to someone with less
 context.
 
-If you cannot write the code for a step, the plan is not finished. Say what is blocking it and
-put it in an open questions section rather than hiding it behind a phrase.
+If you cannot state a behaviour with an example, the plan is not finished. Say what is blocking it
+and put it in an open questions section rather than hiding it behind a phrase.
 
 Then ask it. A blocker recorded in an open questions section stops `execute-plan` before it
 starts, so a question you could have settled in one exchange costs a whole cycle instead. Put it
@@ -346,7 +437,8 @@ it to trace to.
 
 Some tasks genuinely cannot be tested: a human check against deployed environments, a rotation
 that touches a partner, a decision recorded as a runbook entry. A plan may contain one, and it
-**must say so explicitly** rather than inventing a test to fill the shape.
+**must say so explicitly** rather than inventing a test to fill the shape. Its behaviours still
+carry an example: the wording the task must produce, or the output of a check command.
 
 ```markdown
 - [ ] **Step 4.1: There is no test for this**
@@ -373,6 +465,8 @@ is worse than an honest gap because it reads as coverage.
 6. No task depends on a file no task creates.
 7. Every step's bold title opens with its id, `Step <task>.<step>:`, and no id repeats:
    `keel plan status <plan>` exits 0, and no step title is in the old form, `**Step <n>: `.
+8. Every behaviour has an example a test, or for a no-test task a check command or a reader, can
+   assert.
 
 Fix inline. Then report coverage and hand off.
 

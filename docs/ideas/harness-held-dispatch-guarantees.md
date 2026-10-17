@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-10-13, choosing items 1 and 2 from an assessment of Claude Code features keel does not use yet, after the delegated-review build merged |
-| Status | built 2026-10-13, via docs/plans/2026-10-13-harness-held-dispatch-guarantees.md |
+| Status | variants A and C built 2026-10-13, via docs/plans/2026-10-13-harness-held-dispatch-guarantees.md; item 4 built 2026-10-14, via docs/plans/2026-10-14-opt-in-ci-review.md; item 8 answered once in a real session on 2026-10-14; item 5 piloted twice without git, undecided |
 | Recommendation | Build something smaller: ship the subagent status line, block file edits for `keel-fanout`, and add the two prompt sentences the incidents call for. Do not put reviewers in harness worktrees |
-| Next | Nothing for variants A and C. Items 4 to 8 are decided together |
+| Next | Nothing for variants A and C. Item 4 is built (the workflow file is the switch), item 6 is dropped, item 7 is piloted with a verdict, item 8 is answered once (a delegated subagent loaded and followed a path-scoped rule), and item 5 is undecided, waiting on pilot runs in which `git` works inside the eval sandbox |
 
 ## The problem
 
@@ -24,10 +24,10 @@ it cost a hand clean-up twice.
 - **2026-10-12, a reviewer left a worktree behind.** The quality review of the same step created a
   detached worktree at `928a03d` under the device's temp directory and did not remove it. The next
   review found it in `git worktree list` and the coordinator removed it by hand.
-- **The label is unverifiable, and that is recorded.** `CHANGELOG.md:29`: "Known gap, not closed:
-  the validator checks that a dispatch names a model, in any skill, and never the `inherit: `
-  label". **No instance of a label that lied is on record**, so item 1 rests on the gap and not on a
-  failure.
+- **The label is unverifiable, and that is recorded.** `CHANGELOG.md`, 0.23.0: "Known gap, not
+  closed: the validator checks that a dispatch names a model, in any skill, and never the
+  `inherit: ` label". **No instance of a label that lied is on record**, so item 1 rests on the gap
+  and not on a failure.
 
 ## What was asked for
 
@@ -92,7 +92,7 @@ finding below). The cheap fix for the evidence is two sentences in two prompts.
 | 4. The label is confirmed rendered on Claude Code and unchecked on Codex | `docs/standards.md#Confirmed on Claude Code` | Variant A is Claude Code only, the same position the label already has |
 | 5. `keel-fanout` sets only a model | `agents/keel-fanout.md:4`; its rules are prose, `agents/keel-fanout.md:17` | Variant C is a frontmatter edit. `tests/validate-skills.sh` checks name, description and model only, so new fields pass |
 | 6. Codex resolves the profile in its own file | `lib/harness/codex.sh:86` writes `.codex/agents/keel-fanout.toml` with a model and an effort | Any field added to the Claude agent has no Codex counterpart until someone checks the toml format |
-| 7. The rubric pass already owns its worktree in prose | `skills/review-code/references/rubric-pass.md:76`, and four open gaps at `docs/plans/2026-10-12-independence-of-a-delegated-review.md:1241` to `:1244` | D would not close those gaps: untracked files and dependencies are absent from a harness worktree too |
+| 7. The rubric pass already owns its worktree in prose | `skills/review-code/references/rubric-pass.md#Create it with`, and four open gaps at `docs/plans/2026-10-12-independence-of-a-delegated-review.md:1241` to `:1244` | D would not close those gaps: untracked files and dependencies are absent from a harness worktree too |
 | 8. A recorded claim may be stale | `docs/standards.md#a session's model cannot be changed by a plugin` says no plugin can change the session's model. Skill frontmatter now takes a `model` that "applies for the rest of the current turn" (Claude Code skills docs) | Out of scope here. Re-check before anything else cites that sentence; it bears on `model-routing.md` |
 | 9. The label rule leaves a question open that A answers | `docs/ideas/independence-of-a-delegated-review.md`, open question 4: does a profile label lose the self-documentation `inherit: ` has | With A, the row shows the model whatever the label says, so a profile name in the label stops costing that |
 
@@ -121,21 +121,74 @@ here rather than deleted so each decision keeps its trace.
 
 Recorded so they are not lost; none blocks the build above.
 
-4. **Review in CI is opt-in.** Decided by Bernard, 2026-10-13: running `review-code` through the
-   Claude Code GitHub Action is off unless the user explicitly turns it on. Not decided: where the
-   switch lives. A profile key would have to declare its reader like every other key does.
+4. **Review in CI is opt-in, and the workflow file is the switch.** Decided by Bernard, 2026-10-13
+   and 2026-10-14: running `review-code` through the Claude Code GitHub Action is off unless the
+   user explicitly turns it on, and turning it on means running a keel command that writes
+   `.github/workflows/keel-review.yml`. There is no profile key, so there is nothing for keel to
+   read or keep in sync. Built in `4e485eb` (`docs/plans/2026-10-14-opt-in-ci-review.md`); the
+   workflow is unrun against a real repository and the action is not pinned to a commit.
 5. **Should `review-code` run as a forked skill** (`context: fork` with `agent:`), so the harness
    rather than the body enforces independence? It moves the suite run and the plugin step into the
-   fork and answers open question 3 of the delegated-review record by default. To decide together.
-6. **Should run-on-purpose skills set `disable-model-invocation: true`**, which removes their
-   description from every session's context and frees room under decision 6? Candidates named so
-   far: `apex-export`, `port-assess`, possibly `ship`. To decide together.
-7. **Should keel measure itself with Claude Code's `/skill-doctor` and `claude plugin eval`** before
-   building more of its own eval harness? `docs/ideas/plugin-delegation-eval-gap.md` waits on
-   exactly a runner that loads a plugin. To decide together.
-8. **Item 3 of the assessment, path-scoped rules written by `keel init`**, is not raised for
-   decision yet: it needs one experiment first, whether a delegated implementer loads a
-   `.claude/rules/` file whose `paths:` match the files it edits.
+   fork and answers open question 3 of the delegated-review record by default. **Pilot written,
+   not run, 2026-10-14**, on the unmerged branch `experiment/forked-review`: a variant skill
+   `review-code-forked` and the case `forked-review-code-runs-the-pass`, which asks whether the fork
+   still runs the suite, reads the rubric, makes no nested dispatch (a subagent cannot dispatch one)
+   and reports a ranked finding, at what cost against the $0.53 of the dispatch version. **Run
+   twice, 2026-10-14, Claude Code 2.1.299, one run each:** the first scored 0.80, failed by the
+   judge on the ranked finding with the reply lost; the second scored 1.00 at $0.39, against $0.42
+   to $0.57 for five dispatch runs the same day. The fork fired, made no nested dispatch, read the
+   rubric itself and reported the planted bug as Blocking with its `file:line`. Neither version
+   could run `git` (see item 7), and the fork's one attempt at the suite was refused, so its "ran
+   the suite" means it tried. **Undecided:** two runs without `git` show a fork can do the pass,
+   not that it does it as well as the dispatch.
+6. **Dropped, 2026-10-14.** `/skill-doctor` run in a repository using keel showed all 25 keel
+   listings cost about 1,600 tokens a turn, and `disable-model-invocation` on the apex trio would
+   free about 200. Hiding `incident-response` or `ship` would defeat their point, so nothing is
+   worth the change. The larger cost is outside keel: 19 never-used skills synced from claude.ai,
+   about 4,900 tokens a turn, which the user can turn off on claude.ai.
+7. **Piloted, 2026-10-14.** `claude plugin eval` loads the real plugin and grades the tool calls,
+   which `tests/evals/` never does, but it has no git-state grader and each run starts in an empty
+   workspace, so it complements the release gate and does not replace it. `/skill-doctor` reports
+   what each skill costs and how often it ran; it does not report triggering collisions. Two pilot
+   cases are in `tests/plugin-evals/`: whether a plain review request reaches `review-code`, and
+   whether it dispatches its rubric pass at `inherit`. **Run 2026-10-14, Claude Code 2.1.296,
+   three runs of each case, $2.16:** all six runs scored 1.00. A plain request reached
+   `review-code` 3 of 3 and found the planted bug (one judge vote in nine dissented). The dispatch
+   case saw `Skill` first, the `inherit: ` description, and a brief carrying the diff command and
+   the standards path, 3 of 3. An `Agent` dispatch works inside an eval, keel's hooks did not stop
+   a run, and the dispatch is gradable. **A subagent's own tool calls reach the
+   transcript.** The first probe matched the driver's own read of `rubric-pass.md` and proved
+   nothing; narrowed to `rubric.md`, which only the subagent reads, it passed on a rerun (one run,
+   $0.53, so a reviewer's `git stash` is now gradable, though no case grades it yet). **Verdict:**
+   adopt `claude plugin eval` beside the release gate, not in place of it, for what the gate cannot
+   see: whether a skill fires and whether it dispatches. Three runs is evidence the path works, not
+   a rate. **Found later the same day:** in every review run on the owner's Mac, on 2.1.296 and
+   2.1.299, `git` failed inside the eval sandbox (Apple's `/usr/bin/git` wrapper cannot write its
+   cache there) and `Bash` was refused after that. Each review read the files instead of a diff, and
+   most ran no suite. So the runs show the skill fires, dispatches and reads the rubric, not a
+   review working with `git` inside the harness. Launching the eval with Xcode's real `git`
+   directory first on `PATH` changed nothing: the run still reached the wrapper, and `PATH` is not
+   among the variables the eval is documented to pass through. Two more things seen: a `tool_used`
+   grader counts a refused call, and the judge is noisy, with two unanimous FAILs in the day's runs,
+   one of them on a reply read afterwards and found to meet the rubric.
+8. **Item 3 of the assessment, path-scoped rules written by `keel init`**, needed one experiment:
+   whether a delegated implementer loads a `.claude/rules/` file whose `paths:` match the files it
+   edits. **Answered once, 2026-10-14, in a real session on Claude Code 2.1.299, not in the eval
+   harness.** The setup was a scratch repository built by the case's `scaffold.sh`, with an
+   `InstructionsLoaded` hook logging every load. A prompt that only read `src/fees.sh` loaded the
+   unconditional rule at session start and four path-scoped rules, the scaffold's `src/fees*.sh`
+   among them, on that read. In the delegated run the log shows `fees.md` loaded by the subagent
+   (the event carries its `agent_id`, and names `src/fees.sh` as the trigger), and the file came
+   back with the `# FEE-RULE:` line the rule asks for. **That is one run. It shows a delegated
+   implementer can load and follow a path-scoped rule, not how often it does.** The control, the
+   same task given to the main agent, loaded nothing and wrote no marker: its transcript shows two
+   `Bash` commands, a compound `cat` and a `printf` append, and no `Read` or `Edit` call, and the
+   docs name `Read`, `Write`, `Edit` and a single-file `cat` or `head` as what triggers a load. The
+   three eval-harness runs of the control also wrote no marker with only `Read`, `Glob`, `Grep`,
+   `Edit` and `Write` allowed, and the cause is not established. The docs say project rules are
+   skipped when `project` is excluded from `--setting-sources`, which would fit, but the harness's
+   flags have not been seen. The two cases stay as written and gate nothing. Rules are context and
+   not enforcement, the docs say, so a hook is still what holds a constraint.
 
 ## Recommendation
 
@@ -144,17 +197,19 @@ Recorded so they are not lost; none blocks the build above.
 Do not put reviewers in harness worktrees: the harness checks out the default branch and tracked
 files only, so variant D would review the wrong tree and still not close the gaps it was for.
 
-Landed: variant A in ce4c8f6, variant C in 7673566, the prompt sentences in e0c09be. Variant A
-landed as a script inlined into the plugin's `settings.json` as a `python3 -I -c` command, because
-`${CLAUDE_PLUGIN_ROOT}` did not resolve there when probed. Variant C's tool denial holds for the
-agent file, and nothing pins that a `keel-fanout: ` dispatch selects that agent. The row format,
-its colours (none, the row is plain text) and truncation, and the `docs/harness-support.md` rows
-listed under "Not decided here" were decided in the build, so only the opt-in switch for item 4 and
-items 5 to 8 remain open.
+Landed: variant A in ce4c8f6, variant C in 7673566, the prompt sentences in e0c09be, and item 4, the
+opt-in CI review, in 4e485eb. Variant A landed as a script inlined into the plugin's `settings.json`
+as a `python3 -I -c` command, because `${CLAUDE_PLUGIN_ROOT}` did not resolve there when probed.
+Variant C's tool denial holds for the agent file, and nothing pins that a `keel-fanout: ` dispatch
+selects that agent. The row format, its colours (none, the row is plain text) and truncation, and
+the `docs/harness-support.md` rows listed under "Not decided here" were decided in the build, so
+only item 5 remains open.
 
 ## Not decided here
 
 - The status line's exact row format, its colours, and whether it truncates the label or the model
   first in a narrow pane.
 - The `docs/harness-support.md` rows for the new claims and the probe that fills them.
-- Where the opt-in switch for item 4 lives, and everything about items 5 to 8.
+- Item 5: whether `review-code` becomes a forked skill. Its two pilot runs had no `git`.
+- Whether `keel init` writes path-scoped rules. Item 8's result shows a delegated implementer can
+  load one; it does not decide this.

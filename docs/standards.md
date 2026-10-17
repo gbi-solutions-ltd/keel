@@ -82,7 +82,7 @@ named checks let a driver that skipped the brief see what its dispatch left out.
 
 **Example:** `skills/repo-snapshot/SKILL.md` keeps its agent table inline and moves the eleven
 output sections to `references/section-templates.md`. `skills/review-code/SKILL.md` step 3 says to
-read `references/rubric-pass.md` before dispatching and names the five checks it carries.
+read `references/rubric-pass.md` before dispatching and names the six checks it carries.
 
 ## A check is never stricter than correct output
 
@@ -159,13 +159,13 @@ run cut short at the timeout looks exactly like a failure and is not one.
 
 ## Documentation lands with the change, not after
 
-**Rule:** a skill is not done until `README.md`, `CHANGELOG.md`, and the plan are updated in the
-same commit.
+**Rule:** a change is not done until `README.md`, `CHANGELOG.md`, and the plan are updated in the
+same pull request: the same commit for a task run alone, the records task at the join for a batch.
 
-**Why:** a status line claiming 3 of 19 when 5 exist makes every other claim in the file
-suspect.
+**Why:** a status line claiming 3 of 19 when 5 exist makes every other claim in the file suspect,
+and a batch's records wait for its records task: batched tasks each writing them conflict at merge.
 
-**Example:** every `feat(skill):` commit in this repository touches those three files.
+**Example:** `docs/plans/2026-10-16-plans-declare-batches.md` writes its batch's records in task 3.
 
 ## Shipped prose states the current state, and history lives in the changelog
 
@@ -378,6 +378,10 @@ names it. Wide mechanical reading goes to the delegation profile `keel-fanout`. 
 code under a gate, or judging another agent's verdict, stays `inherit`, labelled the same way and
 never omitted: an unlabelled dispatch is ambiguous between inherited and forgotten, and the reader
 cannot tell which from the transcript alone.
+**One exception, since 2026-10-16 (ADR-0008):** an implementer whose plan names `keel-implementer`
+as its routing runs on the delegation profile `keel-implementer`, labelled `keel-implementer: `.
+Only the implementer: every review, spec pass and plan review stays `inherit` whatever the plan
+says, and a plan that names nothing keeps its implementer on `inherit`.
 `tests/validate-skills.sh` fails a dispatch that names no routing at all, since 2026-08-20, and
 since 2026-09-06 fails a body that names a vendor model alias at all.
 
@@ -398,13 +402,14 @@ nothing is claimed there either way, per ADR-0004. Landed in all eight delegatin
 **On Claude Code the model is shown as well as stated, since 2026-10-13.** <!-- keel:claim property=subagent_row_model harness=claude -->
 keel's `settings.json` sets a subagent status line that writes each running subagent's resolved
 model after its description, when the description starts with a label keel's dispatches write:
-`inherit: ` or `keel-fanout: `, as written above. A row labelled `keel-fanout: ` that runs on the
-main model is then visible to the person the label is for. Only those rows are overridden, because a
-status line replaces the whole row: another plugin's subagent, or one the user started, keeps its
-default row (per the vendor docs, not observed: "omit a task's id to keep the default rendering",
-and every probed row was labelled or overridden). The label is matched at the start of the
-description once control characters are dropped from it, because that is the text drawn; label text
-later in a description, or a label missing its space, does not count. `LABELS` in
+`inherit: `, `keel-fanout: ` or `keel-implementer: `, as written above. A row labelled
+`keel-fanout: ` that runs on the main model is then visible to the person the label is for. Only
+those rows are overridden, because a status line replaces the whole row: another plugin's subagent,
+or one the user started, keeps its default row (per the vendor docs, not observed: "omit a task's id
+to keep the default rendering", and every probed row was labelled or overridden). The label is
+matched at the start of the description once control characters are dropped from it, because that is
+the text drawn; label text later in a description, or a label missing its space,
+does not count. `LABELS` in
 `lib/subagent_statusline.py` must name each dispatch profile the standard defines, so a new profile
 needs an entry there or its rows keep the default rendering. As read from the client's source, the
 row leads with the agent's name, or its type when it has no name, so for an unnamed agent the same
@@ -454,10 +459,12 @@ re-reads context the main thread already holds. The payoff therefore depends on 
 complexity: a router that did would be wrong in the direction nobody notices, since a cheap model
 doing a poor job produces plausible output rather than an error.
 
-Which model each profile should resolve to is still open, and on Codex it is unmeasured: the pin in
-`.codex/agents/keel-fanout.toml` was chosen from a price list and nothing has checked it clears the
-fan-out quality bar. Recorded as open question 3 in `docs/ideas/model-routing.md`, which is also the
-standing evidence that a cheaper model passes every structural check and is wrong twice as often.
+Which model each profile should resolve to is still open, and on Codex it is unmeasured: the pins
+in `.codex/agents/keel-fanout.toml` and `.codex/agents/keel-implementer.toml` were chosen from a
+price list (both are `gpt-5-codex-mini`, the second carried over from the first) and nothing has
+checked that either clears its bar, the fan-out quality bar or the one for writing code under a
+gate. Recorded as open question 3 in `docs/ideas/model-routing.md`, which is also the standing
+evidence that a cheaper model passes every structural check and is wrong twice as often.
 The announcement was asked
 for directly and was originally recorded here as costing nothing. **Corrected 2026-08-20:** it costs
 body words, and in three skills there are none to spare. The rule stays as written and the shortfall

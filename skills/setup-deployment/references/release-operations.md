@@ -150,3 +150,31 @@ back from the database, not the deploy log saying the step was invoked.
 record, and on a system with real users that is somebody's data. Where a write genuinely must be
 exercised, that is a decision to record, with what it creates and how it is removed, which puts it
 in the ledger like anything else.
+
+## Merging unfinished work dark
+
+**Deploying and releasing are separate acts.** A deploy puts code on the servers. A release lets
+users reach it. Keeping them apart is what allows unfinished work to merge to the default branch
+early, instead of living on a long branch that drifts from everything else and lands in one large,
+unreviewable merge.
+
+**Work merged before it is finished ships behind a flag that is off in production.** The code is
+deployed with every other change and does nothing until someone turns the flag on. The flag is
+checked at the entry point, so that off means the old path runs untouched and not a half-built
+path with its output hidden.
+
+**The flag is named, has an owner, and has a removal date or condition.** The name says what it
+gates, the owner is a person who answers for it, and the removal is a date or an event such as
+"once every merchant is on the new path". A flag nobody owns stays forever, and each one left
+behind doubles the combinations of state the system can be in. A flag with no owner and no removal
+condition is not a release mechanism, it is a second configuration nobody reviews.
+
+**Turning the flag on is the release, and it is recorded like a deploy.** Write down who turned it
+on, in which environment, when, and what the flag was before, in the place deploys are recorded.
+Users see the change at that moment, so that moment is the one an incident reader will look for.
+
+**Turning the flag off is a rollback that needs no deploy.** It is the second lever
+`skills/incident-response/SKILL.md` names, after rolling back the deploy, and it is faster than a
+redeploy because nothing is built, shipped or migrated. That only holds if the code behind the flag
+can be switched off without a data change that cannot be undone: a flag in front of a migration that
+rewrites rows is not a rollback, and the migration needs its own plan.

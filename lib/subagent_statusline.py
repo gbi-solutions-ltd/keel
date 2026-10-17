@@ -13,9 +13,9 @@ import sys
 
 SEP = " " + chr(0xB7) + " "
 ELLIPSIS = "..."
-# The two labels docs/standards.md ("A dispatch names its model, and says so") has a dispatch lead
-# its description with, as written there: the profile, a colon and a space.
-LABELS = ("inherit: ", "keel-fanout: ")
+# The labels docs/standards.md ("A dispatch names its model, and says so") has a dispatch lead its
+# description with, as written there: the profile, a colon and a space.
+LABELS = ("inherit: ", "keel-fanout: ", "keel-implementer: ")
 # Fewest characters of the lead worth showing before its ellipsis. Fewer say nothing about which
 # agent it is, and the room is better spent on the label.
 LEAD_KEEP = 3

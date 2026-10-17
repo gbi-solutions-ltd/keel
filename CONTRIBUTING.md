@@ -153,8 +153,10 @@ unrecoverable.
 - No em or en dashes, in the message as well as the code.
 - Say *why*, not just what. If a test or a real repository changed your mind, that belongs in the
   message; it is the most valuable thing in the history.
-- **Documentation lands in the same commit.** `README.md`, `CHANGELOG.md`, and the plan. A status line
-  claiming 3 of 19 when 5 exist makes every other claim suspect.
+- **Documentation lands in the same pull request.** `README.md`, `CHANGELOG.md`, and the plan: in
+  the same commit for a task run on its own, and in the records task at the join for a batch,
+  because tasks that run side by side and each write the same record would conflict at the merge. A
+  status line claiming 3 of 19 when 5 exist makes every other claim suspect.
 
 **Review:** either Bernard Tebandeke or `gfsekamanya`, and never the change's own author. Both are
 not required; requiring both would stall the tool whenever one is busy, which is how internal

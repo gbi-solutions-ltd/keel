@@ -22,7 +22,8 @@ Route to one skill and follow it. Do not do the work in this skill.
 | how should we build this, what stack, which database, record a decision | `design-architecture` |
 | write the implementation plan, plan this out | `write-plan` |
 | execute the plan, start building, go | `execute-plan` |
-| implement X, add feature Y | `tdd` |
+| implement X, add feature Y, a small change | `write-plan` (short path) |
+| just write the code for X, no PR | `tdd` |
 | **production is down right now**, on call, outage, customers affected | `incident-response` |
 | this is broken, why does X fail, this test is flaky, fix bug Z | `debug` |
 | what are our conventions, set up linting, does the code still follow our standards | `coding-standards` |

@@ -167,7 +167,7 @@ session happens to be pinned to (ADR-0005):
 | Brief | Delegation profile | Why |
 | --- | --- | --- |
 | `repo-snapshot`, `port-assess`, `apex-port-plan`, `shape-idea`, `write-docs`, `write-plan`, `security-audit` fan-outs | `keel-fanout` | Wide mechanical reading over many files, with a cited `path:line` for every claim, so the output is checkable |
-| `execute-plan` implementation, both reviews and concurrent batches, and the `write-plan` reviewer | `inherit` | These write code under the TDD gate or judge another agent's verdict. A cheaper model gets less benefit of the doubt, not more |
+| `execute-plan` implementation, both reviews and concurrent batches, and the `write-plan` reviewer | `inherit` | These write code under the TDD gate or judge another agent's verdict. A cheaper model gets less benefit of the doubt, not more. A plan may route its implementer to `keel-implementer` instead (ADR-0008); the reviews stay `inherit` |
 
 Every dispatch announces its profile in the brief's own `description`, leading it:
 `Agent(keel-fanout: <task>)`, `inherit` labelled the same way and never omitted. `docs/standards.md`

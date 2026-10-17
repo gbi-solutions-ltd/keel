@@ -47,3 +47,6 @@ scratchpad/
 # NOTE: do not add `docs/` here. The artifact chain reads from the docs root, and a
 # gitignored docs root silently breaks every skill downstream of repo-snapshot.
 # See docs/03-install-and-distribution.md, "The gitignored-docs trap".
+
+# claude plugin eval writes its reports here
+tests/plugin-evals/results/

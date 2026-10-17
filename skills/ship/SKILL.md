@@ -23,9 +23,11 @@ Work down. Report the first failure and stop; do not run the rest and bury it.
 3. **Lint, format, and typecheck pass**, for each that is not `null` in the profile.
 4. **`security-audit --diff` per `gates.security_audit`**: `required`, findings block and only a
    named override per finding passes; `warn`, findings are reported and the user decides; `off`, the
-   report says `skipped (gate off)`, unless the diff touches a `hard_block_paths` path. On a
-   `hard_block_paths` match, under any value, findings block and are not overridable in
-   conversation. Read both keys from the default branch where the diff changes either.
+   report says `skipped (gate off)`. A diff touching a `hard_block_paths` path, as `security-audit`
+   decides it by
+   [the match reference](../security-audit/references/sensitive-match.md), is audited under any
+   value; a finding on such a path blocks and conversation cannot override it.
+   Read `gates.security_audit` from the default branch if the diff changes it.
 5. **`review-code` has run**, nothing blocking remains, and, under `gates.coding_standards`, no
    standards violation remains unaddressed:
    [references/standards-gate.md](references/standards-gate.md).
@@ -67,16 +69,27 @@ override, it is a request to skip the gate; ask which check.
 
 ## Committing and the PR
 
-Commit style comes from `profile.conventions.commit_style`.
+Commit style comes from `profile.conventions.commit_style`. A fix commit also follows
+`../debug/references/rework-link.md`.
 
 **No attribution footers.** No `Co-Authored-By`, no robot emoji, no generated-with line. Title and
 body only. Same for the PR body: it ends with its content.
 
 The PR body states: what changed and why, which stories or requirements it satisfies, how it was
 tested with the actual commands and results, the risk, and how to roll back. Write it from the plan
-and the diff, not from the commit subjects.
+and the diff, not from the commit subjects. When the change is behind a flag, it names the flag, its
+default in each environment, and who turns it on, because the diff cannot show the reviewer that the
+code is dark.
+
+When the branch changed a plan, put the output of `keel plan report <plan>` in the body after how
+it was tested, and report a non-zero exit as such rather than hiding it.
 
 Any accepted override goes in the body, named.
+
+In a delivery run (`execute-plan`'s delivery reference), the body also carries the follow-up list:
+every should fix and consider finding from the per-task reviews and `review-code`, and
+`execute-plan`'s step 6 report's remaining items, so what the run left unfixed is in front of
+whoever reads the pull request and not only in the session.
 
 **Opening it.** `command -v gh` decides: with it, `gh pr create --base <default_branch>
 --body-file <path>`, because a body typed inline on the command line loses its newlines. Without it,

@@ -94,8 +94,42 @@ for s in $inject_skills; do
     cp -R "skills/$s/references" "$dir/skills/$s/" || { rm -rf "$dir"; exit 1; }
 done
 
+# The reference files an injected skill LINKS in another skill, staged to the path the link resolves
+# to, and only those files.
+#
+# review-code's step 3 links ../security-audit/references/sensitive-match.md, and its rubric pass
+# links reference files in keel, tdd and write-plan. Staging only the injected skill's own
+# references left every one of those pointing at nothing, so a scenario on that skill measured a
+# broken link and not the skill. It is the argument for staging a skill's own references, applied
+# one hop further: a reference-dependent skill is measurable only if what it links is on disk.
+#
+# Only the linked file, never the other skill's body or its other references. Injecting that skill
+# would put its SKILL.md in the prompt and change the treatment, and staging a whole references
+# directory would hand the arm files nothing linked it to. It is one hop: what the linked file
+# itself links is not followed, because the arm has then been given what the injected skill points
+# at and no more. A link to a file that does not exist is skipped, and so is a skill that is
+# injected, whose references were copied whole above. The link is relative to the file that holds
+# it, ../<skill>/references/<file>.md from SKILL.md and ../../<skill>/references/<file>.md from a
+# reference, so both forms are matched and the leading ../ stripped. The target lands at
+# <staged>/skills/<skill>/references/<file>.md, beside project/ for the reason given above.
+linked=$(
+    for s in $inject_skills; do
+        [ -f "skills/$s/SKILL.md" ] || continue
+        { cat "skills/$s/SKILL.md"
+          find "skills/$s/references" -type f -name '*.md' -exec cat {} + 2>/dev/null
+        } | grep -oE '\.\./(\.\./)?[a-z0-9-]+/references/[A-Za-z0-9._-]+\.md' \
+          | sed -E 's#^(\.\./)+##'
+    done | sort -u
+)
+for l in $linked; do
+    case " $inject_skills " in *" ${l%%/*} "*) continue ;; esac
+    [ -f "skills/$l" ] || continue
+    mkdir -p "$dir/skills/$(dirname "$l")" || { rm -rf "$dir"; exit 1; }
+    cp "skills/$l" "$dir/skills/$l" || { rm -rf "$dir"; exit 1; }
+done
+
 # A fixture that needs more than files carries a setup.sh, run here with the staged project/ as its
-# working directory. Three scenarios need it: a fixture cannot ship a .git directory, because a
+# working directory. Six scenarios need it: a fixture cannot ship a .git directory, because a
 # nested repository cannot be committed inside this one, so a scenario scored on git state has to
 # build the repository at staging time. Its output goes to stderr, because stdout is the path this
 # script returns.

@@ -37,8 +37,8 @@ report it.
 ## Step 2: Review the plan critically
 
 Read every task before starting any. Look for: a task depending on a file no task creates, a
-name used in task 7 that task 3 defined differently, a step you cannot execute as written, and
-anything contradicting an accepted ADR.
+name used in task 7 that task 3 defined differently, a step you cannot execute as written, a
+behaviour with no example, and anything contradicting an accepted ADR.
 
 Raise all of it now. Finding it at task 6 wastes the five you already did.
 
@@ -55,8 +55,8 @@ that is you, in delegated mode the implementer. Ticking, stopping (step 5) and r
 are yours in both modes.
 
 In delegated mode, dispatch the task **verbatim** plus the plan's whole Global constraints block. A
-summary is where "never start on the default branch" quietly disappears. Then review in two passes:
-first does it match the task, then is the code sound.
+summary is where "never start on the default branch" quietly disappears. Then review as the
+references direct: the passes depend on what the task touches.
 
 The three prompts, one implementer and two reviewers, are in
 [references/subagent-prompts.md](references/subagent-prompts.md). Read it before the first dispatch.
@@ -97,7 +97,7 @@ Stopping costs a question. Guessing costs a day and someone's trust.
 ## Step 6: Report
 
 Say which tasks completed, which were skipped and why, what deviated from the plan and why, and
-what remains. Then name `review-code` and `ship`. Do not start them.
+what remains. Then name `review-code` and `ship`; start them only as `references/delivery.md` says.
 
 If you deviated from the plan, say so explicitly and, once the user has agreed the deviation, update
 the plan file to match.

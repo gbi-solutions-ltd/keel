@@ -1,16 +1,15 @@
 # The plan reviewer brief
 
-Dispatch this once, after step 5's self-review passes, before handing off. Model
-`inherit`: this is judgement about whether a plan is buildable, which is the work least worth
-making cheaper.
+Dispatch this once, after step 5's self-review passes, before handing off. Model `inherit`: this is
+judgement about whether a plan is buildable, which is the work least worth making cheaper.
 
 ## Why a dispatch and not another checklist item
 
 The self-review in [plan-template.md](plan-template.md) compares the plan to itself. Story coverage
 counts headings, the placeholder scan greps for phrases, name consistency reads two tasks side by
 side, command accuracy reads the profile, the hand-over check reads each task's last step, the file
-check reads task dependencies, and the id check runs `keel plan status`. **None of them opens the
-code the plan will be built on.**
+check reads task dependencies, the id check runs `keel plan status`, and the examples check reads
+each behaviour's example. **None of them opens the code the plan will be built on.**
 
 A run given exactly the four checks step 5 then carried, over a deliberately flawed plan, passed all
 four and reported the plan's central defect only because it opened a source file off its own
@@ -32,8 +31,8 @@ So the reviewer is briefed on dimensions, not on items, and it is told to read t
 Review this implementation plan for whether it can actually be built against this repository.
 Someone has already run the plan self-review: story coverage, placeholder phrases, name consistency
 between tasks, commands coming from the profile, hand-over steps that stage named paths, no task
-depending on a file no task creates, and step ids that `keel plan status` accepts. All of it passed.
-Do not repeat it.
+depending on a file no task creates, every behaviour has an example, and step ids that
+`keel plan status` accepts. All of it passed. Do not repeat it.
 
 === PLAN ===
 <paste the plan, or its path>
@@ -52,9 +51,10 @@ Answer six questions.
 2. Can each story actually be delivered by the tasks assigned to it? Not "is there a task", but
    "does the work in that task produce the outcome the story states". Read the story's "so that"
    clause against the code.
-3. Are the steps executable as written? A step saying "write the failing test" with no test in it,
-   or "run it and watch it fail" naming no command and no expected output, is not executable,
-   however clean the plan looks. Count them.
+3. Are the steps executable as written? A behaviour with no example, or an example that neither a
+   test nor, for a no-test task, a check command or a reader could assert, is not executable, nor is
+   "run it and watch it fail" naming no command and no expected output, however clean the plan
+   looks. Count them.
 4. Does the decomposition match this codebase's established patterns? Name any task that puts a
    file somewhere the repo does not otherwise put files, or splits work the repo keeps together.
    Also say whether the task count looks right, and why.

@@ -15,8 +15,8 @@ existing system those differ, and the gap is this skill's most valuable output.
 
 <HARD-GATE>
 No design, no plan, no code until the user has approved the PRD, however simple the product surface
-looks. A single feature or bug routed to `tdd` or `debug` does not enter this gate: name that skill
-and stop. A short PRD is fine; skipping it is not.
+looks. A single feature the short path accepts, or a bug routed to `debug`, does not enter this
+gate: name `write-plan` or `debug` and stop. A short PRD is fine; skipping it is not.
 </HARD-GATE>
 
 If the user overrides the gate, write down what you assumed and carry on.

@@ -86,9 +86,9 @@ schema_fingerprint_for() {
         3) printf '2313ce09f5c0' ;;
         4) printf 'd5159ecbff0b' ;;
         5) printf 'ebcd5f8fba88' ;;
+        6) printf '23588273f3d2' ;;
     esac
 }
-
 errors=0
 warnings=0
 desc_chars=0
@@ -352,7 +352,7 @@ bad_models=$(grep -rhoiE 'model `[a-z0-9.-]+`' skills/*/SKILL.md skills/*/refere
 #
 # THE DESCRIPTION IS CHECKED FOR PRESENCE AND NOT FOR LENGTH. The 216 character ceiling that bounds
 # a skill description is deliberately not applied: agents/keel-fanout.md's own description is 242
-# characters, so extending it here would fail the only agent file in the tree, and
+# characters, so extending it here would fail agents/keel-fanout.md itself, and
 # docs/standards.md calls a check stricter than correct output the unrecoverable failure. Whether an
 # agent description belongs in the 1,320 token always-loaded total is a separate measurement nobody
 # has taken; it is not taken here, and this comment is where that is recorded.

@@ -25,8 +25,8 @@ nothing checks either, so the guarantee a user gets varies by which skill they h
   `skills/write-plan/references/plan-review.md:67` and
   `skills/execute-plan/references/subagent-prompts.md`. The cite-a-location rule appears in those
   first two, in `skills/shape-idea/SKILL.md:42`, and twice in `agents/keel-fanout.md`.
-- **Verified by reading.** `write-plan` dispatches a reviewer (`SKILL.md:95`) whose brief forbids
-  the authoring context (`plan-review.md:76`), and `execute-plan` dispatches two
+- **Verified by reading.** `write-plan` dispatches a reviewer (`SKILL.md#Then dispatch a reviewer`)
+  whose brief forbids the authoring context (`plan-review.md:76`), and `execute-plan` dispatches two
   (`skills/execute-plan/references/subagent-prompts.md#Dispatch implementation and both reviews`).
   `review-code` carries `Agent` in its `allowed-tools` (`:4`). Before task 3 it dispatched nothing:
   step 2 offered an external plugin and fell back to an inline pass. Since task 3 it dispatches its
@@ -100,7 +100,7 @@ answer for that shape: `docs/ideas/lint-after-each-edit.md` was declined on exac
 
 | Finding | Evidence | What it means for the idea |
 |---|---|---|
-| The plan-review scenario asked for is shipped | `skills/write-plan/SKILL.md:95`, brief at `references/plan-review.md`, model `inherit` | `skeptic` duplicates a working mechanism |
+| The plan-review scenario asked for is shipped | `skills/write-plan/SKILL.md#Then dispatch a reviewer`, brief at `references/plan-review.md`, model `inherit` | `skeptic` duplicates a working mechanism |
 | That brief exists because of a measured run, and its finding is the one `skeptic` omits | `plan-review.md`: a run given four self-review items over a flawed plan passed all four and found the central defect only because it opened a source file unprompted | A reviewer not told to read the repository is the reviewer that failed. `skeptic` never says to, and its `tools:` line omits Bash |
 | `skeptic` inverts a rule stated in three places | "Do not praise the plan" against `review-code/SKILL.md:62`, `plan-review.md:67`, `subagent-prompts.md` | A reviewer forbidden from approving invents findings. `review-code` step 4 requires saying when nothing blocks and naming what was checked |
 | `skeptic` caps findings at five | Against `review-code/SKILL.md:62` and the cap-at-ten rule, which treats exceeding it as the finding | A cap drops the sixth finding with no signal |

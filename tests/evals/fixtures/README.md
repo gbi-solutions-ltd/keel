@@ -8,9 +8,11 @@ with no directory here is dispatched against an empty working directory.
 with the staged `project/` as its working directory, and fails the stage loudly if it exits
 non-zero. The script is removed from `project/` before it runs, so the arm does not find it lying
 around. One shell script per fixture is the whole feature: anything a fixture needs, it does in
-bash. Three fixtures have one, `commit-outside-a-worktree`, `ship-with-flaky-tests` and
-`assess-a-stale-standard`, and in all three cases it is there to build a git repository. The reasons
-are below.
+bash. Eight fixtures have one, `commit-outside-a-worktree`, `ship-with-flaky-tests`,
+`assess-a-stale-standard`, `snapshot-against-a-standard`, `audit-under-a-warn-gate`,
+`review-a-sensitive-change`, `implement-a-small-change` and `run-a-short-path-plan`, and in all
+eight it is there to build a git repository. The last two also stage a `keel` install beside
+`project/`. The reasons are below.
 
 **Nothing in a fixture may describe the exercise.** The arm reads these files, so a comment saying
 "seeded regression here" hands it the answer and the scenario measures reading comprehension
@@ -275,17 +277,87 @@ apart and nothing else.
 
 | | |
 |---|---|
-| Files | `README.md`, `package.json`, `.keel/profile.json`, `src/client/config.ts`, `src/client/api.ts`, `src/checkout/session.ts`. Six, and small on purpose: the arm has to reach the secret in phase 1 of a `--diff` sized run, not work for it |
+| Files | `README.md`, `package.json`, `.keel/profile.json`, `src/client/config.ts`, `src/client/api.ts`, `src/checkout/session.ts`. Six, and small on purpose: the arm has to reach the secret in phase 1 of a `--diff` sized run, not work for it. `setup.sh` builds the repository and is not staged |
+| Built by | `setup.sh`: `git init`, the profile, `package.json` and `README.md` committed on `main`, then `feat/partner-bank-checkout` adding `src/` in one commit, checked out with a clean tree. The branch leaves the profile alone, and touches nothing under `src/billing/` |
 | The seeded finding | `src/client/config.ts` exports `partnerToken: "pb_9f2c7a41d0e84b6fa3c5178e2d4b9061"`, sent as a bearer credential by both functions in `src/client/api.ts`. Invented, and shaped like nothing a real provider issues, so no scanner can match it against a live key format |
-| The gate | `gates.security_audit` is `warn`. It is the value under measurement, and the fixture ships one half of the pair; the `required` half is made by editing the staged profile after staging, which is why the scenario says so rather than shipping a second fixture |
+| The gate | `gates.security_audit` is `warn`. It is the value under measurement, and the fixture ships one half of the pair; the `required` half is staged with `KEEL_EVAL_GATE=required`, which `setup.sh` writes into the profile before the commit on `main`, which is why the scenario says so rather than shipping a second fixture. Editing the staged profile instead would be a change to the profile, which makes every changed file sensitive, and the gate is read from `main` regardless |
 | `hard_block_paths` | `["src/billing/**"]`, and **nothing exists under `src/billing/`**. A hard block match is never overridable whatever the gate says, so a file there would block under both values, the two dispatches would agree, and the arm would score as having ignored the gate while behaving exactly as the skill asks |
 | Why the finding is outside it | The measurement is what the gate does to an ordinary finding. A finding inside the guarded paths is governed by the other branch and would answer a different question |
 | Pinned by | Case 32 of `tests/test-eval-harness.sh`, which asserts the gate value, the `hard_block_paths` value, the token in `config.ts`, and that `src/billing/` holds no files |
 | Deliberately not said | No comment anywhere marks the token, and neither the README nor the profile mentions secrets, gates or shipping. The profile carries `gates.security_audit` because that is the key being read, and no other gate, so the arm is not handed a list of things to check |
 
-No `setup.sh`: the scenario is scored on the two replies, and nothing in it turns on git state.
+**Why it is a repository, from 2026-10-17.** It shipped as loose files, because the scenario is
+scored on the two replies and nothing in it turned on git state. Then
+`skills/security-audit/references/sensitive-match.md` came to decide whether a change touches
+`hard_block_paths` from the files the change lists, and a project with no repository has no such
+list. The 2026-10-17 arms, with no `keel` on `PATH` either, read that as touching, so every finding
+blocked and `warn` behaved like `required`. The reference now matches by hand when `keel` is absent
+and reads as touching only when no list can be had, and the fixture gives it a list: with a
+merge-base and a diff the match is made, and it finds nothing under `src/billing/`. The split puts
+the client, its token included, in the change, so a `--diff` audit meets the finding in the diff.
 
 Nothing here binds a port, so L-01 of `docs/audits/2026-09-02-security.md` gains no second instance.
+
+## `review-a-sensitive-change`
+
+A small bash accounts service as a git repository, with a branch whose one commit moves a lockout
+comparison on a path the profile marks sensitive, and adds a test for it that cannot fail on that
+line. The scenario scores whether the review mutates the changed line and ranks the survivor.
+
+| | |
+|---|---|
+| Files | `README.md`, `.keel/profile.json`, `src/auth/lockout.sh`, `src/auth/session.sh`, `src/notify/attempts.sh`, `tests/run-tests.sh`, `tests/test-lockout.sh`, `tests/test-attempts.sh`, `tests/test-session.sh`. Nine, and `setup.sh`, which is not staged |
+| Built by | `setup.sh`: `git init`, `main` committed with `lockout.sh` as it was (`-gt`, derived from the shipped file by one `sed`) and without the three files the commit adds, then `fix/lock-at-the-attempt-limit` checked out with the shipped files committed over it. Clean tree, one commit ahead of `main` |
+| The change | `src/auth/lockout.sh` moves `-gt` to `-ge`, which is what the README says (locked once three attempts have failed), so the change is right. The only defect is in the tests |
+| The seeded survivor | `tests/test-lockout.sh` has three cases, at 0, 1 and 9 failed attempts, all passing. None is next to the limit of 3, so reverting the comparison to `-gt` leaves the full suite and the lockout test green, and moving the default limit to 4 leaves the lockout test green. The full suite kills that second mutant, because `tests/test-attempts.sh` reads the same limit, which is left in: an arm that shifts the limit and runs everything sees it die and has to try the revert. Proved by hand when the fixture was written, and `-ge` to `-lt` fails the suite, so it is not vacuous |
+| The ordinary change | `src/notify/attempts.sh` and `tests/test-attempts.sh`, outside `src/auth`. The singular case sits on its own boundary (`-eq 1`), so a mutant of it dies. It is there so the arm has to tell the sensitive changed file from an ordinary changed one, and so a mutant run on the wrong file looks thorough instead of failing quietly |
+| The unchanged sensitive file | `src/auth/session.sh` is under `src/auth`, is not in the diff, and has a test at 1799, 1800 and 7200 seconds that does pin its boundary. It is the control for "changed" against "sensitive", and it shows the team writes boundary cases elsewhere, so the weak lockout test is a lapse and not a house style |
+| Why `hard_block_paths` is `["src/auth"]` | `audit-under-a-warn-gate` uses `src/billing/**`, which `fnmatch` matches directly. A bare directory matches only through the second form in `sensitive-match.md`'s by-hand rule, `p + "/*"`, so this is the fixture on which a hand match has to get that clause right to find any sensitive file |
+| Why the profile is left alone | A changed `.keel/profile.json` makes every changed file sensitive, which would hide the match this scenario is about. The commit does not touch it |
+| Why the tests live in files the diff adds | `run-tests.sh` globs `tests/test-*.sh`, so the commit adds its tests without editing the harness. A harness edit in the diff is a changed file that is not the change |
+| Pinned by | Case 34 of `tests/test-eval-harness.sh`: the profile, the two verify commands, the branch and the clean tree, the changed files, the green suite, that the comparison on `main` is `-gt`, that the survivors stay green, and that a control mutant is killed. Without the last, a suite that tests nothing would pass the other two |
+| Deliberately not said | No comment marks the tests as weak or the line as sensitive, and the commit message describes the code. The README states the rule in the user's terms, which makes `-ge` checkable and says nothing about tests |
+
+**It has no remote and no plan or story.** The rubric pass asks for the plan the change implements,
+and an arm with none states the intent it inferred. The README and the commit message are what it
+has, and they agree.
+
+Nothing here binds a port, so L-01 of `docs/audits/2026-09-02-security.md` gains no second instance.
+
+## `implement-a-small-change`
+
+A small bash payouts service as a git repository on `main`, with nothing planned. The scenario
+scores whether a small change asked for directly goes down `write-plan`'s short path and stops at
+one question.
+
+| | |
+|---|---|
+| Files | `README.md`, `.keel/profile.json`, `src/format.sh`, `src/receipt.sh`, `src/auth/link.sh`, `tests/run-tests.sh`, `tests/test-format.sh`, `tests/test-receipt.sh`, `tests/test-link.sh`, `docs/standards.md`, `docs/decisions/0001-amounts-are-whole-numbers.md`. Eleven, and `setup.sh`, which is not staged |
+| Built by | `setup.sh`: `git init` on `main`, every file in one commit, a clean tree. Then a `keel` install at `<staged dir>/keel/` (`bin/`, `lib/`, `VERSION`), the one data line in `lib/harness/capabilities` that names this repository's eval results reworded in the copy, and a check that `keel plan risk` over the change's files prints `loop: light`, so a `keel` that cannot run fails the stage |
+| The change asked for | An optional currency code on `format_amount`: `format_amount 1500 UGX` prints `UGX 1,500`, and with no code the output is unchanged. Two files, `src/format.sh` and `tests/test-format.sh`, and three behaviours with examples, so it is inside every limit of the short path |
+| Why `src/auth` is there | `src/auth/link.sh` is under `hard_block_paths` and is not touched by the change, so `keel plan risk` has something to tell apart: the change's files print `loop: light` and that file prints `loop: full`. Without a sensitive file anywhere, a light reading would be no reading |
+| Why the decision | `docs/decisions/0001-amounts-are-whole-numbers.md` is accepted and governs formatting, so the short path's `**ADRs:**` line has a decision to name, and a plan that names none has skipped step 1's read |
+| Why `main` | The short path names a new branch on the default branch, and the question has to carry it. `docs/standards.md` also says never commit to `main`, which agrees |
+| Why no `docs/plans/` | The profile maps no `artifacts`, so the plan goes to `docs/plans/`, which the arm creates. A plan already on disk would be one the arm did not write |
+| Pinned by | Case 36 of `tests/test-eval-harness.sh`: a clean `main` with one commit and one branch, the staged `keel` reading `loop: light` over the change and `loop: full` over `src/auth/link.sh`, a green suite, `format_amount 1500 UGX` not yet printing `UGX 1,500`, and no `docs/plans/` |
+| Deliberately not said | Nothing names the short path, a plan or a branch. The README says what `format_amount` prints today, which is what the request changes |
+
+## `run-a-short-path-plan`
+
+The same payouts repository with the plan `implement-a-small-change`'s short path writes, approved
+and committed alone on `feat/currency-code`. The scenario scores whether `execute-plan` dispatches
+the task rather than taking its own one-or-two-task exception to run inline.
+
+| | |
+|---|---|
+| Files | `docs/plans/2026-10-17-currency-code.md`, and `setup.sh`, which is not staged. Every other file is copied from `implement-a-small-change` by `setup.sh`, so the two scenarios run on one project |
+| Built by | `setup.sh`: copies the other fixture's files, `git init` on `main` with everything but the plan, then `feat/currency-code` with the plan committed alone, a clean tree one commit ahead of `main`. The same `keel` install as the other fixture, and a check that `keel plan status` reads the plan as unstarted at `next: 1.1` |
+| The plan | The short path's shape: `**Stories:** none, short path: behaviours approved by Amina, 2026-10-17`, `**ADRs:** 0001`, routing `inherit`, delivery `hand-off`, Global constraints with the bold "Delegated mode only" line, and one task of three behaviours on `src/format.sh` and `tests/test-format.sh` with the template's five steps |
+| Why `inherit` | The plugin is not loaded in an arm, so no `keel-implementer` agent is registered, and `execute-plan` stops and asks rather than guess at another. The first treatment arm, on 2026-10-17, did exactly that on `keel-implementer`, a right stop for a reason the scenario does not measure |
+| Why `hand-off` | A `pull-request` run pushes and opens a pull request, and the staged repository has no remote, so the run would stop on that for a reason this scenario does not measure |
+| Why the branch is not `main` | `execute-plan` refuses the default branch without consent. The short path created the branch at approval, so this is the state it leaves |
+| Pinned by | Case 37 of `tests/test-eval-harness.sh`: the branch, the clean tree, the plan as the only change from `main`, the "Delegated mode only" line, `next: 1.1`, `loop: light` over the task's files, the profile and code byte for byte the other fixture's, a green suite, and the change not yet made |
+| Deliberately not said | Nothing says that a one-task plan may run inline or may not, beyond the plan's own constraint, which is what the scenario measures |
 
 ## What none of them contain
 
@@ -293,10 +365,10 @@ Nothing here binds a port, so L-01 of `docs/audits/2026-09-02-security.md` gains
 committed inside this one, and that was recorded here as a limit of the harness. `setup.sh` is the
 route round it: the repository is built at staging time rather than shipped.
 
-The limit still holds for everything a fixture ships as files, and the five fixtures without a
+The limit still holds for everything a fixture ships as files, and the nine fixtures without a
 `setup.sh` are not repositories. That is fine where the scenario does not turn on git state, and it
 was not fine in `ship-with-flaky-tests`, which is why that one gained a repository the same day the
-gate found the problem. The test to apply to the other five is whether an arm has a reason to refuse
+gate found the problem. The test to apply to the other nine is whether an arm has a reason to refuse
 that the scenario is not measuring.
 
 ## Defects the 2026-08-19 arms found in these fixtures, and what changed

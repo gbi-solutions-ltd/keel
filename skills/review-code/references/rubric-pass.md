@@ -28,6 +28,11 @@ A subagent starts cold, so a brief that names none of these makes it guess:
   minutes a second time;
 - the test command for the revert check: `verify.test_one` from `.keel/profile.json` with its
   placeholders (`{path}` or `{name}`) filled for the added test file or case, else `verify.test`;
+- the sensitive files step 3 found, one path per line, or `none`, so the reviewer mutates the
+  files the project marked and does not choose them;
+- `verify.test_one` with its placeholder left unfilled, since item 6 runs a different covering test
+  for each mutant and only the reviewer knows which; else `verify.test`;
+- on a re-review, the last round's survivors, as the table rows that reported them;
 - the absolute path to `rubric.md`: the path you read this brief from, with `rubric-pass.md`
   replaced by `rubric.md`. A relative path does not resolve from the repository the subagent works
   in.
@@ -47,19 +52,24 @@ Standards: <path to standards.md>
 Decisions: <the decisions directory>
 Suite result, run by the driver: <quoted output>
 Test command for item 5 below: <verify.test_one, else verify.test>
+Sensitive paths: <the files, or none>
+Test command for item 6 below, placeholder unfilled: <verify.test_one, else verify.test>
+Survivors from the last round, on a re-review: <the table rows, or none>
 
 === RUBRIC ===
 Read <absolute path to rubric.md> in full and answer its checks against the diff. The links in the
 rubric are relative to the rubric's own directory, so resolve them from there and not from the
 repository you work in. The suite has already run and its result is above: do not run it again,
-except through item 5's revert check where only `verify.test` exists. That runs the whole suite,
-which takes minutes each time. A failing or missing suite is itself a finding.
+except through item 5's revert check or item 6's mutants where only `verify.test` exists. Those run
+the whole suite, which takes minutes each time. A failing or missing suite is itself a finding.
 
-Also answer these five, which the rubric does not cover. Read the plan, the decisions and the
+Also answer these six, which the rubric does not cover. Read the plan, the decisions and the
 standards first.
 
 1. Does the diff match the plan? Anything implemented that no task asked for is unplanned scope.
-   Anything a task asked for and is absent is an incomplete claim.
+   Anything a task asked for and is absent is an incomplete claim. Where the plan lists behaviours,
+   does every behaviour's example have a case named for it? For a task with no test, quote the line
+   of the diff, or the check output, that produces it.
 2. Does every changed line trace to the request? Adjacent improvements, reformatting and drive-by
    refactoring belong in their own change.
 3. Were the tests written first? A test committed after its implementation never ran red, so it is
@@ -70,15 +80,45 @@ standards first.
 5. Has any test in the diff been proved able to fail? A case nobody watched go red is unproven.
    Revert the line it covers, run the test command above, restore it. A suite that cannot fail is
    a finding.
+6. Does every changed decision line on a sensitive path have a test that can fail on it? These are
+   the paths a mistake costs most on, and a test that cannot fail on a changed guard is no evidence.
+   For each changed decision line in a file under `Sensitive paths` that is production code, make
+   one mutant in item 5's throwaway worktree (create it as below if item 5 made none), run the
+   covering test, record killed or survived, and restore the line before the next mutant. On a
+   re-review run the last round's survivors first: each must now die. A decision line the fix adds
+   gets its own mutant.
+   - Production code is a file some test runs. Tests, docs, `*.json`, `*.yml`, `*.yaml` and `*.toml`
+     are not: list each as unchecked, with the reason "no test runs it". On keel's own list, for
+     example, `hooks/*` counts; `settings.json`, `.github/workflows` and `templates/ci-review.yml`
+     do not.
+   - A decision line is a condition, comparison, guard, early return, boolean operator or boundary
+     constant. Mutants: shell `[ "$n" -ge 3 ]` to `-gt`, `|| exit 1` removed, a `case` arm removed;
+     awk `NR > 1` to `NR > 2`; Python `if a and b` to `or`; TypeScript `===` to `!==`, `??` removed.
+   - The covering test is the test file the diff changed for that source, else the one named after
+     it (`tests/test-<name>.sh`, `test_<name>.py`, `<name>.test.ts`), run with the item 6 test
+     command above with its placeholder filled; else `verify.test`.
+   - Make at most 10 mutants, in diff order, and at most 3 where only `verify.test` can run them,
+     because each then costs a whole suite run. Name every decision line you left unchecked. Those
+     are reported, not findings, so the cap never becomes a block.
+   - With `Sensitive paths: none`, say `not applicable: no hard_block_paths path changed`.
+   A surviving mutant is Blocking: name the line, the mutation and the case that would kill it,
+   because nothing in the suite observes that line's behaviour on a path the project marked
+   sensitive. A row `| src/auth/session.ts:42 | >= to > | npm test -- session.test.ts | survived |`
+   becomes the finding "no case pins a session expiring exactly at its limit".
 
-Do item 5's revert in a throwaway worktree, never in the working tree: the author's tree is not
-yours to change, and another reviewer may be reading it. Create it with
+Do item 5's revert and item 6's mutants in a throwaway worktree, never in the working tree: the
+author's tree is not yours to change, and another reviewer may be reading it. Create it with
 `git worktree add --detach <path> HEAD`, where `<path>` is a new directory under the system temp
 directory. If the change is not committed, apply it there with
-`git diff HEAD | git -C <path> apply`. Remove it with `git worktree remove --force <path>` before
-you report, whatever the outcome, and say that you did. The revert leaves it modified, so a plain
-remove would refuse. If the test cannot run there, say that the revert check was not done and why;
-do not do it in the working tree.
+`git diff HEAD | git -C <path> apply`, but skip that when `git diff HEAD` is empty (only new files
+changed): `apply` rejects empty input, and a failed step must not stop the copy that follows. Then
+copy in the untracked files, from the repository root:
+`git ls-files -z --others --exclude-standard | tar --null -T - -cf - | tar -xf - -C <path>`.
+`git diff` lists no untracked file, and item 6 must be able to mutate a new file on a sensitive
+path. Remove it with `git worktree remove --force <path>` after item 6 and before you report,
+whatever the outcome, and say that you did. The revert and the mutants leave it modified, so a
+plain remove would refuse. If a test cannot run there, say that the revert check or that mutant was
+not done and why; do not do it in the working tree.
 
 Do not edit the change. Say what is wrong and let the author fix it. Run no git command that
 changes the author's index, working tree or stash: no `stash`, `checkout`, `restore`, `reset`,
@@ -97,7 +137,25 @@ Rank each finding, by these meanings and no others:
 - Consider: a genuine preference. Say it once.
 Each has a `file:line`, what is wrong, why it matters and what to do. If nothing blocks, say so in
 the first line and name what you checked. Cap at around ten.
+
+Report item 6 as a table, so the evidence is read and not asserted: one row per mutant, then the
+unchecked lines with their reasons.
+
+| file:line | mutation | command | killed or survived |
+|---|---|---|---|
 ```
+
+## Why item 6 mutates, and how far
+
+Verify RED shows that a test the author wrote can fail. It does not show that a test already in the
+suite can fail on a line this diff changed, and on a path the project marked sensitive that is the
+claim worth checking. Item 6 closes it the way
+[../../tdd/references/writing-good-tests.md](../../tdd/references/writing-good-tests.md), "Proving a
+case can fail, after the fact", describes: one line reverted, the covering test run, the line
+restored. The 10-mutant cap and the report-not-block rule for unchecked lines keep the cost bounded,
+so a large diff on a sensitive path costs a stated amount of review and never an unreviewable one.
+It runs once, in the final review, where the whole change is in view; the per-task reviews inside
+`execute-plan` do not run it.
 
 ## Reading the result
 

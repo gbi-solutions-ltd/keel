@@ -360,6 +360,17 @@ if [ -f "$M" ]; then
         [ -f "$xd/.keel/handoff.md" ] && leaked="$leaked .keel/handoff.md"
         [ -z "$leaked" ] && ok "the public export still excludes what it is meant to" \
           || bad "the public export still excludes what it is meant to" "exported:$leaked"
+
+        # A file that ships can cite one that does not. On 2026-10-13 a plan cited
+        # `docs/audits/<file>.md:125`, the export dropped docs/audits, and the export's own suite
+        # went red at release time, after the internal tag. Running the checker inside the export
+        # catches that here, against the exclusion list export-public.sh actually applies.
+        if xc="$(cd "$xd" && tests/validate-citations.sh 2>&1)"; then
+            ok "every citation in the public export resolves inside it"
+        else
+            bad "every citation in the public export resolves inside it" \
+                "$(printf '%s\n' "$xc" | grep '^FAIL' | head -3)"
+        fi
     else
         bad "tests/export-public.sh runs" "non-zero exit"
     fi

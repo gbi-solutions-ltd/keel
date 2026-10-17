@@ -141,12 +141,13 @@ precedent for the accept escape hatch in scenario 3.
 
 ## Epic E-02: `execute-plan` refuses to tick over a blocking quality finding
 
-**Goal:** a task cannot be ticked and committed while its own per-task quality review found
-something blocking, the same way a `DEVIATES` spec-compliance verdict already stops it.
+**Goal:** in the full loop, a task cannot be ticked and committed while its own per-task quality
+review found something blocking, the same way a `DEVIATES` spec-compliance verdict already stops
+it. (Amended 2026-10-16, decided by Bernard: see S-03.)
 **Requirements:** FR-11
 **Stories:** S-03
-**Ships when:** a delegated `execute-plan` run with a `Blocking` quality-review finding is not
-ticked or committed until the finding is resolved or accepted.
+**Ships when:** a delegated `execute-plan` run, for a task in the full loop, with a `Blocking`
+quality-review finding is not ticked or committed until the finding is resolved or accepted.
 
 ### S-03 A `Blocking` quality finding gates the tick, the same as `DEVIATES`
 
@@ -159,7 +160,8 @@ ticked or committed until the finding is resolved or accepted.
 | Status of requirement | confirmed |
 
 **As a** coordinator running `execute-plan` in delegated mode
-**I want** a `Blocking` finding from a task's code-quality review to stop the tick
+**I want** a `Blocking` finding from a task's code-quality review to stop the tick, in the full
+loop
 **So that** I cannot commit a standards violation just because the spec-compliance pass alone
 happened to pass
 
@@ -167,7 +169,8 @@ happened to pass
 
 ```gherkin
 Scenario: quality review returns a Blocking finding
-  Given a task's spec-compliance review returned COMPLIES
+  Given a task in the full loop
+  And its spec-compliance review returned COMPLIES
   And its code-quality review returned a Blocking finding
   When the coordinator reaches the tick-and-commit step
   Then the task is not ticked
@@ -175,18 +178,29 @@ Scenario: quality review returns a Blocking finding
   And the coordinator's next action is the same as a DEVIATES verdict: resolve, then re-verify
 
 Scenario: quality review returns only Should-fix or Consider findings
-  Given a task's spec-compliance review returned COMPLIES
+  Given a task in the full loop
+  And its spec-compliance review returned COMPLIES
   And its code-quality review returned only Should-fix or Consider findings
   When the coordinator reaches the tick-and-commit step
   Then the task is ticked and committed
   And the Should-fix and Consider findings are recorded in the report per Step 6
 
 Scenario: the user explicitly accepts a Blocking quality finding
-  Given a task's code-quality review returned a Blocking finding
+  Given a task in the full loop
+  And its code-quality review returned a Blocking finding
   And the user has explicitly accepted it
   When the coordinator reaches the tick-and-commit step
   Then the task is ticked and committed
   And the acceptance is noted in the plan file
+
+Scenario: a task in the light loop (amended 2026-10-16, decided by Bernard)
+  Given keel plan risk exits 0 with "loop: light" for the task's change
+  And the project's gates.coding_standards is "required"
+  And its spec pass returned COMPLIES
+  When the coordinator reaches the tick-and-commit step
+  Then the task is ticked and committed without a per-task quality review
+  And the same standards are enforced once per feature, by ship's Step 5 standards gate through
+    review-code
 ```
 
 **Notes:** `skills/execute-plan/references/subagent-prompts.md#Code quality review` already
@@ -194,6 +208,14 @@ dispatches this review with the `PROJECT STANDARDS` block and the `Blocking`/`Sh
 vocabulary on every task; `#On a DEVIATES` only ever discusses `DEVIATES` handling. This story adds
 the missing branch to "Running the loop," not a new review pass. Confirmed by Bernard, 2026-09-21,
 proposed directly and confirmed in-scope for this PRD.
+
+**Amended 2026-10-16, decided by Bernard** (`docs/plans/2026-10-16-proportional-review-loop.md`):
+this story applies in the full loop, which is the loop for a task whose change touches a path in
+the project's `hard_block_paths` or whose loop `keel plan risk` cannot decide. A task touching none
+gets the light loop, one spec pass, and the standards are enforced for it once per feature by
+`ship` step 5's gate (S-01, S-02) through `review-code` only where `gates.coding_standards` is
+`required`: under `warn` a violation is reported and the ship continues, and under `off` nothing
+enforces them. A repository that declares no `hard_block_paths` gets the light loop.
 
 ## Epic E-03: Mechanical rules shipped as config by `keel init`
 

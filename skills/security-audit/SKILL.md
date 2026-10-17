@@ -20,8 +20,10 @@ maybes gets ignored; three real ones get fixed.
 | `--diff` | Before every ship. The default | 1, 2, 6, 7 on changed code only |
 | `--full` | New engagement, monthly, or after an incident | All |
 
-Read `.keel/profile.json` for `gates.security_audit` and any `hard_block_paths`, from the default
-branch where the diff changes either, so a change cannot relax its own audit. Before a ship,
+Whether the diff touches a `hard_block_paths` path is decided by `keel plan risk` or by its rule
+by hand, never by reading one profile, so a change cannot relax its own audit:
+[references/sensitive-match.md](references/sensitive-match.md) gives both and how to read
+it. Read `gates.security_audit` from the default branch where the diff changes it. Before a ship,
 `off` means skip the audit and say so, unless the diff touches a `hard_block_paths` path, which is
 audited whatever the gate says; an audit the user asks for runs anyway. Step 5 covers the other
 values.
@@ -88,9 +90,9 @@ between runs. Say so.
 Then report to `ship`. `gates.security_audit` sets this report's verdict: `required` says findings
 block shipping, `warn` says the user decides whether to accept them, `off` skips the audit before a
 ship and says so, except on a diff touching a `hard_block_paths` path. A finding on a
-`hard_block_paths` path blocks under any value and is never overridable in conversation. The reply
-opens with that verdict: under `warn`, unless a `hard_block_paths` finding blocks, say first that
-the gate does not block, then recommend.
+`hard_block_paths` path (the reference says which are) blocks under any value and is never
+overridable in conversation. The reply opens with that verdict: under `warn`, unless a
+`hard_block_paths` finding blocks, say first that the gate does not block, then recommend.
 
 ## Common mistakes
 

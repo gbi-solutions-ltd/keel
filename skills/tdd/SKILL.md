@@ -1,6 +1,6 @@
 ---
 name: tdd
-description: Use when implementing any feature, bugfix, or behaviour change, before writing implementation code.
+description: Use when writing implementation code for any feature, bugfix or behaviour change, including each task a plan dispatches; a small change the user asks for directly, outside a plan, starts at write-plan's short path.
 allowed-tools: [Read, Write, Edit, Bash, Grep, Glob, AskUserQuestion]
 ---
 
@@ -28,7 +28,8 @@ delete, then implement fresh from the test.
 ## Commands come from the profile
 
 Read `.keel/profile.json` first: `verify.test_one` for one test, `verify.test` for the suite,
-`verify.test_integration` for database-backed tests.
+`verify.test_affected` for the tests a change since `{base}` affects, `verify.test_integration` for
+database-backed tests.
 
 ## The cycle
 
@@ -36,11 +37,10 @@ Read `.keel/profile.json` first: `verify.test_one` for one test, `verify.test` f
 
 The unit is every case going red for one named missing production change, named as the **smallest**
 change making that case red; a case needing a second change is a second unit. Before its first test,
-write the **start record**: the starting commit, and the tests already red there, which the previous
-unit's boundary run reports (the first unit's costs one `verify.test`). Name that commit in the
-report. No VCS? Say so: the baseline is the working tree as found. Write the cases together, real
-code rather than mocks, one behaviour per case, each name stating it. Cannot name the change? It
-asserts nothing.
+write the **start record**: the starting commit, and the tests still red after the last boundary
+(the first unit's costs one `verify.test`). Name that commit in the report. No VCS? Say so: the
+baseline is the working tree as found. Write the cases together, real code rather than mocks, one
+behaviour per case, each name stating it. Cannot name the change? It asserts nothing.
 
 Can you write the whole spec before writing any of it? If not, this cycle is design work: one case
 at a time. **The iron law is unchanged:** batching changes how many cases go red together, never
@@ -82,13 +82,16 @@ test.
 
 Only once green. Remove duplication, improve names, extract helpers. No new behaviour. Stay green.
 
-### Unit boundary: run the suite
+### Unit boundary: run the tests
 
-The unit ends with one `verify.test` run. A suite run costs far more than one test's.
+The unit ends with one `verify.test_affected` run when the profile sets it, `{base}` the start
+record's commit, else one `verify.test`: it runs what the unit could have broken, and `review-code`
+and `ship` still run the suite. Fallbacks to `verify.test`, and carried reds:
+[references/affected-tests.md](references/affected-tests.md).
 
 Red for tests this unit did not touch? Name them and match them against the start record. All
-matched means the unit is done: record them and carry on. An unmatched red is this unit's: hand it
-to `keel:debug`.
+matched means the unit is done: record them and carry on. An unmatched red goes to `keel:debug`,
+naming this unit, or after any affected run every unit since the first start record.
 
 ## Exceptions, stated out loud
 
@@ -123,7 +126,7 @@ All of these mean: delete the code, start with the test.
 
 Every new function has a test. You watched each case asserting new behaviour fail first, for the
 expected reason. Any case you could not watch fail, you broke the line it covers and watched it go
-red. You wrote the minimum. The boundary suite ran, every red matched. Edge cases and error paths
+red. You wrote the minimum. The boundary run showed only matched reds. Edge cases and error paths
 are covered. Cannot claim all six? You skipped TDD.
 
 ## Bugs

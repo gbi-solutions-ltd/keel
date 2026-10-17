@@ -1519,7 +1519,7 @@ Paste the `git status --porcelain` output into your report.
 | 6 | **Main session only** | Dispatches an arm and scores the reply. A subagent scoring its own arm is an echo, not a measurement |
 
 **For every delegated task**, the implementer brief at
-`skills/execute-plan/references/subagent-prompts.md:20-61` now carries a
+`skills/execute-plan/references/subagent-prompts.md:20-74` now carries a
 `=== PROJECT STANDARDS ===` block at `:29-30`, whose placeholder reads
 `<paste the rules from <docs_root>/standards.md this task could breach>`. **It must be filled in, not
 left as the placeholder.** For every task in this plan the rules that could be breached are the same

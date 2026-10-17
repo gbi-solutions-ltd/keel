@@ -1,6 +1,6 @@
 # Subagent prompts for delegated mode
 
-Three prompts: one to implement a task, two to review it. Read this before the first dispatch.
+One prompt implements a task, two review it (one in the light loop). Read before the first dispatch.
 
 ## Why two review passes and not one
 
@@ -21,13 +21,20 @@ the previous task, so anything omitted is unavailable rather than merely unmenti
 Implement exactly this task and nothing more.
 
 === TASK (verbatim from the plan) ===
-<paste the task, including its Files, Interfaces, and every numbered step>
+<paste the task, including its Files, Interfaces, Behaviours, Done when, and every numbered step>
 
 === GLOBAL CONSTRAINTS (verbatim from the plan header) ===
 <paste the whole Global constraints block, including the verify commands>
 
 === PROJECT STANDARDS ===
 <paste the rules from <docs_root>/standards.md this task could breach>
+
+=== BEHAVIOURS ===
+Where the task lists `**Behaviours:**`, write the tests from them: at least one case per example,
+each case named for the behaviour it asserts. Take verbatim only what `**Interfaces:**` gives. A
+listed behaviour with no example makes the task not executable as written: stop and report. For a
+task that says it has no test, its examples are checked by its check command or a reader: write no
+test for them. A task with no behaviours list, in the older shape, is followed as written.
 
 === RULES ===
 - Follow the steps in order. Do not skip the step that runs the test and watches it fail.
@@ -100,7 +107,10 @@ quality reviewer left a worktree behind.
 Answer five questions:
 1. Is every step's stated outcome actually present?
 2. Is anything here that no step asked for? Name it.
-3. Does the test assert the behaviour the task described, or something adjacent?
+3. Does each listed behaviour have a test asserting its example, and does no test assert something
+   adjacent instead? For a task with no test, quote the line of the diff, or the check output, that
+   produces each behaviour's example. For a task with no behaviours list, in the older shape, does
+   the test assert the behaviour the task describes?
 4. Did the verify commands run, and did they pass? Quote the output rather than the claim.
 5. Is the output of the task's `Done when:` command in the report? Absence is DEVIATES on its own,
    however good the code looks: an unrun done condition means nothing here has been checked.
@@ -147,6 +157,50 @@ line.
 [../../keel/references/reporting-findings.md](../../keel/references/reporting-findings.md) carries
 the reason behind the ranking, cap and first-line rules the prompt above states.
 
+## Which loop a task gets
+
+How many review passes a task gets depends on what it touches, and a command decides it, not your
+reading of the diff. "Running the loop" below is the full loop; this section says where the light
+loop differs.
+
+Once the implementer has staged, run `keel plan risk --staged`. For a batched task, run
+`keel plan risk --range <base>..<task-head>` over that task's commits. It compares the changed paths
+with the `hard_block_paths` of every profile the hook could read: the root's as `HEAD` has it (as
+`<base>` has it, for a range) and as the working tree has it, every nested one, and the nearest
+profile above the repository. So a change cannot lower its own review, and a change that includes
+any `.keel/profile.json` is `loop: full` whatever the profiles then say. If you stage anything the
+implementer did not, run `keel plan risk --staged` again on the index as it will be committed,
+just before committing, and take that verdict.
+
+- **Light loop** only when the command exits 0 and its last line is `loop: light`: a declared list
+  that the change touches nowhere, or no list declared at all.
+- **Full loop** otherwise: `loop: full` (a path matched), exit 1 (a usage error), 3 (a profile that
+  cannot be read, or no `python3`) or 6 (git that cannot run), a `keel` too old to have the command,
+  or no `keel`. Failing to decide is never a reason to review less.
+- **Neither, on exit 4** (nothing staged, or an empty range). In the shared tree it means the
+  implementer staged nothing: it committed against its rules, or produced nothing. Stop, check
+  `git status` and `git log`, then ask.
+
+In the light loop the task gets one spec pass. COMPLIES: tick and commit, the tick note carrying
+`loop: light`. DEVIATES: **why the fix pass may build on the rejected attempt here**, where the full
+loop's rule below forbids it: the fix is scoped to what the verdict names, it is capped at one
+round, and a second rejection goes to a person rather than to another agent. In order:
+
+1. One fix pass: a fresh implementer dispatch on the plan's routing, with the implementer's label,
+   handed the staged attempt and the verdict and told to change only what the verdict names. It
+   counts toward `rounds`. In a worktree it amends the task's commit with `git commit --amend`
+   rather than adding one, and you re-resolve `<task-head>`.
+2. Re-run the same `keel plan risk` command.
+3. If it exits 0 with `loop: light`, one spec pass again. A second DEVIATES stops and asks the
+   person, with both verdicts.
+4. If it is anything else, because the fix touched a declared path or the command could not decide,
+   discard the attempt and dispatch fresh in the full loop, `rounds` continuing.
+
+A light-loop task has had no quality review. Its Step 6 report names `review-code` as that review,
+which the feature gets once at the end. `ship` step 5 enforces the project's standards through it
+only under `gates.coding_standards: required`; `warn` reports a violation and ships, and `off`, or
+no key, does not look. It is the light loop's quality review, not an optional next step.
+
 ## Running the loop
 
 One task at a time, unless the plan declares a concurrent batch and every condition in
@@ -190,21 +244,30 @@ You are ticking boxes for work you did not do, so tick on the subagent's reporte
 note, `keel plan tick <plan> <id> --note <text>`, for every step it named as already satisfied.
 Nobody witnessed those, and the plan is the only place that can say so.
 
-**On a DEVIATES verdict**, re-dispatch the same task to a fresh subagent with the review attached,
-rather than asking the original to fix it. A subagent that has already justified its approach will
-defend it, and you get a negotiation instead of a correction.
+**The last step you tick done in a task carries
+`--note 'rounds: <n>; routing: <profile>; loop: <light|full>'`**, `n` being the number of
+implementer dispatches the task took and `loop` the word the section above decided. Any other text
+follows after a further `; `, because `keel plan report` reads a field only at the start of the
+note or after `; `. The note applies in inline mode too, where you implement and `n` is 1 unless the
+task was redone. Nothing decides a loop in inline mode: write the loop `keel plan risk`
+printed if you ran it, and otherwise leave the field out.
 
-**Discard the first attempt before re-dispatching, and be explicit about what that means**, because
-"fresh subagent" is a claim about the tree as much as about the agent. Nothing was committed, so
-there is no history to rewrite: unstage and discard the working tree, and the second subagent starts
-from exactly the state the first one did. In a declared batch, reset or delete that task's worktree
-and do not merge it.
+**On a DEVIATES verdict in the full loop**, re-dispatch the same task to a fresh subagent with the
+review attached, rather than asking the original to fix it. A subagent that has already justified
+its approach will defend it, and you get a negotiation instead of a correction.
 
-**Never re-dispatch on top of the rejected attempt.** A fresh agent handed a tree containing work a
-reviewer just rejected reads it as the starting point and builds on it, which is how a DEVIATES
-verdict turns into two entangled problems instead of one corrected task. If the work was committed
-anyway, by an implementer that ignored its rules or a plan written before them, say so and stop:
-undoing a commit is the user's call, and it is the one repair this loop must not make silently.
+**In the full loop, discard the first attempt before re-dispatching, and be explicit about what that
+means**, because "fresh subagent" is a claim about the tree as much as about the agent. Nothing was
+committed, so there is no history to rewrite: unstage and discard the working tree, and the second
+subagent starts from exactly the state the first one did. In a declared batch, reset or delete that
+task's worktree and do not merge it.
+
+**In the full loop, never re-dispatch on top of the rejected attempt.** A fresh agent handed a tree
+containing work a reviewer just rejected reads it as the starting point and builds on it, which is
+how a DEVIATES verdict turns into two entangled problems instead of one corrected task. If the work
+was committed anyway, by an implementer that ignored its rules or a plan written before them, say so
+and stop: undoing a commit is the user's call, and it is the one repair this loop must not make
+silently.
 
 **A `blocking` finding from the quality review is handled exactly as a DEVIATES verdict is**, and
 for the same reason: the tick is the gate, and a finding acted on only after the commit is a
@@ -216,13 +279,21 @@ into the plan file beside the task before its box is ticked.
 
 ## Which model each prompt goes to
 
-**Dispatch implementation and both reviews with model `inherit`, with each dispatch's description
-starting `inherit: `.** These write code under the TDD gate and judge whether another agent's
-verdict is right, which is the work least worth making cheaper. The wide reading briefs in other
-skills go to delegation profile `keel-fanout`; these do not.
+**Dispatch implementation and both reviews with the routing named here, each description starting
+with it.** Both reviews go to model `inherit`, with the description starting `inherit: `. They judge
+whether another agent's verdict is right, which is the work least worth making cheaper, and no plan
+routes them. The wide reading briefs in other skills go to delegation profile `keel-fanout`; these
+do not.
+
+**The implementer goes to the routing the plan's header names, and to `inherit` when it names
+none.** The line is `**Implementer routing:**`. On `inherit` the implementer is model `inherit`, its
+description starting `inherit: `. On `keel-implementer` it is delegation profile `keel-implementer`,
+its description starting `keel-implementer: `. Any other routing value is not guessed at: stop and
+ask. Announce the routing in one line before the first dispatch.
 
 A cheaper model that silently handled something that mattered is the failure this rule exists to
-make visible, and it is invisible by construction: the output looks like output.
+make visible, and it is invisible by construction: the output looks like output. The label and the
+tick note's routing field are how a routed implementer is seen.
 
 ## What you keep, and what you do not touch
 
@@ -234,9 +305,9 @@ you a question mid-task, so a task that needs one will guess.
 not the one-character fix that is plainly correct. Every correction goes back through a fresh
 dispatch, at any size.
 
-The reason is not tidiness. Both review passes are fed the subagent's diff, so **an edit you make
-is the only change in the whole run that neither pass sees.** It is not a small unreviewed change,
-it is the only unreviewed change.
+The reason is not tidiness. Every review pass, two in the full loop and one in the light, is fed the
+subagent's diff, so **an edit you make is the only change in the whole run that no pass sees.** It
+is not a small unreviewed change, it is the only unreviewed change.
 
 **The plan file is the exception, and it is yours.** The implementer prompt forbids the subagent
 from touching it and step 6 requires you to keep it true, so nobody else can. The test for an

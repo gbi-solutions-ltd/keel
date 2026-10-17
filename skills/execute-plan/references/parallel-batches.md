@@ -16,6 +16,14 @@ A batch is eligible only when **all five** hold:
 5. No task in it creates or edits shared config: a lockfile, a linter or formatter config, a CI
    file, or `.keel/profile.json`.
 
+The coordinator runs `keel plan batches <plan>`, and every task of a declared batch must sit in one
+batch it prints (a declared batch may be part of a printed one). That settles conditions 2, 3 and 5,
+because the command reads the same `Depends on:` and `Files` lines they are about. Condition 1 is
+the declaration, and condition 4 is read in the task text, where the command's `check:` line points.
+A declared batch it does not print is withdrawn, as "When not to batch" already says. Where `keel`
+cannot run, read those lines for conditions 2, 3 and 5 yourself, because the command reads only
+those lines.
+
 **1 to 3 are the ones people check, and on their own they produce a green suite that proves
 nothing.** A run asked to execute a five-task plan as fast as it reasonably could worked out
 unaided that three leaf tasks had disjoint files and no shared symbols, then refused to overlap
@@ -40,12 +48,13 @@ That is the whole value of the plan, gone, with every checkbox ticked.
 
 ## Dispatching
 
-Dispatch the batch in one message, model `inherit`, with each dispatch's description starting
-`inherit: `, each agent working in its own checkout so no two write the same tree.
+Dispatch the batch in one message, each implementer on the plan's `**Implementer routing:**`
+(model `inherit` when the plan has none, delegation profile `keel-implementer` when it names it),
+with each description starting `inherit: ` or `keel-implementer: ` to match, each agent working in
+its own checkout so no two write the same tree. Both reviews stay `inherit`.
 
-`inherit` because these agents write code under the TDD gate, which is the work least worth making
-cheaper. [subagent-prompts.md](subagent-prompts.md) sets the same pin for the same reason, and a
-batch is that work run concurrently rather than different work.
+Batch implementers follow the same routing rule as [subagent-prompts.md](subagent-prompts.md), since
+a batch is that work run concurrently rather than different work.
 
 The worktree gives each agent its own checkout, so the shared working tree stops being shared.
 Without it, three further failures follow, all predicted in the same run and none of them a rare
@@ -79,15 +88,21 @@ Add to each implementer prompt:
 
 The exception is safe for the reason the general rule exists: the guarantee is that nothing reaches
 **shared** history before review, and a worktree is not shared. The commit stays private until you
-merge it back at the join, which happens after both passes. A batched task that ran in the shared
-tree instead would break the rule rather than be excepted from it.
+merge it back at the join, which happens after that task's review. A batched task that ran in the
+shared tree instead would break the rule rather than be excepted from it.
 
 ## Joining
 
-Review each returned task in the usual two passes as it arrives; that part does not batch. Take the
-diff both passes need from that worktree alone, as `git diff <the commit the batch started from>..HEAD`
-run inside it. A plain `git diff` in the shared tree shows a mixture of all three, or nothing at all
-once each agent has committed, and **an empty diff produces a confident COMPLIES over nothing.**
+Review each returned task as it arrives; that part does not batch. Take the diff the review needs
+from that worktree alone, as `git diff <the commit the batch started from>..HEAD` run inside it. A
+plain `git diff` in the shared tree shows a mixture of all three, or nothing at all once each agent
+has committed, and **an empty diff produces a confident COMPLIES over nothing.**
+
+Each task's loop comes from `keel plan risk --range <base>..<task-head>` over that task's commits,
+with `<base>` the commit the batch started from, and not from one answer for the whole batch: tasks
+in a batch touch different paths. The rule and its fallbacks are in
+[subagent-prompts.md](subagent-prompts.md). A light-loop fix pass inside a worktree amends the
+task's commit rather than adding one, so no rejected commit reaches shared history.
 
 **If that diff is empty, stop rather than review it.** The usual cause is a batched task whose final
 step handed over instead of committing, so the work is staged in the worktree and never reached a
@@ -103,10 +118,11 @@ Then, in one place and by you:
    through a stale read.
 4. Confirm each task's own commit landed with only its own paths in it, then commit the merge.
 
-**A task that came back DEVIATES is not merged.** Reset or delete its worktree and re-dispatch it
-from the commit the batch started from, so the fresh subagent gets the state the first one had.
-Merging it first and correcting afterwards puts rejected work into shared history and leaves the
-re-dispatch building on top of it.
+**In the full loop, a task that came back DEVIATES is not merged.** Reset or delete its worktree and
+re-dispatch it from the commit the batch started from, so the fresh subagent gets the state the
+first one had. Merging it first and correcting afterwards puts rejected work into shared history and
+leaves the re-dispatch building on top of it. A light-loop task is not reset: its one fix pass
+amends the task's commit in the worktree, as above, and it is merged once its spec pass complies.
 
 A red suite at the join is a real finding about the combination, which is exactly what no task could
 have discovered alone. Use `keel:debug` through Phase 3, then send its Phase 4 to a fresh

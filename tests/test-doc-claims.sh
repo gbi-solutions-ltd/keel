@@ -209,11 +209,17 @@ fi
 sv="$(grep -oE '^SCHEMA_VERSION=[0-9]+' bin/keel | head -1 | cut -d= -f2)"
 # 5 since 2026-09-25, when docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md
 # task 5 declared conventions.no_attribution_footers, the key the message hook now honours.
-if [ "$sv" = "5" ]; then
-    ok "SCHEMA_VERSION is where the no-footers task left it ($sv)"
+# 6 since 2026-10-16, when docs/plans/2026-10-16-manage-test-speed.md task 1 declared
+# verify.test_affected and gates.suite_warn_seconds.
+if [ "$sv" = "6" ]; then
+    ok "SCHEMA_VERSION is where the test-speed task left it ($sv)"
 else
-    bad "SCHEMA_VERSION is where the no-footers task left it" \
-        "bin/keel is at $sv, expected 5. docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md was the last plan to move it, by declaring conventions.no_attribution_footers. A further bump is either a change riding along or one that needs its own story, its own schema row and its own fingerprint line in tests/validate-skills.sh"
+    sv_msg="bin/keel is at $sv, expected 6. docs/plans/2026-10-16-manage-test-speed.md was the last"
+    sv_msg="$sv_msg plan to move it, by declaring verify.test_affected and"
+    sv_msg="$sv_msg gates.suite_warn_seconds. A further bump is either a change riding along or one"
+    sv_msg="$sv_msg that needs its own story,"
+    sv_msg="$sv_msg its own schema row and its own fingerprint line in tests/validate-skills.sh"
+    bad "SCHEMA_VERSION is where the test-speed task left it" "$sv_msg"
 fi
 
 # Plan 0 left these two changes of its own untested. Both are literal strings in a file that exists

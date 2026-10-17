@@ -88,6 +88,17 @@ name = "keel-fanout"
 model = "gpt-5-codex-mini"
 model_reasoning_effort = "low"
 AGENT
+
+    # The implementer profile a plan may route to (ADR-0008). Same stance as above: THE MODEL IS
+    # UNMEASURED. It is the fan-out profile's guess carried over because an implementer needs the
+    # same "cheaper and faster than the driver", and nothing has measured that it clears the bar for
+    # code written under the TDD gate. Model and effort are carried over unchanged, so neither is a
+    # choice anyone has made for an implementer.
+    cat > .codex/agents/keel-implementer.toml <<'AGENT'
+name = "keel-implementer"
+model = "gpt-5-codex-mini"
+model_reasoning_effort = "low"
+AGENT
     [ -n "$root" ] || true
 }
 
@@ -109,6 +120,7 @@ harness_context_file() { :; }
 harness_config_paths() {
     printf 'committed|.codex/config.toml\n'
     printf 'committed|.codex/agents/keel-fanout.toml\n'
+    printf 'committed|.codex/agents/keel-implementer.toml\n'
 }
 
 # Open question 6 of the architecture, and the reason this function is not empty on a harness that

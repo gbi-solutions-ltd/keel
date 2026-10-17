@@ -5428,8 +5428,13 @@ json.dump(d, open(p,"w"), indent=2)
 DOWNGRADE
 ( cd "$w" && "$ROOT/bin/keel" init -y >/dev/null 2>&1 )
 got="$(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(d.get("schema_version"), json.dumps(d.get("harnesses")))' "$w/.keel/profile.json")"
-[ "$got" = '5 ["claude"]' ] && ok "a schema 2 profile upgrades to claude only" \
-  || bad "a schema 2 profile upgrades to claude only" "got $got"
+# The schema number is read from bin/keel and not typed. This case tests which harnesses an upgrade
+# infers, not what the schema version is, and a literal here made every schema bump edit a case
+# that has nothing to do with it (it said 5 until docs/plans/2026-10-16-manage-test-speed.md moved
+# the version to 6). "init writes schema version" above is where the number is pinned.
+sv_now="$(sed -n 's/^SCHEMA_VERSION=\([0-9][0-9]*\)$/\1/p' "$ROOT/bin/keel")"
+[ "$got" = "$sv_now"' ["claude"]' ] && ok "a schema 2 profile upgrades to claude only" \
+  || bad "a schema 2 profile upgrades to claude only" "got $got, want $sv_now"
 rm -rf "$w"
 
 # An explicit --harness must win on a repository that ALREADY has a profile, and until this was
@@ -5806,8 +5811,12 @@ PY
   || bad "init writes none of the six retired keys" "still written: $left"
 
 sv="$(python3 -c "import json;print(json.load(open('$wr/.keel/profile.json'))['schema_version'])")"
-[ "$sv" = "5" ] && ok "init writes schema version 5" \
-  || bad "init writes schema version 5" "got $sv"
+# 6 since 2026-10-16: docs/plans/2026-10-16-manage-test-speed.md task 1 declared
+# verify.test_affected and gates.suite_warn_seconds. A literal stays here on purpose, unlike the
+# harness case above: this is the tripwire that makes a schema bump a deliberate act with a reason
+# in the commit.
+[ "$sv" = "6" ] && ok "init writes schema version 6" \
+  || bad "init writes schema version 6" "got $sv"
 
 # The floor for the first case. What it covers is a profile that parses but carries a gates object
 # missing keys: that would satisfy "none of the six are present" while breaking every gate that
@@ -6503,6 +6512,395 @@ sp="$(fixture node-ts)"; : > "$sp/pnpm-lock.yaml"
   && ok "init detects verify.security from a pnpm-lock.yaml" \
   || bad "verify.security" "pnpm: got '$(verify_of "$sp" security)'"
 rm -rf "$sp"
+
+# ---- a slow suite is named as a cost, and verify.test_affected is declared ---------------------
+# docs/plans/2026-10-16-manage-test-speed.md task 1, behaviours 2 to 8; ADR-0009 is the decision
+# these cases hold to. tdd runs verify.test at every unit boundary, so full doctor says what a slow
+# suite costs, and a project whose runner can select the affected tests declares that command in
+# verify.test_affected instead of paying for the whole suite each time.
+#
+# Every doctor case reads doctor's own output, because the line is the product. The node-ts fixture
+# and not a bare one: a bare repository detects as project.kind "docs", and doctor then prints no
+# verify line at all (see the verify.e2e cases above).
+
+# One JSON value written into a fixture's profile exactly as a hand edit would write it. `keel
+# profile set` cannot write a bare 0, a quoted word or a null the way a person editing the file
+# does, and it cannot delete a key, which "absent means 60" needs. $3 is a JSON literal, or UNSET
+# to remove the key.
+setj() {   # setj <dir> <dotted.path> <json literal | UNSET>
+    python3 - "$1/.keel/profile.json" "$2" "$3" <<'PY'
+import json, sys
+p, path, lit = sys.argv[1:4]
+root = d = json.load(open(p))
+*parents, leaf = path.split(".")
+for k in parents:
+    d = d[k]
+if lit == "UNSET":
+    d.pop(leaf, None)
+else:
+    d[leaf] = json.loads(lit)
+json.dump(root, open(p, "w"), indent=2)
+open(p, "a").write("\n")
+PY
+}
+
+# Full or --fast doctor in a fixture, both streams, so a WARN and an ok are read the same way.
+doc_run() {   # doc_run <dir> [flag...]
+    local d="$1"; shift
+    ( cd "$d" && "$KEEL" doctor "$@" 2>&1 )
+}
+
+# One initialised node-ts fixture, copied for each case below. Initialising once keeps this block
+# cheap, which matters in a plan about the cost of a suite, and the lint, typecheck and build
+# commands are cleared so that doctor does not start npm three times per run to learn nothing this
+# block reads.
+speed_tpl="$(fixture node-ts)"
+( cd "$speed_tpl" && "$KEEL" init -y >/dev/null 2>&1 )
+for k in lint typecheck build; do setj "$speed_tpl" "verify.$k" null; done
+
+# A copy of that template whose verify.test is the given command.
+speed_fixture() {   # speed_fixture <verify.test command>
+    local d; d="$(mktemp -d)"
+    cp -R "$speed_tpl/." "$d/"
+    setj "$d" verify.test "\"$1\""
+    printf '%s' "$d"
+}
+
+# Full doctor in a fixture, started in the background with its output sent to a file, so that the
+# cases that need a suite to take real seconds wait for them together and not one after another.
+# Collected by `wait` below; the fixtures share nothing, so the runs cannot disturb each other.
+start_doc() {   # start_doc <dir> <output file>
+    ( doc_run "$1" > "$2" ) &
+}
+
+# The seconds doctor printed on its own "verify.test runs (Ns)" line.
+ran_seconds() {   # ran_seconds <doctor output>
+    printf '%s\n' "$1" | sed -n 's/^ok    verify\.test runs (\([0-9][0-9]*\)s).*/\1/p' | head -1
+}
+
+# The behaviour 3 warning, built from the seconds doctor itself reports, so the case holds whatever
+# $SECONDS happened to give (a 2 second suite measures as 2 or 3). The minutes are the plan's
+# (seconds * 10 + 30) / 60 in whole numbers, written out here and not read from bin/keel, so the
+# formula is checked and not echoed.
+slow_warning_ok() {   # slow_warning_ok <doctor output> <threshold>
+    local line el m phrase want
+    line="$(printf '%s\n' "$1" | grep '^WARN  verify\.test took ' | head -1)"
+    el="$(ran_seconds "$1")"
+    [ -n "$line" ] && [ -n "$el" ] || return 1
+    m=$(( (el * 10 + 30) / 60 ))
+    case "$m" in 0) phrase="under a minute" ;; 1) phrase="about 1 minute" ;; *) phrase="about $m minutes" ;; esac
+    want="WARN  verify.test took ${el}s, over gates.suite_warn_seconds ($2s): tdd runs it at every unit boundary, so ten units spend $phrase in it. Set verify.test_affected, or raise gates.suite_warn_seconds if ${el}s is this suite's honest cost."
+    [ "$line" = "$want" ]
+}
+
+# ---- behaviour 2: the keys exist, init writes both, a person's value survives a re-run
+sd="$(fixture node-ts)"
+( cd "$sd" && "$KEEL" init -y >/dev/null 2>&1 )
+got="$(prof_of "$sd" verify.test_affected gates.suite_warn_seconds | tr '\n' '|')"
+[ "$got" = "None|60|" ] \
+  && ok "init writes verify.test_affected null and gates.suite_warn_seconds 60" \
+  || bad "init writes verify.test_affected null and gates.suite_warn_seconds 60" "got '$got'"
+( cd "$sd" && "$KEEL" profile set verify.test_affected 'npx vitest run --changed {base}' >/dev/null 2>&1 )
+( cd "$sd" && "$KEEL" profile set gates.suite_warn_seconds 90 >/dev/null 2>&1 )
+( cd "$sd" && "$KEEL" init -y >/dev/null 2>&1 )
+got="$(prof_of "$sd" verify.test_affected gates.suite_warn_seconds | tr '\n' '|')"
+[ "$got" = "npx vitest run --changed {base}|90|" ] \
+  && ok "re-running init keeps a verify.test_affected and a gates.suite_warn_seconds a person set" \
+  || bad "re-running init keeps what a person set" "got '$got'"
+rm -rf "$sd"
+
+got="$(python3 - "$ROOT/templates/profile.schema.json" <<'PY' 2>&1
+import json, sys
+s = json.load(open(sys.argv[1]))["properties"]
+ta = s["verify"]["properties"]["test_affected"]
+sw = s["gates"]["properties"]["suite_warn_seconds"]
+print(ta["type"], sw["type"], sw["minimum"], bool(ta["x-keel-read-by"]), bool(sw["x-keel-read-by"]))
+PY
+)"
+[ "$got" = "['string', 'null'] integer 1 True True" ] \
+  && ok "the schema declares both keys, with the types the plan names and a reader each" \
+  || bad "the schema declares both keys" "got '$got'"
+
+got="$(python3 - "$ROOT/templates/keel-profile.example.json" <<'PY' 2>&1
+import json, sys
+d = json.load(open(sys.argv[1]))
+print("test_affected" in d["verify"], "suite_warn_seconds" in d["gates"])
+PY
+)"
+[ "$got" = "True True" ] && ok "the example profile shows both keys" \
+  || bad "the example profile shows both keys" "got '$got'"
+
+# keel's own profile is at the schema bin/keel declares and carries both keys, so keel's doctor does
+# not call it stale. verify.test_affected stays null there: no runner of this repository selects
+# affected tests, and the suite warning doctor prints for keel's own suite is true.
+sv_now="$(sed -n 's/^SCHEMA_VERSION=\([0-9][0-9]*\)$/\1/p' "$ROOT/bin/keel")"
+got="$(python3 - "$ROOT/.keel/profile.json" <<'PY' 2>&1
+import json, sys
+d = json.load(open(sys.argv[1]))
+print(d["schema_version"], d["verify"]["test_affected"], d["gates"]["suite_warn_seconds"])
+PY
+)"
+[ "$got" = "$sv_now None 60" ] \
+  && ok "keel's own profile is at the current schema and carries both keys" \
+  || bad "keel's own profile is at the current schema and carries both keys" "got '$got', want '$sv_now None 60'"
+
+# ---- behaviours 3 to 6: the suites that take real seconds are started together, then read
+# Each needs a suite that really runs longer than its threshold, and $SECONDS has one second
+# granularity, so these are the slow part of this block. They start here and are read below.
+tmp_out="$(mktemp -d)"
+sw="$(speed_fixture 'sleep 2')";               setj "$sw" gates.suite_warn_seconds '"001"'
+sp="$(speed_fixture 'sleep 3')";               setj "$sp" gates.suite_warn_seconds 1
+sf="$(speed_fixture 'sleep 2; exit 1')";       setj "$sf" gates.suite_warn_seconds 1
+sm="$(speed_fixture 'sleep 2')";               setj "$sm" gates.suite_warn_seconds 1
+setj "$sm" verify.test_affected '"echo affected"'
+sa="$(speed_fixture 'sleep 2')";               setj "$sa" gates.suite_warn_seconds 1
+setj "$sa" verify.test_affected '"sleep 2"'
+sb="$(speed_fixture 'sleep 2')";               setj "$sb" gates.suite_warn_seconds 1
+setj "$sb" verify.test_affected '"sleep 2 "'
+sc="$(speed_fixture 'sleep 2')";               setj "$sc" gates.suite_warn_seconds 1
+setj "$sc" verify.test_affected '"  sleep 2"'
+s0="$(speed_fixture 'sleep 1')";               setj "$s0" gates.suite_warn_seconds 0
+sn="$(speed_fixture 'sleep 1')";               setj "$sn" gates.suite_warn_seconds null
+sq="$(speed_fixture true)";                    setj "$sq" gates.suite_warn_seconds '"fast"'
+sg="$(speed_fixture true)";                    setj "$sg" gates.suite_warn_seconds 1234567890
+start_doc "$sw" "$tmp_out/sw"; start_doc "$sp" "$tmp_out/sp"; start_doc "$sf" "$tmp_out/sf"
+start_doc "$sm" "$tmp_out/sm"; start_doc "$sa" "$tmp_out/sa"; start_doc "$sb" "$tmp_out/sb"
+start_doc "$sc" "$tmp_out/sc"; start_doc "$s0" "$tmp_out/s0"; start_doc "$sn" "$tmp_out/sn"
+start_doc "$sq" "$tmp_out/sq"; start_doc "$sg" "$tmp_out/sg"
+wait
+
+# ---- behaviour 3: a suite over the threshold warns, and says what it costs
+# The threshold here is the string "001": a string of digits reads as that number, zeros and all, so
+# this is the plan's 1 second threshold and a 2 second suite measures as 2 or 3.
+out="$(cat "$tmp_out/sw")"
+if slow_warning_ok "$out" 1; then
+    ok "a passing suite over gates.suite_warn_seconds warns, naming the cost"
+else
+    bad "a passing suite over gates.suite_warn_seconds warns, naming the cost" \
+        "$(printf '%s\n' "$out" | grep 'verify\.test ')"
+fi
+printf '%s\n' "$out" | grep -qE '^ok    verify\.test runs \([0-9]+s\): sleep 2$' \
+  && ok "the warning sits beside doctor's existing verify.test runs line, which stays" \
+  || bad "the verify.test runs line stays" "$(printf '%s\n' "$out" | grep 'verify\.test ')"
+printf '%s\n' "$out" | grep -qE 'verify\.test took [0-9]+s, over gates\.suite_warn_seconds \(1s\)' \
+  && ok "the warning matches the plan's pattern, and \"001\" was read as 1" \
+  || bad "the warning matches the plan's pattern" "$(printf '%s\n' "$out" | grep 'verify\.test ')"
+
+# Three seconds is the first suite whose cost reads in minutes, and it measures as 3 or 4, which
+# both give 1: the arithmetic and the singular hold whichever it is. The plural "about N minutes"
+# branch is checked by reading bin/keel, as the exclusive threshold is: a suite long enough to
+# reach 2 minutes would hold the parallel group about six seconds longer, for a word.
+out="$(cat "$tmp_out/sp")"
+if slow_warning_ok "$out" 1 && printf '%s\n' "$out" | grep -q 'ten units spend about 1 minute in it\.'; then
+    ok "a three second suite is costed at about 1 minute for ten units"
+else
+    bad "a three second suite is costed at about 1 minute for ten units" \
+        "$(printf '%s\n' "$out" | grep 'verify\.test ')"
+fi
+
+# A run that fails gets its existing line and no warning, however long it took.
+out="$(cat "$tmp_out/sf")"
+case "$out" in
+  *"verify.test took"*|*"verify.test takes"*) bad "a failing suite gets no slow-suite line" "$out" ;;
+  *"FAIL  verify.test does not run ("*) ok "a failing suite keeps its existing line and gets no slow-suite line" ;;
+  *) bad "a failing suite keeps its existing line" "$(printf '%s\n' "$out" | grep 'verify\.test ')" ;;
+esac
+
+# ---- behaviour 4: at or under the threshold, nothing new is said
+# `true` under the default 60. The comparison is exclusive (a run equal to the threshold does not
+# warn), which no real run lands on reliably, so a reviewer reads it in bin/keel. Absent, a
+# 9 digit maximum and the digit strings are all quiet, and absent is quiet without a word.
+sq0="$(speed_fixture true)"
+for lit in 60 UNSET 999999999 '"90"' '"090"'; do
+    setj "$sq0" gates.suite_warn_seconds "$lit"
+    out="$(doc_run "$sq0")"
+    case "$out" in
+      *"suite_warn_seconds"*|*"verify.test took"*|*"verify.test takes"*)
+        bad "a fast suite says nothing new (threshold $lit)" "$(printf '%s\n' "$out" | grep 'suite_warn\|verify\.test ')" ;;
+      *"ok    verify.test runs ("*) ok "a fast suite says nothing new (threshold $lit)" ;;
+      *) bad "a fast suite says nothing new (threshold $lit)" "no verify.test runs line: $out" ;;
+    esac
+done
+
+# ---- behaviour 5: a suite managed by verify.test_affected is not warned about
+out="$(cat "$tmp_out/sm")"
+el="$(ran_seconds "$out")"
+want="ok    verify.test takes ${el}s, over 1s; tdd runs verify.test_affected at unit boundaries instead, so the suite runs once at the start of each task, in review-code, ship and CI"
+if [ -n "$el" ] && printf '%s\n' "$out" | grep -qxF "$want" \
+   && ! printf '%s\n' "$out" | grep -q '^WARN  verify\.test took'; then
+    ok "a slow suite managed by verify.test_affected is an ok line that says why"
+else
+    bad "a slow suite managed by verify.test_affected is an ok line that says why" \
+        "want '$want', got: $(printf '%s\n' "$out" | grep 'verify\.test ')"
+fi
+
+# The same string as verify.test saves nothing, so the warning fires and says so. Compared with the
+# whitespace at either end removed: `sleep 2 ` is the command `sleep 2`.
+for pair in "identical:sa" "with a trailing space:sb" "with a leading space:sc"; do
+    label="${pair%%:*}"; out="$(cat "$tmp_out/${pair##*:}")"
+    line="$(printf '%s\n' "$out" | grep '^WARN  verify\.test took ' | head -1)"
+    case "$line" in
+      *"same command as verify.test"*)
+        printf '%s\n' "$out" | grep -q '^ok    verify\.test takes' \
+          && bad "verify.test_affected $label equals verify.test" "also printed the ok line: $out" \
+          || ok "verify.test_affected $label equals verify.test: the warning fires and says so" ;;
+      *) bad "verify.test_affected $label equals verify.test" \
+             "no warning naming the same command: $(printf '%s\n' "$out" | grep 'verify\.test ')" ;;
+    esac
+done
+
+# ---- behaviour 6: a bad threshold is named, and 60 is used
+bad_threshold_case() {   # bad_threshold_case <label> <doctor output file> <how doctor shows the value>
+    local out want
+    out="$(cat "$2")"
+    want="WARN  gates.suite_warn_seconds is $3, which is not a whole number from 1 to 999999999, so 60 was used. Set it with: keel profile set gates.suite_warn_seconds <seconds>"
+    # "60 was used" is checked as behaviour and not only as words: a 1 second suite is over a
+    # threshold of 0 and under 60, so a doctor that obeyed the 0 would warn about it too.
+    if printf '%s\n' "$out" | grep -qxF "$want" \
+       && ! printf '%s\n' "$out" | grep -q '^WARN  verify\.test took'; then
+        ok "a threshold of $1 is named, and 60 is used"
+    else
+        bad "a threshold of $1 is named, and 60 is used" \
+            "want '$want', got: $(printf '%s\n' "$out" | grep 'suite_warn\|verify\.test ')"
+    fi
+}
+bad_threshold_case 0 "$tmp_out/s0" 0
+# A present null is a bad value and not an absent key: it is what someone writes to turn the
+# warning off, and reading it as 60 without a word would leave them believing it worked.
+bad_threshold_case null "$tmp_out/sn" "null or empty"
+bad_threshold_case '"fast"' "$tmp_out/sq" "'fast'"
+# Whole, and still out of range: the message names the range rather than calling it not a number.
+bad_threshold_case 1234567890 "$tmp_out/sg" 1234567890
+out="$(doc_run "$s0" --fast)"
+case "$out" in
+  *suite_warn_seconds*) bad "doctor --fast does not read gates.suite_warn_seconds" "$out" ;;
+  *) ok "doctor --fast says nothing about a bad gates.suite_warn_seconds: it runs no suite" ;;
+esac
+rm -rf "$tmp_out" "$sw" "$sp" "$sf" "$sm" "$sa" "$sb" "$sc" "$s0" "$sn" "$sq" "$sg" "$sq0"
+
+# ---- behaviour 7: verify.test_affected is reported and never run
+st="$(speed_fixture true)"
+for flag in "" --fast; do
+    out="$(doc_run "$st" ${flag:+"$flag"})"
+    printf '%s\n' "$out" | grep -qxF 'ok    verify.test_affected is null: tdd runs verify.test at each unit boundary' \
+      && ok "a null verify.test_affected is an ok line (doctor ${flag:-full})" \
+      || bad "a null verify.test_affected is an ok line (doctor ${flag:-full})" \
+             "$(printf '%s\n' "$out" | grep 'test_affected')"
+done
+# A command that leaves evidence behind, as the verify.e2e cases do: it needs a commit only a tdd
+# unit has, so doctor must not run it, and the files are a fact on disk where the output is a claim.
+setj "$st" verify.test_affected '"touch affected-ran-sentinel {base}"'
+for flag in "" --fast; do
+    out="$(doc_run "$st" ${flag:+"$flag"})"
+    printf '%s\n' "$out" | grep -qxF 'ok    verify.test_affected is set (declared, not run): touch affected-ran-sentinel {base}' \
+      && ok "a set verify.test_affected is shown (doctor ${flag:-full})" \
+      || bad "a set verify.test_affected is shown (doctor ${flag:-full})" \
+             "$(printf '%s\n' "$out" | grep 'test_affected')"
+    if [ -e "$st/affected-ran-sentinel" ] || [ -e "$st/{base}" ]; then
+        bad "doctor does not execute verify.test_affected (doctor ${flag:-full})" "the sentinel exists, so it ran"
+    else
+        ok "doctor does not execute verify.test_affected (doctor ${flag:-full})"
+    fi
+done
+# A runner that tracks changes itself needs no {base}, and is not a finding.
+setj "$st" verify.test_affected '"echo changed"'
+out="$(doc_run "$st")"
+printf '%s\n' "$out" | grep -qxF 'ok    verify.test_affected is set (declared, not run): echo changed' \
+  && ! printf '%s\n' "$out" | grep -qE '^(WARN|FAIL) .*test_affected' \
+  && ok "a verify.test_affected without {base} is accepted" \
+  || bad "a verify.test_affected without {base} is accepted" "$(printf '%s\n' "$out" | grep 'test_affected')"
+rm -rf "$st"
+
+# ---- behaviour 8: a templated key is kept out of the places that run bare commands
+# The setup goes through `keel profile set`, which refuses a path the profile lacks, and the value
+# is checked before the assertion: a key init never wrote would otherwise leave both cases green
+# for want of anything to skip.
+sc="$(fixture node-ts)"
+( cd "$sc" && "$KEEL" init -y >/dev/null 2>&1 \
+  && "$KEEL" profile set verify.test_affected 'npx vitest run --changed {base}' >/dev/null 2>&1 \
+  && rm -rf .github && "$KEEL" init -y >/dev/null 2>&1 )
+if [ "$(prof_of "$sc" verify.test_affected)" != 'npx vitest run --changed {base}' ]; then
+    bad "write_ci skips verify.test_affected" "fixture precondition: the profile does not hold it"
+elif [ ! -f "$sc/.github/workflows/ci.yml" ]; then
+    bad "write_ci skips verify.test_affected" "fixture precondition: no workflow was written"
+elif grep -qF '{base}' "$sc/.github/workflows/ci.yml"; then
+    bad "write_ci skips verify.test_affected" "{base} reached CI: $(grep -nF '{base}' "$sc/.github/workflows/ci.yml")"
+else
+    ok "the generated CI workflow has no line containing {base}"
+fi
+rm -rf "$sc"
+
+tp="$(fixture bare)"
+( cd "$tp" && "$KEEL" init -y >/dev/null 2>&1 )
+( cd "$tp" && "$KEEL" guard install >/dev/null 2>&1 )
+( cd "$tp" && "$KEEL" profile set conventions.protect_default_branch false >/dev/null 2>&1 )
+( cd "$tp" && "$KEEL" profile set verify.test_affected 'npx vitest run --changed {base}' >/dev/null 2>&1 )
+( cd "$tp" && "$KEEL" profile set verify.security 'npm audit' >/dev/null 2>&1 )
+# Checked before anything is committed, on the baseline: setj below would create the key on a
+# profile that never had it, and the case would then compare null with nothing and pass.
+tp_pre=1
+[ "$(prof_of "$tp" verify.test_affected)" = 'npx vitest run --changed {base}' ] || tp_pre=0
+( cd "$tp" && git add -A && git commit -q -m "baseline: both are commands" )
+ta_old="$( cd "$tp" && git rev-parse HEAD )"
+setj "$tp" verify.test_affected null
+( cd "$tp" && git add -A && git commit -q -m "verify.test_affected is now null" )
+ta_new="$( cd "$tp" && git rev-parse HEAD )"
+push_check() {   # push_check <new sha> <old sha>: the pre-push hook's output, and its status
+    ( cd "$tp" && printf 'refs/heads/main %s refs/heads/main %s\n' "$1" "$2" \
+        | PATH="$(dirname "$KEEL"):$PATH" .git/hooks/pre-push origin git@example.invalid:gbi/f.git 2>&1 )
+}
+if [ "$tp_pre" -eq 0 ]; then
+    bad "pre-push does not refuse verify.test_affected going null" \
+        "fixture precondition: the baseline profile does not hold a verify.test_affected command"
+else
+    out="$(push_check "$ta_new" "$ta_old")"; rc=$?
+    [ "$rc" -eq 0 ] && ok "pre-push does not refuse verify.test_affected going from a command to null" \
+      || bad "pre-push does not refuse verify.test_affected going null" "exit $rc: $out"
+fi
+# The control, in the same repository and through the same hook: a verify command that is run
+# bare going null is still refused, with a non-zero exit and not only a mention. Without it the case
+# above would pass on a hook that refused nothing.
+setj "$tp" verify.security null
+( cd "$tp" && git add -A && git commit -q -m "verify.security is now null" )
+sec_new="$( cd "$tp" && git rev-parse HEAD )"
+out="$(push_check "$sec_new" "$ta_new")"; rc=$?
+if [ "$rc" -ne 0 ]; then
+    case "$out" in
+      *verify.security*) ok "the control: pre-push still refuses verify.security going to null (exit $rc)" ;;
+      *) bad "the control: pre-push refuses verify.security going null" "exit $rc but unnamed: $out" ;;
+    esac
+else
+    bad "the control: pre-push refuses verify.security going null" "exit 0: the hook refused nothing"
+fi
+rm -rf "$tp"
+
+# ---- the interpreter budget: two keys read, no start spent
+# doctor's python3 starts are capped at 10 above. A profile written before the keys existed lacks
+# both, and json_get spends a start confirming an absence, so the new reads must not go through it
+# for a key the profile does not name. A profile without the keys costs no more than one with them.
+count_doctor_starts() {   # count_doctor_starts <dir>
+    local shimdir real_python n
+    shimdir="$(mktemp -d)"; real_python="$(command -v python3)"
+    printf '#!/bin/sh\nprintf "x\\n" >> "%s/count"\nexec "%s" "$@"\n' "$shimdir" "$real_python" > "$shimdir/python3"
+    chmod +x "$shimdir/python3"; : > "$shimdir/count"
+    ( cd "$1" && PATH="$shimdir:$PATH" "$KEEL" doctor >/dev/null 2>&1 )
+    n="$(grep -c x "$shimdir/count" 2>/dev/null || true)"
+    rm -rf "$shimdir"
+    printf '%s' "${n:-99}"
+}
+# A fixture whose verify.test passes, so that doctor reaches the threshold read: on a suite that
+# fails, suite_cost_note is never called, and the case would count starts that skip the read it
+# guards.
+sk="$(speed_fixture true)"
+fresh_starts="$(count_doctor_starts "$sk")"
+setj "$sk" verify.test_affected UNSET
+setj "$sk" gates.suite_warn_seconds UNSET
+setj "$sk" schema_version 5
+stale_starts="$(count_doctor_starts "$sk")"
+[ "$stale_starts" -ge 1 ] && [ "$stale_starts" -le "$fresh_starts" ] && [ "$fresh_starts" -le 10 ] \
+  && ok "a schema 5 profile without the two keys costs doctor no more python3 starts than a schema 6 one ($stale_starts, $fresh_starts)" \
+  || bad "doctor's python3 starts with the two keys absent" "$stale_starts on a schema 5 profile against $fresh_starts on a schema 6 one"
+rm -rf "$sk" "$speed_tpl"
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

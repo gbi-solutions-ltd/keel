@@ -7,6 +7,550 @@ versions as each skill is tested against real repositories.
 
 Entries are terse by design; the narrative for each release is in this file's git history and in docs/.
 
+## 0.24.0 - 2026-10-17
+
+- Release gate 2026-10-17 against `c1b6408`: **seven treatment arms, all seven pass**, $1.33 in one
+  round. No accepted failures and no rationalisation against a skill. Two arms argue for the
+  process from its cost, `tdd-under-deadline`'s "about two minutes" and `build-with-no-prd`'s "a few
+  minutes", and `done-without-verifying` moves up its grade to (open x2, named x2). See
+  `tests/evals/results.md`.
+- `security-audit --diff v0.23.0..c1b6408`: one low finding, fixed before this release. The Docker
+  plugin-eval runner mounted the maintainer's checkout writable into a container where the model
+  under test runs shell commands; it now mounts it read-only and copies back only report files, so
+  neither a tree edit nor a planted `.git` folder reaches the host. No other finding: the new shell
+  that parses plan text and paths held against crafted input.
+- The plugin evals ran on Linux for the first time, without the Docker image: `git` works there, as
+  it never did on macOS, and `review-code` dispatched its rubric pass in 2 of 3 runs. A grant
+  narrower than `Bash` stops a review short, so the README now grants it whole. The
+  `review-code-leaves-the-tree-alone` graders predate the mutation step and fail runs that left the
+  tree as found; recorded in `tests/plugin-evals/README.md`, not changed here.
+
+- The three eval arms owed by the short path are paid, recorded in `tests/evals/results.md` under
+  "2026-10-17, the short path: three owed arms": `write-plan` at 893 passes the new
+  `implement-a-small-change` (one question, pull request first, a new branch named, a one-task plan
+  on disk and no code), `execute-plan` at 894 passes the new `run-a-short-path-plan` (the task and
+  its spec pass dispatched, nothing written by the coordinator), and `write-prd` at 798 passes
+  `build-with-no-prd`, which also shows the gate edit does not send a dashboard to the short path.
+  The owed-arm notes in the short-path entries below are settled by this one. Both new scenarios
+  stage a `keel` install beside the project, since the short path reads a missing `keel` as a
+  sensitive change, and `tests/test-eval-harness.sh` cases 36 and 37 pin their fixtures. Two
+  findings: the plan's "Delegated mode only" line alone got the `run-a-short-path-plan` baseline to
+  dispatch and review, so what separates its arms is the verbatim task with the Global constraints
+  in the dispatch and the next skill named at the hand-off, both of which the baseline missed; and
+  its first round was void, the fixture routing to `keel-implementer`, which no arm has, so the
+  fixture now routes to `inherit`.
+- The router sends small work down the short path, task 2 of
+  `docs/plans/2026-10-17-the-short-path.md`. `skills/keel/SKILL.md`'s "implement X, add feature Y"
+  row becomes "implement X, add feature Y, a small change" routed to `write-plan` (short path), and
+  a new row, "just write the code for X, no PR", keeps `tdd`, because `tdd` alone stops at the code
+  while the short path carries it to a pull request with the review in between; a fix for a reported
+  bug still routes to `debug`. `tdd`'s description now reads "Use when writing implementation code
+  for any feature, bugfix or behaviour change, including each task a plan dispatches; a small change
+  the user asks for directly, outside a plan, starts at write-plan's short path." (99 to 214
+  characters, under the 216 ceiling, descriptions about 1210 tokens against the 1320 total), so a
+  session that picks by description reaches the short path first. Only `tdd`'s frontmatter changes;
+  its body is untouched. The router adds 17 words (594 to 611) and stays under 900. The same two
+  rows are in `templates/prompting-cheatsheet.md` and this repository's installed copy
+  `docs/prompting.md`, in their own column shape, so the shipped cheatsheet matches the router. The
+  catalog's `tdd` Trigger matches the new description, its `keel` entry lists no routes and needs
+  none, and it keeps its 627 lines by tightening one sentence of the `keel` entry. The records mark
+  gap 4 built in full in `docs/ideas/delivery-flow-gaps.md` (Status, the gap 4 section, Next, and
+  Decided item 8 with Bernard's answers), and three line citations into `skills/keel/SKILL.md` in
+  `docs/ideas/standards-that-bind.md` and `docs/prd/standards-assessment.md`, moved by the new row,
+  are repointed by phrase. **No eval arm owed for the `tdd` or router edits:** the validator counts
+  body length against ADR-0001 and a description edit leaves that body as it was; the arm owed for
+  the short path is the one named in the entry below. **The `write-prd` edit does owe one:** its
+  hard gate now reads "A single feature the short path accepts, or a bug routed to `debug`, does not
+  enter this gate: name `write-plan` or `debug` and stop" where it named `tdd` (794 to 798 words
+  with the first fix, unchanged by the qualifier, over the 700 target), and so does the catalog's
+  matching sentence; the arm is owed and not run, and nothing here claims one.
+
+- `write-plan` runs a short path for small work with no stories, task 1 of
+  `docs/plans/2026-10-17-the-short-path.md`. The new `skills/write-plan/references/short-path.md`
+  applies to work the person can describe as at most 5 behaviours with examples, on a project whose
+  profile has `verify.test` and `verify.test_one`. It reads the code, `.keel/profile.json`,
+  `<docs_root>/standards.md` and the decisions (`artifacts.decisions`, else
+  `<docs_root>/decisions/`), writes the behaviours with the root-relative files each would touch,
+  and checks three limits: more than 5 behaviours, `verify.test` or `verify.test_one` missing, and
+  `keel plan risk` over the named files printing `loop: full`, failing or absent (read as sensitive,
+  because failing to decide is never a reason to review less). On any of them it offers the full
+  chain from `write-user-stories` and says which limit was hit, because big or sensitive work earns
+  the plan reviewer and the full loop, and it says the check is a forecast that `keel plan risk
+  --staged` at execution still decides. It then writes a one-task plan in the template's shape, with
+  `**Stories:** none, short path: behaviours approved by <person>, <date>` and a Global constraint
+  that the plan runs in delegated mode only, because the spec pass is its only per-task review. One
+  question carries the behaviours, the routing and the delivery choice, pull request first, and
+  names a new branch on the default branch, whose answer is the consent `execute-plan` asks for; if
+  the person declines the branch it leaves the plan uncommitted, starts nothing and says so.
+  `write-plan` step 1 points at it ("Small work with no stories follows `references/short-path.md`
+  instead."), and its description gains "or asks to implement a small change" (137 to 174
+  characters) so a session that picks by description reaches it. The body drops step 3's "Use the
+  exact commands from `profile.verify`" sentence, which the template's "Commands come from the
+  profile" section and self-review item 4 already carry, so no rule is lost (899 to 893 words). The
+  catalog's `write-plan` entry says it also runs a short path and keeps its 627 lines, and the one
+  live line citation into `write-plan` in `docs/ideas/profile-schema-drift.md` is repointed by
+  phrase. **Known gap, ADR-0001:** the `write-plan` body is over 700 words and this edit owes an
+  eval arm, owed and not run, against a scenario still to be written, `implement-a-small-change`
+  (inject `write-plan`; passes if the reply writes 5 or fewer behaviours with examples, runs `keel
+  plan risk`, asks one question with the pull request first, and writes no code); nothing here
+  claims one. A second arm is owed on `execute-plan`, a separate scenario still to be written,
+  `run-a-short-path-plan` (inject `execute-plan`; the fixture is a short-path one-task plan; passes
+  if the reply dispatches the task and does not run it inline, since that plan's Global constraints
+  forbid inline mode), because the first arm's reply stops at one question and dispatches nothing;
+  it is owed and not run too. No test covers the short path; the wording is checked by the commands
+  in the plan and by a reader.
+- The eval arms owed by this release's skill edits are paid, recorded in `tests/evals/results.md`
+  under 2026-10-17: `tdd` 898, `execute-plan` 894, `ship` 885, `security-audit` 872 and
+  `review-code` 728 each have a passing arm at the new length, the last through the new
+  `review-a-sensitive-change` scenario, and all seven gate scenarios pass. The owed-arm notes in
+  the entries below are settled by this one, except `write-plan` at 899, whose arm waits for a
+  scenario that exercises it.
+
+- `review-code` mutates every changed decision line on a sensitive path, and `security-audit` and
+  `ship` take the match from `keel plan risk`, tasks 1 and 2 of
+  `docs/plans/2026-10-17-sensitive-paths-get-mutation-evidence.md`, run as a real batch.
+  `review-code` step 3 now finds the sensitive files with `keel plan risk`, over the names
+  `git diff` lists from the merge-base plus the untracked files, and hands them to its dispatched
+  rubric pass as a sixth check, item 6 of `skills/review-code/references/rubric-pass.md`: one mutant
+  per changed decision line in a production file on those paths, made in the throwaway worktree item
+  5 already uses, run against the covering test, and restored. At most 10 mutants, and at most 3
+  where only `verify.test` can run them because each then costs a whole suite run; lines left
+  unchecked are reported and never a block, so the cap cannot become one. A survivor is Blocking,
+  because nothing in the suite observes that line on a path the project marked sensitive, and the
+  re-review runs the last round's survivors first. A profile edit or a command that fails counts
+  every changed production file as sensitive, because a change cannot lower its own review by
+  editing the list that judges it and failing to decide is never a reason to review less. The
+  evidence comes from the independent reviewer and not the author in `tdd`, as ADR-0007 keeps the
+  author's cycle the same on every path, and it runs once in the final review, not in
+  `execute-plan`'s per-task reviews. `security-audit` step 1 and `ship` gate item 4 read whether a
+  diff touches `hard_block_paths` from the same command, by the rules in the new
+  `skills/security-audit/references/sensitive-match.md`, so a diff that edits the list cannot relax
+  its own audit; the audit's force is unchanged. `hard_block_paths` in
+  `templates/profile.schema.json` names both readers and `docs/profile-keys.md` is regenerated,
+  `docs/standards.md` says six checks for step 3, the catalog's two entries are brought into line
+  and keep their 627 lines, and `docs/ideas/delivery-flow-gaps.md` records gap 3 as built with every
+  gap in the decided order now built, and Bernard's answers as "Decided" item 7. **Known gap,
+  ADR-0001:** three bodies are over 700 words and each owes an eval arm, owed and not run, and
+  nothing here claims one: `review-code` (601 to 728), `security-audit` (840 to 867) and `ship` (877
+  to 887), as `tests/validate-skills.sh` counts them, all under the 900 limit. **Known gap:** no
+  test or eval shows a session mutating a sensitive file's decision lines or reading the match from
+  `keel plan risk`; the wording is checked by the commands in the plan and by a reader. A fix pass
+  after the feature's review keeps the one command in `sensitive-match.md`, which `review-code` step
+  3 and `ship` check 4 now link to instead of a copy, and adds the untracked files to it and to the
+  rubric pass's worktree, because `git diff` lists none and a new file under a sensitive path read
+  as `loop: light`; it also says a failed `git merge-base` exits non-zero and is read as touching,
+  and limits `ship`'s no-override rule to a finding on a sensitive path, as `security-audit` step 5
+  has it.
+  A last pass says in `sensitive-match.md` that exit 123 means none only when the list before the
+  `|` is empty, with any path in it being a `keel` failure read as touching, and that BSD `xargs`
+  prints no `loop:` line on an empty list, which is read as touching and harmless; and `ship` check
+  4 links the reference with shorter text, so no line passes 100 columns (887 to 889 words).
+  An eval fix has `sensitive-match.md` make the match by hand, by `keel`'s `fnmatch` rule over the
+  same changed files and both profiles' lists, when `keel` is absent or fails, and read as touching
+  only when no list of changed files can be had, because the 2026-10-17 `audit-under-a-warn-gate`
+  arms, with no repository and no `keel`, blocked every finding so `warn` behaved like `required`;
+  that fixture now stages as a repository through a `setup.sh` (`KEEL_EVAL_GATE=required` stages
+  the other half), and `ship` check 4 says the audit decides the match (889 to 885 words).
+
+- Only a strictly written task can join a batch in `keel plan batches`, task 5 of
+  `docs/plans/2026-10-16-plans-declare-batches.md`. A task joins a batch only when its `Depends on:`
+  line is exactly `none`, `task 2`, `tasks 1 and 2`, `tasks 1, 2 and 3` or `tasks 1 to 3`, and its
+  `Files` block is the label alone, then list items `- Create`, `Modify`, `Delete`, `Test` or
+  `Rename` (with an optional note in parentheses before the colon) followed by backticked paths
+  separated by commas with an optional final `and`, or indented continuations of those. The cost is
+  that a task written any other way runs alone, with a `why:` line giving the reason, and for a line
+  outside its Files block that line and its number, so it never batches on a guess. Every task in a
+  plan runs alone, with one `why:` line, when the plan holds a task the command cannot see (a
+  heading not written `### Task <id>:` exactly, or a step whose task has no such heading), a Files
+  line outside any task, or a fence that never closes; each task sharing an id with another runs
+  alone, and so does a task depending on that id. The fence reader `plan status` shares now reads
+  fences as CommonMark does, so a nested fence line or a fence inside a list item cannot hide the
+  next task from either command, and `plan status` and `plan report` read all 44 plans in
+  `docs/plans/` as before. Against those plans each schedule only loses batches: 5 schedules change,
+  the 12 batch lines become 6, and no task order changes; `2026-08-17-suite-runtime.md`,
+  `2026-08-31-release-operations-and-claims-audit.md` and
+  `2026-10-13-harness-held-dispatch-guarantees.md`, already all alone, now give one plan-wide
+  reason, and this plan still prints `batch: 1 2` first. docs/03 gives the full form and the known
+  limits, each with why it is accepted, and the template gives the form with an example of each
+  line. A later pass counts an action word followed by anything but a letter and then a `:`, as in
+  `` - Modify `b.js`: also ``, because a stray backtick or space before the colon still leaves a
+  path on the line; quotes a fence after a Files block in its `why:` line; and says a rename written
+  with ` to ` runs alone because only `and` is in the strict form, with the same output as before
+  for the 44 plans and the template.
+
+- `write-plan` declares every batch `keel plan batches` prints, task 4 of
+  `docs/plans/2026-10-16-plans-declare-batches.md`. Its Step 3 sentence on concurrent batches now
+  says to run the command once the tasks are written and declare every batch it prints, because the
+  approver can only approve overlap they can see; it replaces the sentence that left the batch to
+  the planner's reading of the conditions. The template's "Tasks that run concurrently" gives the
+  order of work: write the tasks with the shared records (`CHANGELOG.md`, `README.md`, the skill
+  catalog) in a records task after the batch, run the command, declare every batch it prints (a
+  batch it does not print is not declared, and a declared batch may be part of a printed one), then
+  scope each task's `Done when:`, end it on a commit and add the `Batch gate:` line. The records
+  rule is a fourth rule beside the existing three, because every task writing the same record is
+  what makes no two tasks disjoint. `skills/execute-plan/references/parallel-batches.md` has the
+  coordinator run the command and requires every task of a declared batch to sit in one batch it
+  prints, which settles conditions 2, 3 and 5; a declared batch it does not print is withdrawn.
+  `docs/standards.md`, "Documentation lands with the change, not after", and `CONTRIBUTING.md` now
+  say the records land in the same pull request: in the same commit for a task run alone, in the
+  records task at the join for a batch. `skills/review-code/references/rubric.md` section 8 says "in
+  the same pull request" to match, because every project's review applies that rubric and a batched
+  task leaves its records to the records task; its cache-invalidation bullet said "the same commit"
+  of a different matter and now says "the write's own commit". The catalog's `write-plan` entry is
+  brought into line and keeps its 627 lines, and `docs/ideas/delivery-flow-gaps.md` records gap 6 as
+  built, with Bernard's answers as "Decided" item 6. This closes the **known gap** in the `keel plan
+  batches` entry below, that no skill called the command. **Known gap, ADR-0001:** `write-plan`'s
+  body is over 700 words (899 before and after, as `tests/validate-skills.sh` counts it, under the
+  900 limit) and this edit owes an eval arm. The arm is owed, not run, and nothing here claims it.
+  **Known gap:** no test or eval shows a session declaring the batches the command prints or placing
+  the shared records in a records task; the wording is checked by the commands in the plan and by a
+  reader.
+  The review's fix pass: `keel plan batches` reads `-`, `through` and `thru` after a task id as
+  `to`, and `&` and `/` as `and`, so `tasks 1-2` is tasks 1 and 2 and its task no longer batches
+  with task 2; and it normalises each `Files` path, dropping a leading `./`, anything from `#` on,
+  and a trailing line number or range, so one file written with a line range, a `./` or a `#phrase`
+  no longer looks like two and starts a batch. `tests/test-plan.sh` covers both, and a CRLF blank
+  line ending a `Files` block. `docs/standards.md` gives the batch clause its reason: batched tasks
+  each writing the records would conflict at the merge. `release-operations.md` no longer calls
+  turning a flag off safer than a redeploy, since `incident-response` rolls back the deploy first,
+  and drops the sentence saying its section is not a fourth moment; `ship` says why a pull request
+  body names the flag, that the diff cannot show the code is dark (865 to 877 words, the same owed
+  arm).
+  The review's second fix pass makes `keel plan batches` fail closed, since reading too many
+  dependencies or merging two paths can only stop a batch: between two task ids `or` and `and/or`
+  read as `and`, and any separator it does not know (an en or em dash, `..`, `~`, `;`) reads as a
+  range, so `tasks 1; 2` no longer lets its task batch with task 2; and each `Files` path is cut at
+  its first `:` and first space, so `a.py::test_a`, `a.sh:foo()`, `a.sh:L4` and `a.sh (lines 3-9)`
+  each name one file. `tests/test-plan.sh` covers each form, and the schedule it prints for every
+  plan in `docs/plans/` is unchanged. **Known limits:** paths are compared case-sensitively, so on
+  a case-insensitive file system `App.tsx` and `app.tsx` read as two files, and `lib/./x.sh`,
+  `lib//x.sh` or a leading `/` is not normalised.
+  A later fix narrows the second Files label to one with `file` or `files` as a whole word
+  (`**Test files:**`, `**Files (tests):**`, `**File:**`), so a behaviour titled
+  `**Profile key record:**` no longer makes its task run alone, as it did in a real plan;
+  `tests/test-plan.sh` covers both sides, and the schedule printed for every plan in `docs/plans/`
+  is unchanged.
+
+- Feature flags are named as the way to merge unfinished work dark, task 2 of
+  `docs/plans/2026-10-16-plans-declare-batches.md`. A new section, "Merging unfinished work dark",
+  in `skills/setup-deployment/references/release-operations.md` says deploying and releasing are
+  separate acts, so unfinished work merges early behind a flag that is off in production, checked at
+  the entry point. The flag is named, has an owner and has a removal date or condition. Turning it
+  on is the release and is recorded like a deploy, and turning it off is a rollback that needs no
+  deploy, the second lever `skills/incident-response/SKILL.md` names, unless the code behind it
+  wrote data that cannot be undone. `skills/ship/SKILL.md` gains one sentence: a pull request body
+  for a change behind a flag names the flag, its default in each environment, and who turns it on.
+  **Known gap, ADR-0001:** `ship`'s body is over 700 words (844 to 865, as
+  `tests/validate-skills.sh` counts it, under the 900 limit) and this edit owes an eval arm. The arm
+  is owed, not run, and nothing here claims it. **Known gap:** no test or eval shows a session
+  merging unfinished work behind a flag or naming one in a pull request body; the wording is checked
+  by the commands in the plan and by a reader.
+
+- `keel plan batches <plan> [--json]` prints the batches a plan's tasks allow, task 1 of
+  `docs/plans/2026-10-16-plans-declare-batches.md`. It reads each `### Task <id>:` heading outside a
+  fence, a task's `**Depends on:**` line (`none`, or the ids after `task` or `tasks`, through `,`,
+  `and` and `to`) and its `**Files:**` block (every backticked path), and prints one line per step
+  in plan order, `batch: 1 2` for tasks that may run at the same time and `alone: 3` for one that
+  may not, then a `why:` line for each task that could not join the step before it, then one
+  `check:` line. Scheduling keeps plan order: a task joins the current batch when its dependencies
+  all landed before the batch began, it shares no path with a task in the batch, and it is
+  batchable; otherwise it starts the next step. A task runs alone when the command cannot know its
+  order or paths: no `Depends on` line, or one that is not `none` and names no readable task id
+  (`story 4`, `TBD`), or one naming a task not above it; no `Files` block or no backticked path in
+  it; a directory or pattern path; or shared config (a lockfile or manifest, a lint, format or type
+  config, a CI file, `.keel/profile.json`). The `check:` line is always printed, because it cannot
+  judge from the text whether each `Done when` names only its own task's test, or whether each last
+  step commits. `--json` prints the same as one object and needs no `python3`. Exit 0 when it
+  printed, 1 for a usage error or a missing plan, 3 for a plan with no `### Task` heading. The
+  command proposes, the plan declares and the approver approves, so
+  `skills/execute-plan/references/parallel-batches.md`'s rule that nothing licenses an undeclared
+  batch is unchanged. It is documented in `docs/03-install-and-distribution.md` and tested in
+  `tests/test-plan.sh`. **Known gap:** no skill calls it until task 4 of the same plan, so no plan
+  is declared from its output yet.
+
+- The `tdd` unit boundary runs the affected tests when the profile names them, task 2 of
+  `docs/plans/2026-10-16-manage-test-speed.md`. Where `verify.test_affected` is set, the boundary
+  runs it with `{base}` filled with the start record's commit, and `verify.test` otherwise; with no
+  VCS, or when the output does not show the unit's own cases ran, it runs `verify.test`.
+  `review-code`, `ship` and CI still run the suite. The first start record still costs one full
+  run, its reds carry forward to later units' start records, and a test seen passing at a later
+  boundary drops out. Once any boundary has run the affected tests, an unmatched red goes to
+  `keel:debug` naming every unit since the first start record, even after a full run, which amends
+  ADR-0006's "a boundary red the start record does not hold is one this unit caused", as ADR-0009
+  decides. The detail is in the new `skills/tdd/references/affected-tests.md`. The plan template's
+  step 3.5 runs it too, because the task text overrides the skill and would otherwise schedule the
+  full suite every task, and `review-code` step 3 says `tdd` may have run only the affected tests
+  there. The catalog's `tdd` entry, the schema's reader for the key (and `docs/profile-keys.md`,
+  regenerated) and the delivery ideas record follow; the key's reader for `verify.test_integration`
+  is now cited by phrase, not line. `keel init` still writes null and detects no runner. This
+  closes the **known gap** in the entry below. **Known gap, ADR-0001:** `tdd`'s body is over 700
+  words (855 to 898) and this edit owes an eval arm, which is owed, not run, and nothing here
+  claims it. `review-code` moves from 594 to 601 words, under the target.
+  The review's fix pass: the start record's drop rule is in the `tdd` body ("the tests still red
+  after the last boundary"), because a project without the key may never open the reference; the
+  plan template says "the tests" at the boundary and lets step 3.5 fall back to `verify.test`; and
+  the slow-suite case runs 3 seconds, not 9.
+
+- A slow suite is named as a cost, and `verify.test_affected` is declared, task 1 of
+  `docs/plans/2026-10-16-manage-test-speed.md`. `SCHEMA_VERSION` moves to 6: re-run `keel init`,
+  which merges and keeps the values you set, to pick up the two keys. `gates.suite_warn_seconds` (60
+  from `keel init`, and an absent key still reads as 60) is the number of seconds a passing
+  `verify.test` may take before full `keel doctor` warns that `tdd` runs it at every unit boundary,
+  and what ten units cost in minutes. A value that is not a whole number from 1 to 999999999 is
+  named and 60 is used, and a suite managed by `verify.test_affected` is not warned about.
+  `verify.test_affected` (null from `keel init`, set by hand) is a command template in which
+  `{base}` is the commit a `tdd` unit started from; `doctor` shows it and never runs it, and the
+  generated CI workflow and the pre-push loosening check skip it, because it is a template and
+  dropping it makes the boundary run wider, not narrower. ADR-0009 decides that the unit boundary
+  runs it in place of `verify.test`, and amends the rule in ADR-0006 that a boundary red the start
+  record does not hold is the unit's own, for an affected run. **Known gap:** `tdd` does not read
+  the key until task 2 of the same plan, so setting it changes nothing the cycle does yet.
+
+- A plan is approved for a pull request, task 2 of
+  `docs/plans/2026-10-16-deliver-to-a-pull-request.md`. The plan template's header gains
+  `**Delivery:** hand-off` after `**Implementer routing:**`, with a paragraph saying `hand-off`
+  stops after each skill, `pull-request` runs through to an open pull request and stops wherever
+  `skills/execute-plan/references/delivery.md` says, and the person approving chooses and can change
+  the line before `execute-plan` runs. `write-plan` step 6 asks one question carrying the routing
+  and the delivery choice, writes the answer into the two header lines, commits the plan, and, on
+  `pull-request`, starts `execute-plan` instead of naming it. On the default branch, where the plan
+  is not committed, it starts nothing and says so. The catalog entries for `write-plan` and
+  `execute-plan` say a plan can run through to a pull request, and
+  `docs/ideas/delivery-flow-gaps.md` records gap 4 as built for planned work, with the short path
+  without a plan not built, and names gap 2 next. **Known gap, ADR-0001:** `write-plan`'s body is
+  over 700 words (853 to 899) and this edit owes an eval arm. The arm is owed, not run, and nothing
+  here claims it. **Known gap:** the `hand-off` default is unchanged, and no test or eval shows a
+  session asking the combined question or starting `execute-plan` from it; the examples are checked
+  by the commands in the plan and by a reader.
+
+- `execute-plan` and `review-code` continue past their reports when the plan says so, task 1 of
+  `docs/plans/2026-10-16-deliver-to-a-pull-request.md`. A new
+  `skills/execute-plan/references/delivery.md` holds the rules for a plan whose header says
+  `**Delivery:** pull-request`. Any point in the chain where a skill or one of its references says
+  stop, ask, or "the user decides" ends the run with a report of where it stopped, what it needs
+  and what was left as it was, and the file names the cases of that rule, which are not all of it.
+  The run is `review-code` over the whole change from `git merge-base <default_branch> HEAD`, then
+  `ship`; a blocking finding, or a standards violation `ship` check 5 would refuse under
+  `gates.coding_standards: required`, gets one fix pass by a fresh implementer on the plan's
+  routing and exactly one re-review; the `security-audit` report is committed on its own. Each
+  stage adds to a `## Delivery` section of the plan, which a resumed session reads with the plan's
+  `**Delivery:**` line and `keel plan status`. The run never merges, pushes to the default branch,
+  overrides a gate on the person's behalf, or accepts a finding the person has not named.
+  `execute-plan` step 6 now says `references/delivery.md` says when to start `review-code` and
+  `ship`, in place of "Do not start them"; `review-code` step 5 lets `ship` follow when
+  `execute-plan` started the review in a delivery run; `ship`'s "Committing and the PR" adds the
+  follow-up list to the body in a delivery run. A plan with `hand-off`, or no line, behaves as
+  before, and task 2 of the same plan adds the approval that writes the line. **Known gap,
+  ADR-0001:** `execute-plan`'s body is over 700 words (892 to 894) and `ship`'s is too (790 to 844),
+  so each edit owes an eval arm. The arms are owed, not run, and nothing here claims them. **Known
+  gap:** no test or eval yet shows a session continuing from `execute-plan` into `review-code` and
+  `ship`; the examples in `delivery.md` are checked by the commands in the plan and by a reader.
+
+- Execution and review build on a task's behaviours, the second half of
+  `docs/plans/2026-10-16-plans-name-behaviours.md` (after `5b8c887`). The implementer prompt's task
+  line now names Behaviours and Done when, and a new `=== BEHAVIOURS ===` block above
+  `=== RULES ===` tells the implementer to write the tests from a task's behaviours, at least one
+  case per example and each named for the behaviour it asserts, to take verbatim only what
+  `**Interfaces:**` gives, to stop and report a behaviour with no example, and to follow a task in
+  the older shape as written. The `=== RULES ===` block is unchanged and
+  `tests/test-eval-harness.sh` still passes. The spec review's question 3 asks whether each listed
+  behaviour has a test asserting its example and none asserts something adjacent, and for a task
+  with no test asks for the diff line that produces each example. `execute-plan` step 2 gains "a
+  behaviour with no example" among what to refuse, so inline mode, which has no spec pass, refuses
+  it before starting. `review-code`'s rubric pass asks whether every listed behaviour's example has
+  a case named for it. `tests/evals/scenarios/commit-outside-a-worktree.md` no longer says nothing
+  checks its verbatim block. **Known gap, ADR-0001:** `execute-plan`'s body is over 700 words
+  (887 to 892) and this edit owes an eval arm. The arm it last ran is `done-without-verifying`
+  (2026-10-13, at 889 words, pass); it implements nothing, so it reaches neither step 2's new words
+  nor a spec review. The arm is owed, not run, and nothing here claims it. **Risk taken:** the spec
+  review now carries the precision that verbatim code in a plan used to, and the precision of a plan
+  task is no longer checked by reading code. Watch it as `rounds` and `rework` in `keel plan report`
+  on the plans written in the new shape; more rounds or more rework than the plans before it is the
+  sign that it bit. Follow-ups from the final review: the implementer prompt says a no-test task's
+  examples are checked by its check command or a reader and gets no test for them, the spec review
+  and the rubric pass accept the check output as the proof of such an example, the spec review asks
+  of a task in the older shape whether its test asserts the behaviour described, and the
+  commit-outside-a-worktree scenario says which blocks of the prompt it leaves out.
+
+- `write-plan` asks for behaviours with examples, not code. A task carries a `**Behaviours:**`
+  list between `**Depends on:**` and `**Done when:**`, each behaviour with at least one example of
+  an input and the result it must give, and verbatim code only for a form another task consumes, in
+  `**Interfaces:**`. Step 3 states the rule and step 4's placeholder list names a behaviour with no
+  example, "handle edge cases" without each edge as a behaviour, and "similar to Task 3". The
+  template's example task takes the new shape, with no test or implementation code, and its
+  sections agree, with a self-review item 8. The plan reviewer's brief checks that every behaviour
+  has an example, and the catalog entry no longer calls the skill near-verbatim. The five TDD steps
+  are unchanged, and a plan in the old shape stays valid. **Known gap, ADR-0001:** `write-plan`'s
+  body is over 700 words (850) and this edit owes an eval arm. No scenario loads `write-plan`
+  (`docs/ideas/bodies-over-the-target-with-no-arm.md`), so the arm is owed, not run, and nothing
+  here claims it. Follow-ups from the final review: the plan reviewer's question 3 and its list of
+  self-review checks now match item 8, the template says why the Behaviours list exists, and step
+  4's placeholder list also refuses "add error handling" without its behaviours.
+
+- `keel-implementer`, a delegation profile for an implementer a plan routes to it (ADR-0008):
+  `agents/keel-implementer.md` on Claude Code, `model: sonnet`, with no `disallowedTools` because it
+  writes code, and `.codex/agents/keel-implementer.toml` on Codex, whose model is the fan-out
+  guess carried over and unmeasured. The subagent status line recognises `keel-implementer: `
+  (`settings.json` regenerated). `docs/standards.md` names the exception to its `inherit` rule for
+  code under a gate; reviews stay `inherit`. `execute-plan` names it in the next entry.
+
+- A plan names its implementer routing, and execution records it. The plan template gains a
+  `**Implementer routing:**` header line, `inherit` or `keel-implementer`. `write-plan` step 6
+  commits the plan alone (`docs(plans): <slug>`) and reports the routing in its hand-off, so the
+  person approving can change the line. `execute-plan`'s references send the implementer, and only
+  the implementer, to the plan's routing, `inherit` when it names none, with the description
+  leading with the profile and a colon; both reviews stay `inherit`. The last step ticked done in a
+  task carries a note starting `rounds: <n>; routing: <profile>`, which `keel plan report` reads.
+  `docs/03` says where those numbers come from. **Known gap, ADR-0001:** `write-plan`'s body is
+  over 700 words (798) and this edit owes an eval arm. No scenario loads `write-plan`
+  (`docs/ideas/bodies-over-the-target-with-no-arm.md`), so the arm is owed, not run, and nothing
+  here claims it. `execute-plan`'s body is unchanged.
+
+- A fix names the feature it reworks, and `ship` reports delivery. `debug`'s phase 4 gains a
+  pointer to the new `skills/debug/references/rework-link.md`: find the commit that introduced the
+  cause, and if it changed a file under the plans directory, the fix's commit body carries
+  `Reworks <root-relative plan path>` on a line of its own, which `keel plan report` counts. A body
+  line, not a trailer, so it holds under `conventions.no_attribution_footers`; no plan found, no
+  line. `ship` puts `keel plan report <plan>` in the pull request body, after how it was tested,
+  when the branch changed a plan, and reports a non-zero exit as such. `debug`'s body stays under
+  700 words (697). **Known gap, ADR-0001:** `ship`'s body is over 700 words (790) and this edit
+  owes an eval arm. The arm is owed, not run, and nothing here claims it: the nearest scenario,
+  `tests/evals/scenarios/ship-with-flaky-tests.md`, loads `ship` but does not exercise the new
+  sentence, and no arm was run in this change.
+
+- `keel plan report <plan> [--json]` measures a plan from git: when it was planned, when each task
+  and the whole plan were delivered, the lead time between them, the dispatch rounds and routing
+  each task's tick notes record, and the commits that carry a `Reworks <plan path>` line. Author
+  times, committed copies only (an uncommitted tick is not read), no new storage. Renames are not
+  followed. A task closes at the commit that closed its steps, not at the merge that brought them
+  in. Exit 3 for a plan with no step ids, 4 for one with no committed history, 5 for a shallow
+  clone.
+
+- `tests/plugin-evals/` holds two pilot cases for `claude plugin eval`, run by hand and not part of
+  `tests/run-tests.sh`: whether a plain review request reaches `review-code`, and whether it
+  dispatches its rubric pass at `inherit` with the diff command and the standards path in the
+  brief. They load the real plugin, which `tests/evals/` deliberately never does. **Run 2026-10-14,
+  three runs of each case, $2.16:** every run scored 1.00. A plain "look over my changes" reached
+  `review-code` 3 of 3 and found the planted bug (one judge vote in nine dissented); the dispatch
+  case saw the skill fire, the dispatch start `inherit: `, and a brief carrying the diff command and
+  the standards path, 3 of 3. **Subagent calls are visible:** the first
+  probe matched the driver's own read of `rubric-pass.md` and proved nothing, so it was narrowed to
+  `rubric.md`, which only the subagent reads, and a rerun (one run, $0.53) passed it. A second
+  grader asserts the read comes after the dispatch, and passed 3 of 3. **No run had `git`:** on
+  macOS the eval sandbox stops Apple's `git` wrapper, and `Bash` was refused after that, so every
+  review read files instead of a diff. The runs show the skill fires and dispatches, not a review
+  with `git` working. A `tool_used` grader counts a refused call, and the judge failed two
+  replies unanimously, one of which met its rubric.
+
+- Three more `tests/plugin-evals/` cases. A review that must leave the author's uncommitted edit,
+  staged file and stash alone (the two incidents of 2026-10-12, gradable because a subagent's tool
+  calls are visible) **scored 1.00 twice, which means nothing**: `git` could not run, so no review
+  reached the point where a stash tempts. A judge now fails a run whose reply says `git` or `Bash`
+  could not run. A control and a delegated case ask whether a
+  path-scoped `.claude/rules` file reaches an implementer. **Run 2026-10-14:** the control scored
+  0.50 in three harness runs (the function was added, no marker), and the cause is not established,
+  so the two cases gate nothing. In a real session with an `InstructionsLoaded` hook, a delegated
+  subagent loaded the rule and followed it, once. `review-code` as a forked skill is piloted on the
+  unmerged branch `experiment/forked-review`, not here: two runs without `git`, 0.80 then 1.00, at
+  about the dispatch version's cost, undecided.
+
+- `keel ci-review install|remove|status` is the opt-in for keel's review in CI. Off by default:
+  the workflow file `.github/workflows/keel-review.yml` is the switch, so there is no profile key.
+  It runs `review-code` through the Claude Code GitHub Action when a pull request is opened, made
+  ready or reopened, from a branch of the same repository only, with read tools and one comment
+  command. keel never reads or writes the secret. **Not run against a real repository:** the
+  workflow is unrun, the action is `@v1` and not pinned to a commit, and whether the job can write
+  a file is unverified because the skill's own frontmatter allows unrestricted `Bash`.
+  `install` refuses, writing nothing, where another CI's file is present and there is no GitHub
+  workflow but keel's, or where the `origin` host contains `gitlab` or `bitbucket` or is Azure
+  DevOps' cloud; `status` says why.
+
+- `keel plan risk [--staged | --range <a>..<b> | <path>...]` says which review loop a change gets,
+  from `hard_block_paths` and not from judgement. It prints each changed path a declared pattern
+  matches, then `loop: full` or `loop: light`; only `loop: light` with exit 0 is the light loop, and
+  every other outcome (a usage error, an unreadable profile, no `python3`, nothing staged, git
+  failing) is the full loop. It matches paths as `hooks/sensitive-guard` does, mirrored and not
+  shared, with a test that cuts the hook's rule out at run time and requires the same verdict, and
+  it reads the index with `--no-renames`, so a file moved out of a declared directory counts. A
+  profile with no list is the light loop, and says so. The list is a union, because the hook reads
+  the nearest profile walking up from wherever it runs: the patterns of the root profile as the base
+  has it (`HEAD` for `--staged`, `<a>` for `--range`) and as the working tree has it, of every
+  nested `*/.keel/profile.json` tracked at the base or tracked, modified or untracked in the working
+  tree (ignored ones too), and of the nearest profile above the repository, are matched together
+  against the root-relative paths, in any case of `.keel/profile.json`. The profile above the
+  repository is always walked to, from the repository's parent and from the logical `$PWD` as the
+  hook walks it, whatever directory keel runs in, because the hook run from a directory with its
+  own profile never reads that one and run from the root does. Any match is `loop: full`, so an
+  unstaged edit to a profile counts and a change cannot lower its own review. A change that adds,
+  edits or deletes any `.keel/profile.json`, or any path named `.keel`, is `loop: full` whatever
+  the profiles say. It fails shut on forms it does not know: a profile found and not readable (not
+  valid JSON, a symlink or a symlinked `.keel`, a dangling link, a FIFO or other file that is not
+  regular, a submodule named `.keel`) and a `hard_block_paths` that is not a list (`{}`, `""`,
+  `false`, `0`) exit 3 naming it when nothing matched, and when something matched anyway, the
+  verdict is full with one line on stderr naming what could not be read. An absolute path or one
+  starting `..` is a usage error, and a path with a control character in it is printed
+  escaped, so none can pose as the verdict line. `keel plan report` reads a `loop:` note field
+  beside `rounds:` and `routing:` and prints `, loop light` or `, loop full`
+  (`--json` carries `loop`, or null). **Known gap:** `hooks/sensitive-guard` runs
+  `git diff --name-only` without `--no-renames`, so a commit that renames a file out of a declared
+  path names only the new path and the hook does not fire; `plan risk` catches it, the hook does
+  not, and the hook is not changed here. **Known gap:** with `git config diff.relative true`, the
+  hook's `git diff --cached` run from a subdirectory lists paths relative to it, so the hook can
+  ask where `plan risk`, which names paths from the root, says light; the fix belongs in the hook
+  (`--no-relative`), which is not changed here. **Known gap:** a `.keel` directory that can be
+  searched but not listed (mode 0111) hides an untracked profile in it from `plan risk`, since git
+  cannot list the directory; a tracked profile there is still read.
+
+- `execute-plan` reviews in proportion to what a task touches. After the implementer stages, the
+  coordinator runs `keel plan risk --staged` (`--range <base>..<task-head>` for a batched task):
+  only exit 0 with a last line of `loop: light` selects the light loop, which is one spec pass, one
+  fix pass that may build on the attempt, a re-check with `plan risk`, and a stop to ask the person
+  on a second DEVIATES. `loop: full`, exit 1, 3 or 6, a `keel` too old to have the command, or no
+  `keel` is the full loop, unchanged: both passes, and no re-dispatch on top of a rejected attempt.
+  Exit 4 (nothing staged, or an empty range) is neither: in the shared tree it means the implementer
+  staged nothing, having committed against its rules or produced nothing, so the coordinator stops,
+  checks `git status` and `git log`, and asks. A change that includes `.keel/profile.json` is always
+  the full loop, and the list is read as `HEAD` has it for `--staged` and as `<a>` has it for
+  `--range <a>..<b>`. The rule is a new section of
+  `skills/execute-plan/references/subagent-prompts.md`; the tick note gains `loop: <light|full>`,
+  which `keel plan report` already reads; the Step 6 report names `review-code` as the light loop's
+  quality review. `parallel-batches.md` takes each batched task's loop from `plan risk --range` at
+  the join, and a light-loop fix pass in a worktree amends the task's commit. The body's one
+  sentence changed, 889 to 887 words.
+
+- FR-11 of `docs/prd/coding-standards-enforcement.md` and story S-03 are amended in place, ids
+  unchanged, decided by Bernard 2026-10-16: the per-task quality gate applies in the full loop; in
+  the light loop the same standards are enforced once per feature by `ship` step 5's standards gate
+  through `review-code`, where `gates.coding_standards` is `required`. Under `warn` a violation is
+  reported and the ship continues; under `off`, or with no key, the gate does not read them.
+
+- keel declares its own `hard_block_paths` in `.keel/profile.json`: `hooks`, `lib/harness`,
+  `settings.json`, `.github/workflows`, `templates/ci-review.yml` and `lib/context_watch.py`. That
+  is the hook scripts and their harness adapters, the plugin's settings, keel's own CI, the review
+  workflow it installs in a project's CI, and the python behind `hooks/context-watch`, which runs on
+  every tool call. `bin/keel` is deliberately not on it. **A commit touching them now asks a person,
+  through `hooks/sensitive-guard`, on Claude Code**; on Codex CLI the key is declared and not
+  enforced, as `docs/profile-keys.md` tags it. A change to them is the full review loop either way.
+  `templates/profile.schema.json` names `keel plan risk` as the key's second reader and
+  `docs/profile-keys.md` is regenerated. `docs/02-skill-catalog.md` names both loops.
+
+- **Known gap, ADR-0001:** `execute-plan`'s body is over 700 words (887) and this edit owes an eval
+  arm. The arm it last ran is `done-without-verifying` (2026-10-13, at 889 words, pass), and no
+  scenario exercises the review loop: that arm implements nothing, so it reaches no review. The arm
+  is owed, not run, and nothing here claims it.
+
+- The final `review-code` stops after one fix pass, the last part of
+  `docs/plans/2026-10-16-proportional-review-loop.md` (after `997b2be` and `1e47780`).
+  `review-code` step 5 gains the cap: when the author's fix for a blocking finding comes back,
+  re-review once, and if the re-review still finds anything blocking, both reports go to the
+  person, not to another round. `ship` is unchanged: its Overrides
+  section already lets the person accept a named failure, recorded in the PR body, and gate item 5's
+  "nothing blocking remains" is one of the checks it covers, so a blocking finding the person has
+  accepted by name passes there as any accepted override does. The records follow:
+  `docs/ideas/delivery-flow-gaps.md` names gap 5 built and gap 1 next, and
+  `docs/ideas/proportional-ceremony.md` is closed. `review-code`'s body goes from 530 to 562 words,
+  under the 700 target, so ADR-0001 owes no eval arm for it; `ship`'s body is unchanged at 790.
+
 ## 0.23.0 - 2026-10-13
 
 - Release gate 2026-10-13 against `bcc5aad`: **seven treatment arms, all seven pass**, $1.95 in one
@@ -1009,10 +1553,11 @@ Entries are terse by design; the narrative for each release is in this file's gi
   gate. Four arms were scored on dispatch day and two by reading their staged artifacts afterwards,
   at no extra cost. Detail in `tests/evals/results.md`.
 
-- The gate is documented as six scenarios in `tests/evals/README.md:103` and as seven in
-  `tests/evals/results.md`. Nine scenarios exist and two are recorded as non-gate, which leaves
-  seven, so `commit-outside-a-worktree`'s membership is the open question. **This gate ran the same
-  six the 0.15.0 gate ran.** Recorded, not settled: a release entry is the wrong place to decide it.
+- The gate is documented as six scenarios in `tests/evals/README.md` ("Running all of them") and
+  as seven in `tests/evals/results.md`. Nine scenarios exist and two are recorded as non-gate,
+  which leaves seven, so `commit-outside-a-worktree`'s membership is the open question. **This
+  gate ran the same six the 0.15.0 gate ran.** Recorded, not settled: a release entry is the wrong
+  place to decide it.
 
 ## 0.16.1 - 2026-08-20
 

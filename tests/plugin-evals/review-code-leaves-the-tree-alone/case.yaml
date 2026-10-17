@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: review-code-leaves-the-tree-alone
+context:
+  scaffold_script: scaffold.sh

@@ -29,7 +29,7 @@ Project level (once per repo)
   -> merges a block into CLAUDE.md
   -> writes .claude/settings.json with recommended plugins and hooks
   (Claude Code. On Codex the equivalents are .codex/config.toml, where keel init manages one
-   marked block and leaves the rest of the file alone, and
+   marked block and leaves the rest alone, .codex/agents/keel-{fanout,implementer}.toml, and
    .codex-plugin/plugin.json, which ships in the plugin. See docs/harness-support.md for which
    gates the capability manifest grants that harness, and trust the hooks before relying on them.)
   -> scaffolds docs/keel/
@@ -411,6 +411,357 @@ ticks all land. A tick waits about ten seconds for it, then fails naming it, sin
 leave it behind.
 
 ```bash
+keel plan report <plan> [--json]
+```
+
+Says how long a plan took and whether it came back as a fix, from git alone: nothing is stored, and
+every number comes from the commit history and the committed copies of the plan. The working-tree
+copy is never read, so a tick not yet committed changes nothing. It prints:
+
+```text
+planned: 2026-10-16T09:00:00Z
+planned routing: keel-implementer
+task 1: done 2026-10-16T10:30:00Z, rounds 2, routing keel-implementer, loop light
+task 2: open
+delivered: not yet
+lead time: not yet
+rework: 2 (3f9a1c2 b81d0e7)
+```
+
+`planned` is the author time of the first commit that has the plan. Every time is an author time,
+shown in UTC, because a rebase rewrites committer times and this measures when the work was done.
+`planned routing` is the plan's `**Implementer routing:**` header, or `inherit (not stated)`. A
+task is `done` at the author time of the latest commit at which one of its steps closed, by any
+mark, done, deferred or not applicable. A step closes at a commit where it is closed and is open
+or absent in every parent that has the plan, so a merge does not move the time of a step a branch
+closed before it: tasks run in parallel worktrees and merged back keep the times of their own
+commits. A step already closed in the commit that adds the plan counts as closed at that commit,
+and one closed, reopened and closed again counts from its last close. A task with an open step is
+`open`. `rounds` and `routing` are the last `rounds: <n>` and the last `routing: <text>` in the
+notes of the task's done steps (`keel plan tick --note`). The note is the text after the last
+` Note: ` on the step's line, as `plan tick` writes it, so step text before it is never read, and a
+step with no ` Note: ` has no note. A field begins the note or follows `; `, as in
+`rounds: 2; routing: keel-implementer`, so `subrounds: 3` or a sentence that mentions routing is not
+one; the routing text runs to the next `;` or the end of the note. Absent, each is
+`unknown`. `loop` is read the same way: the last `loop: light` or `loop: full`, which is what
+`keel plan risk` decided for the task. A task with none, or with another word, prints no loop.
+`delivered` is the latest task time once every step is closed, else `not yet`, and
+`lead time` is delivered minus planned in hours to one decimal. `rework` counts the commits
+reachable from `HEAD` whose message holds the line `Reworks <plan path>` on its own line, the path
+from the repository root, with their short hashes, newest first; a line naming another plan does not
+count.
+
+Routing and rounds come from `execute-plan`. It reads the routing from the plan's
+`**Implementer routing:**` header, and when it ticks the last done step of a task it writes
+`rounds: <n>; routing: <profile>` into that step's note. A plan ticked by hand with no note reports
+both as `unknown`.
+
+The `Reworks` line comes from `debug`. When the commit that introduced a bug's cause also changed a
+plan, the fix's commit message body carries `Reworks <root-relative plan path>` on a line of its
+own (`skills/debug/references/rework-link.md`). It is a body line, not a trailer, so it holds where
+`conventions.no_attribution_footers` is true, and a fix whose cause was not introduced with a plan
+carries no line. `ship` puts this report in the pull request body when the branch changed a plan.
+
+Run the report on the branch, before a squash merge: after one, the plan's planned time and its
+delivered time collapse into the one squash commit. A plan committed already ticked reports a lead
+time of `0.0h` for the same reason.
+
+`--json` prints the same facts as one object, with `null` where the text says `not yet` or
+`unknown`, and where a task prints no loop. A missing file exits 1, naming it. A plan with no step
+ids exits 3, as `status` and `tick` do. A plan with no committed history, one not committed yet,
+exits 4. A shallow clone exits 5, since the commits the times come from are not there:
+`git fetch --unshallow` first. The plan's path is read literally, never as a pattern, and may hold
+any characters. It reports the same from any directory in the repository, by a relative path.
+Renames are not followed: the history is that of the plan's present path, so a plan moved or
+renamed is planned, for this report, when it appeared under its present name.
+
+```bash
+keel plan risk [--staged | --range <a>..<b> | <path>...]
+```
+
+Says which review loop a change gets, from the sensitive paths the project declares in its profile,
+so the choice is not a judgement. It prints each changed path that a declared pattern matches, then
+a last line, `loop: full` or `loop: light`:
+
+```text
+src/payments/fee.sh
+loop: full
+```
+
+**Only `loop: light` with exit 0 means the light loop.** Anything else is the full loop:
+`loop: full`, any other exit, a `keel` too old to have the command, or no `keel`. Failing to decide
+is never a reason to review less, and none of the failing exits prints a `loop:` line.
+
+`--staged`, the default, reads the index with `git diff --cached --no-renames --name-only -z`;
+`--range <a>..<b>` reads the commits between with `git diff --no-renames --name-only -z <a> <b>`;
+paths given on the command line are used as they are, named from the repository root as git names
+them (a leading `./` or a doubled `/` is tidied). They are root-relative: an absolute path, one
+that leaves the root with `..`, or the root itself is a usage error, not a path that matches
+nothing. `--no-renames` is deliberate: otherwise a file moved out of a declared directory reports
+only its new name and reads as light. The changed paths never come from the working tree, so an
+unstaged edit to an ordinary file changes nothing; the profiles are read from it too (below), so an
+unstaged edit to a profile does change the verdict. The profile and the paths are both taken from
+`git rev-parse --show-toplevel`, so the answer is the same from any directory in the repository,
+with one exception: a profile above the repository that only a symlinked path to it passes is read
+when keel runs through that path.
+
+<!-- keel:claim gate=sensitive-guard harness=claude -->
+**The list is a union.** `hooks/sensitive-guard` reads the nearest `.keel/profile.json` walking up
+from the directory it runs in, and that can be any directory, so `plan risk` matches the changed
+paths against the patterns of every profile the hook could read from anywhere:
+
+- the root profile as the base has it (`HEAD` for `--staged`, `<a>` for `--range`) and as the
+  working tree has it, which is the only way explicit paths, naming no commit, read it;
+- every nested `*/.keel/profile.json` tracked at the base, tracked or modified in the working tree,
+  or untracked there, ignored files included (`git ls-files --others` without
+  `--exclude-standard`);
+- the nearest profile above the repository, whatever directory keel runs in. The hook stops at the
+  first profile it meets, so run from `svc`, which has its own, it never reads one above the
+  repository, but run from the root, which has none, it does. keel therefore also walks up from the
+  repository's parent, and adds the nearest profile it finds there. It walks from the current
+  directory too, by the logical `$PWD` with symlinks unresolved, as the hook does, and by the
+  resolved path, and from the logical parent of the repository when that differs.
+
+The base is in the union so a change cannot lower its own review, and the working tree is in it
+because the hook reads that: with `["src/auth"]` at `HEAD`, an unstaged edit making it
+`["src/payments"]` and `src/payments/fee.sh` staged, the hook asks, so this says `loop: full`.
+Patterns are used as written and matched against the root-relative paths, as the hook matches
+them, so a nested profile's `src/payments` is the root's `src/payments`, not one under its own
+directory. Any match prints the matching paths and `loop: full`. Discovery is case-insensitive, as
+a macOS file system is, so `svc/.Keel/profile.json` is a profile. A change that adds, edits or
+deletes any `.keel/profile.json`, at the root or below it, in any case, is `loop: full` whatever
+the profiles then say, printing that path as the match with a one-line reason on stderr. So is a
+change to any path whose last component is `.keel`, in any case: a symlink, a submodule or a file
+of that name.
+A matched path is printed with any control character escaped (a newline is `\n`), and one that
+would begin `loop:` is led by `./`, so no path line can read as the verdict.
+
+<!-- keel:claim gate=sensitive-guard harness=claude -->
+A pattern matches a path as `hooks/sensitive-guard` matches it, against the profile's
+`hard_block_paths`: by `fnmatch`, or as a directory, so `src/payments` covers
+`src/payments/fee.sh`. The rule is mirrored in `keel` and not shared with the hook, which must run
+without it; `tests/test-plan.sh` cuts the hook's rule out of the hook when it runs and requires the
+same verdict from both.
+
+<!-- keel:claim gate=sensitive-guard harness=claude -->
+A profile that is found and cannot be read, or whose `hard_block_paths` is not a list of strings,
+is exit 3, naming it, with no `loop:` line, so the loop is the full loop. Unreadable is invalid
+JSON, a symlink (a profile that is one, or a directory named `.keel` that is one, tracked at the
+base or present, dangling or not; a link is never followed), a profile that is not a plain file at
+the base, a profile that is not a regular file in the working tree (a FIFO, which is not opened,
+since opening it waits for a writer), or a `.keel` that is a submodule (mode 160000), at the base
+or in the index. An untracked nested repository named `.keel` is read for the `profile.json` in
+it. A match in a profile that did read is still `loop: full`, since nothing unread can make a match
+less, so exit 3 is for when nothing matched. A full verdict reached while some profile could not be
+read says so in one line on stderr, naming them; the verdict stays full.
+
+<!-- keel:claim gate=sensitive-guard harness=claude -->
+No list anywhere, which is no profile, none with a `hard_block_paths` key, or only empty lists, is
+the light loop, with exit 0, and says so before the verdict:
+
+```text
+no hard_block_paths declared
+loop: light
+```
+
+Lists that match nothing are `loop: light` alone, with no such line. Only a missing key or `[]` is
+no list: `{}`, `""`, `false`, `0` and `null` are lists that cannot be read.
+
+Exit 1 is a usage error: an unknown option, a path that is absolute or leaves the root, or a range
+that is not `<a>..<b>`. Exit 3 is a profile that is not valid JSON, one that exists in any form
+and cannot be read (a dangling symlink, or a symlink at the base, which is not followed), a list
+that is not a list of strings, in any profile the union reads (above) when no list matched, or no
+`python3`. Exit 4 is nothing staged, or a range that changes no file. Exit 6 is git that cannot be
+run, a directory that is not a git work tree, or a range git cannot read.
+
+```bash
+keel plan batches <plan> [--json]
+```
+
+Prints the batches a plan's tasks allow, so `write-plan` can declare them and `execute-plan` can
+check a declared one. One line per scheduling step in plan order, `batch: 1 2` for tasks that may
+run at the same time and `alone: 3` for one that may not; then a `why:` line for each task that
+could not join the step before it (for a task straight after a lone task that runs alone, that
+lone task is the step before it); then one `check:` line:
+
+```text
+batch: 1 2
+alone: 3
+alone: 4
+why: task 3 depends on task 1 and task 2
+why: task 4 depends on task 3
+check: in each batch, every Done when names only its task's own test, and each last step commits
+```
+
+It reads each `### Task <id>:` heading outside a fenced block. An id is digits then any letters
+(`1`, `1b`, `2A`), compared without regard to case. A task's section ends at the next `### Task`
+heading or the next `## ` heading, so a section after the last task is not read into it. Fences are
+read as CommonMark reads them, and as `keel plan status` reads them, since the two share one reader:
+a fence opens on a line indented at most three columns, and closes only on a line of the same
+character, at least as long, indented at most three columns past the list item it opened in, with
+nothing but spaces after it. So a fence of four backticks holding an example fenced with three stays
+open, as the template writes its nested examples, and so does a fence holding a fence line indented
+four or more columns past it; read as a closer, such a line would end the outer fence early, and the
+outer closer would open a phantom fence hiding the next task from both commands. A fence opened on
+its own line inside a list item belongs to the item, as CommonMark has it: it closes on a closer at
+most three columns past the item's content, and ends with the item, at a non-blank line indented
+less than that content. So a fence left without its closer, or opened by an example's stray last
+closer, cannot hide the plan after its item from either command. Outside a list item an indented
+fence keeps CommonMark's reading, its content at any indent, since only an item bounds it.
+
+A task the command cannot see makes every task in the plan run alone, with one `why:` line naming
+it. That is a line that opens like a task heading, with `#`s and then `task` as a word in any case,
+after up to three spaces and any `>` quote marks, and with spaces or a tab after the `#`s, as
+CommonMark takes either, but is not `### Task <id>:` exactly at the start of the line, such as
+`### Task 2 - b`, `###<TAB>Task 2: b`, `## Task 2: b`, `### Task 2. b`, `### Task 2 : b`,
+`### Task two: b`, `### TASK 2: b`, `  ### Task 2: b` or `> ### Task 2: b`; or a step whose task,
+its id before the last dot as `keel plan status` reads it, has no such heading. A hidden task could
+edit any file and need any task, so any batch beside it could put two agents on one file or run a
+task before its dependency.
+
+A `Files`-like label or list item, as the strict form below defines them, after the first task
+heading but in no task's section, as under a `## ` heading between two tasks or after the last, also
+makes every task run alone, with one `why:` line naming it: `why: the line '**Files:**' names files
+outside any task, so every task runs alone, since this command cannot tell which task it belongs
+to`. It could belong to the task above it or the task below, and a batch that missed its paths could
+put two agents on one file. A self-review item written as `6. **Files:** ...` counts too, which
+costs a plan written that way its batches and never makes one unsafe; the template's self-review
+writes no such label.
+
+A fence that never closes hides every line after it, as CommonMark renders it, and so any task
+there, which could edit any file and need any task. It makes every task run alone, with one `why:`
+line naming the line that opens it, such as `why: the fence opened at line 21, '```bash', never
+closes, so every task runs alone, since a task it hides could run out of order`, and
+`keel plan status` reports the same fence as a problem.
+
+An id on more than one heading, compared without case (`2A` and `2a`, or `### Task 2:` twice),
+names no one task. Each task with it runs alone, with `why: task 2a shares its id with another
+task, so its dependents cannot be placed`, and so does a task depending on that id, because which
+of the tasks it waits for is not known.
+
+Only a task written in a strict form can join a batch. A task whose `Depends on:` line or `Files`
+block is not in the form runs alone with a `why:` line. The lines are free text, and a free-text
+reading misreads some ways of writing them into an unsafe batch, a task batched with one it depends
+on or two tasks on one file. Running alone costs only overlap and is never unsafe, so where the text
+is in any doubt the task runs alone, and `write-plan` writes these lines itself, so it can write the
+form.
+
+`**Depends on:**` is read from the label's own line, after the label, with the spaces around it and
+one trailing `.` removed. What remains is exactly one of `none`; `task <id>`; `tasks <id> and <id>`;
+`tasks <id>, <id> and <id>`, with any number of ids before the `and` and an optional comma before it
+once two ids precede it; or `tasks <id> to <id>`, which is every task between the two in plan order
+and every task whose number lies between theirs, because plans are not always in number order and a
+reader takes `tasks 1 to 3` to include task 2 wherever it sits. If one of those is not above the
+task, the task runs alone, with `why: task 4 has a range that reaches a task below it, so its order
+is unknown`, since a task cannot wait for one scheduled after it. `task` and `tasks` match in any
+case, the rest exactly, with one space between words. An id is digits then any letters (`1`, `1b`,
+`2A`), compared without regard to case. So `tasks 1, 2 and 3` is 1, 2 and 3, `tasks 1 to 3` is 1, 2
+and 3, and each of `tasks 1 (schema) and 2 (API)`, `tasks 1-2`, `none (needs task 2's table)` and
+`task 1, with row 3 of its results` runs alone, with `why: task 3 has a Depends on line not in the
+strict form, so its order is unknown`.
+
+`**Files:**` is the block from the label to the next blank line, `**Label:**` line or section end,
+and every line in it is one of: the label line with nothing after it; a list item `- <Word>: `,
+where Word is `Create`, `Modify`, `Delete`, `Test` or `Rename`, optionally with a parenthesised note
+before the colon, as in `- Create (if the body cannot hold the detail): `, followed by one or more
+backticked paths separated by `, ` with an optional final `and`; or an indented continuation line of
+backticked paths with the same separators, after a line that ended on a separator. A path is one
+token of letters, digits and `._-/@+` that does not start or end with `/` and has no empty, `.` or
+`..` segment, so `//`, `/./`, `/../` and a leading `./` are out. A rename names both of its paths,
+as `` - Rename: `src/old.js` and `src/new.js` ``, and a task shares a path with it when it names
+either; written with ` to ` instead of `and`, the line is outside the form and the task runs alone,
+since only `and` is in the strict form. Anything else in the block makes the task run alone, with
+`why: task 2 has a Files block not in the strict form, so its paths are unknown`: prose, a note
+after a path, a Markdown link, a path outside backticks, or a space, `:`, `#`, `\`, `{`, `*`, `?` or
+`[` inside a path. Each of those is how a plan writes a note, a line range, a pattern or a place in
+the file, and each read as a path makes one file read as two, or a pattern read as a file. So does a
+block that is ambiguous about where it ends: a list item, or an indented line that continues the
+last item as a paragraph, after a blank line but before the next `**Label:**` line; a fenced block
+in or after the block; or a list that ends on a separator with nothing to continue it. So does a
+task that names paths outside its block, which a batch would not see: a second `**Files:**` label,
+or any other label with `file` or `files` as a whole word, in any case (`**Test files:**`,
+`**Files (tests):**`, `**File:**`; not `**Profile key record:**` or `**Filename:**`, which name no
+path), quoted or in a list item (`> **Files:**`, `- **Files:**`), or a list item opening with
+`Create`, `Modify`, `Delete`, `Test` or `Rename`, in any case, followed by ` (`, or by no letter
+and then a `:` later on the line, quoted or not, anywhere else in the task, such as a `Behaviours`
+or step item, since Markdown renders each as a label or a list item, and a stray backtick or space
+before the colon, as in `` - Modify `b.js`: also ``, still leaves a path on the line. A longer
+word, as in `Tests:`, `Testing:` or `Created by:`, is not one of the five, so its item is prose.
+For one of these, and for a line after the blank line that ends the block, the reason quotes the first such line with its
+number, so the writer can find it: `why: task 2 has a Files block not in the strict form, so its
+paths are unknown (line 41: '1. Test: an empty list fails.')`. A block with no path counts as no
+Files block.
+
+Paths compare without regard to case, because on a case-insensitive file system `App.tsx` and
+`app.tsx` are one file. A path that holds another is shared with it, so `skills/x` and
+`skills/x/a.md` do not batch, since a directory written without its trailing `/` is still a legal
+path. Merging two paths can only stop a batch, never start a wrong one.
+
+Scheduling keeps plan order. Walking the tasks in order, a task joins the current batch when its
+dependencies all landed before the batch began, it shares no path with a task already in the
+batch, and it is batchable; otherwise the batch is closed and the task starts the next one, or
+runs alone. No task is scheduled before a task above it, so the output is a schedule a plan can
+declare as written. A reason names only the dependencies in the step just closed, or the first
+shared path and the tasks in the batch that have it. A task that follows a task running alone is
+checked against it: a dependency on it, or a path shared with it, is the follower's reason. A
+follower with neither starts a new step and gets no `why:` line of its own, because the lone task's
+reason was given with that task.
+
+A task runs alone, with its reason, when the command cannot know its order or its paths. That is a
+task with no `Depends on:` line, a second one, or one not in the strict form, because reading it
+any other way would batch a task whose dependency was merely written another way; one depending on
+a task the plan does not have above it; a task with no `Files` block, or one whose block is not in
+the strict form, which includes a path that is a directory or a pattern, ending in `/` or holding
+`*`, `?` or `[`, because `skills/x/` and `skills/x/a.md` compare as different strings and would let
+two overlapping tasks into one batch; and a path that is shared config, matched by basename or by
+path as listed, without regard to case: a lockfile or dependency manifest (`package-lock.json`,
+`Cargo.toml`, `go.mod`, `requirements*.txt` and the like), a lint, format or type config
+(`.eslintrc*`, `tsconfig*.json`, `.editorconfig`), a CI file (anything under `.github/workflows/`
+or `.circleci/`, `.gitlab-ci.yml`, `Jenkinsfile`), or `.keel/profile.json`, because two agents each
+editing one of these produce two versions of it. A strict path can still be shared config.
+
+Known limits. Plans in the template's form are read exactly, and a structure the reader cannot place
+runs every task alone. A line-by-line reader cannot be complete against every piece of Markdown, so
+a few edge cases remain, each outside the template's form and accepted for the reason given. Ids
+compare as strings, so `### Task 01:` and `task 1` are two tasks and a task depending on task 1 can
+batch with task 01: the template and `write-plan` number tasks without leading zeros, and reading
+numbers would need a rule for every other spelling of one. A `Depends on:` line inside a blockquote
+is not read, so when the task also has a plain one the quoted one is ignored: the template never
+quotes a label, and a task with only a quoted one has no `Depends on:` line and runs alone. An HTML
+comment is read as plain text, so a heading inside `<!--` and `-->` counts as a task and a label on
+the comment's opening line is not read: the template writes no HTML comment, and the reading then
+matches what an agent reading the raw plan sees. A fence inside a blockquote, or one indented four
+or more columns in a nested list, is not read as a fence, so its lines are read as plain text: the
+template's fences sit at most three columns in, and a missed fence whose closer sits as deep as its
+opener is missed whole, so it hides nothing. A fence opened on its own line inside a list item ends
+where the reader takes the item to end, by its own line-by-line count of the open list items: that
+can differ from CommonMark after a lazy line that does not follow a paragraph, and then the fence
+ends a few lines early, showing them, or runs on past the item to its closer, hiding the lines
+between; the template's steps hold their commands in fences indented with their items, which it
+reads as CommonMark does. A closing line indented less than the item's content is read as the
+fence's closer, where CommonMark ends the item and opens a new fence there: that new fence would
+hide every line after it, so the reader shows those lines rather than hide them, and the template
+indents each closer with its opener. A file named in prose outside a task's `Files` block, such as
+`` *Files:* `src/b.js` `` in italics, is not read, so a batch may not see it: the template names a
+task's files only in its `Files` block, and a reader that took every backticked path in prose as a
+file would run nearly every real plan alone, since their steps and notes name files they do not
+edit.
+
+The `check:` line is always printed, because two conditions for a batch, that each `Done when:`
+names only its own task's test and that each task's last step commits, are text the command cannot
+judge. It proposes; the plan declares and the approver approves.
+
+`--json` prints the same steps, reasons and check as one object, without `python3`. The one
+reason for a plan with a hidden task belongs to no task, so its `task` is empty:
+
+```json
+{"steps": [{"batch": ["1", "2"]}, {"alone": "3"}], "why": [{"task": "3", "reason": "task 3 depends on task 1 and task 2"}], "check": "..."}
+```
+
+Exit 0 when it printed. Exit 1 is a usage error (no argument, an unknown option, or two plans) or a
+missing plan, naming it. Exit 3 is a plan with no `### Task` heading.
+
+```bash
 keel guard install | status | uninstall
 ```
 
@@ -464,6 +815,99 @@ above, and a commit gate arriving uninvited with them is how the whole thing get
 `required` runs `verify.format`, `verify.lint` and `verify.typecheck` and refuses the commit on a
 failure; `warn` runs them and lets the commit through. Null and templated commands are skipped, the
 same way `keel doctor` skips them, because neither can be run as written.
+
+### keel ci-review
+
+```bash
+keel ci-review install [--oauth]
+keel ci-review remove
+keel ci-review status
+```
+
+Review in CI is off until you ask for it, and the workflow file is the switch: present is on, absent
+is off. `install` writes one file, `.github/workflows/keel-review.yml`, from
+`templates/ci-review.yml`. There is no profile key and `keel doctor` has no check for it, because
+there is no setting to read, validate or keep in sync, and a project that never runs the command has
+no workflow, no secret and no cost. `status` says whether the file is absent, keel's or not keel's,
+and, for keel's file or none where `install` would refuse, why (see below); it writes nothing.
+`install` does not commit the file: read it, commit it and push it. `remove` deletes it, and so does
+deleting it yourself.
+
+GitHub reads workflows only from the root of the repository, so the command acts there from any
+directory of the work tree, and it refuses outside a git work tree and in a bare repository. keel
+knows its own file by the first line alone, a mark naming the command. A workflow without that
+mark is never overwritten or removed: `install` refuses over it, `remove` leaves it, and `status`
+says it exists and is not keel's. A file of yours that quotes the mark further down is still yours.
+Running `install` over keel's own file rewrites it, unless one of the refusals below applies, and
+that is how `--oauth` switches the secret the workflow reads from the repository secret
+`ANTHROPIC_API_KEY` to `CLAUDE_CODE_OAUTH_TOKEN`, a subscription token from `claude setup-token`.
+keel never reads, writes or asks for either: it prints the name the workflow reads, and you set
+it.
+
+keel's review in CI runs only on GitHub Actions, so it does not run on GitLab, Bitbucket or Azure
+DevOps. `install` refuses in two cases, names the file or the host it read, and writes nothing, not
+even `.github`:
+
+- another CI system's file, `.gitlab-ci.yml`, `.circleci/config.yml`, `Jenkinsfile`,
+  `azure-pipelines.yml`, `bitbucket-pipelines.yml` or `.drone.yml`, with no GitHub workflow of your
+  own, meaning no `.yml` or `.yaml` in `.github/workflows` other than keel's own. That repository's
+  CI is the other system, and keel does not add a second CI system. This is checked first, so a
+  repository with both gets this reason;
+- an `origin` whose host contains `gitlab` or `bitbucket`, or is Azure DevOps' cloud
+  (`dev.azure.com`, its subdomains, `*.visualstudio.com`). The workflow would never run there. Only
+  the host is printed.
+
+Any other host passes, so GitHub Enterprise on any host name and self-hosted Azure DevOps Server are
+not refused, and neither is an `origin` keel cannot read. There is no flag to override the refusal.
+In a repository on GitHub that carries a stale marker from another CI, delete that marker first.
+
+Where `install` would refuse, `status` says why. With no workflow file it says review in CI is not
+available here: for another CI's file, which CI it is, that the repository has no GitHub workflow,
+and that keel does not add a second CI system; for the `origin`, that review in CI runs only on
+GitHub Actions and which host the `origin` is on. With keel's own file it says the file is a second
+CI system, or that it would never run on that host, and that `remove` deletes it. A workflow keel
+did not write is still reported as not keel's.
+
+The workflow needs the Claude GitHub App on the repository (https://github.com/apps/claude), the
+secret it names, and a project that has run `keel init`; keel sets none of them. It runs
+`review-code` through the Claude Code GitHub Action, and the job is asked to read the diff, run
+`git diff`, `git log` and `git show`, and post one pull request comment. Its tool list holds `Read`,
+`Grep`, `Glob`, `Agent`, those three git commands and one `gh pr comment` command scoped to that
+pull request, with no edit tool and no push. **That is what the workflow asks for, not a
+guarantee:** `skills/review-code/SKILL.md` declares unrestricted `Bash` in its own frontmatter, and
+whether the action honours that is unverified, so nothing here says the job cannot write a file.
+The workflow does not use `pull_request_target`, grants `contents: read` and no `contents: write`,
+checks out with `persist-credentials: false`, and puts only the pull request number and two commit
+hashes in the prompt, never a branch name or the title or body of a pull request.
+
+It skips drafts, pull requests from forks, because GitHub withholds the secret from them, and
+Dependabot, which has no Actions secret. It runs when a pull request is opened, made ready for
+review or reopened, and not on each push, because a review per push is the cost people turn this
+off over. Adding `synchronize` to `types` in the file gives that, and one session for every push.
+Each run is a Claude session on your account, bounded by `--max-turns 30` and a 20 minute job
+timeout. It cannot run the suite, because the job's tools allow no test command and allowing the
+profile's would widen what a pull request's content can make the job execute, so the report says
+"suite not run in CI".
+
+Residual risk: the reviewer reads a pull request's content and can read files on the runner, so a
+repository secret could in principle be shown in a comment by a crafted change. Opening a pull
+request from a branch of the same repository needs write access to it, which limits who can try.
+`persist-credentials: false` and the scoped comment command close the obvious path. The tool
+allowlist is the only restriction on the reviewer, and no deny rule is set for reading `/proc` or
+`.git/config`.
+
+`anthropics/claude-code-action@v1` is a tag, the form the vendor documents, and not a commit. Pin
+it to a commit, with the tag in a trailing comment, as `.github/workflows/ci.yml` pins the other
+actions. This is Claude Code on GitHub only: there is no Codex or GitLab version. The tests pin
+what the file says and what the command does; the workflow has not been run against a real
+repository.
+
+Two more limits are unverified. `git diff`, `git log` and `git show` accept `--output=<file>`, so
+the `Bash(git diff:*)`, `Bash(git log:*)` and `Bash(git show:*)` entries do not stop those commands
+writing a file. That has not been tried in CI, and it is one more reason the read-only limit is
+stated as the workflow's intent and not as a guarantee. The `plugin_marketplaces` URL names no ref,
+so the job is expected to install whatever keel's default branch holds, not the keel version in
+your project. That is unverified until a real run, and the job holds the secret at that point.
 
 ## `keel-fleet <repo-path>... | --file <path-list-file>`
 

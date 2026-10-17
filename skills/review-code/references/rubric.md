@@ -15,7 +15,7 @@ blocker.
 - Concurrency: two callers at once, a retry arriving after a timeout, the same request twice.
 - For anything with money: currency source, rounding direction, idempotency, and whether a
   balance stays reconcilable.
-- If the change writes data that is cached anywhere, does the same commit invalidate it? An
+- If the change writes data that is cached anywhere, does the write's own commit invalidate it? An
   invalidation deferred to a follow-up is one that covers only the write path someone remembered.
 - If the change adds a cache, does it state the staleness it is accepting, and does its key carry
   everything that changes the value?
@@ -211,7 +211,7 @@ validated at the boundary works today and needs repeating at the next leaf. See
 
 Applies wherever the diff changes behaviour, or touches a document at all.
 
-- Was every document the change made wrong updated in the same commit? A README quickstart, a
+- Was every document the change made wrong updated in the same pull request? A README quickstart, a
   runbook step, an API reference, a diagram, a table of environment variables.
 - Where a generator exists, is the output regenerated rather than hand-edited? OpenAPI from the
   framework's decorators, code docs from JSDoc or docstrings, release notes from Conventional

@@ -115,6 +115,18 @@ this record left open are answered as follows.
 `apex-port-plan` and `shape-idea`. Everything in `execute-plan` stays `inherit`, because it either
 writes code under the TDD gate or judges another agent's verdict.
 
+**An implementer may now be routed, since 2026-10-16.** `execute-plan`'s implementer used to stay
+`inherit` along with everything else in it. A plan may now route it, in an `**Implementer
+routing:**` header line naming the delegation profile `keel-implementer`, for its implementer
+dispatches and only those: reviews stay `inherit`. `execute-plan` honours the line once task 3 of
+`docs/plans/2026-10-16-measure-delivery-and-implementer-model.md` lands. The profile is
+`agents/keel-implementer.md` (`sonnet`) on Claude Code and `.codex/agents/keel-implementer.toml` on
+Codex, labelled `keel-implementer: ` on the dispatch. It is the exception to the rule the haiku
+result above supports, decided in
+[ADR-0008](../decisions/ADR-0008-a-plan-may-route-its-implementer.md) on the strength of tests
+watched failing first, a review on the session's model, the label, and the routing recorded per
+task. Nothing has measured it yet: gap 7's rework number by routing is how it will be.
+
 **Alias or full id.** Alias. A full id is reproducible and goes stale inside a pinned release, and
 the validator's job is to catch the stale case, which it can only do against a known alias set.
 

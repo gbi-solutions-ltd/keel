@@ -32,9 +32,11 @@ keel/
 │   └── keel                            # the CLI. Every `keel` subcommand lives in this one file
 │
 ├── agents/
-│   └── keel-fanout.md                  # the delegation profile the fan-out skills name, Claude Code
-│                                       # side. Auto-discovered from the plugin root; the Codex side
-│                                       # is written per project by lib/harness/codex.sh
+│   ├── keel-fanout.md                  # the delegation profile the fan-out skills name, Claude Code
+│   │                                   # side. Auto-discovered from the plugin root; the Codex side
+│   │                                   # is written per project by lib/harness/codex.sh
+│   └── keel-implementer.md             # the profile a plan may route its implementer to (ADR-0008).
+│                                       # Same discovery; its Codex side is written by codex.sh too
 │
 ├── skills/                             # 25 skills, flat namespace
 │   ├── apex-export/
@@ -170,6 +172,7 @@ keel/
 │   └── subagent_statusline.py
 │
 ├── templates/                     
+│   ├── ci-review.yml
 │   ├── keel-profile.example.json
 │   ├── profile.schema.json
 │   ├── project-claude-md-block.md
@@ -187,6 +190,7 @@ keel/
 │   ├── test-agents.sh
 │   ├── test-apex-export.sh
 │   ├── test-cache-install.sh
+│   ├── test-ci-review.sh
 │   ├── test-context-watch.sh
 │   ├── test-doc-claims.sh
 │   ├── test-done-guard.sh
@@ -203,7 +207,8 @@ keel/
 │   ├── validate-citations.sh
 │   ├── validate-skills.sh
 │   ├── fixtures/                       # per-stack detection fixtures, and an APEX capture
-│   └── evals/                          # 14 scenarios, 14 fixtures, results.md
+│   ├── evals/                          # 17 scenarios, 17 fixtures, results.md
+│   └── plugin-evals/                   # 2 pilot cases for `claude plugin eval`, run by hand
 │
 ├── .github/
 │   ├── ruff-requirements.txt           # ruff for the Python lint job, one hash per published file

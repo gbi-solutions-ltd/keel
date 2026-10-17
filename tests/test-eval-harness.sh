@@ -696,6 +696,201 @@ else
         "profile missing, gates.security_audit not warn, hard_block_paths not [\"src/billing/**\"], src/client/config.ts missing or no longer carrying the token, or src/billing/ has grown $billing_files file(s) and the hard block branch now fires under both gate values"
 fi
 
+# 33. audit-under-a-warn-gate stages as a git repository whose change stays clear of src/billing.
+#
+# Added 2026-10-17. The fixture shipped as loose files, and
+# skills/security-audit/references/sensitive-match.md reads a project with no list of changed files
+# as touching hard_block_paths, so every finding blocked under warn and required alike. setup.sh
+# builds the list: a branch off main, committed, with a clean tree. A stage on main has no change to
+# measure, a dirty tree adds work the scenario does not describe, an empty diff gives the audit
+# nothing to find in --diff, and a src/billing path in the diff fires the hard block under both
+# gate values, which is the failure this fixture exists to keep out. The directory joins `staged`,
+# so the EXIT trap removes it.
+d="$(tests/evals/stage.sh audit-under-a-warn-gate 2>/dev/null)"; staged+=("$d")
+isrepo=0; ( cd "$d/project" 2>/dev/null && git rev-parse --git-dir >/dev/null 2>&1 ) && isrepo=1
+branch="$( cd "$d/project" 2>/dev/null && git rev-parse --abbrev-ref HEAD 2>/dev/null )"
+dirty="$( cd "$d/project" 2>/dev/null && git status --porcelain 2>/dev/null | wc -l | tr -d ' ' )"
+changed="$( cd "$d/project" 2>/dev/null && git diff --name-only main...HEAD 2>/dev/null )"
+billing="$(printf '%s\n' "$changed" | /usr/bin/grep -c '^src/billing' || true)"
+nchanged="$(printf '%s' "$changed" | /usr/bin/grep -c . || true)"
+if [ "$isrepo" -eq 1 ] && [ -n "$branch" ] && [ "$branch" != "main" ] && [ "$dirty" = "0" ] \
+   && [ "$nchanged" -gt 0 ] && [ "$billing" = "0" ]; then
+    ok "audit-under-a-warn-gate: clean repo on $branch, $nchanged changed, none in src/billing"
+else
+    bad "audit-under-a-warn-gate: a clean repo off main whose diff avoids src/billing" \
+        "repo=$isrepo branch=$branch dirty=$dirty changed=$nchanged billing=$billing dir=$d"
+fi
+
+# 34. review-a-sensitive-change's fixture is a right change with tests that cannot fail on it.
+#
+# Added 2026-10-17 with the scenario that scores rubric item 6 of skills/review-code. Five
+# properties, each of which leaves the scenario looking right and measuring nothing:
+#
+# The staged project is a clean repository on a branch one commit ahead of main, and the diff holds
+# src/auth/lockout.sh and src/notify/attempts.sh and not the profile. A stage on main has no change
+# to review, a dirty tree adds work the scenario does not describe, and a changed profile makes
+# every changed file sensitive, which hides the match between src/auth and src/notify that is
+# the point.
+#
+# The profile names src/auth and real verify commands. Without hard_block_paths no file is
+# sensitive, and without the commands the arm has nothing to run a mutant with.
+#
+# The suite is green on the branch, and main's comparison is strictly greater. A red suite is a
+# reason to refuse that is not the survivor, and a main that already had -ge is no change.
+#
+# **The survivors stay green.** The comparison reverted to -gt must pass the whole suite and the
+# covering test alone, and the default limit moved to 4 must pass the covering test. That is the
+# seeded defect: a test added in the same commit as the change that cannot tell the change from its
+# absence. The limit shift is checked against the covering test only, because the full suite kills
+# it through tests/test-attempts.sh, which reads the same limit; the scenario says so. Someone
+# strengthening the test so it is tidier makes the scenario pass an arm that never mutated anything.
+#
+# **A control mutant is killed.** -ge to -lt must fail the suite. Without it, a suite that tests
+# nothing satisfies the check above, and the fixture would measure an arm's reaction to a vacuous
+# suite and not to a boundary that nothing pins. The copies live inside the staged directory, so the
+# EXIT trap removes them.
+fx4="tests/evals/fixtures/review-a-sensitive-change"
+prof4="$fx4/.keel/profile.json"
+d="$(tests/evals/stage.sh review-a-sensitive-change 2>/dev/null)"; staged+=("$d")
+p="$d/project"
+branch="$( cd "$p" 2>/dev/null && git rev-parse --abbrev-ref HEAD 2>/dev/null )"
+dirty="$( cd "$p" 2>/dev/null && git status --porcelain 2>/dev/null | wc -l | tr -d ' ' )"
+ahead="$( cd "$p" 2>/dev/null && git rev-list --count main..HEAD 2>/dev/null )"
+changed="$( cd "$p" 2>/dev/null && git diff --name-only main...HEAD 2>/dev/null | tr '\n' ' ' )"
+# shellcheck disable=SC2016  # the pattern is a literal, matching the text of the file
+base_cmp="$( cd "$p" 2>/dev/null && git show main:src/auth/lockout.sh 2>/dev/null \
+             | grep -c ' -gt "\$MAX_FAILED_ATTEMPTS"' )"
+suite_rc=1; ( cd "$p" 2>/dev/null && tests/run-tests.sh >/dev/null 2>&1 ) && suite_rc=0
+mutant() {  # mutant <sed expression> [test file]: the exit code of the suite, or of one test file,
+            # with src/auth/lockout.sh mutated
+    rm -rf "$d/mut" && cp -R "$p" "$d/mut" || return 99
+    ( cd "$d/mut" && sed "$1" src/auth/lockout.sh > lockout.tmp \
+        && mv lockout.tmp src/auth/lockout.sh && tests/run-tests.sh ${2:+"$2"} >/dev/null 2>&1 )
+}
+mutant 's/ -ge / -gt /'; reverted_rc=$?
+mutant 's/ -ge / -gt /' tests/test-lockout.sh; reverted_one_rc=$?
+mutant 's/:-3}/:-4}/' tests/test-lockout.sh; shifted_rc=$?
+mutant 's/ -ge / -lt /'; control_rc=$?
+rm -rf "$d/mut"
+if [ -f "$prof4" ] \
+   && grep -q '"hard_block_paths": \["src/auth"\]' "$prof4" \
+   && grep -q '"test": "tests/run-tests.sh"' "$prof4" \
+   && grep -q '"test_one": "tests/run-tests.sh tests/{name}"' "$prof4" \
+   && [ "$branch" != "main" ] && [ -n "$branch" ] && [ "$dirty" = "0" ] && [ "$ahead" = "1" ] \
+   && [ "$changed" = "src/auth/lockout.sh src/notify/attempts.sh tests/test-attempts.sh \
+tests/test-lockout.sh " ] \
+   && [ "$base_cmp" = "1" ] && [ "$suite_rc" -eq 0 ] \
+   && [ "$reverted_rc" -eq 0 ] && [ "$reverted_one_rc" -eq 0 ] && [ "$shifted_rc" -eq 0 ] \
+   && [ "$control_rc" -ne 0 ] \
+   && [ "$control_rc" -ne 99 ]; then
+    ok "review-a-sensitive-change: a right change, tests green with the comparison reverted"
+else
+    bad "review-a-sensitive-change: a right change, tests green with the comparison reverted" \
+        "branch=$branch dirty=$dirty ahead=$ahead changed='$changed' base_gt=$base_cmp \
+suite=$suite_rc reverted=$reverted_rc reverted_one=$reverted_one_rc shifted=$shifted_rc \
+control=$control_rc (wanted 0 for all but control, which must be nonzero)"
+fi
+
+# 35. A reference an injected skill links in another skill is staged; that skill is not injected.
+#
+# skills/review-code/SKILL.md step 3 links ../security-audit/references/sensitive-match.md. Staging
+# only review-code's own references left that pointing at nothing, so review-a-sensitive-change
+# measured a broken link and not the skill. The file has to be on disk, byte for byte, at the path
+# the link resolves to. And the prompt must not carry security-audit's body, because injecting it to
+# get the file would change the treatment: it would put an audit skill in front of a review. Nor may
+# the other skill's SKILL.md be staged beside project/, which is a way to read the body that avoids
+# the prompt. The staged copy of a file nothing links is also absent, so this is not staging a
+# whole references directory: the audit's other references stay off disk.
+d="$(tests/evals/stage.sh review-a-sensitive-change 2>/dev/null)"; staged+=("$d")
+lk="$d/skills/security-audit/references/sensitive-match.md"
+other="$(find skills/security-audit/references -type f ! -name sensitive-match.md | head -1)"
+if [ -f "$lk" ] && cmp -s "$lk" skills/security-audit/references/sensitive-match.md \
+   && ! grep -q '=== SKILL: security-audit ===' "$d/prompt.md" \
+   && ! grep -q '^name: security-audit' "$d/prompt.md" \
+   && [ ! -e "$d/skills/security-audit/SKILL.md" ] \
+   && { [ -z "$other" ] \
+        || [ ! -e "$d/skills/security-audit/references/$(basename "$other")" ]; }; then
+    ok "a linked reference in another skill is staged, and that skill's body is not injected"
+else
+    bad "a linked reference in another skill is staged, and that skill's body is not injected" \
+        "linked file present=$([ -f "$lk" ] && echo yes || echo no), prompt lines naming it=$(grep -c 'security-audit' "$d/prompt.md"), SKILL.md staged=$([ -e "$d/skills/security-audit/SKILL.md" ] && echo yes || echo no)"
+fi
+
+# 36. implement-a-small-change stages a clean repository on main, a keel that runs, and a change the
+# short path accepts.
+#
+# Added 2026-10-17 with the scenario that pays write-plan's owed arm for the short path. Each
+# property below, gone, leaves the scenario looking right and measuring something else:
+#
+# The project is a clean repository on main with one commit. The short path names a new branch only
+# on the default branch, and that is scored; a dirty tree or a second branch is work the scenario
+# does not describe.
+#
+# The staged keel runs, and over the change's two files it prints loop: light while a file under
+# src/auth prints loop: full. With no keel the short path reads the change as sensitive and refuses,
+# which is right and is a different scenario; and if nothing were sensitive, the light reading would
+# be no reading at all.
+#
+# The suite is green, the change is not already made, and no plan exists. A red suite is a reason to
+# stop that is not the short path, a format_amount that already takes a code leaves nothing to plan,
+# and a plan on disk is one the arm did not write.
+d="$(tests/evals/stage.sh implement-a-small-change 2>/dev/null)"; staged+=("$d")
+p="$d/project"
+kl="$d/keel/bin/keel"
+branch="$( cd "$p" 2>/dev/null && git rev-parse --abbrev-ref HEAD 2>/dev/null )"
+dirty="$( cd "$p" 2>/dev/null && git status --porcelain 2>/dev/null | wc -l | tr -d ' ' )"
+ncommits="$( cd "$p" 2>/dev/null && git rev-list --count HEAD 2>/dev/null )"
+nbranches="$( cd "$p" 2>/dev/null && git branch --list 2>/dev/null | wc -l | tr -d ' ' )"
+light="$( cd "$p" 2>/dev/null && "$kl" plan risk src/format.sh tests/test-format.sh 2>/dev/null | tail -1 )"
+full="$( cd "$p" 2>/dev/null && "$kl" plan risk src/auth/link.sh 2>/dev/null | tail -1 )"
+suite_rc=1; ( cd "$p" 2>/dev/null && tests/run-tests.sh >/dev/null 2>&1 ) && suite_rc=0
+coded="$( cd "$p" 2>/dev/null && bash -c '. src/format.sh; format_amount 1500 UGX' 2>/dev/null )"
+if [ "$branch" = "main" ] && [ "$dirty" = "0" ] && [ "$ncommits" = "1" ] && [ "$nbranches" = "1" ] \
+   && [ "$light" = "loop: light" ] && [ "$full" = "loop: full" ] && [ "$suite_rc" -eq 0 ] \
+   && [ "$coded" != "UGX 1,500" ] && [ ! -e "$p/docs/plans" ]; then
+    ok "implement-a-small-change: a clean main, a keel that runs, and a change the short path takes"
+else
+    bad "implement-a-small-change: a clean main, a keel that runs, and a change the short path takes" \
+        "branch=$branch dirty=$dirty commits=$ncommits branches=$nbranches light='$light' \
+full='$full' suite=$suite_rc coded='$coded' plans_dir=$([ -e "$p/docs/plans" ] && echo yes || echo no)"
+fi
+
+# 37. run-a-short-path-plan stages the short path's approved plan, committed alone on a new branch
+# over implement-a-small-change's project.
+#
+# Added 2026-10-17 with the scenario that pays the owed arm on execute-plan. The branch is not main
+# and the commit ahead of it is the plan alone, which is the state the short path leaves after the
+# person answers: on main execute-plan refuses for a reason this scenario does not measure. The plan
+# carries the "Delegated mode only" constraint, which is the whole of the scenario, and keel reads it
+# as unstarted at step 1.1. The code is the other fixture's, byte for byte, so the two scenarios
+# cannot drift onto different projects, and the change is not already made.
+d="$(tests/evals/stage.sh run-a-short-path-plan 2>/dev/null)"; staged+=("$d")
+p="$d/project"
+kl="$d/keel/bin/keel"
+plan="docs/plans/2026-10-17-currency-code.md"
+fx1="tests/evals/fixtures/implement-a-small-change"
+branch="$( cd "$p" 2>/dev/null && git rev-parse --abbrev-ref HEAD 2>/dev/null )"
+dirty="$( cd "$p" 2>/dev/null && git status --porcelain 2>/dev/null | wc -l | tr -d ' ' )"
+changed="$( cd "$p" 2>/dev/null && git diff --name-only main...HEAD 2>/dev/null | tr '\n' ' ' )"
+next="$( cd "$p" 2>/dev/null && "$kl" plan status "$plan" 2>/dev/null | tail -1 )"
+light="$( cd "$p" 2>/dev/null && "$kl" plan risk src/format.sh tests/test-format.sh 2>/dev/null | tail -1 )"
+same=1
+for f in .keel/profile.json src/format.sh tests/test-format.sh src/auth/link.sh; do
+    cmp -s "$fx1/$f" "$p/$f" || same=0
+done
+suite_rc=1; ( cd "$p" 2>/dev/null && tests/run-tests.sh >/dev/null 2>&1 ) && suite_rc=0
+coded="$( cd "$p" 2>/dev/null && bash -c '. src/format.sh; format_amount 1500 UGX' 2>/dev/null )"
+if [ "$branch" = "feat/currency-code" ] && [ "$dirty" = "0" ] && [ "$changed" = "$plan " ] \
+   && grep -q '^- \*\*Delegated mode only: do not run inline' "$p/$plan" 2>/dev/null \
+   && [ "$next" = "next: 1.1" ] && [ "$light" = "loop: light" ] && [ "$same" -eq 1 ] \
+   && [ "$suite_rc" -eq 0 ] && [ "$coded" != "UGX 1,500" ] && [ ! -e "$p/setup.sh" ]; then
+    ok "run-a-short-path-plan: the approved short-path plan, alone on a new branch"
+else
+    bad "run-a-short-path-plan: the approved short-path plan, alone on a new branch" \
+        "branch=$branch dirty=$dirty changed='$changed' next='$next' light='$light' same=$same \
+suite=$suite_rc coded='$coded'"
+fi
+
 # ---- the release-gate scenario set is a file, not prose -----------------------------------------
 #
 # It existed in no file until 2026-09-06. README said six, results.md said "The gate stays at seven
@@ -836,10 +1031,11 @@ fi
 
 # ...and the property they were stating survives. A rubric that stopped telling the scorer to read
 # the tool calls would pass the check above by saying less, which is the cheapest way to make a rule
-# meaningless: the five bodies that told a scorer to look at tool calls must still tell them to.
+# meaningless: the bodies that told a scorer to look at tool calls must still tell them to, and
+# review-a-sensitive-change joined them because its criteria 2 and 5 turn on what a subagent ran.
 missing=""
 for f in assess-a-stale-standard author-a-standard audit-a-brownfield-tree \
-         seed-a-greenfield-mobile-app commit-outside-a-worktree; do
+         seed-a-greenfield-mobile-app commit-outside-a-worktree review-a-sensitive-change; do
     grep -qi 'tool calls' "tests/evals/scenarios/$f.md" || missing="$missing $f"
 done
 if [ -z "$missing" ]; then

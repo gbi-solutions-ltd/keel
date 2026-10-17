@@ -95,8 +95,8 @@ and nobody can tell in advance which one to run.
 
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
-| FR-01 | The skill must select between author mode and assess mode from the words of the request, before reading `standards.md` or any source file. | confirmed | Brief item 1, this conversation, 2026-09-01. The router admits one skill per request (`skills/keel/SKILL.md:42`), so the distinction cannot be deferred to a second routing pass |
-| FR-02 | The router row that reaches `coding-standards` must carry at least one assess phrasing alongside its existing author phrasings. Today it reads `\| what are our conventions, set up linting \| coding-standards \|`. | confirmed | `skills/keel/SKILL.md:28`; brief item 1 |
+| FR-01 | The skill must select between author mode and assess mode from the words of the request, before reading `standards.md` or any source file. | confirmed | Brief item 1, this conversation, 2026-09-01. The router admits one skill per request (`skills/keel/SKILL.md#One skill.`), so the distinction cannot be deferred to a second routing pass |
+| FR-02 | The router row that reaches `coding-standards` must carry at least one assess phrasing alongside its existing author phrasings. Today it reads `\| what are our conventions, set up linting \| coding-standards \|`. | confirmed | `skills/keel/SKILL.md#what are our conventions, set up linting`; brief item 1 |
 | FR-03 | Asked to assess when no `<docs_root>/standards.md` exists, the skill must say that no document exists and offer to author one. It must not silently author one. | confirmed | Brief item 1, which asks explicitly what happens in this case |
 | FR-04 | Asked to author when a `<docs_root>/standards.md` already exists, the skill must name the existing document and ask before overwriting it. | inferred | `docs/ideas/standards-that-bind.md:336` records that the skill's step 4 writes the document with no branch for an existing file, checked by reading rather than by running |
 | FR-05 | Where the request's words fit both modes and a `standards.md` exists, the skill must ask which is wanted, as one question. | author-added, see note | Follows from FR-01 and FR-04. Nobody asked for it; delete it and the skill guesses |
@@ -201,7 +201,7 @@ ADR-0001 length arm without adding it to the release gate is
 
 | ID | Constraint | Imposed by | Evidence |
 |---|---|---|---|
-| CON-01 | The mode goes inside `coding-standards`. Not a new skill, not a widened `review-code`. | The idea record, already decided | `docs/ideas/standards-that-bind.md:379-383`. A widened `review-code` contradicts its own skill's principle at `skills/review-code/SKILL.md:16-22` and voids its changed-lines scope; a new skill loses on the router's one-skill rule (`skills/keel/SKILL.md:42`) and on the roster |
+| CON-01 | The mode goes inside `coding-standards`. Not a new skill, not a widened `review-code`. | The idea record, already decided | `docs/ideas/standards-that-bind.md:379-383`. A widened `review-code` contradicts its own skill's principle at `skills/review-code/SKILL.md:16-22` and voids its changed-lines scope; a new skill loses on the router's one-skill rule (`skills/keel/SKILL.md#One skill.`) and on the roster |
 | CON-02 | The four checks run in the order given: house-defaults coverage, backlog, judgement sample, departures ledger. | The idea record | `docs/ideas/standards-that-bind.md:433-460`, and `:617-618`: "a mode that lists the checks without ranking them throws away the only thing this instance taught" |
 | CON-03 | Output is a dated report under `<docs_root>/audits/`, never an edit to `standards.md`. | The idea record, answering its own open question 4 | `docs/ideas/standards-that-bind.md:462-463, 589-593` |
 | CON-04 | Any repository used as an example in keel's own documents or fixtures carries a generic name. Naming a real client repository fails the suite. | keel | `tests/no-internal-leaks.sh`, which fails on project-specific identifiers. The instance is `payments-api` throughout |
@@ -231,7 +231,7 @@ is Q3.
 
 ## 11. Out of scope
 
-- **Problem B, making standards bind during coding.** Already shipped in `13d90d9`, verified in the tree: the `=== PROJECT STANDARDS ===` block is now in the implementer prompt at `skills/execute-plan/references/subagent-prompts.md:29` as well as the review prompt at `:114`; the plan template names the standards document at `skills/write-plan/references/plan-template.md#Copied verbatim from the stories` with an example at `skills/write-plan/references/plan-template.md#requires a named exception type, never a bare catch`; `docs/02-skill-catalog.md:69` now reads "Enforced by nothing at coding time"; and `:382` now reads "Not `<docs_root>/standards.md`, which this line claimed".
+- **Problem B, making standards bind during coding.** Already shipped in `13d90d9`, verified in the tree: the `=== PROJECT STANDARDS ===` block is now in the implementer prompt at `skills/execute-plan/references/subagent-prompts.md:29` as well as the review prompt at `:135`; the plan template names the standards document at `skills/write-plan/references/plan-template.md#Copied verbatim from the stories` with an example at `skills/write-plan/references/plan-template.md#requires a named exception type, never a bare catch`; `docs/02-skill-catalog.md:69` now reads "Enforced by nothing at coding time"; and `:382` now reads "Not `<docs_root>/standards.md`, which this line claimed".
 - **Open question 3, why a loaded rule does not bind.** Untouched by this work and still open (`docs/ideas/standards-that-bind.md`, "Why does a loaded rule not bind?"). No requirement here depends on its answer, because the mode is a procedure that returns findings rather than a rule told to a model.
 - **Answering Q1, whether the ranked order generalises.** Still open, and deliberately not blocking. Section 14's decision 1 runs all four checks together whatever the answer, so nothing in this PRD waits on it. It closes when a second repository is assessed and its per-check finding counts are recorded, which is the first row of section 9. It carries in the idea record as its open question 5 (`docs/ideas/standards-that-bind.md:625-632`).
 - **Remediating anything an assessment finds.** The mode reports. Fixes route to the skill the finding names.
@@ -292,7 +292,7 @@ Every routing and documentation surface, measured in this repository at `13d90d9
 
 | Surface | Line and current text | Edit | Budget cost |
 |---|---|---|---|
-| Router | `skills/keel/SKILL.md:28`, `\| what are our conventions, set up linting \| coding-standards \|` | Add an assess phrasing to the trigger cell | About 5 words on a 553 word body with 147 spare to the 700 target (`docs/ideas/standards-that-bind.md#TARGET_WORDS=700`) |
+| Router | `skills/keel/SKILL.md#what are our conventions, set up linting`, `\| what are our conventions, set up linting \| coding-standards \|` | Add an assess phrasing to the trigger cell | About 5 words on a 553 word body with 147 spare to the 700 target (`docs/ideas/standards-that-bind.md#TARGET_WORDS=700`) |
 | Skill description | `skills/coding-standards/SKILL.md:3`, 181 characters | Append a 32 character assess clause | 213 of 216. Measured |
 | Skill body | `skills/coding-standards/SKILL.md`, 683 words | The mode's 193 words | 876 of 900. Measured. Triggers NFR-03 |
 | Report format | New file under `skills/coding-standards/references/` | Write it | Zero. References are unbounded (`tests/validate-skills.sh:161-162`) |

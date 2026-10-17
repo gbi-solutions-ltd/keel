@@ -188,10 +188,11 @@ fi
 
 # 16. Only rows keel labelled are overridden. An override replaces the whole row, so a row without a
 #     label would lose its elapsed time, live progress and queued count for a subagent keel never
-#     dispatched: another plugin's, or the user's own. The labels are the two the standard names,
-#     `inherit: ` and `keel-fanout: ` (docs/standards.md, "A dispatch names its model, and says
-#     so"), as written, at the start of the description. Each case sets the rows to be left alone
-#     beside a labelled neighbour, because "prints nothing" is also what a broken script does.
+#     dispatched: another plugin's, or the user's own. The labels are the three the standard names,
+#     `inherit: `, `keel-fanout: ` and `keel-implementer: ` (docs/standards.md, "A dispatch names
+#     its model, and says so"), as written, at the start of the description. Each case sets the
+#     rows to be left alone beside a labelled neighbour, because "prints nothing" is also what a
+#     broken script does.
 #
 #     (a) A row with a model and no label is left alone: one with an agent type, and one with no
 #     description at all.
@@ -363,6 +364,13 @@ want='{"id": "a", "content": "keel:keel-fanout · inherit: d · m"}
 {"id": "b", "content": "rev · inherit: d · m"}
 {"id": "c", "content": "inherit: d · m"}'
 [ "$got" = "$want" ] && ok "a name or type of spaces only gives way to the agent type, or to no lead" || bad "a name or type of spaces only gives way to the agent type, or to no lead" "got: $got"
+
+# 23. A dispatch labelled `keel-implementer: ` is a keel label (ADR-0008), so its row shows the
+#     model the profile resolved to. Row b is the control: a description that merely contains the
+#     label later on is not one. Without row l the empty output a broken script gives would pass.
+got="$(row '{"columns":120,"tasks":[{"id":"l","agentType":"keel:keel-implementer","description":"keel-implementer: task 2","model":"claude-sonnet-5-5","tokenCount":500},{"id":"b","description":"note keel-implementer: task 2","model":"m"}]}')"
+want='{"id": "l", "content": "keel:keel-implementer · keel-implementer: task 2 · claude-sonnet-5-5 · 500 tokens"}'
+[ "$got" = "$want" ] && ok "a keel-implementer: row shows the model it runs on" || bad "a keel-implementer: row shows the model it runs on" "got: $got"
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

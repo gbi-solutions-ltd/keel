@@ -380,7 +380,7 @@ belongs are reference files and references are explicitly unbounded
 
 | Option | Body-word cost | Description cost | Other cost | Verdict |
 |---|---|---|---|---|
-| **Mode in `coding-standards`** | **150 measured**, landing 833. The four-check version at full length is 236, landing 919 and **over the ceiling** | 32 of the 35 spare chars (181 of 216 at `skills/coding-standards/SKILL.md:3`) | Crosses the 700 target, so ADR-0001 buys an eval arm; one router row reworded at `skills/keel/SKILL.md:28` | **Recommended, at the 150-word length** |
+| **Mode in `coding-standards`** | **150 measured**, landing 833. The four-check version at full length is 236, landing 919 and **over the ceiling** | 32 of the 35 spare chars (181 of 216 at `skills/coding-standards/SKILL.md:3`) | Crosses the 700 target, so ADR-0001 buys an eval arm; one router row reworded at `skills/keel/SKILL.md#what are our conventions, set up linting` | **Recommended, at the 150-word length** |
 | **Widened `review-code`** | 52 on a 611 body, landing 663 | None | None | **Cheapest and wrong.** It contradicts `skills/review-code/SKILL.md:16-22`, "A review without the intent is proofreading", and makes `rubric.md:104-106`'s scope section, which is defined over changed lines, meaningless |
 | **New skill** | A fresh body of 500 to 700 words | ~48 tokens of the 199 spare | A router row, a `README.md` count claim (`tests/test-doc-claims.sh:45-47`), and a SessionStart roster entry with **21 characters of headroom** | **Costs the most for the least** |
 
@@ -417,12 +417,12 @@ The description cost holds: appending a 32-character clause such as
 `, or assessing code against them` lands the description at 213 of the 216 cap
 (`tests/validate-skills.sh`), using 32 of the 35 spare characters.
 
-**Against the router's "One skill" rule** (`skills/keel/SKILL.md:42-44`): the rule says that when two
-skills fit, the process skill goes first and may invoke the other. A separate assessment skill would
-fit alongside `coding-standards` on almost every phrasing that reaches row 28,
-"what are our conventions, set up linting". That is the ambiguity the rule exists to resolve, and
-resolving it means either a fourth line of router prose or a user who is asked which of two skills
-they meant. A mode inside `coding-standards` never presents the choice.
+**Against the router's "One skill" rule** (`skills/keel/SKILL.md#One skill.`): the rule says that
+when two skills fit, the process skill goes first and may invoke the other. A separate assessment
+skill would fit alongside `coding-standards` on almost every phrasing that reaches the
+`coding-standards` row, "what are our conventions, set up linting". That is the ambiguity the rule
+exists to resolve, and resolving it means either a fourth line of router prose or a user who is
+asked which of two skills they meant. A mode inside `coding-standards` never presents the choice.
 
 **Against the description ceiling** (`tests/validate-skills.sh:54`, `DESC_TOTAL_MAX_TOKENS=1320`,
 measured at 1,121 today, so 199 tokens spare): a new skill is affordable here. The average skill
@@ -665,10 +665,10 @@ of 216~~, **superseded 2026-09-01: it shipped at 193 words landing 876, and a 31
 landing 212.** The 150 was measured against a draft that carried neither the three mode-selection
 branches nor the link to the reference file, and a further 11 words were added after the first
 ADR-0001 arm failed. See `tests/evals/results.md`.
-One router row reworded at `skills/keel/SKILL.md:28`, and one eval arm under ADR-0001. The four
-checks go in the order section 2a gives, and that order is the substance: ~~the cheapest check found
-the most~~, and a mode that lists the checks without ranking them throws away the only thing this
-instance taught.
+One router row reworded at `skills/keel/SKILL.md#what are our conventions, set up linting`, and one
+eval arm under ADR-0001. The four checks go in the order section 2a gives, and that order is the
+substance: ~~the cheapest check found the most~~, and a mode that lists the checks without ranking
+them throws away the only thing this instance taught.
 
 **"The cheapest check found the most" was half wrong, and a second instance on 2026-09-01 said so.**
 Check 1 found the most, decisively, 51 findings of 76. It is not the cheapest: reading ten topic

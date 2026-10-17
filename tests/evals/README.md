@@ -37,6 +37,19 @@ happened; the reply's prose is not evidence that a file was opened.
 They are staged beside `project/` and not inside it, for the reason `prompt.md` and `setup.sh` are
 kept out: they are not files the arm should find lying around in the repository it is working on.
 
+**A reference an injected skill links in another skill is staged too, and only that file.** A skill
+body or one of its references may link `../<skill>/references/<file>.md`, or
+`../../<skill>/references/<file>.md` from a reference. `review-code` step 3 links `security-audit`'s
+`sensitive-match.md` this way. `stage.sh` copies each such file to
+`<staged dir>/skills/<skill>/references/<file>.md`, so the link resolves from the staged tree.
+Without it a scenario on that skill measures a broken link and not the skill, which is the argument
+above one hop further. The other skill is not injected, so its body is not in the prompt and the
+treatment is unchanged, and its other references are not staged, since nothing linked them. The
+copy is one hop: a file reached through a linked file is not followed. A link to a file that does
+not exist is skipped. Added 2026-10-17 for `review-a-sensitive-change`. It also stages the files
+the other injecting scenarios link, which none of them had on disk before, so a result recorded
+for one of them was measured without those files.
+
 **Every flag there is load bearing**, worked out on 2026-08-19:
 
 - `--setting-sources ""` and `--disable-slash-commands` stop the arm loading the installed keel
@@ -159,6 +172,13 @@ A scenario that needs a project to work in has one under `tests/evals/fixtures/<
 into `project/` at staging time. A scenario without one gets an empty directory. See
 `fixtures/README.md`, which records what each fixture seeds and is deliberately never staged.
 
+**A fixture whose skill runs `keel` stages an install of it beside `project/`**, at
+`<staged dir>/keel/`, from its `setup.sh`: `bin/`, `lib/` and `VERSION` copied from this tree. Put
+`<staged dir>/keel/bin` first on `PATH` for both arms of that scenario, so the baseline has the same
+tools. `implement-a-small-change` and `run-a-short-path-plan` are the two, added 2026-10-17: the
+short path reads a missing `keel` as a sensitive change and refuses, which is right and is not what
+either scenario measures. Every other scenario runs with no `keel`, and says so where it matters.
+
 **A fixture that needs more than files carries a `setup.sh`**, run after the copy with the staged
 `project/` as its working directory. A setup that exits non-zero fails the stage and prints no path,
 because a half-built fixture dispatches an arm that produces something which looks like a result. It
@@ -167,7 +187,7 @@ repository, and which `commit-outside-a-worktree` is scored on.
 
 ## Running all of them before a release
 
-Fourteen scenarios exist; 7 scenarios are dispatched at the release gate, listed in
+Seventeen scenarios exist; 7 scenarios are dispatched at the release gate, listed in
 `tests/evals/gate-scenarios`, one dispatch each. That file is the set: the runbook's
 dispatch script reads it rather than carrying its own copy, and `tests/test-eval-harness.sh`
 fails the build if this sentence, the runbook or the file disagree. Record the result
@@ -198,6 +218,9 @@ injects a skill that fans out, and it does not dispatch the fan-out. Checked 202
 `write-prd`, `design-database`, `incident-response`, `execute-plan tdd`, `tdd`, `ship` and
 `security-audit`. None of `repo-snapshot`, `port-assess`, `apex-port-plan`, `write-plan`,
 `shape-idea` or `write-docs`.
+
+Since 2026-10-17 `implement-a-small-change` injects `write-plan`, for its short path, which writes
+a one-task plan and dispatches nothing, so it leaves the hole as it was.
 
 `audit-under-a-warn-gate` is the one, added 2026-09-08, and it **narrows the hole rather than
 closing it**. `security-audit` delegates a phase per subagent on a `--full` run and on no other, and

@@ -130,27 +130,32 @@ CHANGELOG was right, and every install stayed on the previous skills because the
 seen 0.2.0 and had no reason to fetch again. The symptom is a skill fix that reaches nobody and
 cannot be reproduced by its author, whose working tree is correct.
 
-**The suite goes red at this point, once, and that is normal:**
+**The suite goes red at this point, in two files, and that is normal:**
 
 ```
+  FAIL  doctor output unchanged against HEAD: 13c13 < ok    configured by keel 0.22.0 --- > ok    configured by keel 0.23.0
 == tests/test-cache-install.sh (1s)
-  FAIL  version, from a tracked-files-only copy (got: 0.16.1)
+  FAIL  version, from a tracked-files-only copy (got: 0.22.0)
 ```
 
-`tests/test-cache-install.sh` builds its copy with `git archive HEAD` and compares `keel version`
-from it against the working `VERSION`, so between the edit and the commit those two genuinely
-disagree. **Commit, then re-run, and require green.** One failing file with that exact message is
-expected; anything else is not.
+Both compare the committed tree against the working one. `tests/test-cache-install.sh` builds its
+copy with `git archive HEAD` and compares `keel version` from it against the working `VERSION`.
+`tests/test-keel.sh` runs `keel doctor` from a worktree of `HEAD` and diffs its output against the
+working tree's, and doctor prints the version. Between the edit and the commit both genuinely
+disagree. **Commit, then re-run, and require green.** Those two failures, with the version as the
+only difference, are expected; anything else is not. The second was first seen at 0.23.0.
 
 ```bash
-tests/run-tests.sh          # expect the one failure above
+tests/run-tests.sh          # expect the two failures above
 git add VERSION .claude-plugin/plugin.json .codex-plugin/plugin.json CHANGELOG.md
 git commit                  # "release: 0.17.0"
 tests/run-tests.sh          # expect: All test files passed
 ```
 
-`shellcheck` is not installed on the release machine and `run-tests.sh` prints `SKIP` for it. CI
-runs it. That is the one check that is only ever green in CI, so section 3's wait is not optional.
+The release machine has `shellcheck` (0.11.0 at 0.23.0), and `run-tests.sh` runs it as the last
+step, printing `OK    shellcheck clean`. On a machine without it, `run-tests.sh` prints `SKIP` and
+only CI runs it. Section 3's wait is not optional either way, because CI is what proves the release
+commit itself.
 
 ## 3. Land it internally
 
@@ -289,7 +294,8 @@ A local clone shows what you built. The API shows what people can read.
 
 | Symptom | Likely cause | Action |
 |---|---|---|
-| `FAIL version, from a tracked-files-only copy (got: <old>)`, alone | The bump is edited but not committed | Expected. Commit, re-run, require green |
+| `FAIL version, from a tracked-files-only copy (got: <old>)` and `FAIL doctor output unchanged against HEAD`, differing only in the version, and nothing else | The bump is edited but not committed | Expected. Commit, re-run, require green |
+| The export's suite fails `validate-citations.sh` on a file under an excluded path | A shipped document cites an excluded one by line. Happened at 0.23.0, after the internal tag | Fix the citation in its own PR. `tests/test-harness-claims.sh` now runs the checker inside a real export, so the next one goes red before release |
 | Any other test red at bump time | Not the bump | Stop. Fix it in its own change |
 | `gh pr checks` green but the release commit was never built | The check ran against the previous head | Read `headSha` on the run, not the PR |
 | The export's file count and the clone's disagree | A suite run left `.pyc` files that `rsync` copied | Re-export from a clean tree, commit inside it before running the suite. *Recorded* |

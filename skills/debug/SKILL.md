@@ -68,6 +68,8 @@ Refuted? Form a new hypothesis from what you learned. Do not stack another fix o
    refactoring; both make the fix unreviewable.
 3. **Verify.** Run `profile.verify.test` yourself, not an earlier run: the new test passes, no new
    red, the reproduction no longer reproduces.
+4. **Name the plan it reworks.** Once verified, follow
+   [references/rework-link.md](references/rework-link.md).
 
 ## The three-fix circuit breaker
 

@@ -1,6 +1,6 @@
 ---
 name: write-plan
-description: Use when a design or stories exist and implementation is about to start, or the user asks for an implementation plan or a task breakdown.
+description: Use when a design or stories exist and implementation is about to start, or the user asks for an implementation plan or a task breakdown, or asks to implement a small change.
 allowed-tools: [Read, Write, Grep, Glob, Bash, Agent, AskUserQuestion]
 ---
 
@@ -23,6 +23,7 @@ at; a plan that contradicts an accepted decision is worse than no plan.
 
 If no stories exist, stop and name `keel:write-user-stories` as next; it routes to `write-prd` where
 no PRD exists. A plan cannot be written in the same pass as the requirements it rests on.
+Small work with no stories follows `references/short-path.md` instead.
 
 On a greenfield project every verify command is `null`. Task 1 creates the toolchain and writes them
 into the profile; the template says how.
@@ -64,24 +65,29 @@ a reviewer could reject one task while approving its neighbour.
 **Every task carries a `Done when:` line**: a `profile.verify` command and its passing result, or,
 where a task genuinely has none, a statement that there is no command.
 
+Every task carries a `**Behaviours:**` list: each behaviour, with at least one example of an input
+and the result it must give, such as "a net payout of 1000 at 3% is 970". The only verbatim code a
+plan carries is a form another task consumes, in `**Interfaces:**`.
+
 **Every task carries a `Depends on:` line** naming the tasks that must land first, or `none`;
-absent is read as unknown and runs alone. Where tasks depend on nothing outstanding and no two name
-the same file, declare a concurrent batch in the header. The template states the three further
-conditions a batch must also meet.
+absent is read as unknown and runs alone. Once the tasks are written, run `keel plan batches` and
+declare every batch it prints in the header, because the approver can only approve overlap they can
+see. The template says how.
 
 Every task follows the same five steps: write the failing test, run it and watch it fail, write
 minimal code, run it and watch it pass, then run the suite at the unit boundary and hand over by
 staging the named paths. Only a task in a declared concurrent batch commits, inside its own
-worktree. Use the exact commands from `profile.verify`, never a guess at what the project uses.
+worktree.
 
 ## Step 4: No placeholders
 
 These are plan failures, not shortcuts. Never write them:
 
 - "TBD", "implement later", "fill in details"
-- "Add appropriate error handling", "handle edge cases", "add validation"
-- "Write tests for the above" without the test code
-- "Similar to Task 3" instead of repeating the code. Tasks are read out of order
+- A behaviour with no example
+- "Handle edge cases", "add validation" or "add error handling" without each edge or rule as a
+  behaviour with its example
+- "Similar to Task 3" instead of restating the behaviours. Tasks are read out of order
 - A type, function, or method that no task defines
 
 Each one moves a decision from you to someone with less context. That is the opposite of
@@ -99,5 +105,11 @@ description starting `inherit: `. Fix what it returns, or record why not.
 
 ## Step 6: Hand off
 
-Report task count, story coverage, any concurrent batches, and anything the plan could not settle.
-Name `execute-plan` as next. Do not start it.
+Report task count, story coverage, any concurrent batches and anything the plan could not settle.
+Then ask one question carrying the routing and the delivery choice, for example "Approve, implement
+on keel-implementer, deliver to a pull request", and write the answer into `**Implementer
+routing:**` and `**Delivery:**`, because `execute-plan` reads those lines, not this conversation.
+Commit the plan alone, `docs(plans): <slug>`. On the default branch, leave it uncommitted, start
+nothing and say so: a delivery run records its progress in a committed plan. Otherwise, on
+`pull-request`, start `execute-plan`, because approval chose the pull request as the next gate; on
+`hand-off`, name it and do not start it.

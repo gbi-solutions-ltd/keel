@@ -1,0 +1,46 @@
+# installed by `keel ci-review install`. Remove it with `keel ci-review remove`.
+# keel's review in CI. This file is the switch: it runs while the file exists.
+# Cost: one Claude session per pull request opened, made ready or reopened.
+# Needs the Claude GitHub App on the repository (https://github.com/apps/claude), the secret named
+# below, and a project that has run `keel init`. keel sets none of them.
+name: keel review
+on:
+  pull_request:
+    types: [opened, ready_for_review, reopened]
+concurrency:
+  group: keel-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  review:
+    # Skips drafts, forks (GitHub withholds the secret from them) and Dependabot, which has no
+    # Actions secret. Dependabot counts as the pull request's author or as the actor.
+    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]' && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # Not pinned to a commit. Pin it, with the tag in a trailing comment, as you pin your other
+      # actions.
+      - uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          plugin_marketplaces: "https://github.com/gbi-solutions-ltd/keel.git"
+          plugins: "keel@gbi"
+          prompt: |
+            /keel:review-code Review pull request #${{ github.event.pull_request.number }}:
+            git diff ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}
+            Change no file. Skip step 2's plugin delegation and do not print its install note. The
+            suite cannot run on this runner: say "suite not run in CI" once and go on. Post the
+            report as one pull request comment:
+            gh pr comment ${{ github.event.pull_request.number }} --body-file -
+          claude_args: '--max-turns 30 --allowedTools "Read,Grep,Glob,Agent,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(gh pr comment ${{ github.event.pull_request.number }} --body-file -:*)"'

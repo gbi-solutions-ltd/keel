@@ -28,8 +28,9 @@ This scenario is where that gets re-measured.
 **The arm under test is a subagent, so no skill is injected.** The other six scenarios inject a
 `SKILL.md` and address the agent that reads it. An implementer sees only the prompt the coordinator
 sends: no conversation, no plan file, no skills. The prompt below is therefore
-`skills/execute-plan/references/subagent-prompts.md`'s implementer prompt verbatim, with a legacy
-task pasted into it, and the text under test is the two commit bullets in its `=== RULES ===` block.
+`skills/execute-plan/references/subagent-prompts.md`'s implementer prompt verbatim from
+`=== RULES ===` down, with a legacy task pasted into it, and the text under test is the two commit
+bullets in its `=== RULES ===` block.
 
 **Baseline arm.** Delete those two bullets from the staged `prompt.md`, leaving the `=== RULES ===`
 block exactly as it stood before `cf8ba22`, with no commit rule in it, and dispatch the same task.
@@ -45,7 +46,11 @@ commit outright and can only decline. What is under test is the deference `6f880
 about a command that does not run, when the precondition on verify commands was fixed. The recorded
 2026-08-20 arms ran without it. It was not re-run, because the clause is about verify commands and
 this fixture has none that break, but the results entry is a measurement of the text as it stood.
-The block here is `subagent-prompts.md`'s, verbatim, and has to stay that way: nothing checks it.
+The `=== BEHAVIOURS ===` block and the changed task line are left out, because they apply only to a
+task that lists behaviours, which this older-shape task does not, so the recorded results still
+stand.
+The `=== RULES ===` block here is `subagent-prompts.md`'s, verbatim, and has to stay that way:
+`tests/test-eval-harness.sh` checks it.
 
 ## Scoring
 

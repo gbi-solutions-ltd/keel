@@ -88,8 +88,7 @@ work where no skill has been picked yet.
 hook injects a compressed version of it into every session.
 
 Routing table lives in [`templates/prompting-cheatsheet.md`](../templates/prompting-cheatsheet.md),
-which is the same content shipped to users so the routing rules and the user documentation
-cannot drift apart.
+which is the same content shipped to users, so rules and docs cannot drift apart.
 
 ---
 
@@ -165,8 +164,8 @@ The third mode is `revise`, not `refactor`, so the mode name cannot be confused 
 `refactor` skill.
 
 All three run the questionnaire first, one question per message, following the `brainstorming`
-pattern from superpowers. The hard gate: no design or code until the user has approved the PRD in
-writing; a single feature or bug routed to `tdd` or `debug` goes there instead.
+pattern from superpowers. The hard gate: no design or code until the PRD is approved in writing; a
+single feature the short path accepts, or a bug routed to `debug`, goes there instead.
 
 Sections: executive summary, problem statement, vision and goals, users and personas,
 functional requirements, non-functional requirements, technical constraints, UX
@@ -244,25 +243,25 @@ and any deviation gets its own ADR.
 
 ### `write-plan`
 
-**Trigger:** an approved design or spec exists and work is about to start.
+**Trigger:** an approved design or spec exists and work is about to start, or a small change.
 **Reads:** architecture doc, stories.
 **Writes:** `profile.artifacts.plans` if that is set, otherwise `<docs_root>/plans/`, as `YYYY-MM-DD-<slug>.md`.
-**Does:** superpowers' `writing-plans`, near-verbatim, because it is the best version of
-this that exists. Bite-sized steps of 2 to 5 minutes. Exact file paths. Real code in the
-plan, never "add error handling here". Each task carries a `Consumes` and `Produces`
-interface block so a task executed in isolation knows the signatures its neighbours use.
+**Does:** superpowers' `writing-plans` with a task shape of keel's own, because it is the best
+version of this that exists. Bite-sized steps of 2 to 5 minutes. Exact file paths. Behaviours
+with examples in the plan, never "add error handling here". Each task carries a `Consumes` and
+`Produces` interface block so a task executed in isolation knows the signatures its neighbours use.
 
 Every task follows the TDD five-step shape: write the failing test, run it and watch it fail, write
 minimal code, run it and watch it pass, then run the suite and hand over; only a task in a declared
-concurrent batch commits for itself, in its own worktree.
+concurrent batch commits, in its own worktree. Each task carries a `Depends on:` line, which lets
+`execute-plan` overlap work; the plan declares every batch `keel plan batches` prints, so the
+approver sees the overlap they approve. It also runs a short path for small work.
 
-Each task also carries a `Depends on:` line, which is what lets `execute-plan` overlap work;
-a plan may declare a batch of tasks as concurrent when the template's five conditions hold.
-
-Ends with a self-review pass: does every story map to a task, are there placeholders left,
-do the type names used in task 7 match what task 3 defined. Those four are mechanical and run
-inline. A dispatched reviewer then covers what they cannot reach, because all four compare the
-plan to itself and none of them opens the codebase the plan will be built on.
+Ends with a self-review pass: does every story map to a task, are there placeholders left, do the
+type names used in task 7 match what task 3 defined. Those four are mechanical and run inline. A
+dispatched reviewer then covers what they cannot reach, because all four compare the plan to itself
+and none of them opens the codebase the plan will be built on. Approval asks one question for
+routing and delivery; a pull request choice starts `execute-plan` and runs to an open pull request.
 
 ### `execute-plan`
 
@@ -271,18 +270,18 @@ plan to itself and none of them opens the codebase the plan will be built on.
 **Writes:** code, commits, and checked boxes back into the plan file.
 **Does:** two modes, one of them the default.
 
-- **Delegated, the default:** a fresh subagent per task with two-stage review, spec compliance
-  first, then code quality, from superpowers' `subagent-driven-development`. Implementation noise
-  stays in subagents. Where the plan declares a concurrent batch, its tasks are dispatched
-  together, each in its own worktree. The coordinator dispatches, reviews, ticks, commits and
-  reports, and writes no production code at any size: both reviewers are fed the subagent's diff,
-  so a coordinator's own edit is the only change in the run nobody reviews.
+- **Delegated, the default:** a fresh subagent per task, from superpowers'
+  `subagent-driven-development`; `keel plan risk` picks two-stage review (full loop) or one spec
+  pass (light). Implementation noise stays in subagents. Where the plan declares a concurrent batch,
+  its tasks are dispatched together, each in its own worktree. The coordinator dispatches, reviews,
+  ticks, commits and reports, and writes no production code at any size: every reviewer is fed the
+  subagent's diff, so a coordinator's own edit is the only change in the run nobody reviews.
 - **Inline:** executes tasks in the current session with a checkpoint after each. Right for
   small plans and when the user wants to watch, and taken by naming it and why, not by drifting.
 
 Stops and asks rather than guessing when it hits a blocker, a failing verification it cannot
 explain, or an instruction it does not understand. Never starts on the default branch without
-consent.
+consent. A plan approved for a pull request runs on through `review-code` and `ship`.
 
 **REQUIRED SUB-SKILL:** `tdd` for every task, `debug` through Phase 3 for a failure the task caused.
 
@@ -292,12 +291,13 @@ consent.
 
 ### `tdd`
 
-**Trigger:** implementing any feature or bugfix, before writing implementation code.
-**Reads:** `.keel/profile.json` for `verify.test` and `verify.test_one`.
+**Trigger:** writing implementation code for any feature, bugfix or behaviour change, or a plan
+task; a small change asked for directly, outside a plan, starts at `write-plan`'s short path.
+**Reads:** `.keel/profile.json` for `verify.test`, `verify.test_one` and `verify.test_affected`.
 **Writes:** tests, then code.
-**Does:** superpowers' `test-driven-development`, adapted to read the test command from the
-profile instead of guessing. Keeps the iron law, the rationalisation table, and the red
-flags list, all of which are load-bearing under pressure.
+**Does:** superpowers' `test-driven-development`, adapted to read the test command from the profile
+instead of guessing. Keeps the iron law, the rationalisation table, and the red flags list, all of
+which are load-bearing under pressure. The boundary runs `verify.test_affected` when set.
 
 Adds one thing superpowers lacks: an explicit exception path. Throwaway spikes, generated
 code, and pure config are exempt, but the exemption must be stated out loud and the spike
@@ -370,18 +370,19 @@ a second opinion on a diff.
 **Does:** delegates to the `code-review` plugin when installed, because its multi-agent
 confidence-scored review beats a single inline pass, and dispatches its own rubric pass to a
 subagent on `inherit` either way, so that pass is not run by the context that wrote the code. Both
-passes stand and the rubric pass settles a conflict. The rubric covers correctness, standards
-conformance, test coverage and honesty, error handling, performance, security, simplicity.
+passes stand and the rubric pass settles a conflict. The rubric covers correctness, standards, test
+coverage and honesty, error handling, performance, security, simplicity.
 
 The house-specific additions the generic plugin will not know about: does the diff match the plan,
 does every changed line trace to the request (Karpathy's surgical-changes test), were the tests
-written first, is any accepted decision contradicted, and has a test been proved able to fail.
+written first, is any accepted decision contradicted, and has a test been proved able to fail. A
+change to a sensitive path gets one mutant per changed decision line, and a survivor blocks.
 
 ### `security-audit`
 
 **Trigger:** before shipping, "is this secure", any auth, payments, PII, secrets, or
 external input work, on a schedule, or on request.
-**Reads:** the diff or the whole repo, `.keel/profile.json`.
+**Reads:** the diff or the whole repo, `.keel/profile.json`, and `keel plan risk` for the match.
 **Writes:** `<docs_root>/audits/YYYY-MM-DD-security.md`.
 **Does:** two scopes.
 
@@ -393,10 +394,9 @@ Phases, ordered by where breaches actually come from: secrets in git history, de
 and supply chain, CI/CD pipeline and env var exposure, then OWASP Top 10 against the code,
 then a STRIDE threat model of the architecture, then auth and authorisation specifically.
 
-Two rules that keep it useful rather than noisy: every finding needs a concrete exploit
-scenario and a file:line, and findings below a confidence threshold are dropped rather than
-listed as "consider reviewing". A report of forty maybes gets ignored; a report of three
-real ones gets fixed.
+Two rules that keep it useful rather than noisy: every finding needs a concrete exploit scenario and
+a file:line, and findings below a confidence threshold are dropped rather than listed as "consider
+reviewing". A report of forty maybes gets ignored; a report of three real ones gets fixed.
 
 **Plugin calls, Claude Code only:** `security-guidance` for its hook-level coverage on every edit, and the
 built-in `/security-review` command as a cross-check on the diff.

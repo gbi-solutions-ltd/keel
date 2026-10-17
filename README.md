@@ -168,7 +168,7 @@ generic (`tests/no-internal-leaks.sh`), and scans for what would execute on or l
 installing machine (`tests/supply-chain-scan.sh`, 19 pattern rules and 5 structural). Full rule
 list is in [`CONTRIBUTING.md`](CONTRIBUTING.md#the-rules-the-validator-enforces).
 
-14 scenarios exist, testing whether a discipline skill changes behaviour under pressure, which
+17 scenarios exist, testing whether a discipline skill changes behaviour under pressure, which
 shape checks cannot; results and the arguments they produced are in
 [`tests/evals/results.md`](tests/evals/results.md).
 
@@ -183,6 +183,18 @@ Pre-push refuses anything `keel scan` flags in the tree being pushed or a key fi
 it carries, a push straight to the default branch, and a push whose profile is weaker than what is
 already on the remote. Pre-commit is inert until `gates.commit_guard` turns it on. Detail is in
 [`docs/03-install-and-distribution.md`](docs/03-install-and-distribution.md#commands).
+
+Review in CI is off until you ask for it:
+
+```bash
+keel ci-review install    # writes .github/workflows/keel-review.yml; --oauth for a subscription token
+keel ci-review remove     # or delete the file
+```
+
+It runs `review-code` through the Claude Code GitHub Action on pull requests from branches of the
+same repository, one Claude session each. It needs the repository secret named in the file, the
+Claude GitHub App and a project that has run `keel init`; keel sets none of them. Detail is in
+[`docs/03-install-and-distribution.md`](docs/03-install-and-distribution.md#keel-ci-review).
 
 ## How to read this repo
 

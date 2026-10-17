@@ -29,7 +29,8 @@ If nothing fires and you expected it to, say `/keel` and describe the task.
 | "design a schema", "review this database", "normalise these tables", "what column type" | `design-database` | a schema review with every section filled |
 | "write the implementation plan", "plan this out" | `write-plan` | `docs/plans/<date>-<slug>.md` |
 | "execute the plan", "start building", "go" | `execute-plan` | code and commits |
-| "implement X", "add feature Y" | `tdd` | failing test first, then code |
+| "implement X", "add feature Y", "a small change" | `write-plan` (short path) | `docs/plans/<date>-<slug>.md` once you approve the behaviours, then code, and a pull request if you choose it |
+| "just write the code for X", "no PR" | `tdd` | failing test first, then code, and no pull request |
 | "what are our conventions", "set up linting", "enforce style", "does the code still follow our standards" | `coding-standards` | `docs/standards.md` plus lint config, or `docs/audits/<date>-standards.md` in assess mode, or `docs/audits/<date>-standards-audit.md` in audit mode |
 | "production is down", "we have an outage", "customers are affected" | `incident-response` | a restored service, then an incident record |
 | "this is broken", "why does X fail", "this test is flaky", "fix bug Z", "wtf" | `debug` | root cause, then a failing test, then the fix |

@@ -19,26 +19,27 @@ conventions (FR-02, FR-03, FR-07, NFR-01), and 4 are author-added (FR-01, FR-08,
 ## 1. Executive summary
 
 `gates.coding_standards` is declared in every project's profile and enforces nothing:
-`templates/profile.schema.json:286` says so of itself. Of the 81 individual rules in
-`skills/coding-standards/references/`, 33 are checked by `review-code`'s rubric, and again per-task
-by `execute-plan`'s own quality review, but classified `Should fix`, not `Blocking`, so they never
-stop a ship or a tick; the other 48 have no check at all. This PRD wires `gates.coding_standards`
-to something real, at three points: it makes a `required` project's ship gate actually refuse on
-an unaddressed standards violation, it makes `execute-plan` refuse to tick a task over an
-unaddressed `Blocking` quality finding the same way it already refuses over a failed spec-compliance
-review, it ships lint- and CI-level config for the handful of rules that are genuinely mechanical,
-and it makes `repo-snapshot` surface a standards gap during onboarding instead of staying silent
-about one the way it does today.
+`templates/profile.schema.json#"coding_standards": {` says so of itself. Of the 81 individual rules
+in `skills/coding-standards/references/`, 33 are checked by `review-code`'s rubric, and again
+per-task by `execute-plan`'s own quality review, but classified `Should fix`, not `Blocking`, so
+they never stop a ship or a tick; the other 48 have no check at all. This PRD wires
+`gates.coding_standards` to something real, at three points: it makes a `required` project's ship
+gate actually refuse on an unaddressed standards violation, it makes `execute-plan` refuse to tick a
+task over an unaddressed `Blocking` quality finding the same way it already refuses over a failed
+spec-compliance review, it ships lint- and CI-level config for the handful of rules that are
+genuinely mechanical, and it makes `repo-snapshot` surface a standards gap during onboarding instead
+of staying silent about one the way it does today.
 
 ## 2. Problem statement
 
 The user asked for confirmation that coding standards can be enforced and, where possible, that
 they are difficult to violate. Investigated directly this session: they cannot be, and are not.
 
-`docs/profile-keys.md:54`, verbatim, about `gates.coding_standards`: "No skill, hook or CLI path
-is written to read it, so nothing in keel enforces it." Grepped to confirm this is still true: the
-key's only appearance in `bin/keel` is inside the pre-push hook's loosening-check, which protects
-the *value* from being silently weakened on a push, and it never gates the code's content.
+`docs/profile-keys.md#gates.coding_standards`, verbatim, about `gates.coding_standards`: "No skill,
+hook or CLI path is written to read it, so nothing in keel enforces it." Grepped to confirm this is
+still true: the key's only appearance in `bin/keel` is inside the pre-push hook's loosening-check,
+which protects the *value* from being silently weakened on a push, and it never gates the code's
+content.
 
 `skills/ship/SKILL.md:29` already says "`review-code` has run and nothing blocking remains," and
 `review-code` already runs unconditionally inside `ship` (schema 4 retired the standalone
@@ -119,7 +120,7 @@ Three, all people already using keel-managed projects:
 
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
-| FR-11 | `execute-plan`'s delegated loop must treat a `Blocking` finding from the per-task code-quality review the same way it already treats a `DEVIATES` verdict from the spec-compliance review: the task is not ticked or committed until the finding is resolved, or the user explicitly accepts it. | confirmed | Bernard, 2026-09-21, proposing plan-time enforcement directly, confirmed as in-scope for this PRD. `skills/execute-plan/references/subagent-prompts.md#Code quality review` (the quality review already receives the `PROJECT STANDARDS` block and produces `Blocking`/`Should fix`/`Consider` findings, on every task); `skills/execute-plan/references/subagent-prompts.md#On a DEVIATES` (in "Running the loop") states the `DEVIATES` handling in full and says nothing about what a `Blocking` quality finding requires before ticking |
+| FR-11 | In the full loop, `execute-plan`'s delegated loop must treat a `Blocking` finding from the per-task code-quality review the same way it already treats a `DEVIATES` verdict from the spec-compliance review: the task is not ticked or committed until the finding is resolved, or the user explicitly accepts it. The full loop is the one `keel plan risk` gives a task whose change touches a path in the project's `hard_block_paths`, or whose loop it cannot decide. In the light loop, a task touching none, there is no per-task quality review, and the same standards are enforced once per feature by `ship` step 5's standards gate (FR-01) through `review-code` where `gates.coding_standards` is `required`; under `warn` a violation is reported and the ship continues, and under `off` nothing enforces them. **Amended 2026-10-16, decided by Bernard.** | confirmed | Bernard, 2026-09-21, proposing plan-time enforcement directly, confirmed as in-scope for this PRD. `skills/execute-plan/references/subagent-prompts.md#Code quality review` (the quality review already receives the `PROJECT STANDARDS` block and produces `Blocking`/`Should fix`/`Consider` findings, on every task); `skills/execute-plan/references/subagent-prompts.md#On a DEVIATES` (in "Running the loop") states the `DEVIATES` handling in full and says nothing about what a `Blocking` quality finding requires before ticking. Amended 2026-10-16, decided by Bernard (`docs/plans/2026-10-16-proportional-review-loop.md`): a repository with no `hard_block_paths` gets the light loop, and FR-11 applies in the full loop only |
 
 This is the cheapest of the three enforcement points in this PRD: the review dispatch, the
 standards block, and the severity vocabulary all already exist per-task; only the *handling* of a
@@ -165,7 +166,7 @@ through a formal plan (a direct edit, a small fix) still only meets `gates.codin
 
 | Behaviour | Kind | Evidence | What to do |
 |---|---|---|---|
-| `gates.coding_standards` accepted and stored by `keel init`/`keel profile set` with no effect elsewhere | deliberate deferral | `templates/profile.schema.json:286`, `docs/profile-keys.md:54` | Addressed by FR-01 through FR-03; not a bug, a known and named gap |
+| `gates.coding_standards` accepted and stored by `keel init`/`keel profile set` with no effect elsewhere | deliberate deferral | `templates/profile.schema.json#"coding_standards": {`, `docs/profile-keys.md#gates.coding_standards` | Addressed by FR-01 through FR-03; not a bug, a known and named gap |
 | `review-code` classifies every standards violation as `Should fix`, never `Blocking` | deliberate consequence of `review-code`'s own general-purpose design | `skills/review-code/SKILL.md#Step 4: Rank, and say what blocks` | Not to be changed generally. FR-01 adds a second, `gates.coding_standards`-specific check in `ship`, rather than reclassifying `review-code`'s severity table, which serves every review, not only standards |
 | `execute-plan`'s per-task quality review already produces `Blocking` findings against the standards block, and nothing requires acting on one before the coordinator ticks and commits | accident | `skills/execute-plan/references/subagent-prompts.md#Code quality review` through `#Running the loop` | Addressed by FR-11 |
 | `repo-snapshot`'s six fan-out agents (Boot/Data/Surface/Quality/Delivery/Docs) never read the project's `standards.md` | accident | `skills/repo-snapshot/SKILL.md`, grepped for any mention | Addressed by FR-08 |
@@ -208,8 +209,12 @@ FR-11 already state as testable behaviour. No trend measurement is built for thi
 - `review-code` keeps running unconditionally inside `ship`. Falsifiable: if that changes, FR-01's
   precondition ("review-code has run") may no longer hold on every ship attempt.
 - `execute-plan`'s delegated loop keeps dispatching a code quality review carrying the
-  `PROJECT STANDARDS` block, on every task. Falsifiable: if that dispatch is removed or stops
-  receiving the block, FR-11 has nothing to gate on.
+  `PROJECT STANDARDS` block, on every task in the full loop (amended 2026-10-16, decided by
+  Bernard: a light-loop task gets no per-task quality review; FR-11 applies in the full loop only).
+  Falsifiable: if that dispatch is removed or stops receiving the block, FR-11 has nothing to gate
+  on. A light-loop task's standards are enforced once per feature by `ship` step 5 only where
+  `gates.coding_standards` is `required`; under `warn` or `off` a light-loop task's standards
+  violation can ship.
 - A project adopting FR-05/FR-06 already has a working `tsconfig.json` or CI workflow for the merge
   to target; a project with neither gets whichever of `keel init`'s existing scaffolding paths
   already write one, unchanged by this PRD.

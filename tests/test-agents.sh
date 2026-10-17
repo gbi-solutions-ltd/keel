@@ -92,5 +92,33 @@ else
     ok "keel-fanout keeps Bash and sets no tools allowlist"
 fi
 
+# keel-implementer is the routed implementer (ADR-0008): it writes code, so the two things pinned
+# for keel-fanout are pinned the other way. It runs on `sonnet`, the model named in the plan that
+# routes to it, and it denies no tool, because an implementer that cannot Edit or Write implements
+# nothing. Read the same way as above, so CRLF line endings are line endings.
+impl=agents/keel-implementer.md
+if [ ! -f "$impl" ]; then
+    bad "keel-implementer runs on sonnet" "$impl does not exist"
+    bad "keel-implementer denies no tool and sets no tools allowlist" "$impl does not exist"
+else
+    ifm="$(awk '{sub(/\r$/, "")} /^---$/{c++; if(c>=2) exit; next} c==1' "$impl")"
+    imodel="$(printf '%s\n' "$ifm" | sed -n 's/^model:[[:space:]]*//p' \
+        | sed -e 's/[[:space:]]*$//' -e "s/^[\"']//" -e "s/[\"']\$//")"
+    if [ "$imodel" = sonnet ]; then
+        ok "keel-implementer runs on sonnet"
+    else
+        bad "keel-implementer runs on sonnet" "model is '$imodel'"
+    fi
+    if grep -q '^disallowedTools:' <<<"$ifm"; then
+        bad "keel-implementer denies no tool and sets no tools allowlist" \
+            "a disallowedTools: line stops it writing code"
+    elif grep -q '^tools:' <<<"$ifm"; then
+        bad "keel-implementer denies no tool and sets no tools allowlist" \
+            "a tools: line narrows what it inherits"
+    else
+        ok "keel-implementer denies no tool and sets no tools allowlist"
+    fi
+fi
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

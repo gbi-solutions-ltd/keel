@@ -22,6 +22,7 @@
   "verify": {
     "test": "npm test",
     "test_one": "npm test -- {path}",
+    "test_affected": "npx jest --changedSince={base}",
     "test_integration": "npm run test:integration",
     "lint": "npm run lint",
     "format": "npm run format:check",
@@ -35,7 +36,8 @@
     "coding_standards": "required",
     "security_audit": "required",
     "commit_guard": "off",
-    "done_verified": "warn"
+    "done_verified": "warn",
+    "suite_warn_seconds": 60
   },
   "conventions": {
     "commit_style": "conventional",

@@ -38,6 +38,10 @@ Read `gates.coding_standards` from `.keel/profile.json` before item 5.
 | `warn` | Reported in the same words, then the ship continues |
 | `off` | Not read. Item 5 requires only that `review-code` has run and nothing blocking remains |
 
+In a delivery run, the record that `review-code` has run is the plan's `## Delivery`
+`- review-code:` line (the final one, not round 1), because a session that never saw the review
+has nothing else to check "has run" against.
+
 A profile with no `gates.coding_standards` key reads as `off`. `keel init` writes `required` on
 every profile it creates.
 

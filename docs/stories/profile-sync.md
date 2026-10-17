@@ -372,7 +372,8 @@ Scenario: the profile line names all three subcommands
   Then the profile line names get, set and sync
 ```
 
-**Notes:** one scenario, because there is one observable outcome. `bin/keel:2174` is the line.
+**Notes:** one scenario, because there is one observable outcome.
+`bin/keel#read or correct one profile field` is the line.
 
 ---
 

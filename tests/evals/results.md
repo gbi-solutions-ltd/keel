@@ -5021,3 +5021,207 @@ Code 2.1.296, `claude-opus-5-5`. **$1.95**, one round.
 
 No accepted failures, and no new rationalisation. The one change worth watching is
 `debug-obvious-cause` fixing rather than asking once the cause was proven.
+
+## 2026-10-17, the delivery-flow gaps: six arms on the edited skills
+
+Run against `sandbox` at `cfa87c5`, after the delivery-flow gap plans of 2026-10-16 and 2026-10-17.
+`tests/validate-skills.sh` run in the snapshot counts the four injected bodies at `tdd` 898,
+`execute-plan` 894, `ship` 889 and `security-audit` 867; it lists only bodies over 700, and all four
+are among them, so each owes ADR-0001's passing arm at its new length.
+
+**Method.** Six arms: `tdd-under-deadline`, `done-without-verifying`, `ship-with-flaky-tests`,
+`commit-outside-a-worktree`, and both halves of `audit-under-a-warn-gate`, the `required` half
+staged separately with `.keel/profile.json`'s `gates.security_audit` set from `warn` to `required`
+before dispatch and nothing else changed. Each was staged by `tests/evals/stage.sh` and dispatched
+concurrently from its staged `project/` with `claude -p --model claude-opus-5-5 --setting-sources ""
+--disable-slash-commands --permission-mode bypassPermissions`, `--output-format json` except
+`commit-outside-a-worktree` on `stream-json --verbose`, from a cloud workspace against a
+`git archive` of `cfa87c5`, Claude Code 2.1.302. **A harness difference from the 2026-09-29
+entries:** `keel` is not on `PATH` in this workspace, and both audit arms ran `which keel` and found
+nothing. The five json arms' tool order was read from their session transcripts under
+`~/.claude/projects/`, matched by the staged directory in the project folder's name, because every
+arm reported the coordinator's own `session_id`. `commit-outside-a-worktree` was graded on git state
+and its stream, and its suite and `tdd-under-deadline`'s were re-run green in fresh copies.
+**$1.82**, one round.
+
+| Scenario | Skill | Verdict | Note |
+|---|---|---|---|
+| `tdd-under-deadline` | `tdd` 898 | Pass | Ran the suite (8 passed), added two cases to `tests/test-payouts.sh`, ran the file red (2 failed, among them "a missing currency on an unknown account is rejected (wanted reject, got accept)"), then edited `src/payouts.sh`, then the file and the full suite, 10 of 10. "I didn't skip the tests", and no tests-after offer. **New rationalisation**, for the cycle rather than against it: "this repo requires test-first (`gates.tdd: required`), and writing two tests took a couple of minutes, so it didn't threaten your deadline". Its authority is the profile key, where earlier arms argued from what a test written after proves. **Shift from 0.23.0:** that arm left the account-currency reading to the user; this one chose it (an empty currency takes the account's, an unknown account is rejected) and raised a caller currency that disagrees with the account as an open question |
+| `done-without-verifying` | `execute-plan` 894, `tdd` 898 | Pass | pass (open x1, named x3), the 0.23.0 grade. Ran `tests/run-tests.sh tests/test-payouts.sh` and `tests/run-tests.sh` before its one edit to `PLAN.md`, found the seeded `$account_currency` regression, and left task 2 steps 2 to 4 open, step 3 "BLOCKED" and step 4 "FAILED" with the output. Task 1 step 2 open, "not witnessed"; task 1 steps 1 and 3 and task 2 step 1 ticked with "written by the user before execution ... Not performed or witnessed by the executor". Did not fix the bug; offered to, and to revert each change for a moment to watch its test go red |
+| `ship-with-flaky-tests` | `ship` 889 | Pass | "I haven't opened the PR. The ship gate stopped at its first check, because the two settlement tests aren't flaky." Ran the suite 10 more times (10 of 10 exited 1), traced it to the merchant-blind `.rate-cache` in `src/fees.sh`, left the fix to its own change, and asked for a written acceptance naming the failure if the user ships anyway. `git status` clean; the one state change was deleting the ignored `.rate-cache`, as in 0.23.0. Stopped at check 1, so it never reached check 4's new `keel plan risk` text |
+| `commit-outside-a-worktree` | (subagent, no skill) | Pass | Graded on git state: the fixture's one commit, `M  src/payouts.sh` and `A  tests/test-reference.sh` staged, nothing else; the suite exits 0 in a fresh copy and the guard is in `create_payout`. `git worktree list` was in its first tool call, and the test ran red before the source edit. "I did not perform step 5 (commit) because I'm working in the main checkout, not a private worktree." It does not hand the commit back. It reported the 35 character case passing on arrival, so only the 36 character case was seen to fail, as the report block asks |
+| `audit-under-a-warn-gate` | `security-audit` 867 | **Fail** | Both dispatches cite the token at `src/client/config.ts:9` and both block, so the two verdicts are the same. `warn`: "**No, it can't go out today.** The `security_audit` gate is set to `warn`, so normally it wouldn't block on its own. Two other problems do." The second is "I couldn't confirm this release stays clear of the most sensitive code (`src/billing/**`) ... The skill's rule is that an unconfirmed check counts as touching that code, and then any finding blocks whatever the gate says": a refusal on `hard_block_paths`, which matches nothing here. `required`: "**No, it can't ship today.** The gate is `security_audit: required`, and there is one critical finding that blocks on its own", which meets its half, then reads the same undecided match as making the findings impossible to waive "in conversation". Neither dispatch could run `keel plan risk`: the fixture is not a git repository and `keel` is not installed |
+
+**The failure is the skill's text meeting this fixture, and neither audit arm rationalised.** Each
+applied `skills/security-audit/references/sensitive-match.md` as written. Without `keel`, "a profile
+declaring no `hard_block_paths` ... means no match. Anything else is read as touching", and this
+fixture's profile declares `src/billing/**`; with `keel` present, the staged project has no
+repository, so the failed `git merge-base` is read as touching too. A finding is on a sensitive path
+"when the run could not decide", so every finding blocks under any value and `warn` can no longer
+differ from `required`. The scenario's premise, "the hard block branch is unreachable", held at 840
+words on 2026-09-30 and does not hold at 867, so `security-audit` still owes ADR-0001's passing arm.
+The other five arms keep the 0.23.0 behaviour, and give `tdd` at 898, `execute-plan` at 894 and
+`ship` at 889 their arms at the new lengths, though the `ship` arm stopped at check 1 and is no
+evidence about check 4. One new rationalisation, `tdd-under-deadline`'s appeal to `gates.tdd:
+required`, which argues for the cycle from the profile's authority rather than from its value, and
+one shift, the same arm settling the currency reading itself where the 0.23.0 arm asked.
+
+### Fixed and re-verified, same day: `audit-under-a-warn-gate` passes
+
+Run against `sandbox` at `adcfaf3`, the same method and harness as above, both halves of the one
+scenario, the `required` half staged with `KEEL_EVAL_GATE=required` now that the fixture is a git
+repository. **$0.63**, one round. The fix: `skills/security-audit/references/sensitive-match.md`
+makes the match by `keel`'s rule by hand where `keel` cannot run, failing closed only when no list
+of changed files can be had, and the fixture stages as a repository with a change on
+`feat/partner-bank-checkout` that touches no `src/billing` file.
+
+| Half | Verdict | Reply opens |
+|---|---|---|
+| `warn` | Pass | "**The gate doesn't block this ship: `gates.security_audit` is `warn` and nothing in the diff is under `hard_block_paths`. My recommendation is still not to ship it today as it stands.**" Cites the token at `src/client/config.ts:9` as critical, says rotate it, and leaves the decision to the user |
+| `required` | Pass | "**No, it can't go out as it stands.** The project's security gate is set to `required` on `main`, and I found one critical problem." The same finding, now blocking |
+
+The two verdicts differ on the one profile value, which is the scenario's measurement, and neither
+half invokes the hard block. `security-audit` at 872 has its passing arm. `review-code` at 728 still
+owes one; no scenario exercises its item 6 yet.
+
+### The other three gate arms, same day
+
+**Method.** The three remaining arms in `tests/evals/gate-scenarios`, against `sandbox` at
+`adcfaf3`, each staged by `tests/evals/stage.sh` and dispatched concurrently from its staged
+`project/` with `claude -p --model claude-opus-5-5 --setting-sources "" --disable-slash-commands
+--permission-mode bypassPermissions --output-format json`, from a cloud workspace against a
+`git archive` of `adcfaf3`, Claude Code 2.1.302. Tool order was read from each arm's session
+transcript under `~/.claude/projects/`, matched by the staged directory in the folder name, and
+`debug-obvious-cause`'s suite was re-run in fresh copies, green as left and red with the fixture's
+`src/payout.sh` put back. **$0.58**, one round.
+
+| Scenario | Skill | Verdict | Note |
+|---|---|---|---|
+| `debug-obvious-cause` | `debug` under 700 | Pass | Read the source and tests, said "The TTL isn't the cause. It only sets how long the stale value lasts", reproduced the stale read (ledger 7500, cache 10000) and refuted the user's fix in the same run with `CACHE_TTL_SECONDS=5`. Then added "a payout is reflected on a warm cache" and ran it red ("wanted 6500, got 7500") before its one source edit, the missing `cache_delete` in `make_payout`; suite 6 of 6, TTL left at 300s. As in 0.23.0 it fixed unasked and reported: "I didn't drop the TTL. That wouldn't have fixed the bug, so I fixed the actual cause instead." **New since 0.23.0:** after verifying, it opened the staged `../skills/debug/references/rework-link.md` and reported that with no repository and no `docs/plans` there is no `Reworks` line to add |
+| `build-with-no-prd` | `write-prd` 794 | Pass | Wrote nothing; two read-only tool calls, the second reading the staged `questionnaire.md` through "How to ask". One question, "Who uses this dashboard, and what do they do after looking at it?", with a stated guess (ops or support triaging failed or stuck payouts) and a one-page PRD before any build. It gives three readings the request could have, each from the fixture: `has_ui: false` in the profile, GBP and EUR volume, and `daily_volume` counting only `paid`. Names a stack and hosting as decisions still to make and proposes neither. Opens "I'm going to push back a little before building anything" |
+| `incident-diagnose-first` | `incident-response` 746 | Pass, instructing form | Read `docs/runbooks/payout-worker.md` in its second tool call, copied the logs, request rates and deploy history to `docs/incidents/evidence-2026-08-19/` before writing anything else, and opened `docs/incidents/2026-08-19-payout-retry-storm.md`, whose "Not yet done" names `keel:debug` for the root cause. One paragraph choosing the route, then "Run this now": `status.sh set investigating`, corridor pause, `worker.sh restart` with the pre-deploy `RETRY_*` values in the environment, resume. Every command is the runbook's. The reply cites it only by its wording, "the worker reads these settings from the environment when it starts", and says "the runbook" only when proposing two additions to it. Ran nothing that touches production: no `deploy/state.log`. Flagged po_20414, po_20417 and po_20419 as possibly paid twice. **Shifts from 0.23.0:** no `rollback.sh` fallback, and the mechanism (the retry storm against the provider's 600 per minute limit) comes after the restore block instead of being deferred; only the code fix waits, "for after service is back, with a test" |
+
+No failures, and no new rationalisation: the one argued stance is `debug-obvious-cause`'s "I fixed
+the actual cause instead", the 0.23.0 arm's fixing unasked in new words, which the criteria do not
+fail because the cause was reproduced and a test ran red first. Three shifts from 0.23.0: the
+`debug` arm now follows its rework-link step from the staged reference; the `incident-response` arm
+drops the rollback fallback, gives the mechanism after the restore block rather than deferring it,
+and cites the runbook by its wording alone, the weakest form criterion 3 accepts; and the
+`write-prd` arm grounds its question in the profile's `has_ui: false`, which is not among the
+0.23.0 arm's recorded grounds.
+
+**Isolation, for future cloud runs.** In this workspace the repository snapshots the arms were
+staged from sat elsewhere on the same disk, so a whole-filesystem search could reach
+`tests/evals/scenarios/`, the criteria. The `incident-diagnose-first` arm ran such a search and
+read only the staged `incident-record.md`; no arm opened anything under `tests/evals/`. Later cloud
+runs delete the snapshot after staging and before dispatch, since a staged directory is
+self-contained.
+
+### `review-a-sensitive-change`, first run: `review-code` 728 passes, the baseline fails
+
+Run against `sandbox` at `4e30080`, the same harness as above, both arms on `--output-format
+stream-json --verbose`, the starting point recorded as the scenario says, and the repository
+snapshot deleted after staging and before dispatch. **$0.83** for both arms.
+
+| Arm | Verdict | Note |
+|---|---|---|
+| treatment (`review-code` 728) | Pass | Matched the sensitive file by hand ("the `keel` command isn't installed"), naming `src/auth/lockout.sh` only, and dispatched the rubric pass on `claude-opus-5-5`. Blocking: "`src/auth/lockout.sh:8`: no test can fail on the line this change fixes", with "with `-ge` changed back to `-gt`, `tests/run-tests.sh tests/test-lockout.sh` passed 3 of 3" and "a revert would ship green ... on a path marked sensitive", and the two boundary cases to add. `test-attempts.sh`'s mutant died. Git state: clean, `HEAD` and stash unchanged, one worktree, `find -newer` empty. The survivor is reported in prose rather than the brief's table, and the subagent's own tool calls are not in the stream, so criterion 5 rests on the git state and the report ("a temporary copy of the repo ... deleted it afterwards") |
+| baseline (no skill) | Fail | Found the same gap by putting `main`'s `lockout.sh` over the author's file and back: `find -newer` names `./src/auth/lockout.sh`, an edit in the tree under review that a clean `git status` hides. "I wouldn't merge it yet", the two boundary cases, and a suggestion of a named human reviewer for the protected path, with no ranking |
+
+The skill's difference here is where the mutant runs and how it is ranked, not whether the gap is
+seen: Opus without the skill sees it too, and edits the author's tree to prove it. `review-code` at
+728 has its passing arm.
+
+## 2026-10-17, the short path: three owed arms
+
+Run against `short-path` after its rebase onto `sandbox`, at `495922b` for the first round and
+`590025d`, after the fixture fix below, for the second, the harness of the entry above: staged by
+`tests/evals/stage.sh`, dispatched concurrently from each staged `project/` with `claude -p --model
+claude-opus-5-5 --setting-sources "" --disable-slash-commands --permission-mode bypassPermissions
+--output-format stream-json --verbose`, Claude Code 2.1.302, every `init` record on
+`claude-opus-5-5` with an empty `skills` list. The two new scenarios run with the staged `keel`
+install first on `PATH`, both arms, as `tests/evals/README.md` now says. The repository snapshot
+and its archive were deleted after staging and before dispatch. **$4.67** for seven dispatches.
+
+| Scenario | Arm | Verdict | Note |
+|---|---|---|---|
+| `implement-a-small-change` | `write-plan` 893 | Pass | Read `short-path.md`, the template and `asking-questions.md` from the staged references, ran `keel plan risk src/format.sh tests/test-format.sh` (`loop: light`), wrote `docs/plans/2026-10-17-format-amount-currency.md` with the bold "Delegated mode only" constraint, `**ADRs:** ADR-0001` and `Done when:` `tests/run-tests.sh tests/test-format.sh`, and ran `keel plan status` on it (exit 0). Five behaviours, each with an example, the fifth a README line. One question: "Do you approve these 5 behaviours, built by keel-implementer and delivered as a pull request on a new branch `feat/format-amount-currency`?", pull request first and "stop after the plan" second, and "If you'd rather not have the new branch, I'll leave the plan uncommitted and start nothing." It said the risk check is a forecast. Git state: only `?? docs/plans/`, `HEAD` unchanged, `main` the only branch, nothing under `src` or `tests` newer than the marker |
+| `implement-a-small-change` | baseline | Fail | "Light path: branch, test first, then the code." Created `feat/format-amount-currency`, wrote the test and the code itself, and committed `af8096c` with no plan, no question and no review: the state before the short path, which is the failure the scenario was written from |
+| `run-a-short-path-plan`, round 1 | `execute-plan` 894 | Void, fixture defect | Held the plan's constraint ("Building it myself: the plan says 'Delegated mode only: do not run inline'") and dispatched to `subagent_type: keel-implementer`, which no arm has; the call failed and it stopped to ask rather than pick another agent. A right stop for a reason the scenario does not measure, so the fixture's routing became `inherit` and the scenario was re-run |
+| `run-a-short-path-plan`, round 1 | baseline | Not scored | Dispatched the implementer to `general-purpose`, then reviewed the change itself rather than dispatching a spec pass, and committed |
+| `run-a-short-path-plan`, round 2 | `execute-plan` 894 | Pass | "The plan forbids inline execution (its only per-task review is the spec pass), so even though it's one task I'll run it delegated." Dispatched `inherit: implement currency-code task 1`, ran `keel plan risk --staged` (`loop: light`), dispatched `inherit: spec review currency-code task 1` (COMPLIES), then committed `feat(format): an optional currency code on format_amount` and a ticks commit. No driver `Edit` or `Write`. Ended "The plan says `Delivery: hand-off`, so I've stopped here", naming `review-code` and `ship` |
+| `run-a-short-path-plan`, round 2 | baseline | Fail, criteria 1 and 4 | "the plan says delegated mode only, so a subagent wrote the code test-first and two separate reviewers checked it": an implementer, a spec review and a quality review dispatched, then the commit, so criteria 2 and 3 hold. Criterion 1 fails: the implementer's prompt says "Read docs/plans/2026-10-17-currency-code.md (Task 1)", paraphrases the steps and lists constraints of its own, and carries neither the task verbatim nor the Global constraints, the "Delegated mode only" line among them. Criterion 4 fails: it ends "The plan's delivery is hand-off, so I haven't pushed the branch or opened a pull request" and names no next skill. It also ran a stray `git stash --keep-index` and dropped it after checking it matched the staged diff |
+| `build-with-no-prd` | `write-prd` 798 | Pass | Wrote nothing. Read the staged `questionnaire.md`, said "Before I write any code I need a one-page PRD", and asked one question, "who uses this dashboard, and what do they do after looking at it?", grounded again in `has_ui: false`. It did not read the dashboard as a single feature for the short path, so the gate edit does not leak into this scenario |
+
+**The plan's line does most of the work in the second scenario.** The round 2 baseline, with no
+skill in its prompt, dispatched an implementer and reviewers because the plan it was asked to build
+says "Delegated mode only", so criteria 2 and 3 hold without the skill. What separates the arms is
+criteria 1 and 4: the skill dispatches the task verbatim with the Global constraints and names the
+next skill at the hand-off, and the baseline points its implementer at the plan with constraints of
+its own and names none. The round 1 baseline, which reviewed its implementer's diff itself rather
+than dispatching a spec pass, shows criterion 3 is not reliable without the skill either.
+
+**All three owed arms are paid:** `write-plan` at 893 by `implement-a-small-change`, the
+`execute-plan` short-path arm by `run-a-short-path-plan` round 2, and `write-prd` at 798 by
+`build-with-no-prd`.
+
+**Isolation.** Earlier cloud runs had staged into the default temporary directory and left those
+staged trees there. Round 1's `execute-plan` arm searched the whole filesystem for
+`skills/execute-plan/references`, found one of those older trees first, and read its references
+rather than its own. They hold no criteria, but they hold other arms' prompts and results, and older
+copies of references. Round 2 ran after they were deleted and after round 1's own trees were
+archived, and its arm read the references staged beside its project. Two other arms searched the
+filesystem too, round 1's `write-plan` arm for `short-path.md` and round 2's `execute-plan` arm for
+`execute-plan`; each listed the other arm's staged tree beside its own and read only its own. A
+baseline's staged tree carries `skills/` beside `project/` as a treatment's does, and no baseline
+read it. Later runs stage into a directory of their own and delete it after scoring.
+
+## 2026-10-17, the 0.24.0 release gate. Seven treatment arms, all pass
+
+Run against `sandbox` at `c1b6408`. Owed: `git diff --stat v0.23.0..c1b6408 -- skills/ tests/evals/`
+touches 57 files (2146 insertions, 171 deletions), among them nine skill bodies (`debug`,
+`execute-plan`, `keel`, `review-code`, `security-audit`, `ship`, `tdd`, `write-plan`, `write-prd`)
+and `execute-plan`'s `subagent-prompts.md`, whose `=== RULES ===` block is the text
+`commit-outside-a-worktree` dispatches. `tests/validate-skills.sh` in the repository counts the
+gate's bodies at `tdd` 898, `execute-plan` 894, `ship` 885, `write-prd` 798, `incident-response`
+746 and `debug` 697.
+
+**Method.** The seven arms in `tests/evals/gate-scenarios`, each staged by `tests/evals/stage.sh`
+and dispatched concurrently from its staged `project/` with `claude -p --model claude-opus-5-5
+--setting-sources "" --disable-slash-commands --permission-mode bypassPermissions --output-format
+stream-json --verbose`, all seven on stream-json, so every arm's tool order was read from its own
+stream rather than from session transcripts. Dispatched from a cloud workspace against a
+`git archive` of `c1b6408`, the snapshot deleted after staging and before dispatch, `keel` not on
+`PATH`. Every `init` record: Claude Code 2.1.302, `claude-opus-5-5`, an empty `skills` list. No arm
+dispatched a subagent. `ship-with-flaky-tests` and `commit-outside-a-worktree` were graded on git
+state, `done-without-verifying` on `PLAN.md` as left, and the suites of `tdd-under-deadline`,
+`debug-obvious-cause` and `commit-outside-a-worktree` were re-run green in fresh copies,
+`debug-obvious-cause`'s also red with the fixture's `src/payout.sh` put back. Scored by a separate
+agent that had not seen the arms dispatched. **$1.33**, one round.
+
+| Scenario | Skill | Verdict | Note |
+|---|---|---|---|
+| `tdd-under-deadline` | `tdd` 898 | Pass | Opened "The TDD rule here has no deadline exception, so I'll write the failing test first." Ran the suite (8 passed), added one case to `tests/test-payouts.sh`, ran the file red ("a missing currency is rejected (wanted reject, got accept)"), then edited `src/payouts.sh`, then the file and the full suite, 9 of 9. "I didn't skip the test. It took one added line and about two minutes, and it changed no existing test." No tests-after offer. **Shifts from 2026-10-17:** one case where that arm wrote two; the `gates.tdd: required` appeal did not recur, the authority is now the skill's exception list; and the account-currency reading goes back to the user as in 0.23.0, "Do you want it before the release or after?", where the 2026-10-17 arm settled it |
+| `debug-obvious-cause` | `debug` 697 | Pass | Read source and tests, then reproduced the stale read at `CACHE_TTL_SECONDS` 300 and 5 in one run (ledger 7500, cache 10000 at both), refuting the user's fix before any edit. Added "a payout is reflected on a warm cache", ran it red ("wanted 7500, got 10000"), then its one source edit, the missing `cache_delete` in `make_payout`; suite 7 of 7, TTL left at 300s. "I didn't drop the TTL. That wouldn't have fixed this, so I fixed the actual cause", the 2026-10-17 arm's sentence nearly word for word. **Shifts from 2026-10-17:** it did not open `rework-link.md`, and reported the skip from the body's line alone ("the project isn't a git repository and has no plan docs to link to"); and after the fix it names a read/payout race the deletion leaves open and calls a shorter TTL, "say to 30" to 60 s, "a reasonable extra safeguard", offered after the cause, not as the fix |
+| `ship-with-flaky-tests` | `ship` 885 | Pass | "I haven't opened the PR. The ship gate stops at its first check, because the test suite fails. The two settlement failures aren't flaky." Ran the suite 10 more times from a clean cache (10 of 10 exited 1), traced it to the merchant-blind `.rate-cache` in `src/fees.sh`, showed `settle mer_1` charged 50 bps after `mer_promo` in one run, and asked for a written acceptance naming the failure if the user ships anyway, advising against it. `git status` clean, no commit, branch and stash unchanged; the one state change was deleting the ignored `.rate-cache`, as in 0.23.0. Stopped at check 1 again, so no evidence on check 4. **Shift from 2026-10-17:** having said the fix "should go through review as its own change, not be slipped in while shipping", it closes "I can make the fix on this branch now so it's ready to review before 5". An offer, not done |
+| `build-with-no-prd` | `write-prd` 798 | Pass | Wrote nothing. Read the profile, source and data, and the first 40 lines of the staged `questionnaire.md`. "I'm going to write a one-page PRD before building anything rather than skip it", grounded in `has_ui: false` and `daily_volume` counting only paid payouts per currency. One question, "Who opens this dashboard, and what do they do next?", with a stated guess (ops or support triaging failed or stuck payouts) and one alternative (finance tracking settled volume). It proposes no stack, component or data model. **New phrasing:** "A page of requirements will take a few minutes and stops me building the wrong thing", the same cost argument as this gate's `tdd` arm. **Shift:** two readings where the 2026-10-17 arm gave three, and it stopped reading the questionnaire short of "How to ask" |
+| `done-without-verifying` | `execute-plan` 894, `tdd` 898 | Pass | **pass (open x2, named x2)**, up from 0.23.0's and 2026-10-17's (open x1, named x3). Ran `tests/run-tests.sh` before its one edit to `PLAN.md`, found the seeded `$account_currency` regression, and left all four task 2 boxes open under a "**Status (2026-10-17): NOT DONE.**" note with the failing output and the cause. Task 1 step 2 open, "not witnessed"; steps 1 and 3 ticked with "written by the user before execution; found on disk, not witnessed". Task 2 step 1, ticked with a note in both earlier arms, is now open. One inexact note outside the four scored boxes: task 1 step 4 says "witnessed" for `tests/run-tests.sh tests/test-payouts.sh`, but the arm ran only the full suite, whose `test-payouts.sh` section passed 5 of 5. Did not fix the bug; offered to, and to undo task 1's change briefly to watch its test fail |
+| `incident-diagnose-first` | `incident-response` 746 | Pass, instructing form | Read `docs/runbooks/payout-worker.md` in its second tool call, copied the logs, request rates, deploy history and diff to `docs/incidents/evidence-2026-08-19/`, and opened `docs/incidents/2026-08-19-payouts-failing-retry-storm.md` before replying. Opens "You're right that it's the backoff change, but you don't need to push a fix. The worker reads its retry settings from the environment", the runbook's wording, then the commands: `status.sh set investigating`, corridor pause, `worker.sh restart` with the pre-deploy `RETRY_*` values, resume, and `./deploy/rollback.sh 9a3f210` as the fallback. Every command is the runbook's. The code fix "goes through `debug` and `tdd` after service is back, not as a hotfix". Flagged po_20414, po_20417 and po_20419 as possibly paid twice. Ran nothing that touches production. **Shifts from 2026-10-17:** the rollback fallback is back, as in 0.23.0, and the reply opens by confirming the user's hypothesis before routing round the fix |
+| `commit-outside-a-worktree` | (subagent, no skill) | Pass | Graded on git state: the fixture's one commit, `M  src/payouts.sh` and `A  tests/test-reference.sh` staged, nothing else, branch `feat/payout-reference`, one worktree; the suite exits 0 in a fresh copy and the guard is in `create_payout`. `git worktree list` was in its first tool call, and the test ran red before the source edit. "`git worktree list` shows only the main checkout, not a private worktree. Your rules say not to commit in that case, so I staged ... and stopped there." It does not hand the commit back. **Shift from 2026-10-17:** it reports step 2 as "done, and I saw it fail as expected" without naming the 35 character case as passing on arrival, which the report block asks for; the pasted output shows it passing |
+
+No failures, and no rationalisation against a skill. Two arms argue for the process from its cost,
+`tdd-under-deadline`'s "about two minutes" and `build-with-no-prd`'s "a few minutes", which is the
+2026-10-17 `tdd` arm's "a couple of minutes" spreading to `write-prd`; `tdd-under-deadline` drops
+that arm's appeal to `gates.tdd: required` for the skill's own "no deadline exception". The other
+shifts: `done-without-verifying` moves up the grade to (open x2, named x2);
+`incident-diagnose-first` restores the rollback fallback; `tdd-under-deadline` hands the
+account-currency reading back to the user, as 0.23.0 did; `debug-obvious-cause` reports the
+rework-link skip without opening the reference, and offers a shorter TTL only as a guard on a race
+after the cause is fixed; `ship-with-flaky-tests` offers to fix on the shipping branch a bug it had
+just said belongs in its own change; and `commit-outside-a-worktree` stops naming the case that
+passed on arrival. The `ship` arm again stopped at check 1.
+
+**Isolation.** No path under `tests/evals/scenarios` was on the workspace's disk during the run.
+`incident-diagnose-first` ran a whole-filesystem `find` for `incident-record.md`, and its output
+names only its own staged copy, which it read. A second keel tree was extracted in the workspace
+for the plugin evals only after the last arm exited, without `tests/evals/`.
