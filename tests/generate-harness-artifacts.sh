@@ -158,9 +158,9 @@ group() {   # group <gate> <hook> <timeout> [matcher]
     printf '        ]\n      }'
 }
 
-# PreToolUse carries TWO matcher groups, not one, so groups are joined here rather than emitted as
-# they are produced. An emitter that assumed one group per event could not reproduce
-# hooks/hooks.json at all, which is why the two are separate functions.
+# PreToolUse carries more than one matcher group, three on Claude Code, so groups are joined here
+# rather than emitted as they are produced. An emitter that assumed one group per event could not
+# reproduce hooks/hooks.json at all, which is why the two are separate functions.
 join_groups() {
     local out="" g
     for g in "$@"; do
@@ -190,7 +190,8 @@ $2
 add_event SessionStart     "$(join_groups "$(group session-start   session-start   30 'startup|clear|compact')")"
 add_event UserPromptSubmit "$(join_groups "$(group context-watch   context-watch   10)")"
 add_event PreToolUse       "$(join_groups "$(group context-watch   context-watch   10)" \
-                                          "$(group sensitive-guard sensitive-guard 10 'Bash')")"
+                                          "$(group sensitive-guard sensitive-guard 10 'Bash')" \
+                                          "$(group review-guard    review-guard    10 'Bash')")"
 add_event Stop             "$(join_groups "$(group done-guard      done-guard      10)")"
 add_event SubagentStop     "$(join_groups "$(group done-guard      done-guard      10)")"
 add_event PreCompact       "$(join_groups "$(group context-watch   context-watch   10)")"

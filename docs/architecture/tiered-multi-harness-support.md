@@ -37,7 +37,7 @@ file is absent, and nothing claims the guarantee is unconditional.**
 | Tier A must not regress. Claude Code behaviour is unchanged, byte for byte where possible | Requester, Tier A definition | Fixed, not negotiable |
 | Codex cannot express a scoped human approval prompt. `permissionDecision: "ask"` is schema-valid and discarded, and the tool call proceeds | `keel-on-codex.md` Part 1 test 3; `openai/codex#28437`, open since 2026-06-16 | Fixed, external |
 | Tier claims must be mechanically checked. Prose that outruns the code is a test failure, not a documentation nit | Requester, stated non-negotiable | High |
-| Skill bodies sit against a hard 900-word ceiling with single-digit headroom on the tightest | ADR-0001; `tests/validate-skills.sh` | High, and it binds the skills decision alone |
+| Skill bodies sit against a hard 700-word ceiling, warned within 30 of it, with single-digit headroom on the tightest | ADR-0011; `tests/validate-skills.sh` | High, and it binds the skills decision alone |
 | `bin/keel` is 2,020 lines of bash with 76 coupling points, but they sit in 3 of 7 subcommands and every writer is a leaf | Brief F, `bin/keel#init)        shift; cmd_init "$@" ;;` dispatch | Medium |
 | Per-release eval cost doubles, 6 runs to 12, roughly $6 | `keel-on-codex.md` Part 4 | Medium, accepted by the requester |
 | No new runtime dependency. keel is bash plus an optional python3 | `bin/keel:59-61`, `.keel/profile.json` `stack` | Medium |
@@ -531,10 +531,10 @@ installed: it compares files against files.
 
 **Evals.** Per-harness arms double the release gate from 6 dispatches to 12. This is a manual
 per-release cost, not a per-PR one; evals are not in CI. Codex baselines must be *observed* rather
-than inherited, which is one-time work of 6 to 12 additional dispatches, and ADR-0001's word ceiling
-was calibrated against Claude Code's skimming behaviour and is **inherited but unvalidated** on
-Codex until arms are run. That status is itself a claim, and it is registered as one so the build
-fails if a document states the ceiling as validated on both harnesses.
+than inherited, which is one-time work of 6 to 12 additional dispatches, and bodies under the
+700-word ceiling, a policy limit (ADR-0011), are checked by arms only on Claude Code and **inherited
+but unvalidated** on Codex until arms are run. That status is itself a claim, and it is registered
+as one so the build fails if a document states the ceiling as validated on both harnesses.
 
 **Observability.** None added. keel writes no telemetry by design
 (`docs/01-architecture.md`, "What we deliberately leave out").
@@ -703,8 +703,8 @@ This is a finding, and it changes the shape of the answer rather than the answer
 `tests/evals/stage.sh:99` does not invoke anything. It is a line inside a heredoc printed to
 **stderr** as guidance for a human, and `stage.sh` never runs `claude` as a subprocess. There is no
 dispatcher anywhere in `tests/evals/`, and no scorer either: `tests/evals/run.sh:3` states
-"Dispatching and scoring are done by an agent, deliberately", and `tests/evals/README.md:75-77` says
-scoring is deliberately human. The `jq` snippets against Anthropic's `stream-json` shape in
+"Dispatching and scoring are done by an agent, deliberately", and `tests/evals/README.md:147-149`
+says scoring is deliberately human. The `jq` snippets against Anthropic's `stream-json` shape in
 `results.md` are one-off recipes recorded for a reader, not code any test runs.
 
 So there is nothing to convert to a dispatch table, and **the "second output parser" is not needed,

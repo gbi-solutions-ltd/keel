@@ -127,3 +127,42 @@ distinguishes unset from empty and never puts the value in a shell trace. Those 
 
 Every pipeline needs a stated answer to: what is rolled back, what is not, and how long it takes.
 Schema is usually the part that is not, and that must be explicit rather than discovered.
+
+## A flaky test: the recorded quarantine
+
+Read this before a test leaves the gate.
+
+**Investigate first.** Run the test repeatedly and look for what differs between runs: environment
+variables, order, time, shared state. A cause found is fixed, not quarantined. A test that passes
+alone and fails after another test leaves a file behind is a fix.
+
+**The quarantine file.** A committed file the pipeline reads, one line per test, with four fields
+separated by ` | `: the test, an owner, a reason, and a removal date as `YYYY-MM-DD`. Blank lines
+and lines starting with `#` are skipped. The path is the project's choice. For example:
+
+```
+# ci/quarantine.txt: test | owner | reason | remove by
+tests/test-export.sh | R. Mensah | times out on the shared runner, cause not yet found | 2026-11-15
+```
+
+**The owner and the date are the person's.** Where the request does not name them, ask one question
+for both. Never invent an owner or a date. Until they are given, either leave the file empty so the
+test stays in the gate, or write the entry with the literal placeholder `OWNER?` or `DATE?`. The
+gate rejects a placeholder, so the build fails until the person fills it in.
+
+**What the gating job does.** It runs every test not listed. It fails when any line lacks one of the
+four fields, has a placeholder, or has a removal date that has passed, with a message naming the
+test and the field. An entry dated yesterday fails the gate with "tests/test-export.sh:
+remove-by 2026-10-17 has passed".
+
+**The listed tests still run,** in their own job that reports their result and cannot fail the
+build: on GitHub Actions, `continue-on-error: true` on that job alone. This is the only job in the
+pipeline whose tests may not fail the build, and only for tests the file lists.
+
+**The runbook names the quarantine,** next to the rollback, so the people who deploy can see what
+is not gating.
+
+**What is not a quarantine.** Moving a test out of the gating job by any other route:
+`continue-on-error` on a step or job that runs a test the file does not list, `|| true` or any other
+way of discarding a test's exit code, a separate job running a test with no line in the file, or a
+test left out of the gating command. Each one is "the test does not fail the build".

@@ -29,11 +29,11 @@ project, and nobody has read the skills together to find the rest.
 
 A model following a keel skill reads a body of about 730 words and the references it opens, where a
 rule can be stated several times, a table can repeat the steps above it, and keel's own facts can
-sit among rules meant for every project. `skills/tdd/SKILL.md:87` told every project its suite takes
-313 seconds, which was keel's own `tests/run-tests.sh` as measured for ADR-0006, until commit
-`268a950`. How often a body's wording causes a wrong action is unknown: the one failed eval arm on
-record (commit `a132794`, 2026-08-19) broke a rule stated plainly, and 15 of the 25 skills have no
-scenario to measure.
+sit among rules meant for every project. `skills/tdd/SKILL.md` line 87 at `b821eef` told every
+project its suite takes 313 seconds, which was keel's own `tests/run-tests.sh` as measured for
+ADR-0006, until commit `268a950`. How often a body's wording causes a wrong action is unknown: the
+one failed eval arm on record (commit `a132794`, 2026-08-19) broke a rule stated plainly, and 15 of
+the 25 skills have no scenario to measure.
 
 ## 3. Goals and non-goals
 

@@ -188,15 +188,15 @@ Copied in full. A task executed by a fresh agent that reads only its own section
   any staged file that does, which is the tripwire `284ce5f` added after `design-database`'s
   references narrated their own eval. Task 5's fixture and task 2's and task 3's reference files are
   all staged.
-- **And nothing staged may narrate this repository's own development.** `tests/evals/stage.sh:64-69`
-  copies **every** reference of an injected skill into the arm's tree, so a sentence about a plan, a
-  branch, a release, an unbuilt story or an eval reaches the arm even when it never types the
-  literal `tests/evals` that case 4 greps for. **Which arms:** the loop is driven by each scenario's
-  own `Inject:` line, so `coding-standards`'s references reach the two scenarios that inject it,
-  `assess-a-stale-standard` and `author-a-standard`, and task 5 adds a third. They do not reach an
-  arm injecting `debug` or `ship`. Say "the arms that inject it" rather than "every arm": an earlier
-    draft of this plan said the latter three times and it is not true. Case 4 catches the string;
-  this half is on the writer. It binds `references/seed.md`, `references/audit.md` and
+- **And nothing staged may narrate this repository's own development.** `tests/evals/stage.sh` lines
+  64-69 at `4331022` copies **every** reference of an injected skill into the arm's tree, so a
+  sentence about a plan, a branch, a release, an unbuilt story or an eval reaches the arm even when
+  it never types the literal `tests/evals` that case 4 greps for. **Which arms:** the loop is driven
+  by each scenario's own `Inject:` line, so `coding-standards`'s references reach the two scenarios
+  that inject it, `assess-a-stale-standard` and `author-a-standard`, and task 5 adds a third. They
+  do not reach an arm injecting `debug` or `ship`. Say "the arms that inject it" rather than "every
+  arm": an earlier draft of this plan said the latter three times and it is not true. Case 4 catches
+  the string; this half is on the writer. It binds `references/seed.md`, `references/audit.md` and
   `references/audit-offer.md`.
 - **Nothing staged may hand an arm a number it is scored on.** `skills/coding-standards/SKILL.md`
   is injected whole and its Step 1 example names a 7 to 3 SQL split, so task 5's fixture uses a
@@ -366,15 +366,14 @@ all. Do not write `<docs_root>/standards.md` from this file.
 ```
 
 **Neither file names a plan, a branch, a release or a story, and that is deliberate.**
-`tests/evals/stage.sh:64-69` stages every reference of an injected skill, so both files reach every
-arm that injects `coding-standards`, task 6's included. A stub saying "planned only after audit's
-eval arm reports", "while the branch is unshipped" and "do not release, tag or merge to `main`"
-tells the arm it is inside this repository's own development, which is the exposure `284ce5f` closed
-by
-de-narrating references rather than by excluding files from staging. **The release constraint is
-not weakened by moving it: it lives in this plan's own header, which ships to nobody.** Both
-sentences of it stand, and so does the instruction to delete this file and drop seed's cell from
-Step 0 in the same change if epic C is cancelled.
+`tests/evals/stage.sh` lines 64-69 at `4331022` stages every reference of an injected skill, so both
+files reach every arm that injects `coding-standards`, task 6's included. A stub saying "planned
+only after audit's eval arm reports", "while the branch is unshipped" and "do not release, tag or
+merge to `main`" tells the arm it is inside this repository's own development, which is the exposure
+`284ce5f` closed by de-narrating references rather than by excluding files from staging. **The
+release constraint is not weakened by moving it: it lives in this plan's own header, which ships to
+nobody.** Both sentences of it stand, and so does the instruction to delete this file and drop
+seed's cell from Step 0 in the same change if epic C is cancelled.
 
 **Then state the routing in `tests/evals/scenarios/author-a-standard.md`, which this task changes
 under its feet.** That fixture has code and no `docs/standards.md`
@@ -1062,11 +1061,12 @@ hand-over: `:3` reads "at 0.16.1. 293 tracked files" against a `plugin.json` at 
 this task should make.
 
 **No requirement identifier goes in this file.** An earlier draft ended the sentence "the failure
-**FR-04** exists to prevent". `tests/evals/stage.sh:64-69` stages every reference of an injected
-skill, so this file reaches every arm that injects `coding-standards`, and the plugin install puts
-the whole reference directory on every adopter's disk. **The adopter is the stronger half of this
-argument**, and it is the half that does not depend on the harness: an adopter has no access to this
-repository's PRD, so the identifier is a dangling pointer into a document they cannot open.
+**FR-04** exists to prevent". `tests/evals/stage.sh` lines 64-69 at `4331022` stages every reference
+of an injected skill, so this file reaches every arm that injects `coding-standards`, and the plugin
+install puts the whole reference directory on every adopter's disk. **The adopter is the stronger
+half of this argument**, and it is the half that does not depend on the harness: an adopter has no
+access to this repository's PRD, so the identifier is a dangling pointer into a document they cannot
+open.
 
 **Not "`bin/keel` ships them".** `bin/keel` copies nothing under `skills/`, which
 `docs/03-install-and-distribution.md:35` states outright ("Skills are never copied into a repo") and

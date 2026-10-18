@@ -94,7 +94,7 @@ gap is coverage, and coverage is the tier-1-shaped half of the problem.
 | The scoped guarantee is not fully delivered either | 2026-08-20: **each** arm carried exactly one defective citation inside section 10 (haiku `.gitignore:9-11`, real carve-out at `:20`; sonnet `tests/run-tests.sh:31`, real line `:34`) | This is the finding worth acting on. Step 3 verification is the skill's own promise and it leaks |
 | Defect counts overstate independent errors | Sonnet's 4 out-of-range citations are one wrong mental offset for the end of a 1,864-line file, spent across one table | Any future measurement should count root causes as well as citations, or a single slip reads as a systemic rate |
 | A document holds only 59 to 77 citations | Measured, both arms | The population is too small for sampling to work. This is the decisive constraint |
-| **The citation rule is the skill's own, not a README overclaim** | `skills/repo-snapshot/SKILL.md:13` states it as the core principle; `:64-65` puts it verbatim into every subagent brief; `skills/repo-snapshot/references/section-templates.md:11-12` says "There is no third option" | Stated three times inside the skill. `docs/01-architecture.md:169` is a fourth statement, not the origin. So this is **an unenforced rule, not an unstated one**, which is a stronger finding: the repo already decided, and never checked |
+| **The citation rule is the skill's own, not a README overclaim** | `skills/repo-snapshot/SKILL.md:13` states it as the core principle; `skills/repo-snapshot/SKILL.md#Append to every brief verbatim` puts it verbatim into every subagent brief; `skills/repo-snapshot/references/section-templates.md:11-12` says "There is no third option" | Stated three times inside the skill. `docs/01-architecture.md:169` is a fourth statement, not the origin. So this is **an unenforced rule, not an unstated one**, which is a stronger finding: the repo already decided, and never checked |
 | Nothing anywhere enforces it | No test, validator or hook reads a snapshot. `tests/validate-skills.sh` validates skill bodies, never their output | The rule has not been checked once since it was written |
 | **The expensive error landed in an uncited claim** | Sonnet's "six subcommands" sits in section 10's `Also noted` paragraph, which carries no `path:line` anywhere in it | An uncited claim is invisible to tiers 1, 2 and 3 alike, because all three begin from a citation. This is the gap |
 
@@ -225,7 +225,7 @@ ones**, and it is cheaper.
 one of the escape hatches the rules already name. It is deterministic, needs no model, and lands
 exactly where the expensive error was: sonnet's only materially wrong fact sat in the one section 10
 item with no citation in it. The rule it enforces is already written three times inside the skill
-(`skills/repo-snapshot/SKILL.md:13` and `:64-65`,
+(`skills/repo-snapshot/SKILL.md:13` and `skills/repo-snapshot/SKILL.md#every brief verbatim`,
 `skills/repo-snapshot/references/section-templates.md:11-12`), so this adds no policy, it checks a
 policy the repository set and never verified.
 

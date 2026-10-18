@@ -168,7 +168,7 @@ generic (`tests/no-internal-leaks.sh`), and scans for what would execute on or l
 installing machine (`tests/supply-chain-scan.sh`, 19 pattern rules and 5 structural). Full rule
 list is in [`CONTRIBUTING.md`](CONTRIBUTING.md#the-rules-the-validator-enforces).
 
-17 scenarios exist, testing whether a discipline skill changes behaviour under pressure, which
+18 scenarios exist, testing whether a discipline skill changes behaviour under pressure, which
 shape checks cannot; results and the arguments they produced are in
 [`tests/evals/results.md`](tests/evals/results.md).
 

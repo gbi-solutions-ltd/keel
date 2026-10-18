@@ -78,11 +78,11 @@ Variants of building it:
    degrades safely, so this is a signal problem and not a correctness one.** Only nine distinct
    profile paths are read across all 24 skills, and the five that could be missing are all `verify`
    commands, whose readers are written for the `null` case already (`skills/ship/SKILL.md:23`,
-   `skills/setup-deployment/SKILL.md` line 30 at `bda1acc`, `skills/coding-standards/SKILL.md:54`,
-   `skills/write-plan/SKILL.md#On a greenfield project`, `skills/execute-plan/SKILL.md:29`). The
-   only field read by code rather than by a model is `hard_block_paths`, and
-   `hooks/sensitive-guard:57` exits 0 in silence when the profile does not contain the string at
-   all, which its header at line 16 states is deliberate.
+   `skills/setup-deployment/SKILL.md` line 30 at `bda1acc`, `skills/coding-standards/SKILL.md:64`,
+   `skills/write-plan/SKILL.md#On a greenfield project`,
+   `skills/execute-plan/references/preconditions.md:17`). The only field read by code rather than by
+   a model is `hard_block_paths`, and `hooks/sensitive-guard:57` exits 0 in silence when the profile
+   does not contain the string at all, which its header at line 16 states is deliberate.
 
    **But that same line is the sharpest argument for this idea.** Absent and opted-out are
    indistinguishable to the guard. A project that predates the field and a project that considered

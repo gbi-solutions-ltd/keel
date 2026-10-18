@@ -17,8 +17,8 @@ remember. Listed only so you know what you are covered for:
 
 frontmatter has `name` and `description`; the description starts with "Use when" and is under 260
 <!-- keel:claim property=validated_word_ceiling harness=claude -->
-characters; the body is within the 900 word ceiling, warns over the 700 target and says how many
-words are left once it is within 30 of the ceiling; no `@` links;
+characters; the body is within the 700 word ceiling of ADR-0011 and says how many words are left
+once it is within 30 of it; no `@` links;
 no hardcoded `docs/keel` path
 in a skill or template; no `{{DOCS_ROOT}}` in a skill; relative links resolve; no em or en dashes.
 
@@ -29,16 +29,16 @@ written it. That is why they are enforced rather than documented.
 
 ## Skills are markdown, and the body is a budget
 
-**Rule:** a skill body targets 700 words. 900 is a hard ceiling. `tests/validate-skills.sh` fails
-at the ceiling and warns over the target, and a body over the target needs a passing eval arm at
-that length in `tests/evals/results.md`. See `docs/decisions/ADR-0001-skill-body-word-ceiling.md`.
+**Rule:** a skill body is at most 700 words, a hard limit with no eval-arm exception, by ADR-0011.
+`tests/validate-skills.sh` fails a body over 700 and warns from 671; never raise the number. Room
+comes from taking out reasons, then duplicates a linked reference states in full, then step detail.
 
-**Within 30 words of the ceiling the warning says how many are left**, added 2026-08-20. "Over the
-700 target" reads the same at 750 and at 897, and only one of those is a body where the next edit
-fails the suite. **`write-plan` was at 897, three words of headroom**, and `execute-plan` was at 884
-with sixteen; both were found by trying to edit them rather than by reading anything. The place a
-number like that has to reach someone is the moment they run the suite, which is what the warning
-now does.
+**Within 30 words of the ceiling the warning says how many are left**, added 2026-08-20 under
+ADR-0001's 900 and kept by ADR-0011 at 700. A warning without the number reads the same at 671 as
+at 699, and only the second is a body where the next edit fails the suite.
+**`write-plan` was at 897 under the old ceiling, three words of headroom**, and `execute-plan` was
+at 884 with sixteen; both were found by trying to edit them rather than by reading anything. The
+warning reaches whoever is about to edit a body at the moment they run the suite.
 
 **`write-plan`'s relocation was rejected on 2026-08-20 and revisited on 2026-09-04.** The earlier
 reading was that all eight sections are instruction at the point of use, so the four mechanical
@@ -58,27 +58,27 @@ step, not a way to buy words.
 body gets skimmed rather than followed. The previous numbers were 400 and 600 under a hard 700, and
 they failed in a specific way worth remembering: the targets were documented and unchecked while
 the ceiling was enforced, so bodies went where the check was. By 2026-08-16 no skill met 400, four
-were under 600, and fifteen of 24 sat within 20 words of the ceiling. **A ceiling with no enforced
-number under it is not a limit, it is where bodies settle.**
+were under 600, and fifteen of 24 sat within 20 words of the ceiling. **Bodies settle against
+whatever number is enforced**, so the remedy is text that leaves the body, not another number.
 
-**Example:** `skills/coding-standards/SKILL.md` is the case that shows moving detail out has a
-floor: `coding-standards` carried 12 reference files and 17,816 words against a body of 683 when
-ADR-0001 measured it, and carries 17 and 22,726 against 726 today. Reach for a reference
-because a reader needs it at one step, not as a way to buy words.
+**Example:** `skills/coding-standards/SKILL.md` is the case ADR-0001 took to show that moving
+detail out has a floor: it carried 12 reference files and 17,816 words against a body of 683 then,
+and with its reasons moved out carries 18 and 22,916 against 645 today, so the floor did not hold.
+Reach for a reference because a reader needs it at one step, not as a way to buy words.
 
 ## Subagent briefs stay in the body, or the dispatching step says to read them
 
 **Rule:** detail belongs in `references/`, except a brief the skill dispatches to a subagent. That
-stays in the body unless it would push the body past ADR-0001's target. Then the step that
+stays in the body unless it would push the body past ADR-0011's 700 ceiling. Then the step that
 dispatches links the brief and says to read it before building the call, and where the brief
 carries checks the skill exists for, the body names them too.
 
 **Why:** a brief in a reference file is one the model may not have loaded at the moment it builds
 the dispatch. Progressive disclosure is right for reading and wrong for constructing a call. Three
 briefs do not fit their bodies: `execute-plan`'s three prompts, `write-plan`'s plan review, and
-`review-code`'s rubric pass, over 1,000 words against a body held under 700 because no eval arm
-injects it. For those, the instruction at the step stands in for the brief being there, and the
-named checks let a driver that skipped the brief see what its dispatch left out.
+`review-code`'s rubric pass, over 1,000 words against a body held under 700 words. For those, the
+instruction at the step stands in for the brief being there, and the named checks let a driver that
+skipped the brief see what its dispatch left out.
 
 **Example:** `skills/repo-snapshot/SKILL.md` keeps its agent table inline and moves the eleven
 output sections to `references/section-templates.md`. `skills/review-code/SKILL.md` step 3 says to
@@ -125,6 +125,20 @@ validator that silently passes everything is worse than none.
 
 **Example:** `tests/validate-skills.sh` is checked by `tests/test-validate-skills.sh`, 34 cases,
 including both directions.
+
+## Scripts parse under bash 3.2, which a heredoc inside `$( )` can break
+
+**Rule:** a script must parse under `/bin/bash` 3.2, macOS's own. Read a long heredoc into a
+variable first (`IFS= read -r -d '' script <<'PY' || true`), then capture the command fed from it.
+
+**Why:** bash 3.2 scans a heredoc inside `$( )` for balanced backticks and quotes even when the
+delimiter is quoted, so one backtick in a Python comment stops the whole file parsing. That shipped
+in `hooks/review-guard`: every Bash call a keel reviewer made on stock macOS exited 2. CI's Linux
+job, on bash 5, passed; only its macOS job failed.
+
+**Example:** `tests/test-review-guard.sh` runs the hook under `/bin/bash` by name. The other
+`$( ... <<'PY'` sites in `bin/keel` and `lib/` parse today only because their bodies happen to
+balance.
 
 ## Evidence about the tooling comes from the tooling, not from the shell around it
 
@@ -340,8 +354,8 @@ arm and nobody else, so it never discharged this departure. What closed it: the 
 from a spoken sentence to the dispatch's own `description` (see above), which is at least as cheap
 to say. All three now carry it: `repo-snapshot` and `port-assess` each freed the words at their next
 edit rather than waiting on a task of their own, and `write-docs` stayed at its already-discharged
-756 words by trimming the same count it spent, so its existing eval arm still applies under
-CONTRIBUTING.md's rule that an arm discharges the length it ran at.
+756 words by trimming the same count it spent, which kept its eval arm valid under ADR-0001's rule
+of the time, that an arm discharges the length it ran at.
 
 **This repository branches and reviews like any other.** Work goes on a branch, lands through a
 pull request, and `ship`'s check 8 applies here with no exception. Every commit on `main` arrives as

@@ -13,12 +13,15 @@ Build the whole path from commit to running, including the way back.
 **Core principle:** a pipeline that cannot fail a build is documentation. A deploy with no tested
 rollback is a one-way door.
 
+Why each step is as it is: [references/rationale.md](references/rationale.md). Read it before
+changing a step.
+
 ## Step 1: Find out what exists, and whether it works
 
 Read `.keel/profile.json`, then look for a Dockerfile, CI config, and IaC. Two questions the
 files will not answer directly:
 
-- **Does the pipeline gate?** A test step with `continue-on-error` gates nothing. Read the
+- **Does the pipeline gate?** A test that cannot fail the gating job gates nothing. Read the
   conditions, not the step names.
 - **Does every environment have a deploy path?** A build job with no matching deploy job means
   that environment is not being deployed by this pipeline, whatever the file implies.
@@ -45,7 +48,9 @@ See [references/pipeline-patterns.md](references/pipeline-patterns.md) for the s
 
 Non-negotiables:
 
-- **Tests fail the build.** No `continue-on-error` on a test step.
+- **Tests fail the build.** No `continue-on-error`, `|| true`, or test moved out of the gating
+  job. A flaky test leaves only by
+  [the recorded quarantine](references/pipeline-patterns.md#a-flaky-test-the-recorded-quarantine).
 - **The branch that people work on is gated**, not just the default branch.
 - **No secret reaches a log or an artifact.** Inject at runtime; never copy an env file into an
   image.
@@ -56,27 +61,22 @@ Non-negotiables:
 Multi-stage, a pinned base image, a non-root user, no build tooling in the final layer, a healthcheck,
 and a `.dockerignore` that excludes env files and keys.
 
-**Keep it thin.** Every megabyte is pull latency on every deploy and every package is attack surface.
-Measure with `docker image ls` and `docker history`, and record the size in the runbook so growth is
-visible. See the reference for the specifics.
-
-Then **build it and look inside**: `docker create` and `docker cp`, or `unzip -l` for a jar. What a
+**Keep it thin**, recording its size in the runbook, and **build it and look inside**: read
+[the commands](references/step-detail.md#step-4-containerise-properly) before you do. What a
 Dockerfile appears to copy and what lands in the image are different questions.
 
 ## Step 5: Wire observability
 
-A service with no telemetry is a service whose next incident is measured in hours. Wire the exporter,
-gated on the endpoint variable so local development stays quiet.
+Wire the exporter, gated on the endpoint variable.
 
 Backend comes from `profile.observability.backend`, default `signoz`. Instrument with OpenTelemetry
-whichever it is, so the vendor sits behind the exporter and switching is configuration rather than a
-rewrite. See
+whichever it is. See
 [../coding-standards/references/observability.md](../coding-standards/references/observability.md).
 
 ## Step 6: Environments and secrets
 
 Per environment: what differs, where secrets come from, who can deploy. Environments must not share a
-host or credential unless recorded as a decision; sharing means one incident takes both.
+host or credential unless recorded as a decision.
 
 Migrations need a stated position: when they run, what happens when a deploy is rolled back, and
 whether a failed candidate has already migrated shared state.
@@ -98,7 +98,7 @@ actually been tested.
 
 | Mistake | Instead |
 |---|---|
-| A test step with `continue-on-error` | Tests fail the build, or delete the step |
+| A flaky test moved out of the gate | Fix it, or record its quarantine |
 | Gating only the default branch | Gate the branch people actually work on |
 | Reading the Dockerfile to check contents | Build it and look inside |
 | An env file copied into the image | Inject at runtime |

@@ -3421,7 +3421,7 @@ names the profile instead. The measured word cost of the neutral wording is +2 t
 and every body clears the 900 ceiling with over 100 words to spare, so nothing needs trimming to
 make room:
 
-- `skills/repo-snapshot/SKILL.md:49`: `Dispatch these subagents concurrently **in one message**, delegation profile \`keel-fanout\`:`
+- `skills/repo-snapshot/SKILL.md` line 49 at `a678e64`: `Dispatch these subagents concurrently **in one message**, delegation profile \`keel-fanout\`:`
 - `skills/port-assess/SKILL.md:37`: `Dispatch these subagents in one message, delegation profile \`keel-fanout\`. Each is told:`
 - `skills/apex-port-plan/SKILL.md` line 30 at `bda1acc`: `Dispatch these subagents **in one message** so they run concurrently, delegation profile \`keel-fanout\`, and`
 - `skills/write-plan/SKILL.md` line 44 at `bda1acc`: `one message, delegation profile \`keel-fanout\`, each citing \`path:line\`, said in one line.`

@@ -37,8 +37,8 @@ and why nothing here ever pushes this repository's history anywhere.
 
 ## 1. The eval gate
 
-Six treatment arms, one dispatch each, scored by reading. They cost real money: the 0.17.0 gate was
-**$2.3430** and 2 minutes 16 seconds of wall clock.
+Seven treatment arms, one dispatch each, scored by reading. They cost real money: the 0.17.0 gate
+was **$2.3430** and 2 minutes 16 seconds of wall clock.
 
 **When it transfers.** 0.16.1 shipped on the 0.16.0 gate because no skill body and no eval fixture
 changed, and no scenario exercised the one thing that did. That is the whole test: if the diff since
@@ -53,44 +53,36 @@ does.
 
 **Dispatch all 7 concurrently.** Staging once per arm is what makes that safe, and serial
 dispatch costs the same money for four times the wall clock. The mechanics, and why every flag on
-the `claude -p` line is load bearing, are in `tests/evals/README.md`; do not re-derive them. This is
-the script the 0.17.0 gate ran, kept here because it lives in no repository yet:
+the `claude -p` line is load bearing, are in `tests/evals/README.md`; do not re-derive them.
+Arms run with `bypassPermissions` and search the whole machine, so a gate is dispatched where
+nothing else is within reach (L-01 of `docs/audits/2026-10-18-security.md`). `tests/evals/gate.sh`
+stages every arm and writes `OUT/dispatch.sh`, and dispatches nothing. Stage into an `OUT` outside
+the tree, in a disposable workspace (a cloud session or a container) that holds no personal
+credentials beyond a scoped key for the gate and no other repositories, delete the checkout there,
+then run the dispatch, which refuses while anything keel-shaped is reachable:
 
 ```bash
-#!/usr/bin/env bash
-# Dispatch the release-gate treatment arms in parallel, one staged directory each.
-set -uo pipefail
-REPO=/path/to/keel
-OUT=./gate-run
-mkdir -p "$OUT"
-
-# The set is tests/evals/gate-scenarios and nowhere else. It was pasted here until 2026-09-06,
-# which is how this script ran six arms while results.md said the gate was seven.
-ARMS="$(grep -vE '^$|^#' "$REPO/tests/evals/gate-scenarios")"
-
-for a in $ARMS; do
-    dir="$(cd "$REPO" && tests/evals/stage.sh "$a" 2>"$OUT/$a.stage-err")"
-    if [ -z "$dir" ]; then printf 'STAGE FAILED: %s\n' "$a"; cat "$OUT/$a.stage-err"; continue; fi
-    printf '%s\n' "$dir" > "$OUT/$a.dir"
-    (
-        cd "$dir/project" || exit 1
-        claude -p "$(cat ../prompt.md)" \
-            --setting-sources "" --disable-slash-commands \
-            --permission-mode bypassPermissions --output-format json \
-            > "$dir/result.json" 2>"$dir/result.err"
-        printf '%s exit=%s\n' "$a" "$?" >> "$OUT/exits.txt"
-    ) &
-    printf 'dispatched %-26s %s\n' "$a" "$dir"
-done
-
-wait
+tests/evals/gate.sh /tmp/keel-gate-run                      # one run of each arm
+tests/evals/gate.sh --runs 3 --model <id> /tmp/keel-gate-3  # a pass rate needs more than one run
+tests/evals/gate.sh --dry-run /tmp/keel-gate-dry            # stage and print; lines have no check
+# delete the checkout from this workspace, then:
+bash /tmp/keel-gate-run/dispatch.sh                         # refuses if keel is reachable
 ```
+
+Results are written to `OUT/<scenario>.<run>.jsonl`, with the arm's `.err` and its `.dir` file
+beside it and one `exit=` line per arm in `OUT/exits.txt`. The stream's final `result` record
+carries the model and the cost, which is where the `results.md` entry takes them from. `OUT` must
+be outside the repository and must not already hold `.dir` files; the script refuses both, for the
+reasons in its header. The set is `tests/evals/gate-scenarios` and nowhere else: it was pasted into
+this runbook until 2026-09-06, which is how a script ran six arms while `results.md` said seven.
 
 **Keep the `.dir` files.** Scoring is reading, it is slow, and a session can run out of context
 half way through it. The staged directories survive until the OS clears them, so an unfinished gate
 is resumed by reading the artifacts rather than by paying for the arms twice. The 0.17.0 gate was
 scored across two sessions exactly this way, four arms then two, at no extra cost. Write the paths
-into the `results.md` entry as you go and mark the entry INCOMPLETE until every arm is scored.
+into the `results.md` entry as you go and mark the entry INCOMPLETE until every arm is scored. In a
+disposable workspace, copy `OUT` and the staged directories out, or score before discarding the
+workspace, because they go with it.
 
 **Score against the scenario file, not from memory.** Each `tests/evals/scenarios/<name>.md` carries
 its own criteria and several are scored on an artifact rather than on the reply:
@@ -341,5 +333,4 @@ nothing else exercises. Releases through 0.17.0 ran six, so the next gate runs o
 last one did. The dispatch script in section 1 reads that file now instead of carrying its own copy,
 which is what let the two disagree.
 
-The dispatch script in section 1 belongs in `tests/evals/gate.sh`, where it would be tested and
-maintained rather than pasted. It has produced two gates from a scratch directory.
+`tests/evals/gate.sh` was committed on 2026-10-17, so section 1 runs it rather than a pasted script.

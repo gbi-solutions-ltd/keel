@@ -703,8 +703,8 @@ expands variables, and an unescaped backtick would run a command substitution.
 
 **Two skills, not three.** An earlier draft of this task added `incident-response` on the authority
 of `docs/02-skill-catalog.md`, which says it writes an incident record under `<docs_root>/audits/`.
-That catalog line is stale and the skill is the authority: `skills/incident-response/SKILL.md:42`
-and `skills/incident-response/references/incident-record.md:5` both write
+That catalog line is stale and the skill is the authority: `skills/incident-response/SKILL.md`
+line 42 at `a678e64` and `skills/incident-response/references/incident-record.md:5` both write
 `<docs_root>/incidents/YYYY-MM-DD-<slug>.md`. Adding it would have pointed every scaffolded project
 at the wrong directory. Correct the catalog line in the same edit, below.
 

@@ -1,0 +1,563 @@
+#!/usr/bin/env bash
+# Refuses a keel reviewer the git commands that would change the author's checkout or the state
+# every worktree of a repository shares. Registered on PreToolUse, matcher Bash. Task 1 of
+# docs/plans/2026-10-17-reviewer-git-guard.md.
+#
+# WHY A HOOK AND NOT ONLY THE PROMPT. On 2026-10-12 a spec reviewer ran `git stash` on the tree it
+# was judging, to measure a baseline. The prompts forbid that now, and a prompt binds only as far as
+# the model follows it; the next reviewer that reaches for a habit is stopped here instead.
+#
+# WHO IT TOUCHES. Only a call whose hook input carries agent_type `keel:keel-reviewer`: the plugin
+# name, a colon and the agent name, which is how the 2026-10-17 probe saw a plugin's own agent. The
+# main session's calls carry no agent_type at all, so the author and the coordinator are never
+# touched, and neither is any other agent. lib/harness/capabilities records that probe as the
+# primitive this gate requires, which is why it is registered on Claude Code only.
+#
+# WHAT IT REFUSES, in two classes. State every worktree shares (the stash, commits, refs, tags,
+# config, a remote) is refused wherever the command runs, because a reviewer's own worktree shares
+# it with the author's. An index or a working tree is refused unless it is the reviewer's own: under
+# the system temp directory and outside the author's checkout, which may itself sit under a temp
+# directory, as a `claude plugin eval` workspace does. A target it cannot resolve is refused, since
+# it might be the author's.
+#
+# DENY, NOT ASK. Bernard decided on 2026-10-17 that a caught command is refused, not asked about or
+# logged: a reviewer has no business running one, and a prompt mid-review hands the human a
+# decision the plan already made. The probe saw a deny hold under bypassPermissions.
+#
+# ITS LIMIT, STATED RATHER THAN DISCOVERED. It reads a command string, so `sh -c "git stash"`, an
+# alias or a script reaches git without passing through here. It stops a model following a habit,
+# which is what the incidents were, and is not a boundary against an adversary. A heredoc's body is
+# not skipped but read as commands, so a `git stash` written inside one is refused: that errs
+# toward refusing, and skipping bodies would need a second quoting-aware parser to get right.
+# Two more it does not see, as known gaps: `export GIT_DIR=...` or `export GIT_WORK_TREE=...` in an
+# earlier command moves git's target without the guard following it, since it reads only the
+# assignments written in front of git itself; and `reflog expire`, `submodule deinit` and
+# `worktree lock` are allowed, as is a `fetch` whose refspecs name no local destination, because
+# each touches shared state in a way that loses no committed work. A `fetch` refspec with a `:`
+# destination moves a local ref, so that form is refused.
+#
+# HOW IT READS ITS INPUT, as hooks/sensitive-guard does: a builtin substring filter first, so every
+# call that is not a keel reviewer's returns at once without starting python3; then python3 for the
+# real decision; and a narrower builtin fallback when python3 is absent or the input will not parse.
+
+set -uo pipefail
+
+event="$(</dev/stdin)"
+
+# The cheap filter, with no external command, because it runs on every Bash call of every session.
+case "$event" in
+    *'keel:keel-reviewer'*) ;;
+    *) exit 0 ;;
+esac
+
+deny() {
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"keel review-guard: %s"}}' "$1"
+    exit 0
+}
+
+# THE FALLBACK, for when the JSON cannot be read: python3 is absent, the input will not parse, or
+# the command will not split. It refuses a command in which a listed word directly follows `git` and
+# its global options, and allows the rest, so `git diff` and `rm -rf /tmp/x` still run. Without the
+# parser it cannot tell where a command acts, so the reviewer's own worktree steps are refused too.
+#
+# It acts only when the input's agent_type field names the reviewer, not when the name appears
+# anywhere: the substring filter above also passes a main-session command that merely mentions
+# `keel:keel-reviewer`, and this guard must never block the main session. A name inside the command
+# string is JSON-escaped (`\"agent_type\"`), so it cannot match this pattern.
+blind() {
+    local why="$1" after="$2" named sp opt w re
+    named='"agent_type"[[:space:]]*:[[:space:]]*"keel:keel-reviewer"'
+    [[ $event =~ $named ]] || exit 0
+    # Spaces or a JSON-escaped tab separate words; a JSON-escaped newline may precede `git`.
+    sp='([[:space:]]|\\t)+'
+    opt='(-C|-c|--git-dir|--work-tree)'"$sp"'[^[:space:]]+|--(git-dir|work-tree)=[^[:space:]]+|--no-pager'
+    # The parser's two lists and its special cases, word for word, so neither path is the wider.
+    for w in stash commit push pull merge rebase cherry-pick am revert tag update-ref config \
+             branch notes add rm mv reset restore checkout switch clean apply stage bisect \
+             checkout-index read-tree update-index sparse-checkout symbolic-ref submodule remote \
+             replace filter-branch fetch worktree; do
+        re='(^|[^[:alnum:]_.-]|\\n)git('"$sp"'('"$opt"'))*'"$sp$w"'([^[:alnum:]_-]|$)'
+        if [[ $event =~ $re ]]; then
+            deny "it could not read its input ($why), so it refuses \`git $w\` from a keel reviewer without knowing where it acts. Read the change with git diff, log, show or status.$after"
+        fi
+    done
+    exit 0
+}
+
+# The worktree sentence only where it is true: with python3 present, the fallback is reached only
+# for one unreadable call, and the next well-formed one is judged in full.
+command -v python3 >/dev/null 2>&1 \
+    || blind "python3 is absent" " Without python3 the rubric pass's worktree steps are refused too, so report its items 5 and 6 as not done."
+
+# -I, because the hook runs with the project as its working directory, and a plain `python3 -`
+# puts that directory first on the import path, so a json.py in the project would run here.
+# The script is read here and not as a heredoc inside `$( )`, because bash 3.2, macOS's own, scans
+# such a heredoc for balanced backticks and quotes, and one in a comment stopped the file parsing.
+IFS= read -r -d '' script <<'PY' || true
+import json, os, re, shlex, subprocess, sys
+
+REVIEWER = "keel:keel-reviewer"
+
+try:
+    ev = json.loads(os.environ.get("KEEL_EVENT") or "")
+except ValueError:
+    sys.exit(3)                         # the bash fallback reads the raw input instead
+if not isinstance(ev, dict):
+    sys.exit(3)
+if ev.get("agent_type") != REVIEWER:
+    sys.exit(0)                         # anyone else, including the main session, is untouched
+cmd = (ev.get("tool_input") or {}).get("command")
+if not isinstance(cmd, str):
+    sys.exit(3)
+cwd = os.path.normpath(ev.get("cwd") or os.getcwd())
+
+# State every worktree shares. Refused wherever it runs, because a worktree under /tmp shares all of
+# it with the author's checkout; that is how the 2026-10-12 stash reached the author.
+# `pull` is a fetch and a merge, so it moves refs as a merge does; `replace` and `filter-branch`
+# rewrite what every worktree sees as history.
+SHARED = {"stash", "commit", "push", "pull", "merge", "rebase", "cherry-pick", "am", "revert",
+          "update-ref", "config", "replace", "filter-branch"}
+# An index or a working tree. Refused unless the target is the reviewer's own worktree. The second
+# line is the plumbing and the less common porcelain that write the same things; `bisect` checks
+# out commits. `symbolic-ref` moves HEAD, which is the worktree's own, but only in its write forms,
+# so it is judged in judge_git rather than listed here.
+TREE = {"add", "rm", "mv", "reset", "restore", "checkout", "switch", "clean", "apply",
+        "stage", "bisect", "checkout-index", "read-tree", "update-index", "sparse-checkout"}
+# The branch options that delete, rename, copy or force a ref, or write the branch's config (its
+# upstream, its description), all of which every worktree shares. A short-flag cluster such as
+# `-Df` carries each of its letters, so a short flag is read letter by letter.
+BRANCH_WRITE_LONG = {"--delete", "--move", "--copy", "--force", "--set-upstream-to",
+                     "--unset-upstream", "--edit-description"}
+BRANCH_WRITE_SHORT = set("dDmMcCfu")
+# The options that make `git branch` list, so a word after them is a pattern or a commit and not
+# the name of a branch to create.
+BRANCH_LIST_LONG = {"--list", "--all", "--remotes", "--verbose", "--contains", "--no-contains",
+                    "--merged", "--no-merged", "--show-current", "--points-at"}
+BRANCH_LIST_SHORT = set("larv")
+# The read forms of `git notes`; every other notes subcommand writes refs/notes, which is shared.
+NOTES_READS = {"list", "show"}
+# The read forms of `git remote`, by its action: none (a list, `-v` included), show and get-url.
+# Every other action writes the remote config, which is shared.
+REMOTE_READS = {None, "show", "get-url"}
+# The options that create a branch from another command: a ref, shared, so refused anywhere. A
+# short flag is read letter by letter, as in branch_writes, because `-qb x` is `-q -b x`.
+CREATES_SHORT = {"checkout": set("bB"), "worktree": set("bB"), "switch": set("cC")}
+CREATES_LONG = {"switch": {"--create", "--force-create"}}
+# Subcommand options that take their value as the next word, so the value is never read as a
+# branch name or an action: `git branch --sort -committerdate` lists, it does not create.
+# `--color` is left out on purpose: git takes its value only after `=`, so the word after a bare
+# `--color` really is a branch name, and skipping it would let `git branch --color x` create one.
+SUB_VALUE_OPTS = {"--format", "--sort", "--ref"}
+# The fetch options that take their value as the next word, kept apart from SUB_VALUE_OPTS so no
+# other subcommand skips them: without this, `git fetch --depth 1 <url>` read `1` as the repository
+# and the URL, colon and all, as a refspec moving a local ref.
+FETCH_VALUE_OPTS = {"--depth", "--deepen", "--shallow-since", "--shallow-exclude", "-j", "--jobs",
+                    "--negotiation-tip"}
+# The environment variables that move git's target as --git-dir and --work-tree do, and the index.
+GIT_ENV = {"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"}
+# git's global options that take their value as the next word, so it is never read as the
+# subcommand.
+GIT_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--super-prefix",
+                  "--config-env"}
+
+# The temp directory. `${TMPDIR:-/tmp}` is the form the dispatch instructions ask for, because
+# TMPDIR is often unset on Linux; the two bare forms are accepted as the same expansion. Both the
+# written root and its physical path count, because on macOS /tmp is /private/tmp and /var/folders
+# is /private/var/folders, and a target is compared after `pwd -P` style resolution.
+TMPDIR_ENV = os.environ.get("TMPDIR") or ""
+TMP_EXPANSION = TMPDIR_ENV or "/tmp"
+TMP_PREFIXES = ("${TMPDIR:-/tmp}", "${TMPDIR}", "$TMPDIR")
+roots = set()
+for r in ["/tmp", "/private/tmp", "/var/folders"] + ([TMPDIR_ENV] if TMPDIR_ENV.startswith("/") else []):
+    roots.add(os.path.normpath(r))
+    roots.add(os.path.realpath(r))
+
+
+def under(path, root):
+    return path == root or path.startswith(root.rstrip("/") + "/")
+
+
+def physical(path):
+    # The nearest existing ancestor, resolved as `pwd -P` would, with the rest appended: a
+    # reviewer's worktree usually does not exist yet when the command that creates it is checked.
+    head, tail = path, []
+    while not os.path.exists(head) and head != "/":
+        head, t = os.path.split(head)
+        tail.insert(0, t)
+    return os.path.join(os.path.realpath(head), *tail)
+
+
+def expand(word, base):
+    # A path from the command line, or None when it cannot be resolved without running the shell:
+    # any other variable, a substitution, a glob or `~`. None is refused, because it might be the
+    # author's checkout, and the reason says how to write it so that it resolves.
+    for p in TMP_PREFIXES:
+        if word == p or word.startswith(p + "/"):
+            word = TMP_EXPANSION + word[len(p):]
+            break
+    if not word or word.startswith("~") or any(c in word for c in "$`*?["):
+        return None
+    if not word.startswith("/"):
+        if base is None:
+            return None
+        word = os.path.join(base, word)
+    return os.path.normpath(word)
+
+
+_top = []
+
+
+def checkout():
+    # The author's checkout is the top level of the hook's cwd, which the second probe showed is the
+    # session's starting directory on every call. When git cannot say, cwd itself stands in, which
+    # refuses more rather than less. The timeout is 3 seconds, well inside the hook's own 10 in
+    # hooks/hooks.json: a harness that kills a slow hook gives no decision at all, so a stalled git
+    # must end here, in that conservative fallback, rather than take the hook down with it.
+    if not _top:
+        top = cwd
+        try:
+            r = subprocess.run(["git", "-C", cwd, "rev-parse", "--show-toplevel"],
+                               capture_output=True, text=True, timeout=3)
+            if r.returncode == 0 and r.stdout.strip():
+                top = r.stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            pass
+        _top.append(physical(os.path.normpath(top)))
+    return _top[0]
+
+
+def own(path):
+    p = physical(path)
+    return any(under(p, r) for r in roots) and not under(p, checkout())
+
+
+INSTEAD = ("Read the change with git diff, log, show or status. Change only your own throwaway "
+           "worktree, under the temp directory and outside the author's checkout, reached with "
+           "`cd <worktree> &&` or `git -C <worktree>`.")
+
+
+def refuse(reason):
+    print(json.dumps({"hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "keel review-guard: " + reason,
+    }}))
+    sys.exit(0)
+
+
+def refuse_shared(sub):
+    if sub == "stash":
+        why = ("the stash is shared by every worktree of a repository, so a stash made in any of "
+               "them reaches the author's, and on 2026-10-12 a spec reviewer ran `git stash` on "
+               "the tree it was judging.")
+    else:
+        why = ("it changes state every worktree of a repository shares (commits, refs, tags, "
+               "config or a remote), so it reaches the author's checkout wherever it runs, as the "
+               "2026-10-12 `git stash` did.")
+    refuse("`git %s` is refused to a keel reviewer: %s A reviewer changes nothing it was asked "
+           "to judge, and leaves commits, the stash and refs to the author. %s" % (sub, why, INSTEAD))
+
+
+def check_tree(sub, where):
+    if where is None:
+        refuse("`git %s` is refused to a keel reviewer: it changes an index or a working tree, and "
+               "the guard could not resolve which (a variable other than TMPDIR, `cd -`, a command "
+               "substitution, a relative path from an unresolved directory, or a cd joined to it by "
+               "`;`, a newline, `||` or `&`), so it may be the author's checkout. Write the worktree "
+               "path as \"${TMPDIR:-/tmp}/<name>\" or as a literal path under the temp directory, "
+               "and join a cd to the command with `&&`: after any other separator a cd that failed "
+               "or was skipped leaves the command in the author's checkout. %s" % (sub, INSTEAD))
+    if not own(where):
+        refuse("`git %s` is refused to a keel reviewer: it changes an index or a working tree, and "
+               "its target, %s, is the author's checkout or is not under the system temp "
+               "directory. A reviewer changes nothing it was asked to judge. %s"
+               % (sub, physical(where), INSTEAD))
+
+
+def words_of(rest, value_opts=SUB_VALUE_OPTS):
+    # The subcommand's arguments with the values of value_opts dropped, so a value is never read
+    # as an option or a name.
+    out, skip = [], False
+    for a in rest:
+        if skip:
+            skip = False
+        elif a in value_opts:
+            skip = True
+        else:
+            out.append(a)
+    return out
+
+
+def creates_branch(sub, rest):
+    # The option that makes this command create a branch, or None. Words after `--` are paths.
+    for a in rest:
+        if a == "--":
+            return None
+        if a.split("=", 1)[0] in CREATES_LONG.get(sub, ()):
+            return a
+        if (a.startswith("-") and not a.startswith("--")
+                and set(a[1:]) & CREATES_SHORT.get(sub, set())):
+            return a
+    return None
+
+
+def tree_targets(target, work_tree, git_dir, index):
+    # Where a command that writes an index or a working tree writes. The work tree is the one
+    # named, else the directory git runs in, which a git dir named alone makes the work tree. The
+    # repository, and so the index, is the git dir named, else the one git finds from where it
+    # runs, which a work tree named alone does not change: `git --work-tree=<tmp> reset --hard`
+    # still rewrites the author's index. An index file named is checked as well.
+    return (work_tree or [target]) + (git_dir or [target]) + index
+
+
+def branch_writes(rest):
+    # A branch write: a write option anywhere, or a branch name with no list option to make it a
+    # pattern, since `git branch <name>` creates a branch.
+    listing = named = False
+    for a in words_of(rest):
+        name = a.split("=", 1)[0]
+        short = set(a[1:]) if a.startswith("-") and not a.startswith("--") else set()
+        if name in BRANCH_WRITE_LONG or short & BRANCH_WRITE_SHORT:
+            return True
+        if name in BRANCH_LIST_LONG or short & BRANCH_LIST_SHORT:
+            listing = True
+        if not a.startswith("-"):
+            named = True
+    return named and not listing
+
+
+def judge_git(args, here, env):
+    target, work_tree, git_dir, index, j = here, [], [], [], 0
+    while j < len(args) and args[j].startswith("-"):
+        a = args[j]
+        val = args[j + 1] if j + 1 < len(args) else ""
+        if a == "-C":
+            target = expand(val, target)
+            j += 2
+        elif a in ("--git-dir", "--work-tree") or a.startswith(("--git-dir=", "--work-tree=")):
+            name, eq, v = a.partition("=")
+            if not eq:
+                v, j = val, j + 1
+            (work_tree if name == "--work-tree" else git_dir).append(expand(v, target))
+            j += 1
+        elif a in GIT_VALUE_OPTS:
+            j += 2
+        else:
+            j += 1
+    # GIT_DIR, GIT_WORK_TREE and GIT_INDEX_FILE, from the command's own assignments, are read
+    # after -C, which git applies before it reads them, so a relative value resolves from there.
+    for k, v in env:
+        {"GIT_WORK_TREE": work_tree, "GIT_DIR": git_dir, "GIT_INDEX_FILE": index}[k].append(
+            expand(v, target))
+    if j >= len(args):
+        return
+    sub, rest = args[j], args[j + 1:]
+    action = next((a for a in words_of(rest) if not a.startswith("-")), None)
+    if sub in SHARED:
+        refuse_shared(sub)
+    made = creates_branch(sub, rest) if sub != "worktree" or action == "add" else None
+    if made:
+        refuse_shared("%s %s" % (sub, made))
+    if sub == "worktree" and action == "add":
+        # With no --detach, -b or -B, `worktree add` creates a branch named after the path, or
+        # checks out a branch every worktree shares; -b and -B were refused just above.
+        flags = [a for a in rest if a.startswith("-") and a != "-"]
+        if not any(a == "--detach" or (not a.startswith("--") and "d" in a[1:]) for a in flags):
+            refuse_shared("worktree add without --detach")
+    if sub == "fetch":
+        # The first word is the repository, which may be a URL with a colon; every word after it
+        # is a refspec, and one with a destination after its last `:` moves a local ref.
+        refspecs = [a for a in words_of(rest, SUB_VALUE_OPTS | FETCH_VALUE_OPTS)
+                    if not a.startswith("-")][1:]
+        moves = [r for r in refspecs if ":" in r and r.rsplit(":", 1)[1]]
+        if moves:
+            refuse_shared("fetch " + moves[0])
+    if sub == "remote" and action not in REMOTE_READS:
+        refuse_shared("remote " + action)
+    if sub == "symbolic-ref":
+        # Reads with one name; writes HEAD with two, or deletes it with -d.
+        named = [a for a in rest if not a.startswith("-")]
+        if len(named) >= 2 or {"-d", "--delete"} & set(rest):
+            for where in tree_targets(target, work_tree, git_dir, index):
+                check_tree(sub, where)
+    if sub == "tag":
+        # Only the read forms: no arguments, or a listing that deletes nothing.
+        reads = not rest or (("-l" in rest or "--list" in rest)
+                             and not ({"-d", "--delete"} & set(rest)))
+        if not reads:
+            refuse_shared(sub)
+    if sub == "branch" and branch_writes(rest):
+        refuse_shared(sub)
+    if sub == "notes" and action is not None and action not in NOTES_READS:
+        refuse_shared("notes " + action)
+    if sub == "worktree" and action == "prune":
+        refuse_shared("worktree prune")     # the registry of worktrees is shared
+    if sub in TREE or (sub == "submodule" and action == "update"):
+        # Every place tree_targets says it writes must be the reviewer's own.
+        label = sub if sub in TREE else "submodule update"
+        for where in tree_targets(target, work_tree, git_dir, index):
+            check_tree(label, where)
+    if sub == "worktree" and action in ("remove", "move"):
+        # The path removed or moved is the target, not the directory git runs in: in a concurrent
+        # batch the author's tree is itself a linked worktree, and removing it removes their work.
+        paths = [a for a in rest[rest.index(action) + 1:] if not a.startswith("-")]
+        check_tree("worktree " + action, expand(paths[0], target) if paths else None)
+
+
+ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+
+
+def scan_git(words, here):
+    # Every git word in the command, not only the first, so `env X=1 git stash` and
+    # `timeout 5 git stash` are read too, each with the GIT_ assignments written before it.
+    for k, w in enumerate(words):
+        if w == "git" or w.endswith("/git"):
+            env = [tuple(a.split("=", 1)) for a in words[:k]
+                   if ASSIGNMENT.match(a) and a.split("=", 1)[0] in GIT_ENV]
+            judge_git(words[k + 1:], here, env)
+
+
+def segment(words, here, carries, after_or):
+    # One simple command; returns the target after it and whether a cd moved it. A cd moves the
+    # target of the commands after it, unless it runs in a pipeline or in the background, where
+    # bash gives it a subshell of its own.
+    i = 0
+    while i < len(words) and ASSIGNMENT.match(words[i]):
+        i += 1
+    if i < len(words) and words[i] in ("cd", "pushd", "popd"):
+        # The words after a cd are read for git too, so nothing on a cd's line can hide: a
+        # process substitution such as `<(git stash)` runs whatever cd makes of its arguments.
+        scan_git(words[i + 1:], here)
+        if not carries:
+            return here, False
+        if after_or:
+            # A cd on the right of `||` runs only when the left failed, so in `a || cd X && b`,
+            # `b` runs in the author's checkout whenever `a` succeeds.
+            return None, True
+        args = [a for a in words[i + 1:] if a not in ("-L", "-P", "-e", "-@", "--")]
+        if words[i] == "popd" or not args or args[0] == "-":
+            return None, True           # a directory stack or $HOME: not one it can name
+        return expand(args[0], here), True
+    scan_git(words, here)
+    return here, False
+
+
+def lift(text):
+    # Command substitutions run, so their commands are judged, and their output is not a path the
+    # guard can name, so each is replaced by `$S`, which expand() treats as unresolvable. Done
+    # before shlex because shlex would split `$(pwd)` into words that read as the next command.
+    out, inner, i, q = [], [], 0, None
+    while i < len(text):
+        c = text[i]
+        if q == "'":
+            q = None if c == "'" else q
+            out.append(c)
+            i += 1
+        elif c == "\\" and i + 1 < len(text):
+            out.append(text[i:i + 2])
+            i += 2
+        elif c == "'" and q is None:
+            q = "'"
+            out.append(c)
+            i += 1
+        elif c == '"':
+            q = None if q == '"' else '"'
+            out.append(c)
+            i += 1
+        elif c == "$" and text.startswith("(", i + 1) and not text.startswith("((", i + 1):
+            j, depth = i + 2, 1
+            while j < len(text) and depth:
+                depth += {"(": 1, ")": -1}.get(text[j], 0)
+                j += 1
+            inner.append(text[i + 2:j - 1])
+            out.append("$S")
+            i = j
+        elif c == "`":
+            j = text.find("`", i + 1)
+            j = len(text) if j < 0 else j
+            inner.append(text[i + 1:j])
+            out.append("$S")
+            i = j + 1
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out), inner
+
+
+PUNCT = "();<>|&\n"
+OPERATOR = re.compile(r"&&|\|\||\|&|;;|[;&|()\n]")
+DETACHED = {"|", "|&", "&"}
+# The separators after which the next command runs whether or not the one before succeeded. A cd
+# carries only across `&&`: after one of these, a cd that failed or was skipped leaves bash in the
+# author's checkout, so a target the chain moved is no longer known. `&` is here too, because it
+# backgrounds the whole chain before it, cd and all, into a subshell.
+UNCHAINED = {";", ";;", "\n", "||", "&"}
+
+
+def judge(text, here):
+    text, inner = lift(text)
+    for sub in inner:
+        judge(sub, here)
+    # shlex splits words as the shell does, so a quoted `-m "a; b"` stays one word.
+    # punctuation_chars makes the operators their own tokens; the newline is made one of them, and
+    # taken out of the whitespace, because a newline separates commands as `;` does and shlex would
+    # otherwise swallow it. No comment character: a `#` inside a word would end the line early and
+    # hide what follows it, so a comment is read as words, which can only refuse more.
+    lex = shlex.shlex(text, posix=True, punctuation_chars=PUNCT)
+    lex.whitespace = " \t\r"
+    lex.whitespace_split = True
+    lex.commenters = ""
+    try:
+        tokens = list(lex)
+    except ValueError:
+        sys.exit(4)                     # an unclosed quote: the bash fallback reads it instead
+    # Its limit: shlex does not say whether a token was quoted, so a quoted argument made only of
+    # operator characters, `";"`, reads as an operator. That splits a command early and can only
+    # cost a cd its reach.
+    items = []
+    for t in tokens:
+        if t and all(c in PUNCT for c in t):
+            # Operators, then any redirection glued on, read as a word. The leading run of operator
+            # characters other than `<` and `>` is peeled first, because `)>/dev/null` closes a
+            # subshell and `;>` or `&&>` ends a command, and reading either whole hid that. A lone
+            # `&` before `>` stays with it: `&>` is a redirection, while `&&>` is `&&` then `>`.
+            k = len(t) - len(t.lstrip("();|&\n"))
+            if t[k:].startswith(">") and t[:k].endswith("&") and not t[:k].endswith("&&"):
+                k -= 1
+            items += [(True, a) for a in OPERATOR.findall(t[:k])]
+            if t[k:]:
+                items.append((False, t[k:]))
+        else:
+            items.append((False, t))
+    stack, words, before, moved = [], [], None, False
+    for is_op, v in items + [(True, "\n")]:
+        if not is_op:
+            words.append(v)
+            continue
+        if words:
+            here, cd = segment(words, here, before not in DETACHED and v not in DETACHED,
+                               before == "||")
+            moved = moved or cd
+            words = []
+        if v == "(":
+            stack.append((here, moved))  # a subshell: nothing in it moves the commands after it
+            moved = False
+        elif v == ")" and stack:
+            here, moved = stack.pop()
+        elif v in UNCHAINED:
+            if moved:
+                here = None
+            moved = False
+        before = v
+
+
+judge(cmd, cwd)
+PY
+decision="$(KEEL_EVENT="$event" python3 -I - <<<"$script")"
+status=$?
+case "$status" in
+    0) [ -n "$decision" ] && printf '%s' "$decision"; exit 0 ;;
+    3) blind "the input is not JSON python3 can read" "" ;;
+    4) blind "the command would not split into words" "" ;;
+    *) blind "python3 failed" "" ;;
+esac

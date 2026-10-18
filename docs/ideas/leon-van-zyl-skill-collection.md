@@ -60,7 +60,7 @@ The honest number to plan against is therefore **three, comfortably, or four if 
 narrow**. That is the whole budget, forever, until something is removed.
 
 **What decision 6 says the remedy is when the ceiling is reached.**
-`docs/07-open-decisions.md:339-345`:
+`docs/07-open-decisions.md#Since 2026-08-16 that revisit has a trigger`:
 
 > **Since 2026-08-16 that revisit has a trigger rather than a good intention.** Plan task 7.5 caps
 > the descriptions sum at 1,320 tokens in `tests/validate-skills.sh`, which is 30 skills at the
@@ -108,7 +108,7 @@ no warning tier above the ceiling.
 to lose **87 percent** of its body to become a legal keel skill. What survives that cut is not an
 adaptation of the file, it is a different file that happens to share a topic. ADR-0001's own
 context section already establishes that the relief valve, moving substance into `references/`,
-has a floor: `coding-standards` sits at 726 words with 17 references carrying 22,726 words. Moving
+has a floor: `coding-standards` sits at 645 words with 18 references carrying 22,916 words. Moving
 material out does not pull a body below roughly 680, so "put the other 7,200 words in references"
 does not rescue this either; it produces a body that still has to be written from scratch.
 

@@ -164,9 +164,13 @@ you noticed and move on.
 
 **Standards adherence belongs here too.** Where `<docs_root>/standards.md` exists, the assess
 report at `<docs_root>/audits/YYYY-MM-DD-standards.md` supplies this part: its coverage figure and
-each departure it found, cited to that report rather than restated from your own reading. Where no
-document exists, one line: `No standards document; nothing to assess against`, and section 10
-names `coding-standards` as the fix.
+each departure it found, cited to that report rather than restated from your own reading. A debt
+item elsewhere in this section that the report also found carries both citations: its own
+`path:line` and the report line that records it,
+`<docs_root>/audits/YYYY-MM-DD-standards.md:<line>`. Without the second, a reader cannot tell a
+finding the assessment verified from one you noticed. Where no document exists, one line:
+`No standards document; nothing to assess against`, and section 10 names `coding-standards` as the
+fix.
 
 ## 9. Health metrics
 

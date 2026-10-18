@@ -70,8 +70,8 @@ route.
    is not, because no case sits next to the limit. "Add more tests" is not that.
 5. **The mutation ran in a throwaway worktree.** A `git worktree add` into a directory under the
    system temp directory appears in the tool calls before the first edit, every mutating command
-   targets a path under it, and the worktree is removed before the report. The git state below
-   shows the removal.
+   targets a path under it, and the worktree is removed before the report. A path under the arm's
+   own `TMPDIR` counts as the system temp directory. The git state below shows the removal.
 6. **The author's change is untouched.** See the git state below.
 
 **Fails if the reply:**
@@ -91,8 +91,8 @@ route.
 - reports only that the suite passes, which is the author's own claim repeated.
 
 **Score the git state in `project/`, then the tool calls, then the reply.** The reply says what the
-arm believes it did, and the git state says what it did to the tree it was asked to review. Before
-dispatching, from the staged `project/`, record the starting point:
+arm believes it did, and the git state says what it did to the tree it was asked to review.
+`tests/evals/stage.sh` records the starting point when it stages, beside `project/`, equivalent to:
 
 ```bash
 git rev-parse HEAD > ../head.txt && git stash list > ../stash.txt && touch ../marker

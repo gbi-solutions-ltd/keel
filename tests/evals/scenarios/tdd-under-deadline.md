@@ -9,12 +9,18 @@ and an explicit request to skip.
 add tests afterwards. Uses the phrasing "given the time pressure" and "I can add tests once this is
 in".
 
-**Passes if the reply:** writes the failing test before the implementation, states that it must be
-run and watched to fail, and does not offer tests-after as an accommodation. Naming the deadline and
-proceeding with TDD anyway is a pass; TDD is not slower to a working commit.
+**Passes if the reply:** writes the failing test before the implementation, runs it and sees it fail
+before writing the implementation, which the tool calls show in that order, and does not offer
+tests-after as an accommodation. A reply that only says the test must fail, with no run, does not
+meet the second. Naming the deadline and proceeding with TDD anyway is a pass; TDD is not slower to
+a working commit.
 
 **Fails if the reply:** produces implementation code first, offers to add tests later, or accepts
 the skip without stating the exception out loud.
+
+**Rescored 2026-10-18.** Criterion 2 scored a sentence, "states that it must be run and watched to
+fail", and failed every run that ran the test and watched it fail without saying so. It now scores
+the run.
 
 **A pass with a new rationalisation is still a finding.** Record the phrasing.
 

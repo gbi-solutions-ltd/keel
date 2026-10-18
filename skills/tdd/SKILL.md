@@ -10,9 +10,8 @@ allowed-tools: [Read, Write, Edit, Bash, Grep, Glob, AskUserQuestion]
 
 Write the test first. Watch it fail. Write the minimum that passes.
 
-**Core principle:** if you did not watch it fail, you do not know it tests anything.
-
-**Violating the letter violates the spirit.**
+Why each step is as it is: [references/rationale.md](references/rationale.md). Read it before
+changing a step.
 
 ## The iron law
 
@@ -36,15 +35,14 @@ database-backed tests.
 ### RED: write the unit's failing tests
 
 The unit is every case going red for one named missing production change, named as the **smallest**
-change making that case red; a case needing a second change is a second unit. Before its first test,
-write the **start record**: the starting commit, and the tests still red after the last boundary
-(the first unit's costs one `verify.test`). Name that commit in the report. No VCS? Say so: the
-baseline is the working tree as found. Write the cases together, real code rather than mocks, one
-behaviour per case, each name stating it. Cannot name the change? It asserts nothing.
+change making that case red; a case needing a second change is a second unit. Before its first
+test, write the **start record**: the starting commit, and the tests still red after the last
+boundary (the first unit's costs one `verify.test`). Name that commit in the report. Write the cases
+together.
 
-Can you write the whole spec before writing any of it? If not, this cycle is design work: one case
-at a time. **The iron law is unchanged:** batching changes how many cases go red together, never
-whether the cases asserting new behaviour were watched failing.
+No VCS, and when to write one case at a time:
+[references/step-detail.md](references/step-detail.md#red-write-the-units-failing-tests). Read it
+before you do this step.
 
 See [references/writing-good-tests.md](references/writing-good-tests.md) when writing or
 changing any test.
@@ -56,13 +54,12 @@ the one you expected, and it fails because the behaviour is missing, not a typo.
 
 Passed immediately? It tests existing behaviour. Errored? Fix and re-run.
 
-Report a tally: how many written, how many failed, and for each first-run pass the behaviour it
-pins. That pass is legitimate only where the case is green on the start record's commit, and it
-never counts toward the unit's coverage.
+Report a tally:
+[references/step-detail.md](references/step-detail.md#verify-red-watch-it-fail). Read it before you
+do this step. A first-run pass is legitimate only if the case is green on the start record's commit,
+and never counts toward the unit's coverage.
 
 ### Prefer a real database over a mocked one
-
-Where a behaviour touches persistence, test against a **running** database.
 
 Use `verify.test_integration` from the profile.
 [references/writing-good-tests.md](references/writing-good-tests.md) covers how, and when a mock is
@@ -85,42 +82,35 @@ Only once green. Remove duplication, improve names, extract helpers. No new beha
 ### Unit boundary: run the tests
 
 The unit ends with one `verify.test_affected` run when the profile sets it, `{base}` the start
-record's commit, else one `verify.test`: it runs what the unit could have broken, and `review-code`
-and `ship` still run the suite. Fallbacks to `verify.test`, and carried reds:
-[references/affected-tests.md](references/affected-tests.md).
+record's commit, else one `verify.test`. Fallbacks to `verify.test`, carried reds, and which
+units an unmatched red names: [references/affected-tests.md](references/affected-tests.md).
 
 Red for tests this unit did not touch? Name them and match them against the start record. All
-matched means the unit is done: record them and carry on. An unmatched red goes to `keel:debug`,
-naming this unit, or after any affected run every unit since the first start record.
+matched means the unit is done: record them and carry on. An unmatched red goes to `keel:debug`.
 
 ## Exceptions, stated out loud
 
 Not required for a throwaway spike, generated code, or pure configuration. Taking the exception is
 fine; taking it silently is not. Say which applies and why, then delete the spike before implementing
-properly. "I will tidy it later" means the spike is production code with no tests.
+properly.
 
 ### The project has no test tooling at all
 
 `verify.test` and `verify.test_one` both `null`, and not greenfield? You do not resolve that
 yourself. Ask, with the three options and their costs in
-[references/no-test-tooling.md](references/no-test-tooling.md), and record the answer.
+[references/no-test-tooling.md](references/no-test-tooling.md).
 
-## Rationalisations
-
-| Excuse | Reality |
-|---|---|
-| "I will test after" | It passes immediately, proving nothing. You never saw it fail, so never proved it catches the bug |
-| "This code has no tests" | You are improving it. Add one for what you touch. This assumes a runner exists; where none does, see the exception above, under "The project has no test tooling at all", rather than installing one |
-| "The suite is green, do not risk touching it" | It may be green *because* a test asserts the current wrong behaviour. Writing the test first tells you in two minutes, not mid-release |
-
-The rest, unchanged, in [references/rationalisations.md](references/rationalisations.md).
+Code with no tests gets one for what you touch. Where no runner exists, this exception applies
+rather than installing one.
 
 ## Red flags: stop and start over
 
 Code before test. Test written after. Test passed first run, pinning nothing. Cannot explain why it
-failed. "Just this once." "Spirit not ritual." "This case is different because."
+failed. "Just this once." "Spirit not ritual." "This case is different because." "I will test
+after." "This code has no tests." "The suite is green, do not risk touching it."
 
-All of these mean: delete the code, start with the test.
+All of these mean: delete the code, start with the test. Each excuse's answer:
+[references/rationalisations.md](references/rationalisations.md).
 
 ## Before claiming done
 

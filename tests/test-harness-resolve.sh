@@ -151,8 +151,8 @@ rm -f "$fx2"
 
 if command -v harness_active_gates >/dev/null 2>&1; then
     got="$(harness_active_gates claude | sort | tr '\n' ' ')"
-    [ "$got" = "context-watch done-guard sensitive-guard session-start " ] \
-      && ok "claude resolves four gates" || bad "claude resolves four gates" "got: $got"
+    [ "$got" = "context-watch done-guard review-guard sensitive-guard session-start " ] \
+      && ok "claude resolves five gates" || bad "claude resolves five gates" "got: $got"
 
     # Three gates, and this is where a human sees Tier B change size. It was session-start alone
     # until 2026-09-06: task 1's manifest had split the transcript primitives along Claude Code's
@@ -168,6 +168,13 @@ if command -v harness_active_gates >/dev/null 2>&1; then
     harness_gate_active codex sensitive-guard \
       && bad "sensitive-guard inactive on codex" "reported active" \
       || ok "sensitive-guard inactive on codex"
+
+    # review-guard is dark on Codex: whether a Codex hook's input names the dispatched agent is
+    # unrecorded, so it cannot tell a reviewer from the author, and pretooluse_deny alone is not
+    # enough to make it a gate there.
+    harness_gate_active codex review-guard \
+      && bad "review-guard inactive on codex" "reported active" \
+      || ok "review-guard inactive on codex"
 
     harness_active_gates cursor >/dev/null 2>&1 \
       && bad "an unknown harness is refused" "exit status was zero" \
@@ -335,7 +342,7 @@ if command -v harness_active_gates >/dev/null 2>&1; then
     # that reads as unrelated to the change. Claude's list is the R-01 no-regression set and does
     # not move when a second harness gains a primitive.
     out="$(PATH="$stub" /bin/bash -c ". '$ROOT/lib/harness/resolve.sh'; harness_active_gates claude" 2>&1 | sort | tr '\n' ' ')"
-    [ "$out" = "context-watch done-guard sensitive-guard session-start " ] \
+    [ "$out" = "context-watch done-guard review-guard sensitive-guard session-start " ] \
       && ok "resolves with no python3 on PATH" \
       || bad "resolves with no python3 on PATH" "got: $out"
     rm -rf "$stub"
@@ -356,9 +363,9 @@ schemaish="$(awk -F'|' '($1=="provides"||$1=="requires") && $3 ~ /jsonl|_json|me
 # neither, which was the point of it. What moved codex from one gate to three afterwards was task
 # 14's evidence, not a rename, and that is the distinction these two keep visible: the claude line
 # has never moved at all, and the codex line moves only when a probe row is added or removed.
-[ "$(harness_active_gates claude | sort | tr '\n' ' ')" = "context-watch done-guard sensitive-guard session-start " ] \
-  && ok "the rename left claude at four gates" \
-  || bad "the rename left claude at four gates" "$(harness_active_gates claude | sort | tr '\n' ' ')"
+[ "$(harness_active_gates claude | sort | tr '\n' ' ')" = "context-watch done-guard review-guard sensitive-guard session-start " ] \
+  && ok "the rename left claude at five gates" \
+  || bad "the rename left claude at five gates" "$(harness_active_gates claude | sort | tr '\n' ' ')"
 [ "$(harness_active_gates codex | sort | tr '\n' ' ')" = "context-watch done-guard session-start " ] \
   && ok "the rename left codex holding every primitive it has evidence for" \
   || bad "the rename left codex holding every primitive it has evidence for" "$(harness_active_gates codex | sort | tr '\n' ' ')"
@@ -388,9 +395,11 @@ if [ -x "$GEN" ]; then
       && ok "hooks/hooks.codex.json is not stale" \
       || bad "hooks/hooks.codex.json is not stale" "regenerate it"
 
-    grep -q 'sensitive-guard' "$ROOT/hooks/hooks.codex.json" 2>/dev/null \
-      && bad "codex manifest omits sensitive-guard" "an entry is present" \
-      || ok "codex manifest omits sensitive-guard"
+    for g in sensitive-guard review-guard; do
+        grep -q "$g" "$ROOT/hooks/hooks.codex.json" 2>/dev/null \
+          && bad "codex manifest omits $g" "an entry is present" \
+          || ok "codex manifest omits $g"
+    done
 
     for g in session-start done-guard context-watch; do
         grep -q "$g" "$ROOT/hooks/hooks.codex.json" 2>/dev/null \

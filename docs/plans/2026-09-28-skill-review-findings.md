@@ -358,8 +358,8 @@ body's; the other fifteen were asked one at a time, all approved (F-200 and F-33
 Result: 119 approved, 24 refused. Review found two findings, F-084 and F-130, ruled under the
 table-row class they do not belong to; both were put to Bernard singly and approved. For the
 second plan: `docs/profile-keys.md:55` changes with F-200 and F-339; F-302's kept-at lines are
-removed by F-301, and the rule stays at
-`skills/write-plan/SKILL.md#These are plan failures, not shortcuts`; F-059 already carries F-060's
+removed by F-301, and the rule stays at "These are plan failures, not shortcuts" in
+`skills/write-plan/SKILL.md` at `d9bd7cb`; F-059 already carries F-060's
 fix to the same line; `execute-plan` lands at 889 words and owes its arm. Considered and not acted
 on: four refused body copies (F-140, F-164, F-241, F-243) are kept elsewhere in the same body, so
 refusing them keeps a duplicate inside it.

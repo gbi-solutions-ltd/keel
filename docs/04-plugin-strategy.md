@@ -119,9 +119,9 @@ ones already in use, not the ones you would choose". Calling a documentation ser
 conventions is importing a generic style guide with a citation attached.
 
 `execute-plan` calling `playwright` for browser verification is unpayable rather than wrong: the
-body sits close to the limit ADR-0001 sets, and the shortest honest conditional would still cost
-several sentences. This is also the skill where a wrong instruction is most expensive, so it is not
-a place to shave a sentence from elsewhere.
+body sits close to the 700-word limit ADR-0011 sets, and the shortest honest conditional would
+still cost several sentences. This is also the skill where a wrong instruction is most expensive,
+so it is not a place to shave a sentence from elsewhere.
 
 ## Capabilities, which are not delegations
 

@@ -91,8 +91,8 @@ m_desc_over_ceiling() {
 }
 run "a description over the ceiling is rejected" 1 m_desc_over_ceiling
 
-# Budget. Per ADR-0001 the ceiling is 900 and 700 is a warning, so exit code alone no longer says
-# whether the check fired: a body at 800 must be visible and must not fail. These assert on output.
+# Budget. Per ADR-0011 the ceiling is 700 and a body within 30 of it warns, so exit code alone does
+# not say whether the check fired: a body at 690 warns and passes. These assert on output.
 check_out() {
     local name="$1" expected="$2" root="$3" pattern="$4" want="$5"
     local out actual ok=1
@@ -124,27 +124,27 @@ run_out() {
 
 pad() { local n="$1" f="$2"; local i; for i in $(seq 1 "$n"); do printf 'word%s ' "$i" >> "$f"; done; }
 
-m_over_ceiling() { pad 950 "$1/skills/example/SKILL.md"; }
-run "body over the 900 word ceiling is rejected" 1 m_over_ceiling
+# The fixture's body is 21 words by the validator's count, so pad N makes a body of 21 + N.
+m_701() { pad 680 "$1/skills/example/SKILL.md"; }
+m_700() { pad 679 "$1/skills/example/SKILL.md"; }
+m_671() { pad 650 "$1/skills/example/SKILL.md"; }
+m_670() { pad 649 "$1/skills/example/SKILL.md"; }
+run_out "a body over the 700 word ceiling is rejected" 1 m_701 "body is 701 words, ceiling 700" yes
+# The ceiling is the last legal count, not the first illegal one.
+run_out "a body of exactly 700 words passes" 0 m_700 "words, ceiling 700" no
 
-# The case the ADR turns on. Before it, this body was simply illegal; after it, it is legal and
-# must still be visible, because a ceiling with no warning below it is what bodies migrate to.
-m_over_target() { pad 750 "$1/skills/example/SKILL.md"; }
-run_out "body between 700 and 900 warns" 0 m_over_target "over the 700 target" yes
-
-# And the warning must not fire on a body inside the target, or it carries no information.
-run_out "body inside the target is not warned about" 0 noop "over the 700 target" no
-
-# A body close to the ceiling says how close, because "over the 700 target" reads the same at 750 and
-# at 897 and only one of those is a body where the next edit fails the suite. write-plan sat at 897,
-# three words of headroom, and nothing said so until someone tried to add a sentence. The number has
-# to reach whoever is about to edit the file, and the moment they run the suite is when that is.
-m_near_ceiling() { pad 870 "$1/skills/example/SKILL.md"; }
-run_out "a body near the ceiling reports its headroom" 0 m_near_ceiling "from the 900 ceiling" yes
-
-# It must stay quiet on a body that is over target with room to work, or every warned skill carries a
-# number that means nothing and the ones that matter stop standing out.
-run_out "a body with room to work does not report headroom" 0 m_over_target "from the 900 ceiling" no
+# A body close to the ceiling says how close, because a warning without the number reads the same at
+# 671 and at 699 and only one of those is a body where the next sentence fails the suite. The number
+# reaches whoever is about to edit the file when they run the suite, with where room comes from.
+run_out "a body within 30 of the ceiling reports its headroom" 0 m_671 \
+  "body is 671 words, 29 from the 700 ceiling" yes
+run_out "the headroom warning says room is made in references/" 0 m_671 \
+  "moving reasons or step detail into references/, per ADR-0011" yes
+# Quiet with room to work, or warnings stop standing out. The bare fixture warns about nothing.
+run_out "a body of 670 words is not warned about" 0 m_670 '^WARN' no
+# ADR-0011 has no eval-arm exception and no target below the ceiling, so no output names either.
+run_out "a near-ceiling warning names no eval arm or 700 target" 0 m_671 'eval arm\|700 target' no
+run_out "a ceiling failure names no eval arm or 700 target" 1 m_701 'eval arm\|700 target' no
 
 # Forbidden constructs
 m_at_link() { printf '\nSee @references/thing.md for detail.\n' >> "$1/skills/example/SKILL.md"; }

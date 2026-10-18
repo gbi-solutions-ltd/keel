@@ -42,16 +42,16 @@ you are covered for.
 - `description` starts with "Use when" and states **triggering conditions only**, never the workflow.
   A description that summarises the process becomes a shortcut the model takes instead of reading the
   body.
-- Body within 700 words, which is the target rather than the ceiling: ADR-0001 allows up to 900, and
-  anything over 700 requires a passing eval arm at that length recorded in `tests/evals/results.md`.
-  **An arm discharges the length it was run at, not the body it was run against**, so a body that
-  grows past the length of its last passing arm owes a new one. A gate arm counts, per ADR-0001's
-  clarification of 2026-09-04. Every body over 700 carries a passing arm at its current length, in
-  the two 2026-09-30 entries of `tests/evals/results.md`: `coding-standards` 726, `repo-snapshot`
-  748, `write-prd` 794, `execute-plan` 889, `tdd` 855, `security-audit` 840, `ship` 751,
-  `incident-response` 746, `setup-deployment` 744 and `write-plan` 761. Assume 700 is the limit
-  unless you are willing to run one. Aim at 400 for one linear path, 600 when it fans out to
-  subagents or carries modes.
+- Body at most 700 words, a hard ceiling with no eval-arm exception, per ADR-0011. Within 30 of it,
+  from 671, the validator warns and says how many words are left. Room is made in order, stopping
+  once under 700: reasons to `references/rationale.md`, then an instruction a linked reference
+  states in full is deleted, then step detail to `references/step-detail.md`, the step keeping a
+  one-line instruction and a link that says to read it before doing the step; never by raising the
+  number. **Bodies settle against whatever number is enforced.** Under a hard 700 with 400 and 600
+  as documented targets, fifteen of 24 sat within 20 words of 700 on 2026-08-16; under ADR-0001's
+  900, which let a body past 700 if it carried a passing eval arm at its length, four sat within 20
+  words of 900 on 2026-10-17. So the remedy is a kind of text that leaves the body, not a higher
+  number, and the warning is a question rather than a quota to fill.
 - No `@` links. They force-load at parse time and burn context before it is needed.
 - No literal `docs/keel`. Skills use `<docs_root>` and read `profile.docs_root`; templates use
   `{{DOCS_ROOT}}`.

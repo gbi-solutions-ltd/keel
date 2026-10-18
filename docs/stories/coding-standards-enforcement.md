@@ -391,8 +391,8 @@ Scenario: no standards document exists
   And this is reported as a gap, not omitted
 ```
 
-**Notes:** `skills/coding-standards/SKILL.md:16-24` already has a working assess mode
-(`references/assess.md`); `skills/repo-snapshot/SKILL.md` currently has zero mentions of
+**Notes:** `skills/coding-standards/SKILL.md#Step 0: Choose the mode` already has a working assess
+mode (`references/assess.md`); `skills/repo-snapshot/SKILL.md` currently has zero mentions of
 `coding-standards` or `assess`. Origin-agnostic scope confirmed by Bernard, 2026-09-21 (PRD Q3).
 
 ---

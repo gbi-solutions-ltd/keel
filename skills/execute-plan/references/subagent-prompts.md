@@ -101,6 +101,9 @@ stash: no `stash`, `checkout`, `restore`, `reset`, `commit`, or `git add` of a f
 `git worktree add --detach` in a new directory under the system temp directory, so no branch or
 stray directory lands in the author's repo, and remove it with `git worktree remove --force`
 before you report, whatever the outcome; a plain remove refuses a modified worktree.
+Write its path as `"${TMPDIR:-/tmp}/<name>"` or a literal temp path, and reach it with
+`cd <path> &&` or `git -C <path>`: on Claude Code a hook refuses a target it cannot resolve, such
+as one held in `"$wt"`, and `TMPDIR` is often unset on Linux.
 On 2026-10-12 a spec reviewer ran `git stash` on the tree under review to measure a baseline, and a
 quality reviewer left a worktree behind.
 
@@ -147,6 +150,9 @@ stash: no `stash`, `checkout`, `restore`, `reset`, `commit`, or `git add` of a f
 `git worktree add --detach` in a new directory under the system temp directory, so no branch or
 stray directory lands in the author's repo, and remove it with `git worktree remove --force`
 before you report, whatever the outcome; a plain remove refuses a modified worktree.
+Write its path as `"${TMPDIR:-/tmp}/<name>"` or a literal temp path, and reach it with
+`cd <path> &&` or `git -C <path>`: on Claude Code a hook refuses a target it cannot resolve, such
+as one held in `"$wt"`, and `TMPDIR` is often unset on Linux.
 On 2026-10-12 a spec reviewer ran `git stash` on the tree under review to measure a baseline, and a
 quality reviewer left a worktree behind.
 
@@ -214,10 +220,10 @@ Where `keel` is not installed or not on PATH, or it reports the plan unaddressab
 checkboxes instead.
 
 **Before the first dispatch, and again before each one, check `git status --porcelain` is empty.**
-A dirty tree is not a refusal, so it is not in step 1's table; it is handled here, because it can
-become true again halfway through a run that started clean. Stop and ask what to do with what is
-there: committing, stashing and discarding are all reasonable and all the user's call. See
-[preconditions.md](preconditions.md).
+A dirty tree is not a refusal, so it is not in the table in preconditions.md; it is handled here,
+because it can become true again halfway through a run that started clean. Stop and ask what to do
+with what is there: committing, stashing and discarding are all reasonable and all the user's call.
+See [preconditions.md](preconditions.md).
 
 After both passes, with pass one at COMPLIES and pass two carrying nothing `blocking`: tick the
 task's steps with `keel plan tick <plan> <id>`, **then commit**, with the paths and the message the
@@ -284,6 +290,14 @@ with it.** Both reviews go to model `inherit`, with the description starting `in
 whether another agent's verdict is right, which is the work least worth making cheaper, and no plan
 routes them. The wide reading briefs in other skills go to delegation profile `keel-fanout`; these
 do not.
+
+**Dispatch the spec and quality reviews as agent type `keel-reviewer` where the harness has it**,
+keeping the `inherit: ` description. On Claude Code a hook, `hooks/review-guard`, refuses that
+agent type the git commands that would change the author's tree, and the hook sees the agent type,
+not the description, so the label alone would not let it tell a reviewer from anyone else. Where the
+agent type does not exist, on Codex or in a session without the plugin, dispatch a general agent
+with the same brief: the prompts above state the git rules for every harness, so the review still
+runs.
 
 **The implementer goes to the routing the plan's header names, and to `inherit` when it names
 none.** The line is `**Implementer routing:**`. On `inherit` the implementer is model `inherit`, its

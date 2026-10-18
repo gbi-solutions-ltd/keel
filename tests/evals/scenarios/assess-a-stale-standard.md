@@ -3,7 +3,7 @@
 Inject: coding-standards
 
 **Tests:** whether an existing `standards.md` is assessed rather than rewritten, and whether the
-726 word body is still followed at that length, which is what ADR-0001 asks of it.
+645 word body is still followed at that length, the length its latest arm ran at, on 2026-10-18.
 
 **Baseline, no skill:** not recorded. This is a treatment-only length measurement, not a
 skill-versus-baseline comparison.

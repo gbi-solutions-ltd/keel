@@ -22,18 +22,18 @@ set -uo pipefail
 # before. The bodies it accused were over one stdio block with the match in the first block; the
 # ones it passed were under a block, so the producer had already finished. Timing decided it.
 
-# Per ADR-0001. The ceiling was 700 with 400 and 600 documented as targets, and because the ceiling
-# was the only number enforced, bodies migrated to it: 15 of 24 skills landed within 20 words of it
-# and none met 400. The remedy the standard named, moving substance into references/, is exhausted,
-# which coding-standards demonstrated at 12 reference files and 17,816 reference words with a body
-# still at 683, measured 2026-08-16. It is 17, 22,726 and 726 today, and tests/test-doc-claims.sh
-# asserts that rather than leaving it to the next reader to notice. So the ceiling moves and the
-# target below it is enforced as a warning, because a ceiling with nothing under it is simply where
-# bodies settle.
-CEILING_WORDS=900
-TARGET_WORDS=700
-# How close to the ceiling a body has to be before the warning says how close. Wide enough that a
-# body reaches it before an ordinary edit does, narrow enough that the number still means something.
+# Per ADR-0011, 700 is the hard ceiling. ADR-0001 raised it to 900 because bodies had settled
+# against 700, and they settled against 900 the same way, so a higher number is not a remedy. The
+# remedy chosen is a kind of text that leaves the body: reasons go to references/, and so does step
+# detail, linked from the step that needs it.
+#
+# ADR-0001 took coding-standards at 683 words as the floor of moving detail out. It is 18,
+# 22,916 and 645 today in reference files, reference words and body, so that floor did not hold,
+# and tests/test-doc-claims.sh asserts the figures rather than leaving them to the next reader.
+CEILING_WORDS=700
+# How close a body has to be before the validator warns: from 671. Wide enough that a body reaches
+# it before an ordinary edit does, narrow enough that a warned body is one where the next edit can
+# fail the suite.
 HEADROOM_WORDS=30
 
 # 216 chars is doc 05's 60-token description ceiling, at the chars/3.6 estimate used everywhere else
@@ -124,21 +124,21 @@ for skill in skills/*/SKILL.md; do
         desc_chars=$(( desc_chars + chars ))
     fi
 
-    # Body budget. Past the ceiling the model starts skimming, which is the failure the budget
-    # exists to prevent.
+    # Body budget. Past the ceiling the body fails: ADR-0011 sets 700 as a policy limit, not as the
+    # point where a model starts skimming.
     #
-    # Within HEADROOM_WORDS of the ceiling the warning says how many words are left, because "over
-    # the 700 target" reads the same at 750 and at 897 and only one of those is a body where the next
-    # edit fails the suite. write-plan sat at 897 and nothing said so until someone tried to add a
-    # sentence and had the suite refuse it. Whoever is about to edit a body runs this, so this is
-    # where the number reaches them.
+    # Within HEADROOM_WORDS of the ceiling the validator warns and says how many words are left.
+    # write-plan once sat three words under the ceiling and nothing said so until someone tried to
+    # add a sentence and had the suite refuse it. Whoever is about to edit a body runs this, so this
+    # is where the number reaches them. The warning also says where room comes from, moving reasons
+    # or step detail into references/, because the fix ADR-0011 chose is text that leaves the body
+    # and not a higher number. Below that band nothing is said, so a warning always means the
+    # ceiling is close.
     words=$(printf '%s' "$body" | wc -w | tr -d ' ')
     if [ "$words" -gt "$CEILING_WORDS" ]; then
         report "$name: body is $words words, ceiling $CEILING_WORDS"
     elif [ "$words" -gt $(( CEILING_WORDS - HEADROOM_WORDS )) ]; then
-        warn "$name: body is $words words, $(( CEILING_WORDS - words )) from the $CEILING_WORDS ceiling and over the $TARGET_WORDS target. Adding a sentence fails the suite: take the words out of this body, or move a section a reader needs at one step into references/. ADR-0001 requires a passing eval arm at this length."
-    elif [ "$words" -gt "$TARGET_WORDS" ]; then
-        warn "$name: body is $words words, over the $TARGET_WORDS target (ceiling $CEILING_WORDS). ADR-0001 requires a passing eval arm at this length."
+        warn "$name: body is $words words, $(( CEILING_WORDS - words )) from the $CEILING_WORDS ceiling. Make room by moving reasons or step detail into references/, per ADR-0011."
     fi
 
     # @ links force-load at parse time and burn context before it is needed.

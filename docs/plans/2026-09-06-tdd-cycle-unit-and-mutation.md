@@ -198,7 +198,7 @@ reason. Anything longer than the rule itself goes to `references/`.
   "do not run the suite". The wrong shaped output here is a cycle that never runs the suite at all.
 - [x] **Step 3** `skills/debug/SKILL.md:69` says "the suite passes" and names no command, so it
   leans on tdd having run it. Give it its own instruction naming `profile.verify.test`, the way
-  `skills/ship/SKILL.md:20` and `skills/review-code/SKILL.md#is where the suite result is established rather than inherited` already do. **This is the signal
+  `skills/ship/SKILL.md:20` and `skills/review-code/SKILL.md` at `a678e64` ("is where the suite result is established rather than inherited") already do. **This is the signal
   that would otherwise be lost rather than relocated.**
 - [x] **Step 4** `skills/write-plan/references/plan-template.md` contradicts itself: `:178-180` says
   "Scope the `Done when:` to the task's own test... The suite gate moves to the join" and the worked

@@ -1,7 +1,7 @@
 # Preconditions, and the two that have exceptions
 
-The table in step 1 lists what stops execution. This file says why each one blocks, and covers the
-two that are refused wrongly more often than they are refused rightly.
+The table below lists what stops execution and why each one blocks. This file also covers the two
+that are refused wrongly more often than they are refused rightly.
 
 Both exceptions were found the same way: by running the whole artifact chain on a real greenfield
 project on 2026-08-15 and hitting a gate that could not be cleared by doing anything correctly.
@@ -50,7 +50,7 @@ answer this one, and rewording it would not change that.
 
 `git status --porcelain` is not empty when the run starts.
 
-**This does not refuse the plan**, which is why it is not a row in step 1's table. It is checked at
+**This does not refuse the plan**, which is why it is not a row in the table above. It is checked at
 the start of the loop and again before each dispatch, in
 [subagent-prompts.md](subagent-prompts.md), because it is a property of the moment rather than of
 the plan, and it can become true again halfway through a run that started clean.

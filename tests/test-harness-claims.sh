@@ -185,9 +185,9 @@ fi
 
 # ...and it fires, on the three shapes it has to catch. Without this the case above passes against a
 # predicate that never reports anything, and every document in the tree could claim whatever it
-# liked. The ceiling case is the S-19 hazard specifically: ADR-0001's 900 words were calibrated on
-# Claude Code's preload and nothing has measured them on Codex, so a sentence saying the ceiling
-# holds there is false today and this is what makes it a red build.
+# liked. The ceiling case is the S-19 hazard specifically: bodies under keel's word ceiling have
+# been checked by eval arms only on Claude Code and no arm has run on Codex, so a sentence saying
+# the ceiling holds there is false today and this is what makes it a red build.
 cf="$(mktemp -d)"
 printf '<!-- keel:claim gate=sensitive-guard harness=codex -->\n' > "$cf/gate.md"
 printf '<!-- keel:claim property=validated_word_ceiling harness=codex -->\n' > "$cf/ceiling.md"
@@ -204,7 +204,7 @@ rm -rf "$cf"
 # A prose regex is a technique tests/test-doc-claims.sh:1-16 rejects for JUDGING claims, and this is
 # not judging: its only question is whether somebody registered the sentence, which is coarse enough
 # for a regex to answer honestly.
-VOCAB='sensitive-guard|done-guard|context-watch|session-start|hard_block_paths|900-word|word ceiling|description budget'
+VOCAB='sensitive-guard|done-guard|context-watch|session-start|hard_block_paths|word ceiling|description budget'
 # Lines inside a fenced code block, which are not prose and cannot be claims. Without this the
 # repository tree in docs/06-repo-layout.md reports nine findings, every one of them a FILENAME in a
 # directory listing: hooks/done-guard the file, tests/test-session-start.sh the file. Tagging those

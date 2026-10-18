@@ -30,13 +30,14 @@ description: Use when asked to review changes, look at a diff, or check work bef
 
 ## Body
 
-Target 700 words. 900 is a hard ceiling; past it the model skims, which is the failure the budget
-prevents. keel's `tests/validate-skills.sh` warns over 700, and a body over 700 words needs a
-passing eval arm at that length, per keel's ADR-0001.
+Give bodies a hard limit; past some length the model skims, which is the failure a budget
+prevents. keel's own is an example, not your rule: a 700-word hard ceiling with no exceptions, and
+`tests/validate-skills.sh` warning within 30 of it, per keel's ADR-0011. When a body nears the
+limit, make room by moving reasons, then step detail, into `references/`, not by raising the number.
 
-Shorter is still better, and the warning is a question rather than a quota to fill. The previous
+Shorter is still better, and the warning is a question rather than a quota to fill. keel's earlier
 numbers were 400 and 600 under a hard 700, and every skill drifted to the ceiling because it was the
-only one enforced.
+only one enforced. Raising the ceiling to 900 drew bodies to 900 the same way.
 
 ```markdown
 # Skill Name

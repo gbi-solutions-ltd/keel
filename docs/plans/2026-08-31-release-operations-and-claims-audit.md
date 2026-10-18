@@ -215,12 +215,12 @@ is the variable whose wrong value produces a **successful deploy and a broken sy
 endpoint, a debug flag, a localhost URL, a test key, a session secret shared with a laptop.
 
 **Gap 3: nothing verifies a release against the thing actually running.**
-`skills/setup-deployment/SKILL.md:42` names "smoke test" as the last pipeline stage and says nothing
-about what one checks. `skills/ship/SKILL.md:20-36` gates on tests, lint, audit, review, docs, plan
-and branch, all of which are properties of the repository rather than of the running system. Nobody
-checks that what is live is the artifact that was intended, or reports the difference between a
-check that failed, a check that could not run because something upstream was broken, and a check
-nobody attempted.
+`skills/setup-deployment/SKILL.md` line 42 at `a678e64` names "smoke test" as the last pipeline
+stage and says nothing about what one checks. `skills/ship/SKILL.md:20-36` gates on tests, lint,
+audit, review, docs, plan and branch, all of which are properties of the repository rather than of
+the running system. Nobody checks that what is live is the artifact that was intended, or reports
+the difference between a check that failed, a check that could not run because something upstream
+was broken, and a check nobody attempted.
 
 **Gap 4: nothing audits what a repository claims against what it does.**
 `skills/write-docs/SKILL.md` warns that "restating what the code" goes stale silently, `:87-90`

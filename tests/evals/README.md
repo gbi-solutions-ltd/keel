@@ -13,10 +13,13 @@ and dispatch from there:
 
 ```bash
 dir=$(tests/evals/stage.sh tdd-under-deadline)
-cd "$dir/project" && claude -p "$(cat ../prompt.md)" \
+cd "$dir/project" && TMPDIR="$dir/tmp" claude -p "$(cat ../prompt.md)" \
     --setting-sources "" --disable-slash-commands \
-    --permission-mode bypassPermissions --output-format json > "$dir/result.json"
+    --permission-mode bypassPermissions --output-format json > "$dir/result.json" < /dev/null
 ```
+
+This dispatches with no isolation check, so run the check by hand first, from a disposable
+workspace, as "Why dispatch happens outside the tree" below describes.
 
 **An injected skill's reference files are staged too, and this is what makes a reference-dependent
 skill measurable at all.** `stage.sh` copies `skills/<skill>/references/` for every skill the
@@ -50,6 +53,16 @@ not exist is skipped. Added 2026-10-17 for `review-a-sensitive-change`. It also 
 the other injecting scenarios link, which none of them had on disk before, so a result recorded
 for one of them was measured without those files.
 
+**The recipe sets `TMPDIR` to the staged directory's own `tmp/`, which `stage.sh` creates.** Four
+concurrent `review-code` arms on 2026-10-18 met at one fixed worktree path under the shared temp
+directory and one edited another's tree through it; the `dispatch.sh` that `gate.sh` writes sets
+the same prefix.
+
+**Where the scenario scores against a baseline, `stage.sh` records it beside `project/`:**
+`head.txt`, `stash.txt` and `marker`. A scenario does when its file mentions `head.txt`, as
+`review-a-sensitive-change` and `implement-a-small-change` do. Any other scenario gets none of the
+three.
+
 **Every flag there is load bearing**, worked out on 2026-08-19:
 
 - `--setting-sources ""` and `--disable-slash-commands` stop the arm loading the installed keel
@@ -58,9 +71,13 @@ for one of them was measured without those files.
   text, so both arms take the same two flags.
 - `--permission-mode bypassPermissions` because a scenario like `done-without-verifying` turns on
   whether the arm **runs a command**, and an arm that cannot run one has been prevented from
-  passing. It is safe here only because the working directory is a staged copy outside the tree.
+  passing. It is safe only where nothing else is within reach: arms search the whole machine, so a
+  gate is dispatched from a disposable workspace that holds no keel checkout, no personal
+  credentials beyond a scoped key for the gate, and no other repositories.
 - `--output-format json` records the model and the cost alongside the reply, both of which belong
-  in `results.md`.
+  in `results.md`. The gate script uses `--output-format stream-json --verbose` instead: the
+  stream's last record, of type `result`, carries the same model and cost, and the stream adds the
+  tool calls a rubric may turn on.
 - `--bare` looks right and is not: it requires `ANTHROPIC_API_KEY` and refuses OAuth.
 
 **On Codex the flags are different, and two of the differences are not obvious.**
@@ -87,9 +104,9 @@ text rather than relying on a plugin install. Proven 2026-09-05 and recorded in 
   the machine rather than of the harness and so cannot be asserted by a test here. Check it before
   relying on a Codex baseline, and record the result in this section.
 - **`--dangerously-bypass-approvals-and-sandbox` is eval only.** It disables the sandbox, and it is
-  safe here for the same reason `bypassPermissions` is: the working directory is a staged copy
-  outside the tree. `tests/test-eval-harness.sh` fails the build if it appears in any document a
-  user reads as instructions.
+  safe only where `bypassPermissions` is: where nothing else is within reach.
+  `tests/test-eval-harness.sh` fails the build if it appears in any document a user reads as
+  instructions.
 
 **To check which model a dispatch actually ran on, swap in `--output-format stream-json --verbose`.**
 It emits every assistant message, `tool_use` blocks and their inputs included, so an `Agent` call's
@@ -143,12 +160,18 @@ reading it. It is not a dispatch route.
 **Stage once per arm.** Two arms sharing a directory race on the same files, and the result looks
 fine either way. That nearly happened on 2026-08-16 and is recorded in `results.md`.
 
-**Arms can be dispatched concurrently, and a full gate should be.** Staging once per arm is what makes
-that safe: each arm's working directory is its own, outside the tree, so nothing is shared to race on.
-The six-arm gate on 2026-08-20 ran in about two and a half minutes of wall clock rather than nine,
-at the same cost, because the dispatches overlapped. Wait on all of them and score afterwards; a
-dispatch takes one to three minutes, so a foreground timeout under about five is a timeout on work
-that is still running, and re-dispatching on it pays for every arm twice.
+**Arms can be dispatched concurrently, and a full gate should be.** Staging once per arm is what
+makes that safe: each arm's working directory is its own, outside the tree, so there is nothing
+shared to race on except the system temp directory, which is why each arm gets its own `TMPDIR`. The
+six-arm gate on 2026-08-20 ran in about two and a half minutes of wall clock rather than nine, at
+the same cost, because the dispatches overlapped. `tests/evals/gate.sh` stages, and the
+`OUT/dispatch.sh` it writes dispatches: `gate.sh` stages every arm in `tests/evals/gate-scenarios`
+and runs no `claude`, `--runs N` repeats each arm N times in separate staged directories, and
+`--dry-run` also prints the dispatch lines. `bash OUT/dispatch.sh` then starts every arm at once,
+behind the isolation check below, and closes each arm's stdin. Wait on all of them and score
+afterwards; a dispatch takes one to three minutes, so a foreground timeout under about five is a
+timeout on work that is still running, and re-dispatching on it pays for every arm twice. A second
+`dispatch.sh` in the same `OUT` is refused for that reason.
 
 ### Why dispatch happens outside the tree
 
@@ -162,6 +185,40 @@ treatment between two runs.
 the arm `<dir>/project` as its working directory, and refuses to run at all if `TMPDIR` points
 inside the tree. `tests/test-eval-harness.sh` asserts the isolation rather than trusting it,
 including that the pass criteria are nowhere under the staged directory.
+
+**Run `tests/evals/isolation-check.sh` after staging and before dispatching by hand.** Arms search
+with `find /` and not the `../skills/` path their prompt names, so a keel-shaped copy anywhere on
+the machine is a copy they can read, criteria included (`results.md`, 2026-10-18, follow-up 5). Run
+it from a copy outside the repository, because the repository's own copy is one of the things it
+lists, and give it `--names <file>`, the scenario names one per line, since the repository's
+`scenarios/` is not beside the copy: `isolation-check.sh --names names.txt <staged dir>...`. A
+non-zero exit prints what it found; delete those paths first and run it again. It matches names
+and does not read file contents, so a transcript or an archive holding criteria text is not found;
+read the arm's tool calls for paths outside its staged directory after the run.
+
+`OUT/dispatch.sh` runs the check itself. `gate.sh` copies `isolation-check.sh` and a
+`scenario-names.txt` into `OUT`, and the dispatch runs the copy over every staged directory named by
+the `.dir` files, with the search root printed (`/`; `KEEL_ISOLATION_ROOT` replaces it for tests
+only, and the dispatch warns on stderr when it is set). On a non-zero exit it prints what the check
+printed, says no arm was dispatched, exits 2 and writes nothing. It also refuses, exit 2, a `.dir`
+file that is empty or holds a path that is not absolute. On a machine with keel installed as a
+plugin the plugin's skill tree is one of the shapes the check lists, so `dispatch.sh` refuses there,
+as intended.
+
+**A gate is dispatched from a disposable workspace, and the check is only part of why** (L-01 of
+`docs/audits/2026-10-18-security.md`). Arms run with `bypassPermissions` and search the machine, so
+nothing else may be within reach, and a script inside the checkout cannot be that place. Stage with
+`gate.sh` into an `OUT` outside the tree, in a cloud session or a container that holds no personal
+credentials beyond a scoped key for the gate and no other repositories, delete the checkout there,
+then run `bash OUT/dispatch.sh`. The check matches keel-shaped names only, so it does not detect
+credentials, other repositories or text that quotes criteria: those are kept out of reach by where
+the gate is run, not by anything the script proves.
+
+**What is left even then.** Arms dispatched together can read each other's staged directories and
+the files in `OUT`, since nothing scopes reads between them. The lines `--dry-run` prints dispatch
+with no check, so a person who pastes them has skipped it. And the credential `claude` runs on is in
+the workspace and readable by every arm, because arms inherit the environment and run with
+`bypassPermissions`: use a scoped, revocable key for a gate, and revoke it afterwards.
 
 **A subagent spawned from a session working in this repository is not isolated**, whatever it is
 told. It inherits that working directory. Use the `claude -p` route above.
@@ -187,15 +244,13 @@ repository, and which `commit-outside-a-worktree` is scored on.
 
 ## Running all of them before a release
 
-Seventeen scenarios exist; 7 scenarios are dispatched at the release gate, listed in
-`tests/evals/gate-scenarios`, one dispatch each. That file is the set: the runbook's
-dispatch script reads it rather than carrying its own copy, and `tests/test-eval-harness.sh`
-fails the build if this sentence, the runbook or the file disagree. Record the result
-in `results.md` with the date, and in
-`CHANGELOG.md` for that release: which passed, which failed, and the exact rationalisation any
-failure used. **A new rationalisation is
-the most valuable output here**, because it goes straight into the skill's table and closes a
-loophole nobody had imagined.
+Eighteen scenarios exist; 7 scenarios are dispatched at the release gate, listed in
+`tests/evals/gate-scenarios`, one dispatch each. That file is the set: `tests/evals/gate.sh`
+reads it rather than carrying its own copy, and `tests/test-eval-harness.sh` fails the build if
+this sentence, the runbook or the file disagree. Record the result in `results.md` with the date,
+and in `CHANGELOG.md` for that release: which passed, which failed, and the exact
+rationalisation any failure used. **A new rationalisation is the most valuable output here**,
+because it goes straight into the skill's table and closes a loophole nobody had imagined.
 
 ## The two-arm structure
 

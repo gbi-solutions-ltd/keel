@@ -10,8 +10,10 @@ allowed-tools: [Read, Write, Grep, Glob, Bash, Agent, AskUserQuestion]
 
 Produce one document that lets an engineer who has never seen this repository work in it.
 
-**Core principle:** every claim cites a `path:line`, or is marked `Unknown`. A confident snapshot
-that is wrong is worse than none: the next three decisions inherit the error.
+**Core principle:** every claim cites a `path:line`, or is marked `Unknown`.
+
+Why each step is as it is: [references/rationale.md](references/rationale.md). Read it before
+changing a step.
 
 ## When to use
 
@@ -26,9 +28,9 @@ Run `git log -1 --format=%H`, `git log --oneline -20`, `git ls-files | wc -l`,
 `git branch -a -v`. Read the root listing and any README.
 
 **Compare the default branch against HEAD.** If they differ, record both and establish which
-deploys. A default branch that is not the code you read is itself a finding. They diverge often.
+deploys. A default branch that is not the code you read is itself a finding.
 
-Then find what agents must not read; one 500KB generated file eats a budget:
+Then find what agents must not read:
 
 ```bash
 git ls-files -z | xargs -0 du -k 2>/dev/null | sort -rn | head -15
@@ -43,8 +45,7 @@ re-deriving what someone already wrote.
 
 ## Step 2: Delegate the reading
 
-**Delegate even though it costs more.** Files read inline sit in context all session; a subagent's are
-discarded.
+**Delegate even though it costs more.**
 
 Dispatch these subagents concurrently **in one message**, delegation profile `keel-fanout`, with
 each dispatch's description starting `keel-fanout: `:
@@ -79,12 +80,11 @@ what somebody does, and move the rest to section 8 as `unverified`.
 
 | Claim | How to verify |
 |---|---|
-| Any number | Run the command. Never report a figure from a committed report or an agent's count: stale reports are confidently wrong by an order of magnitude |
+| Any number | Run the command. Never report a figure from a committed report or an agent's count |
 | Security or delivery | Read the cited lines yourself |
 | Setup steps | Execute them |
 
-**Check each command ran.** An errored tool and one that found nothing both exit non-zero. Read the
-output, not the exit code.
+**Check each command ran.** Read the output, not the exit code.
 
 **A claim you could not verify does not reach section 10.** It goes in section 8, marked
 `unverified`.
@@ -92,8 +92,7 @@ output, not the exit code.
 ## Step 4: Write the document
 
 Read [references/section-templates.md](references/section-templates.md) now and follow it. Write
-`<docs_root>/snapshot.md`, or `snapshot-<unit>.md` per unit in a monorepo, stating the unit's
-place in the platform.
+`<docs_root>/snapshot.md`, or `snapshot-<unit>.md` per unit in a monorepo.
 
 ## Step 5: Propose the profile
 

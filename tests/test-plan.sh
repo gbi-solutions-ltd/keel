@@ -2054,18 +2054,35 @@ want="$(printf '%s\n' 'alone: 1' 'alone: 2' 'alone: 3' 'why: task 2 depends on t
 # Every other separator between two ids is not in the strict form either, so the task runs alone
 # and never batches with task 2. An en or em dash is built with a printf escape so this file holds
 # no literal dash. It runs under a UTF-8 locale, where macOS awk's byte-wise substr splits a dash
-# and a regex match on the lone byte is fatal, which a C locale hides.
+# and a regex match on the lone byte is fatal, which a C locale hides. The locale is the first of
+# C.UTF-8 and en_US.UTF-8 that the machine has, because macOS may lack C.UTF-8, and a locale that
+# does not exist falls back to C without a word. A locale exists when its charmap reads UTF-8.
+# With neither, each case whose separator holds a non-ASCII byte is skipped by name, because under
+# C it would pass for the wrong reason; the ASCII separators still run, under C, since they do
+# not depend on the locale.
+dash_loc=""
+for dash_try in C.UTF-8 en_US.UTF-8; do
+    if [ "$(LC_ALL=$dash_try locale charmap 2>/dev/null)" = "UTF-8" ]; then
+        dash_loc="$dash_try"; break
+    fi
+done
+unset dash_try
 for dep in "$(printf 'tasks 1\342\200\2232')" "$(printf 'tasks 1\342\200\2242')" 'tasks 1..2' \
   'tasks 1~2' 'tasks 1; 2' 'tasks 1 or 2' 'tasks 1 and/or 2' 'tasks 1 through 2' 'tasks 1 thru 2' \
   'tasks 1 & 2' 'tasks 1/2' 'tasks 1, 2' 'tasks 1 - 2'; do
+    if [ -z "$dash_loc" ] && [ -n "$(printf '%s' "$dep" | LC_ALL=C tr -d '\000-\177')" ]; then
+        printf '  SKIP  batches separator %s: needs UTF-8, and neither %s nor %s exists here\n' \
+          "'$dep'" C.UTF-8 en_US.UTF-8
+        continue
+    fi
     p="$d/bt-sep.md"
     { task 1 none a.md; task 2 'task 1' b.md; task 3 "$dep" c.md; } > "$p"
-    LC_ALL=C.UTF-8 bt "$p"
+    LC_ALL=${dash_loc:-C} bt "$p"
     want="$(printf '%s\n' 'alone: 1' 'alone: 2' 'alone: 3' 'why: task 2 depends on task 1' \
       "why: task 3 $SDEP" "$CHECK")"
     [ "$bt_rc" -eq 0 ] && [ "$bt_out" = "$want" ] \
-      && ok "batches: a task depending on '$dep' runs alone" \
-      || bad "batches separator $dep" "rc=$bt_rc, got: $bt_out"
+      && ok "batches: a task depending on '$dep' runs alone (LC_ALL=${dash_loc:-C})" \
+      || bad "batches separator $dep (LC_ALL=${dash_loc:-C})" "rc=$bt_rc, got: $bt_out"
 done
 # none is no dependency only as the whole line, with surrounding spaces and one trailing period.
 p="$d/bt-none.md"

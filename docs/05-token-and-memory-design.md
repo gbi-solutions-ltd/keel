@@ -45,23 +45,23 @@ on upgrade, so it goes at the top. Project-specific notes people edit weekly go 
 | SessionStart hook injection | 250 tokens | 400 | `tests/validate-skills.sh`, which also requires it to name every skill |
 | Each skill `description` | 44 tokens, see below | 60 | `tests/validate-skills.sh`, at 216 chars |
 | **All descriptions together** | 44 x skill count | **1,320** | `tests/validate-skills.sh`, which states the total on every run |
-| Skill body | 700 words | 900 | `tests/validate-skills.sh`, which warns over the target |
+| Skill body | none, see below | 700 words | `tests/validate-skills.sh`, which warns within 30 of it |
 | Skill reference files | unbounded | n/a | loaded on demand only |
 
-**One band, per ADR-0001, and the history is the reason.** This table used to carry two: 400 words
+**No band, per ADR-0011, and the history is the reason.** This table used to carry two: 400 words
 for a single linear path and 600 for a skill that fans out or carries modes, both under a hard 700.
 Measured across all 24 skills on 2026-08-16, **no skill met 400 and only four were under 600**,
 while fifteen sat within 20 words of the ceiling and eight within six.
 
 The targets were documented and unchecked; the ceiling was enforced. Bodies went where the check
-was. That is the whole mechanism, and it is why the replacement is a target the validator warns on
-rather than a third documented number.
+was. ADR-0001's 900, with 700 as a warned target, drew bodies the same way, so ADR-0011 makes 700
+the hard ceiling again, warned within 30, with no eval-arm exception and no target below it.
 
-The relief this document used to assume, moving substance into `references/`, does not work at the
-margin. `coding-standards` carries **17 reference files and 22,726 words** in them and its body is
-still 726, against 12, 17,816 and 683 when ADR-0001 measured it on 2026-08-16. A body's floor
-is set by its step count and by the sentence each reference costs to introduce, not by how much
-detail it holds.
+ADR-0001 held that moving substance into `references/` stopped at a floor near 680. ADR-0011 names
+what leaves, in order: reasons, then duplicates a linked reference states in full, then step detail,
+and the floor gave way: `coding-standards` carries **18 reference files and 22,916 words** in them
+and its body is now 645, against 12, 17,816 and 683 when ADR-0001 measured it on 2026-08-16. A
+body's floor is set by its step count, not by the reasons it carries.
 
 What survives from the old reasoning is why a fan-out skill is irreducibly larger: a body that
 dispatches subagents carries the per-agent briefs inline, because a brief in a reference file is one

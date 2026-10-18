@@ -23,10 +23,10 @@ Layer 1  HARNESS GATES   hooks registered with the harness
          (in the repo)    Cost: near zero in context, enforced by the runtime not the model
 ```
 
-Layer 1 is the layer that varies by harness. On Claude Code it is four gates in
-`.claude/settings.json`. On another harness it is whatever that harness's primitives support, which
-is not the same set, and a gate keel cannot deliver there is not registered there. See
-`docs/harness-support.md` for what each harness actually gets.
+<!-- keel:claim gate=review-guard harness=claude -->
+Layer 1 varies by harness. On Claude Code it is five gates in `.claude/settings.json`, the fifth
+`review-guard` (ADR-0010). On another harness it is what that harness's primitives support, not the
+same set; a gate keel cannot deliver there is not registered. See `docs/harness-support.md`.
 
 The split matters. Anything the model can rationalise its way out of belongs in Layer 1.
 Anything every session needs belongs in Layer 2 and must stay small and byte-stable so
@@ -226,8 +226,8 @@ Hard rules, from superpowers' skill-authoring guidance and validated by their te
 
 - `description` states **when to use**, never **what it does**. A description that
   summarises the workflow becomes a shortcut the model takes instead of reading the body.
-- Body targets 700 words, ceiling 900 (ADR-0001). Heavy reference goes in a sibling file, linked
-  by relative path.
+- Body at most 700 words, a hard ceiling warned within 30 of it (ADR-0011). Reasons and step
+  detail go in a sibling file, linked by relative path.
 - Never use `@file` links. They force-load and burn context before it is needed.
 - Cross-reference other skills by name with an explicit marker: `**REQUIRED SUB-SKILL:** keel:tdd`.
 

@@ -10,7 +10,7 @@
 # scenario testing a subagent's behaviour, and that path is exercised by nothing else.
 #
 # review-a-live-schema and assess-a-stale-standard are deliberately OUT, recorded as not gate
-# scenarios before this file existed. So are the other eight. Seventeen scenarios exist and seven
+# scenarios before this file existed. So are the other nine. Eighteen scenarios exist and seven
 # run at the gate; a scenario is not in the gate by virtue of existing.
 #
 # tests/test-eval-harness.sh fails the build when a name here has no scenario file, when

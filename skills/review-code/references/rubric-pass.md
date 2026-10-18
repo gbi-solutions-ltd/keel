@@ -6,6 +6,12 @@ work least worth making cheaper, and a description with no routing label is ambi
 inherited and forgotten. `docs/standards.md`, "A dispatch names its model, and says so", has the
 rule.
 
+Dispatch it as agent type `keel-reviewer` where the harness has it, keeping the `inherit: `
+description. On Claude Code a hook, `hooks/review-guard`, refuses that agent type the git commands
+that would change the author's tree, and the hook sees the agent type, not the description. Where
+the agent type does not exist, on Codex or in a session without the plugin, dispatch a general agent
+with the same brief; the prompt below states the git rules for every harness.
+
 ## Why a dispatch and not a section of the skill
 
 A reviewer that wrote the code, or watched it being written, is anchored on it: it reads what it
@@ -109,16 +115,22 @@ standards first.
 Do item 5's revert and item 6's mutants in a throwaway worktree, never in the working tree: the
 author's tree is not yours to change, and another reviewer may be reading it. Create it with
 `git worktree add --detach <path> HEAD`, where `<path>` is a new directory under the system temp
-directory. If the change is not committed, apply it there with
-`git diff HEAD | git -C <path> apply`, but skip that when `git diff HEAD` is empty (only new files
-changed): `apply` rejects empty input, and a failed step must not stop the copy that follows. Then
-copy in the untracked files, from the repository root:
+directory, named for this review alone: `review-<short commit>-<four letters you choose>`, never a
+fixed name, because two reviews on one machine would share it and one would change the other's tree.
+Look up the short commit first and write the name out in full. If the path exists, choose other
+letters; never reuse or remove a worktree you did not create. Write `<path>` as
+`"${TMPDIR:-/tmp}/<name>"` or a literal path under the temp directory, because on Claude Code a hook
+refuses a target it cannot resolve, such as one held in `"$wt"`, and `TMPDIR` is often unset on
+Linux. If the change is not committed, apply it there with `git diff HEAD | git -C <path> apply`,
+but skip that when `git diff HEAD` is empty (only new files changed): `apply` rejects empty input,
+and a failed step must not stop the copy that follows. Then copy in the untracked files, from the
+repository root:
 `git ls-files -z --others --exclude-standard | tar --null -T - -cf - | tar -xf - -C <path>`.
 `git diff` lists no untracked file, and item 6 must be able to mutate a new file on a sensitive
 path. Remove it with `git worktree remove --force <path>` after item 6 and before you report,
-whatever the outcome, and say that you did. The revert and the mutants leave it modified, so a
-plain remove would refuse. If a test cannot run there, say that the revert check or that mutant was
-not done and why; do not do it in the working tree.
+whatever the outcome, and say that you did. The revert and the mutants leave it modified, so a plain
+remove would refuse. If a test cannot run there, say that the revert check or that mutant was not
+done and why; do not do it in the working tree.
 
 Do not edit the change. Say what is wrong and let the author fix it. Run no git command that
 changes the author's index, working tree or stash: no `stash`, `checkout`, `restore`, `reset`,
@@ -126,7 +138,9 @@ changes the author's index, working tree or stash: no `stash`, `checkout`, `rest
 worktree's files are yours to change, but its stash is the author's, since every worktree of a
 repository shares one: run no `stash` there either. On 2026-10-12 one reviewer ran `git stash` on
 the tree under review and put the stash back, and another left a worktree behind; the next may not
-clean up.
+clean up. Where you run as `keel-reviewer` on Claude Code, a hook enforces these git rules by
+refusing the command; they are stated here for every harness, and hold where no hook does. If it
+refuses one, report the step you could not do rather than look for another way to run it.
 
 Rank each finding, by these meanings and no others:
 - Blocking: wrong behaviour, a security defect, data loss, or an unmet requirement. Must fix before

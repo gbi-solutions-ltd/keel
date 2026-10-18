@@ -961,7 +961,7 @@ The body edit moves the text of `skills/review-code/SKILL.md` and the catalog ed
   at line 85, meaning the instruction to run `profile.verify.test` yourself, as a skill that already
   names the command. The skill is now shorter than line 85, so the citation points past the end of
   the file, and it was already pointing at a table row before this task. Replace it with
-  `skills/review-code/SKILL.md#is where the suite result is established rather than inherited`
+  a citation of the sentence at `skills/review-code/SKILL.md` line 43 at `a678e64`
   (a phrase from the sentence, on one line, with no backticks in it). Leave the rest of the sentence.
 
 Run: `tests/validate-citations.sh`

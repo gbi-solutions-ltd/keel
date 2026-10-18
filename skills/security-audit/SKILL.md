@@ -10,8 +10,10 @@ allowed-tools: [Read, Bash, Grep, Glob, Agent, WebSearch]
 
 Find the doors that are actually unlocked, and prove each one is.
 
-**Core principle:** every finding needs a concrete exploit and a `file:line`. A report of forty
-maybes gets ignored; three real ones get fixed.
+**Core principle:** every finding needs a concrete exploit and a `file:line`.
+
+Why each step is as it is: [references/rationale.md](references/rationale.md). Read it before
+changing a step.
 
 ## Step 1: Pick the scope
 
@@ -21,7 +23,7 @@ maybes gets ignored; three real ones get fixed.
 | `--full` | New engagement, monthly, or after an incident | All |
 
 Whether the diff touches a `hard_block_paths` path is decided by `keel plan risk` or by its rule
-by hand, never by reading one profile, so a change cannot relax its own audit:
+by hand, never by reading one profile:
 [references/sensitive-match.md](references/sensitive-match.md) gives both and how to read
 it. Read `gates.security_audit` from the default branch where the diff changes it. Before a ship,
 `off` means skip the audit and say so, unless the diff touches a `hard_block_paths` path, which is
@@ -30,40 +32,31 @@ values.
 
 ## Step 2: Work the phases in this order
 
-Ordered by where breaches actually come from, which is not where code review looks.
-
 1. **Secrets.** In the working tree, in git history, in build artifacts, in CI logs, in committed
-   `.env` files and keystores. **Build the artifact and look inside it.** A secret in an image or
-   a jar is readable by anyone who can pull it, and this is the single most common serious finding.
+   `.env` files and keystores. **Build the artifact and look inside it.**
 2. **Supply chain.** Outdated majors, known advisories, unmaintained packages, an undeclared
    dependency resolving by hoisting, a lockfile that disagrees with the manifest.
 3. **Pipeline.** What the CI can read, what it prints, who can trigger a deploy, whether tests
    actually gate, and whether a secret reaches a log or an artifact.
-4. **Configuration.** Credentials with defaults, values that start the service when empty (worse
-   than missing, because it starts), and anything that fails open where it should fail closed.
+4. **Configuration.** Credentials with defaults, values that start the service when empty, and
+   anything that fails open where it should fail closed.
 5. **Threat model.** STRIDE over the architecture. See
    [references/stride.md](references/stride.md).
 6. **Code.** OWASP Top 10 against the diff or the repo. See
    [references/owasp-checklist.md](references/owasp-checklist.md).
 7. **Domain.** For anything touching money or cards, work
-   [references/payments-checklist.md](references/payments-checklist.md). This is where the real
-   risk is, and generic tooling does not cover it.
+   [references/payments-checklist.md](references/payments-checklist.md).
 
 Nothing in an audit modifies what is being audited: no configuration edit, no install into the
 project, no request to a write endpoint. Build the artifact in a copy or a throwaway container; a
 check that needs a change to pass was not run, and goes under Not covered.
 
 Delegate phases to parallel subagents on a `--full` run, one per phase,
-delegation profile `keel-fanout`, with each dispatch's description starting `keel-fanout: `. The
-reading stays out of the main context, and step 3 verifies every finding before it is written, so
-nothing ships on the cheaper model's judgement alone.
+delegation profile `keel-fanout`, with each dispatch's description starting `keel-fanout: `.
 
-Brief each on its own phase and nothing else. An agent that can read another's findings starts
-agreeing with them, and agreement between agents that see each other is an echo, not corroboration.
+Brief each on its own phase and nothing else.
 
 ## Step 3: Verify every finding before writing it
-
-A finding you have not confirmed is noise, and noise is what makes audits ignored.
 
 For each: read the cited lines yourself, and state the exploit as a sequence someone could
 follow. If you cannot say who does what and what they get, it does not go in the report. Drop it,
@@ -74,18 +67,15 @@ or move it to a clearly separated "worth checking" list.
 Write `<docs_root>/audits/YYYY-MM-DD-security.md`, following
 [references/report-template.md](references/report-template.md).
 
-Rank by exploitability multiplied by impact, not by scanner severity. Every finding: location,
-exploit, blast radius, fix.
+Rank by exploitability multiplied by impact, not by scanner severity.
 
-Say plainly what you did **not** cover. An audit that implies completeness it does not have is
-worse than a narrow one.
+Say plainly what you did **not** cover.
 
 ## Step 5: Plugin and gate
 
-**Claude Code only.** `security-guidance` covers edits and the end of a turn with its own hooks, so
-it catches what runs between audits; recommend it if absent, and the built-in `/security-review` is
-a useful cross-check on a diff. Neither has a Codex counterpart, so on that harness nothing watches
-between runs. Say so.
+**Claude Code only.** Recommend `security-guidance` if absent, and the built-in `/security-review`
+is a useful cross-check on a diff. Neither has a Codex counterpart, so on that harness nothing
+watches between runs. Say so.
 
 Then report to `ship`. `gates.security_audit` sets this report's verdict: `required` says findings
 block shipping, `warn` says the user decides whether to accept them, `off` skips the audit before a
@@ -99,7 +89,7 @@ overridable in conversation. The reply opens with that verdict: under `warn`, un
 | Mistake | Instead |
 |---|---|
 | Auditing only the code | Secrets, supply chain, and pipeline come first |
-| Reading the Dockerfile instead of the image | Build it and look inside. That is where secrets hide |
+| Reading the Dockerfile instead of the image | Build it and look inside |
 | Forty findings, unranked | Verify each, drop the unproven, rank by exploitability |
 | A severity with no exploit | Name who does what and what they get, or drop it |
 | Implying full coverage | State what you did not cover |

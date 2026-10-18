@@ -72,8 +72,8 @@ Two, and neither is a new audience.
 because something feels off, or out of habit before shipping. They learn the command exists from
 doctor's output and nowhere else, which is why FR-10 is part of this work rather than a follow-up.
 
-**A skill, reading the map.** `write-prd` at `SKILL.md:28` and `:31`, `write-user-stories` at
-`:18`, `design-architecture` at `:25`, `write-plan` at `:19`, `repo-snapshot` at `:41`. They do not
+**A skill, reading the map.** `write-prd` at `SKILL.md:32` and `:35`, `write-user-stories` at
+`:18`, `design-architecture` at `:25`, `write-plan` at `:22`, `repo-snapshot` at `:43`. They do not
 run `sync`; they are why its output has to be a path that resolves.
 
 ## 5. Functional requirements

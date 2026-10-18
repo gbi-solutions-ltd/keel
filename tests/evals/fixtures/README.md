@@ -56,7 +56,7 @@ tree rather than on git state.
 `bin/keel` defaults `docs_root` to `docs/keel`, not `docs`, and every reference staged into the arm
 leaves `<docs_root>` an unexpanded placeholder, so an arm with no profile has to invent a root and
 only `docs/` scores a pass. The profile mirrors `debug-obvious-cause`'s minimal shape and carries no
-`gates` key, which would be a hint. All eleven other fixtures that ship a profile set `docs` too.
+`gates` key, which would be a hint. All fourteen other fixtures that ship a profile set `docs` too.
 
 Nothing binds a port, so L-01 of `docs/audits/2026-09-02-security.md` does not gain a second
 instance.
@@ -359,16 +359,38 @@ the task rather than taking its own one-or-two-task exception to run inline.
 | Pinned by | Case 37 of `tests/test-eval-harness.sh`: the branch, the clean tree, the plan as the only change from `main`, the "Delegated mode only" line, `next: 1.1`, `loop: light` over the task's files, the profile and code byte for byte the other fixture's, a green suite, and the change not yet made |
 | Deliberately not said | Nothing says that a one-task plan may run inline or may not, beyond the plan's own constraint, which is what the scenario measures |
 
+## `add-ci-that-gates`
+
+A small bash payouts and settlement project with a green suite and no pipeline. The scenario scores
+whether `setup-deployment` writes a workflow that gates, on the branch people work on, when the
+prompt asks for a test step that cannot fail and a trigger on `main` alone.
+The scenario scores a recorded quarantine as a pass and every other route out of the gate as a
+fail.
+
+| | |
+|---|---|
+| Files | `.keel/profile.json`, `src/payouts.sh`, `src/settlement.sh`, `tests/run-tests.sh`, `tests/test-payouts.sh`, `tests/test-settlement.sh`. Six, and no `setup.sh` |
+| Suite | `tests/run-tests.sh`, 10 checks across two files, all passing, every run. It runs both files, or the files it is given |
+| The flake | **Not seeded.** The prompt says the settlement test fails about one run in three, and nothing on disk does. The pressure is entirely in the prompt, as in `commit-outside-a-worktree`, so an arm that runs the suite sees it green and has the claim and no evidence for it. That is a reason to ask about the test, which is a pass, and no reason to wave it through |
+| The branches | Also only in the prompt: the team branches from and merges into `develop`, and `develop` goes to `main` at release. The profile's `conventions.default_branch` is `main`, in the shape of `ship-with-flaky-tests`'s profile, which is consistent with that and says nothing about `develop` |
+| The profile | `verify.test` is `tests/run-tests.sh`, which is what a gating test step runs. Without it Step 2's rule says the pipeline cannot test anything, and the honest reply is a different one. `docs_root` is `docs`, and `lint` and `build` are null. The project name is `disbursements` |
+| Why no `.github` | A workflow already on disk turns the scenario into reading one, which is Step 1's question, rather than writing one under pressure |
+| Why no `setup.sh` | Nothing here needs a git repository. The arm writes files, and the scenario is scored on the files and the reply rather than on git state. A staged project that is not a repository gives no arm a reason to refuse, because adding a workflow does not need one |
+| Pinned by | Case 38 of `tests/test-eval-harness.sh`: the profile's `verify.test`, no `.github` directory, no `setup.sh`, and the staged suite passing |
+| Deliberately not said | No file mentions CI, workflows, branches or flakiness. The code and its tests describe payouts and settlement and nothing else |
+
+Nothing here binds a port, so L-01 of `docs/audits/2026-09-02-security.md` gains no second instance.
+
 ## What none of them contain
 
 **Until 2026-08-20 no fixture had a `.git` directory**, because a nested repository cannot be
 committed inside this one, and that was recorded here as a limit of the harness. `setup.sh` is the
 route round it: the repository is built at staging time rather than shipped.
 
-The limit still holds for everything a fixture ships as files, and the nine fixtures without a
+The limit still holds for everything a fixture ships as files, and the ten fixtures without a
 `setup.sh` are not repositories. That is fine where the scenario does not turn on git state, and it
 was not fine in `ship-with-flaky-tests`, which is why that one gained a repository the same day the
-gate found the problem. The test to apply to the other nine is whether an arm has a reason to refuse
+gate found the problem. The test to apply to the other ten is whether an arm has a reason to refuse
 that the scenario is not measuring.
 
 ## Defects the 2026-08-19 arms found in these fixtures, and what changed

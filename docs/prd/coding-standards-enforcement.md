@@ -61,9 +61,9 @@ in full what a `DEVIATES` verdict from the *other* review pass requires (discard
 never tick) and says nothing about what a `Blocking` quality finding requires before the
 coordinator ticks the box and commits.
 
-Separately, `skills/coding-standards/SKILL.md:16-24` already has a working "assess" mode
-(`references/assess.md`) for checking code against an existing `standards.md`, built and shipped
-for a prior gap in this same idea record. `skills/repo-snapshot/SKILL.md` (grepped, zero
+Separately, `skills/coding-standards/SKILL.md#Step 0: Choose the mode` already has a working
+"assess" mode (`references/assess.md`) for checking code against an existing `standards.md`, built
+and shipped for a prior gap in this same idea record. `skills/repo-snapshot/SKILL.md` (grepped, zero
 mentions of `coding-standards` or `assess` anywhere in the file) does not call it, despite both
 skills' own descriptions naming "onboarding onto an unfamiliar codebase" as a trigger.
 
@@ -140,7 +140,7 @@ through a formal plan (a direct edit, a small fix) still only meets `gates.codin
 
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
-| FR-08 | `repo-snapshot` must run `coding-standards`' assess mode (`references/assess.md`) as part of producing a snapshot, when a standards document already exists at the project's standards document path (default `<docs_root>/standards.md`, or wherever `coding-standards` itself resolves it), regardless of whether `coding-standards` itself generated that document, and fold the assessment's findings into the snapshot's gap/debt reporting. | author-added; scope confirmed | User, this session: "even during snapshots, gaps could also be identified based on violated coding standards." `skills/coding-standards/SKILL.md:16-24` (assess mode already reads an arbitrary `standards.md`); `skills/repo-snapshot/SKILL.md` grepped, zero mentions of `coding-standards` or `assess`. Origin-agnostic scope confirmed by Bernard, 2026-09-21 (Q3) |
+| FR-08 | `repo-snapshot` must run `coding-standards`' assess mode (`references/assess.md`) as part of producing a snapshot, when a standards document already exists at the project's standards document path (default `<docs_root>/standards.md`, or wherever `coding-standards` itself resolves it), regardless of whether `coding-standards` itself generated that document, and fold the assessment's findings into the snapshot's gap/debt reporting. | author-added; scope confirmed | User, this session: "even during snapshots, gaps could also be identified based on violated coding standards." `skills/coding-standards/SKILL.md#Step 0: Choose the mode` (assess mode already reads an arbitrary `standards.md`); `skills/repo-snapshot/SKILL.md` grepped, zero mentions of `coding-standards` or `assess`. Origin-agnostic scope confirmed by Bernard, 2026-09-21 (Q3) |
 | FR-09 | When no standards document exists, `repo-snapshot` must say so explicitly as a gap in its own report, rather than omitting the dimension silently. | author-added | Closes the same edge FR-10 (doctor) raises, applied to the snapshot: a project that has opted into standards but has nothing to check is itself worth naming |
 
 ### `doctor`

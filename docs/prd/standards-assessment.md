@@ -25,7 +25,7 @@ all inherited rather than chosen here.
 ## 1. Executive summary
 
 `coding-standards` writes a project's `standards.md` and never reads one back
-(`skills/coding-standards/SKILL.md:16-79`, five authoring steps with no branch that reads an existing
+(`skills/coding-standards/SKILL.md:32-88`, five authoring steps with no branch that reads an existing
 document, confirmed by a directory-wide search finding no mention of assessing, auditing or
 re-checking one). A repository whose standards document is a year old has no way to find out which
 parts of it are still true.
@@ -44,7 +44,7 @@ in the very files it derived them from (`docs/ideas/standards-that-bind.md:214-2
 ## 2. Problem statement
 
 A standards document is written once and read by one skill, over a diff. `review-code` is that skill
-and its scope is defined over changed lines (`skills/review-code/SKILL.md:24`,
+and its scope is defined over changed lines (`skills/review-code/SKILL.md#for the conventions`,
 `skills/review-code/references/rubric.md:64-66`). Nothing reads the document as a whole against the
 tree as a whole, so a document decays silently and the decay is only discovered by whoever next
 trips over it.
@@ -115,7 +115,7 @@ claimed: section 16 measured it the most expensive of the four.
 | FR-07 | For each of the ten indexed topic references, the report must record an applies or does-not-apply verdict and the fact that decided it. | author-added, see note | The index gives ten prose predicates at `skills/coding-standards/references/house-defaults.md:17-26`. Only one, `frontend.md` at `:26`, names profile fields (`profile.stack.has_ui`, `profile.stack.framework`). The other nine are judgements a second run can make differently |
 | FR-08 | The report must state the counting unit it used for "rules" and the per-file denominator that unit produces, both for applicable references and for the rules it reports as folded in, adapted, departed from, or omitted. | author-added, see note | See the reproducibility note below |
 | FR-09 | Where a whole applicable reference has no rule-level content in `standards.md` and no departure row recording the choice, the report must name it as a skipped reference distinctly from an individually omitted rule. | author-added | `docs/ideas/standards-that-bind.md:115-124` treats these as the headline finding, and they are the only part of it that survived the tally's withdrawal, because they rest on zero-hit greps rather than on a count |
-| FR-10 | Check 1 must be assessable against `skills/coding-standards/SKILL.md:70-72`, which requires the house defaults to be included "noting any this project deliberately departs from". A rule neither folded in nor recorded as a departure is a coverage failure. | confirmed | `skills/coding-standards/SKILL.md:70-72`; `docs/ideas/standards-that-bind.md:136-138` |
+| FR-10 | Check 1 must be assessable against `skills/coding-standards/SKILL.md#Include the judgement house defaults`, which requires the house defaults to be included "noting any this project deliberately departs from". A rule neither folded in nor recorded as a departure is a coverage failure. | confirmed | `skills/coding-standards/SKILL.md#Include the judgement house defaults`; `docs/ideas/standards-that-bind.md:136-138` |
 
 **Why FR-08 exists.** The record's first version of this finding reported "76 house rules assessed:
 9 folded in, 9 adapted, 1 departed, 58 silently omitted", with per-reference ratios. That tally has
@@ -201,7 +201,7 @@ ADR-0001 length arm without adding it to the release gate is
 
 | ID | Constraint | Imposed by | Evidence |
 |---|---|---|---|
-| CON-01 | The mode goes inside `coding-standards`. Not a new skill, not a widened `review-code`. | The idea record, already decided | `docs/ideas/standards-that-bind.md:379-383`. A widened `review-code` contradicts its own skill's principle at `skills/review-code/SKILL.md:16-22` and voids its changed-lines scope; a new skill loses on the router's one-skill rule (`skills/keel/SKILL.md#One skill.`) and on the roster |
+| CON-01 | The mode goes inside `coding-standards`. Not a new skill, not a widened `review-code`. | The idea record, already decided | `docs/ideas/standards-that-bind.md:379-383`. A widened `review-code` contradicts its own skill's principle at `skills/review-code/references/rationale.md#A review without the intent is proofreading` and voids its changed-lines scope; a new skill loses on the router's one-skill rule (`skills/keel/SKILL.md#One skill.`) and on the roster |
 | CON-02 | The four checks run in the order given: house-defaults coverage, backlog, judgement sample, departures ledger. | The idea record | `docs/ideas/standards-that-bind.md:433-460`, and `:617-618`: "a mode that lists the checks without ranking them throws away the only thing this instance taught" |
 | CON-03 | Output is a dated report under `<docs_root>/audits/`, never an edit to `standards.md`. | The idea record, answering its own open question 4 | `docs/ideas/standards-that-bind.md:462-463, 589-593` |
 | CON-04 | Any repository used as an example in keel's own documents or fixtures carries a generic name. Naming a real client repository fails the suite. | keel | `tests/no-internal-leaks.sh`, which fails on project-specific identifiers. The instance is `payments-api` throughout |
@@ -262,7 +262,7 @@ is Q3.
 **Decision 1: the four checks always run together, in the ranked order. They are not independently
 selectable.** Three reasons, and the third is the one that decides it.
 
-1. Selectability costs body words. A scope table on the `security-audit` model costs 52 words including its gate line (`skills/security-audit/SKILL.md:16-23`), against 24 words of headroom under the ceiling at 876, so it no longer fits at all. (NFR-01). It fits, but barely, and it buys nothing the mode needs.
+1. Selectability costs body words. A scope table on the `security-audit` model costs 52 words including its gate line (`skills/security-audit/SKILL.md:18-31`), against 24 words of headroom under the ceiling at 876, so it no longer fits at all. (NFR-01). It fits, but barely, and it buys nothing the mode needs.
 2. The ranking is the finding (`docs/ideas/standards-that-bind.md:652-653`). A mode whose first offer is "pick a check" presents the ranking as a menu rather than as a result.
 3. **It is the only way Q1 gets answered.** If checks are selectable, users will run check 1, because the record advertises it as the highest-yield check. The ranking would then never be tested on a second repository, and open question 5 could never close. Running all four every time is what produces the per-check evidence that answers it.
 

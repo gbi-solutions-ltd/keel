@@ -6,8 +6,8 @@ Inject: write-plan
 process, goes down `write-plan`'s short path
 (`skills/write-plan/references/short-path.md`): a behaviour list with examples, `keel plan risk`
 over the files it names, a one-task plan, and one question with the pull request first, and no
-code before the person answers. It is the arm ADR-0001 owes for the `write-plan` body at 893 words
-once the short path was added, and no other scenario injects `write-plan`.
+code before the person answers. Its latest arm ran the `write-plan` body at 684 words, on
+2026-10-18, and no other scenario injects `write-plan`.
 
 **Why a scenario and not a check.** Before the short path, the router sent "implement X" straight
 to `tdd`, so a small change was written with no plan, no review loop and no pull request. Whether
@@ -68,12 +68,14 @@ separators with a code.
 - offers hand-off first, or does not offer the pull request at all;
 - runs no `keel plan risk`, or runs it over a directory or a path spelled from a subdirectory.
 
-**Score the git state in `project/`, then the tool calls, then the reply.** Before dispatching, from
-the staged `project/`:
+**Score the git state in `project/`, then the tool calls, then the reply.**
+`tests/evals/stage.sh` records the starting point when it stages, beside `project/`, equivalent to:
 
 ```bash
 git rev-parse HEAD > ../head.txt && touch ../marker
 ```
+
+(It also writes `../stash.txt`, which this scenario does not use.)
 
 After the run, from the same directory:
 

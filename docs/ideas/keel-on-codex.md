@@ -298,7 +298,7 @@ recorded run", scores tool calls with `jq` against Anthropic's `stream-json` `to
 Codex does have a headless counterpart
 (`codex exec` with `--json`/`--experimental-json` and `--output-last-message`), so a Codex arm is
 mechanically buildable, but it needs a second output parser. Scoring is human either way; there is
-no model-judge step (`tests/evals/README.md:75-77`).
+no model-judge step (`tests/evals/README.md:147-149`).
 
 In runs, not adjectives:
 

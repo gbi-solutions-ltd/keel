@@ -31,7 +31,7 @@ thinner than even the pipeline the project that ships it actually relies on.
 
 ## The delta
 
-| Ship requirement (`skills/ship/SKILL.md:20-36`) | CI (`write_ci`) enforces? | Evidence |
+| Ship requirement (`skills/ship/SKILL.md:20-40`) | CI (`write_ci`) enforces? | Evidence |
 |---|---|---|
 | 1. Tests pass | Partial. Generated CI runs `verify.test`, but only protects a merge if branch protection requires the check | `bin/keel:1146,1156` |
 | 2. New code has new tests | No | No such step exists |

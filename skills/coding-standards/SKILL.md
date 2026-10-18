@@ -13,6 +13,9 @@ Write down what this codebase already does, then move everything mechanical into
 **Core principle:** a convention a linter can check should never be a document anybody reads. Ink
 is for judgement calls only.
 
+Why each step is as it is: [references/rationale.md](references/rationale.md). Read it before
+changing a step.
+
 ## Step 0: Choose the mode
 
 Two facts choose it, before anything is read: whether `<docs_root>/standards.md` exists, and whether
@@ -53,31 +56,24 @@ Sort every convention you found into one of two piles.
 | A tool can check it | Linter, formatter, or a CI script | Indentation, import order, no `console.log`, banned characters |
 | It needs judgement | `<docs_root>/standards.md` | When to extract a service, what belongs in a controller, how much to mock |
 
-Anything in the first pile that ends up in prose will be ignored within a month, because nobody
-re-reads a style guide. Anything in the second pile put into a linter produces false positives
-that teach people to disable the linter.
-
 ## Step 3: Wire the mechanical pile
 
 Configure or extend the project's existing tooling, reading `.keel/profile.json` for what is
-already there. Add rules incrementally, and fix what they flag in the same commit; a linter
-landing with 400 warnings is a linter everyone learns to ignore.
+already there. Add rules incrementally, and fix what they flag in the same commit.
 
 If `profile.verify.lint` is `null`, adding one is the highest-value work here. Prefer a
-check-only command for gates and a separate `--fix` variant for local use: a `lint` script that
-mutates cannot serve as a CI gate.
+check-only command for gates and a separate `--fix` variant for local use.
 
 Where a rule is right but its violations cannot be fixed now, keep it and suppress the known sites
-in a committed file, each entry naming what closes it. Never widen or drop the rule: the suppression
-is what keeps anything new failing. List them under "Not yet mechanical" in `standards.md`.
+in a committed file, each entry naming what closes it. Never widen or drop the rule. List them
+under "Not yet mechanical" in `standards.md`.
 
 ## Step 4: Write the judgement pile
 
 Write `<docs_root>/standards.md`. Follow
 [references/standards-template.md](references/standards-template.md).
 
-Every entry states the rule, one line on why, and a concrete example from this codebase. A rule
-with no reason gets argued about; a rule with no example gets misread.
+Every entry states the rule, one line on why, and a concrete example from this codebase.
 
 Include the judgement house defaults from
 [references/house-defaults.md](references/house-defaults.md), wiring the mechanical ones in Step 3,
@@ -86,8 +82,7 @@ and when each applies. Read the ones that do, no more.
 
 ## Step 5: Verify and report
 
-Run `profile.verify.lint`. It must pass on the current codebase, or you have shipped a broken
-gate.
+Run `profile.verify.lint`. It must pass on the current codebase.
 
 Report: what was derived, what is now enforced by a tool, what remains judgement, and any
 inconsistency you found but did not resolve.

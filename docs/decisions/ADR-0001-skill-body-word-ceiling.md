@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | accepted |
+| Status | superseded by ADR-0011 |
 | Date | 2026-08-16 |
 | Deciders | Bernard Tebandeke |
 | Requirements | none; this governs the repository's own authoring standard |
@@ -27,7 +27,7 @@ fact. Bodies migrate to whatever the validator permits.
 
 The lever the standard offers for relief is moving substance into `references/`. That lever is
 exhausted, and `coding-standards` proves it: **12 reference files carrying 17,816 words, and a body
-still at 683**, as measured on 2026-08-16. That skill now routes four modes and stands at
+still at 683**, as measured on 2026-08-16. As of 2026-10-17 the skill routed four modes and stood at
 17 references, 22,726 reference words, and a body of 726. The conclusion below is unchanged by that:
 moving substance out still did not pull the body under 680, and the growth came from new modes
 rather than from failing to offload. A body's floor is set by its number of steps and by the link-plus-when-to-read

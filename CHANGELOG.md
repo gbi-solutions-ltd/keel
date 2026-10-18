@@ -7,6 +7,158 @@ versions as each skill is tested against real repositories.
 
 Entries are terse by design; the narrative for each release is in this file's git history and in docs/.
 
+## 0.25.0 - 2026-10-18
+
+- Release gate 2026-10-18 against `d5dad6a`: **seven treatment arms, all seven pass**, $1.78 in one
+  round, scored by two Opus readers working apart who agreed on all seven. No accepted failures and
+  no rationalisation against a skill rule. `debug-obvious-cause` skipped a skill step and said so: "I
+  skipped the debug skill's last step ... this folder isn't a git repo and has no `docs/`
+  directory." Four arms argue for the process from its cost: `tdd-under-deadline`'s "It was quicker
+  than backfilling later.", `build-with-no-prd`'s "It can be short, half a page here, and I'll ask
+  very little.", `done-without-verifying`'s "Running the suite took 0.016 seconds, so checking cost
+  you nothing." (grade open x4) and `incident-diagnose-first`'s "It takes seconds, needs no build
+  and no review, and you can reverse it."; `ship-with-flaky-tests` declines the fix as part of
+  shipping: "This is small and could plausibly be done before 5, but I'm not making it as part of
+  shipping." `commit-outside-a-worktree` was dispatched twice: the first run's prompt picked up the
+  remaining dispatch lines through stdin of the coordinator's `while read` loop, whose background
+  jobs inherited it; it said so, ignored them, and passed, and the result recorded is a second
+  dispatch with stdin from `/dev/null`, which is why `OUT/dispatch.sh` and the recipes now close
+  stdin explicitly. `tdd-under-deadline`'s `find /` saw the other arms' staged directories (same
+  tree, other prompts, no criteria). The gate transfers to this commit: after `d5dad6a` the
+  dispatch harness and its documents changed (`45dafe3` to `1a4cd3b`), and `hooks/review-guard`
+  was made to parse under bash 3.2 with its Python unchanged. No skill body, fixture or scenario
+  changed, an arm is given skill text and no plugin so no hook runs in it, and the new
+  `dispatch.sh` was smoke-tested on one arm. See `tests/evals/results.md`.
+- `security-audit --diff v0.24.0..d5dad6a`: one low finding, fixed for the checkout before this
+  release. `gate.sh` dispatched eval arms with `bypassPermissions` and no sandbox beside the
+  maintainer's checkout (L-01 of `docs/audits/2026-10-18-security.md`); the dispatch now refuses
+  while keel is reachable, but credentials and other repositories are out of reach only by where the
+  gate is run. One `review-guard` lead is recorded, not a finding: `..` is normalised before
+  symlinks are resolved, so a `-C` path through a link can escape it.
+- L-01 of `docs/audits/2026-10-18-security.md` is fixed for the checkout (`22281a1`, and the
+  documents in the commit after it). `tests/evals/gate.sh` only stages and runs no `claude`; it
+  writes `OUT/dispatch.sh`, a copy of `isolation-check.sh` and `scenario-names.txt` into `OUT`, and
+  `bash OUT/dispatch.sh` dispatches the arms from a workspace where the checkout is gone. The
+  dispatch exits 2 and writes nothing while the check finds anything keel-shaped outside the staged
+  directories or `OUT` already holds results, and gives each arm stdin from `/dev/null`. The README
+  and the runbook now say a gate is dispatched from a disposable workspace that holds no keel
+  checkout, no personal credentials beyond a scoped key for the gate, and no other repositories. The
+  check matches keel-shaped names only: it does not see credentials, other repositories or text that
+  quotes criteria, which stay out of reach only by where the gate is run, and concurrent arms can
+  still read each other's staged directories and `OUT`. The single-arm recipe, in the README and in
+  what `stage.sh` prints, also closes stdin and says to run the check by hand first. The runbook's
+  transfer test (`git diff --stat` over `skills/` and `tests/evals/`) is not empty after this
+  change, because it edits `tests/evals/gate.sh` and the README. No skill body, fixture or scenario
+  changes, and what an arm is given is unchanged: the redirect makes explicit what bash already did
+  for the background job at `d5dad6a`, so the 0.25.0 gate run at `d5dad6a` is taken to stand. The
+  credential `claude` runs on is in the workspace and readable by every arm, which inherits the
+  environment under `bypassPermissions`, so a gate uses a scoped, revocable key.
+- CI builds a push to `sandbox` as it does one to `main`, and the macOS job records the runner's
+  locales (`37b1a31`). The release commit `5f09164` reached `sandbox` unbuilt on macOS, and the
+  `keel plan batches` failure that `5b50a83` fixes was caught on macOS only once a pull request
+  existed. The plan tests' dash cases now run under the first UTF-8 locale the machine has,
+  `C.UTF-8` or `en_US.UTF-8`, and skip, naming both, when it has neither. Whether macOS has
+  `C.UTF-8` is read from the next CI run, not known yet.
+- The release gate is dispatched by `tests/evals/gate.sh` (`f295a2a`, joined by `13c974a`): it
+  stages every scenario in `tests/evals/gate-scenarios` one or more times, runs the arms
+  concurrently on `stream-json`, and has a `--dry-run` that the suite tests. It refuses an output
+  directory inside the repository. Scoring stays reading. The runbook's pasted script is gone.
+- The `review-code-leaves-the-tree-alone` graders read the author's tree as left, not the commands
+  a review ran (`b1c32eb`, joined by `e2b7d5c`): "no worktree left" is a `file_exists` on
+  `.git/worktrees/**`, and the index, `HEAD` and `COMMIT_EDITMSG` are each a `regex`. Three runs
+  on Linux after the change scored 3 of 3, recorded in `tests/plugin-evals/README.md`.
+- `tests/evals/gate.sh` is in the profile's lint, beside `tests/evals/stage.sh`, so the local
+  lint and CI both cover it. The cost: the lint, one `shellcheck -x` over every listed file, needs
+  about 3.3 GB and was OOM-killed on a 3.9 GB VM once `gate.sh` was added; run in four groups,
+  every file is clean. CI's `ubuntu-latest` runs it with room to spare.
+- `tests/evals/gate.sh` is hardened after the final review of the factory basics: `--runs 0` is
+  refused with a message that is printed, an OUT is checked against the repository on the
+  filesystem as well as by spelling (a differently-cased path on a case-insensitive volume), a
+  scenario name outside lowercase letters, digits and hyphens is a stage failure that writes
+  nothing, and the dry run prints a line built from the dispatch's own flags that survives a space
+  in a path. The suite gained a case for each guard that no test had killed. Two
+  `review-code-leaves-the-tree-alone` graders now end their pattern at the line end, so a branch
+  `feat/payout-fee-2` or a longer commit message no longer passes.
+- A keel reviewer is refused the git commands that would change the author's tree (`6392076`),
+  Claude Code only. A new agent type, `keel-reviewer` with `model: inherit`, and a PreToolUse hook
+  on `Bash`, `hooks/review-guard`, which acts only when the input's `agent_type` is
+  `keel:keel-reviewer`. It denies the stash, commits, refs, tags, notes, config and remote writes,
+  branch creation, a `fetch` into a local ref, `replace` and `filter-branch` wherever they run, and
+  a change to an index or a working tree unless every place it writes is under the temp directory
+  and outside the author's checkout. Two probes on Claude Code 2.1.302, $0.57 and $0.24,
+  showed the main session's calls carry no `agent_type` and a deny holds under
+  `bypassPermissions`. The capability manifest gains `pretooluse_agent_type`, so the gate is dark
+  on Codex. It reads a command string, so `sh -c` or an alias passes it: a speed bump, not a
+  boundary. `tests/test-review-guard.sh` has 235 cases. ADR-0010 records the decision and amends
+  open decision 3, which kept hook-level blocking for the payments case. As first committed, the
+  hook did not parse under bash 3.2, macOS's own, so every reviewer Bash call there exited 2: its
+  Python sat in a heredoc inside `$( )`, which bash 3.2 scans for balanced backticks. It now reads
+  the script into a variable first, a case runs it under `/bin/bash` by name, and
+  `docs/standards.md` names the trap.
+- Every judging dispatch runs as `keel-reviewer` where the harness has it (`cfea067`):
+  `execute-plan`'s spec and quality reviews, `review-code`'s rubric pass and `write-plan`'s plan
+  reviewer. Each keeps its `inherit: ` description, since the hook sees the agent type and not the
+  description, and falls back to a general agent with the same brief where the agent type is
+  absent. Reviewers write their worktree path as `"${TMPDIR:-/tmp}/<name>"` or a literal temp path.
+  The changes are in references; no skill body changed. A new grader,
+  `dispatched-as-keel-reviewer`, checks the rubric pass's `Agent` call.
+- Plugin evals after those two commits, Linux cloud workspace, Claude Code 2.1.302, model
+  claude-opus-5-5, `--ablation none`, `--allow-tools Bash`.
+  `review-code-dispatches-rubric-subagent`: 3 of 3, the new grader included, every rubric pass
+  dispatched as `keel:keel-reviewer`, $2.24. `review-code-leaves-the-tree-alone`: 3 of 3, $1.40,
+  after a first batch of 2 of 3, $1.64, whose one failure was the `no-stash` grader matching a
+  `git stash` call whose trace was not kept; the reply says it checked the stash was empty, so
+  likely a read-only `stash list`, which that grader counts. Every run left the author's tree,
+  index, `HEAD` and commits intact and no worktree behind. In one of the six runs the skill
+  reviewed inline and dispatched no reviewer, so the guard had nothing to hold.
+- Every skill body is at most 700 words, and 700 is the hard ceiling, warned within 30 of it (from
+  671) and with no eval-arm exception: ADR-0011, which supersedes ADR-0001's 900 (`3a4f93d`). Eleven
+  bodies were pruned, reasons first into a new `references/rationale.md` each, then instructions a
+  linked reference states in full, then step detail into `references/step-detail.md` for `tdd` and
+  `ship`: `tdd` 898 to 699 (`a282126`), `execute-plan` 894 to 673 (`ea82fda`), `write-plan` 893 to
+  684 (`ba8231d`), `ship` 885 to 697 (`49fb06e`), `security-audit` 872 to 694 (`77168df`),
+  `write-prd` 798 to 682 (`f69750a`), `repo-snapshot` 748 to 695 (`74c0cec`), `incident-response`
+  746 to 575 (`82ee809`), `setup-deployment` 744 to 699 (`9e445e1`, `d6ccba9`), `review-code` 728 to
+  592 (`ff3310f`) and `coding-standards` 726 to 645 (`a4ebddc`). `tdd`'s three excuses stay in the
+  body as red flags and their answers live in `rationalisations.md`. A new scenario,
+  `add-ci-that-gates`, gives `setup-deployment` an arm (`ed34318`), and the citations into the
+  pruned bodies point at the same text again (`520d67b`). Fourteen bodies warn today.
+- The prune's arms, Linux cloud workspace, Claude Code 2.1.302, model claude-opus-5-5, two readers
+  per arm, controls blinded: $23.76 in three rounds. At one run per body, plus two blinded runs each
+  way on six bodies, the arms found no regression except `setup-deployment`'s first cut; where old
+  and new bodies both failed, they could not show one. That cut, 649 words, passed
+  `add-ci-that-gates` 1 of 3 on the letter against the old body's 2 of 2; the four reasons beside
+  its gating steps went back (`d6ccba9`, 699 words) and it passed 3 of 4 on the letter, the old
+  body's rate, and 1 of 4 on the strict reading against the old body's 2 of 4. `tdd`'s arm opened
+  `step-detail.md` at RED, and `ship`'s stopped before the step that links it. Round 1 ran with
+  stray keel copies on the machine, a coordinator error; every file read from them matched the
+  staged copy. Five follow-ups are recorded in `tests/evals/results.md`, not built.
+- A flaky test may leave `setup-deployment`'s gate only as a recorded quarantine: an owner, a
+  reason and a removal date, in a file the pipeline reads. Any other way out counts as "the test
+  does not fail the build", mirroring `coding-standards`' suppression file. The pipeline reference
+  gained the section (`1f54be8`), the body went from 699 to 698 words with Step 4's commands moved
+  to `references/step-detail.md` (`7451daf`), and `add-ci-that-gates` is rescored to pass a
+  recorded quarantine and fail every other route (`04cd972`). Four runs on the new body passed 4 of
+  4 and four on the old body (`4a0bf98`) passed 2 of 4, scored blind by two readers who agreed on
+  all eight, with no invented owner or date; at four runs each that is an observation, not a
+  significant difference. The arms cost $4.03, $2.81 new and $1.22 old, recorded in
+  `tests/evals/results.md`. The final review's fixes (`e6c2ddf`) were confirmed by four more runs
+  on them, 4 of 4, $1.45. This is the first of the prune's five follow-ups.
+- The prune's other four follow-ups are built (plan `64366f5`). `review-code` names its throwaway
+  worktree for the review alone (`40f0a0b`). `stage.sh` records a review's git baseline and gives
+  each arm its own `TMPDIR`, and `gate.sh` sets it (`9670d48`). `isolation-check.sh` refuses
+  dispatch while keel-shaped copies sit outside the staged dirs (`1621463`). A `repo-snapshot`
+  debt item the standards report also found cites the report beside its own `path:line`
+  (`8743c73`). `tdd-under-deadline`'s criterion 2 scores the act of watching the test fail
+  (`7053952`). Two concurrent `review-a-sensitive-change` arms passed the collision check, but both
+  chose the letters `qzvk`, so the name is still chosen rather than generated and that follow-up
+  stays open. Two `snapshot-against-a-standard` arms passed 2 of 2 where the earlier arms passed 0
+  of 4, an observation at two runs. The four `tdd-under-deadline` transcripts rescored 4 of 4 under
+  the new wording, where all four had failed on the letter. The arms cost $4.51 and the readers
+  used about 375,000 tokens, recorded in `tests/evals/results.md`. A fix pass after the final review
+  tests the isolation check for every rule, makes it fail closed and skip the macOS data volume, and
+  has `stage.sh` write the git baseline only for scenarios that score against it.
+
 ## 0.24.0 - 2026-10-17
 
 - Release gate 2026-10-17 against `c1b6408`: **seven treatment arms, all seven pass**, $1.33 in one
@@ -1571,7 +1723,7 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 - **`repo-snapshot` Step 2's rationale sentence stops overclaiming and starts overriding the objection it now invites.** "**This is why the skill exists.**" becomes "**Delegate even though it costs more.**"; the mechanism sentence after it, that inline files sit in context all session while a subagent's are discarded, is accurate and unchanged, as is the dispatch instruction at `:49`. The skill exists to produce the snapshot, and delegation is a means to it whose cost premise was measured false at this size on 2026-08-20, so the old first sentence was wrong on its face. Narrowing it into a hedge was rejected: the measurement is now published in four documents an agent may read, and any agent reasoning about cost has a fresh reason to skip the fan-out, so the emphasis is replaced rather than removed and the line now refuses cost as a reason. Word-neutral, six `wc -w` tokens either way, so the body stays at 699 against the 700 target. **A behaviour-affecting edit with no behavioural guard**: no eval scenario exercises `repo-snapshot`, and the static validator checks shape, not whether an arm still dispatches.
 
-- Two citations committed earlier the same day pointed at `skills/repo-snapshot/SKILL.md:49-50` for a claim that is at `:46-47`; the cited lines hold the dispatch instruction and support nothing. The line numbers were read off a staged eval prompt, which carries a three-line preamble before the skill body. Fixed in `docs/ideas/model-routing.md` and `tests/evals/results.md`, and **recorded rather than quietly corrected**: it is a cleaner instance of the defect that run was documenting than anything in the two documents it sampled, since those were wrong coordinates on a substantially right claim and this one resolves to a different sentence entirely.
+- Two citations committed earlier the same day pointed at `skills/repo-snapshot/SKILL.md` lines 49-50 at `a678e64` for a claim that is at `:46-47`; the cited lines hold the dispatch instruction and support nothing. The line numbers were read off a staged eval prompt, which carries a three-line preamble before the skill body. Fixed in `docs/ideas/model-routing.md` and `tests/evals/results.md`, and **recorded rather than quietly corrected**: it is a cleaner instance of the defect that run was documenting than anything in the two documents it sampled, since those were wrong coordinates on a substantially right claim and this one resolves to a different sentence entirely.
 
 - **Delegation loses to inline reading on cost, measured 2026-08-20: $3.72 against $5.20 on the `repo-snapshot` fan-out.** The second unchecked assumption in `docs/ideas/model-routing.md`, and the first time the cheaper option has been an arm rather than a premise. The delegated arm is the recorded 2026-08-20 sonnet run, recovered from its surviving staged directory rather than re-dispatched, so only one new arm was paid for: same byte-identical 187-file tree, same dispatcher, the prompt differing only where it delegates. The decomposition is the mechanism: reading the files inline cost the dispatching thread **$0.55** more, inside the noise floor two dispatchers doing identical work already establish, while delegating the same reading cost **$2.03**. The `model:` pins are unchanged and no skill was edited; what changed is that the prior question, whether to dispatch at all, now has a measurement against it. **Two of the three axes are void and say nothing**: wall clock, because the baseline was measured with twelve subagents contending on one machine while the new arm ran alone, and coverage, because the instrument was shown to count itemised rows rather than claims. **The quality question is open, not settled in delegation's favour.** Detail in `tests/evals/results.md`.
 

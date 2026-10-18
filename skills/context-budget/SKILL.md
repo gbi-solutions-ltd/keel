@@ -61,7 +61,7 @@ trimmed file. Otherwise judge it against the table above and say the rubric was 
 
 ## Step 4: Check the skills
 
-Per skill: body word count against a 700-word target, description length, and any `@` link, which
+Per skill: body word count against a 700-word ceiling, description length, and any `@` link, which
 force-loads at parse time.
 
 Where a project has a validator, run it. In keel that is `tests/validate-skills.sh`.

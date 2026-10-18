@@ -90,21 +90,21 @@ claim "open decision count" \
 # asserted.** docs/plans/2026-08-30-design-database.md and
 # docs/plans/2026-08-31-release-operations-and-claims-audit.md cite the old figure as the precedent
 # available when they were written, which is true and stays true, so neither is here.
-# docs/decisions/ADR-0001-skill-body-word-ceiling.md holds one of each in adjacent sentences and is
-# the case that shows the difference: "as measured on 2026-08-16" is the record, "now routes four
-# modes and stands at" is live. Only the second is asserted.
+# docs/decisions/ADR-0001-skill-body-word-ceiling.md held one of each in adjacent sentences until
+# ADR-0011 superseded it. Its live sentence became a record, dated as of 2026-10-17 with that day's
+# figures before the prune, and it left this list: a superseded record tracks no live count.
 #
 # It is a fixed list of locations and phrases rather than a prose parser. A general rule would have
 # to recognise six different sentence shapes, and a check that half-works on prose is worse than a
 # short list somebody has to extend deliberately: the extension is the moment to decide whether the
 # new copy is a record or a claim.
 #
-# THE NINTH, added 2026-09-02. tests/evals/scenarios/assess-a-stale-standard.md said "the 876 word
-# body", written when that was true and left behind by the move of assess's checks into
-# references/assess.md. It is not a document, and it is asserted anyway: it is an undated
-# present-tense claim, it is the length the scenario tells a reader it measures, and it had already
-# gone stale twice by hand. A scenario that misstates what it measures is worse than a document that
-# does, because the next arm is scored against it.
+# THE NINTH, added 2026-09-02, retired 2026-10-18. tests/evals/scenarios/assess-a-stale-standard.md
+# said "the 876 word body", undated and stale twice by hand, so it was asserted although it is not a
+# document: the next arm is scored against what a scenario says it measures. Since 2026-10-18 it
+# names the 645 word body its latest arm ran at, with that date, as the other scenarios name theirs.
+# That is a dated record, so by the rule above it left this list; the scenario's next arm restates
+# the length it ran at.
 cs_refs="$(find skills/coding-standards/references -name '*.md' | wc -l | tr -d ' ')"
 cs_words="$(cat skills/coding-standards/references/*.md | wc -w | tr -d ' ')"
 # The same body_of that tests/validate-skills.sh uses, so the document and the validator cannot
@@ -846,23 +846,19 @@ while IFS='|' read -r file which phrase; do
 done <<'CLAIMS'
 docs/05-token-and-memory-design.md|refs|\*\*[0-9]+ reference files
 docs/05-token-and-memory-design.md|words|and [0-9,]+ words\*\* in them
-docs/05-token-and-memory-design.md|body|still [0-9]+, against
+docs/05-token-and-memory-design.md|body|now [0-9]+, against
 tests/validate-skills.sh|refs|It is [0-9]+,
 tests/validate-skills.sh|words|[0-9,]+ and [0-9]+ today
 tests/validate-skills.sh|body|and [0-9]+ today
 docs/standards.md|refs|carries [0-9]+ and
 docs/standards.md|words|and [0-9,]+ against
 docs/standards.md|body|against [0-9]+ today
-docs/decisions/ADR-0001-skill-body-word-ceiling.md|refs|^[0-9]+ references,
-docs/decisions/ADR-0001-skill-body-word-ceiling.md|words|references, [0-9,]+ reference words
-docs/decisions/ADR-0001-skill-body-word-ceiling.md|body|a body of [0-9]+
 docs/ideas/leon-van-zyl-skill-collection.md|refs|with [0-9]+ references carrying
 docs/ideas/leon-van-zyl-skill-collection.md|words|carrying [0-9,]+ words
 docs/ideas/leon-van-zyl-skill-collection.md|body|sits at [0-9]+ words
 docs/ideas/database-design-and-review.md|refs|precedent at [0-9]+ references
 docs/ideas/database-design-and-review.md|words|references, [0-9,]+ words, and
 docs/ideas/database-design-and-review.md|body|a body of [0-9]+
-tests/evals/scenarios/assess-a-stale-standard.md|body|[0-9]+ word body
 CLAIMS
 
 # NFR-02 of docs/prd/plain-language-chat.md requires the size check to cover every combination of

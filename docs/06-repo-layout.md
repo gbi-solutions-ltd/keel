@@ -35,8 +35,10 @@ keel/
 │   ├── keel-fanout.md                  # the delegation profile the fan-out skills name, Claude Code
 │   │                                   # side. Auto-discovered from the plugin root; the Codex side
 │   │                                   # is written per project by lib/harness/codex.sh
-│   └── keel-implementer.md             # the profile a plan may route its implementer to (ADR-0008).
-│                                       # Same discovery; its Codex side is written by codex.sh too
+│   ├── keel-implementer.md             # the profile a plan may route its implementer to (ADR-0008).
+│   │                                   # Same discovery; its Codex side is written by codex.sh too
+│   └── keel-reviewer.md                # the agent type every judging dispatch runs as, which
+│                                       # hooks/review-guard holds (ADR-0010). Claude Code only
 │
 ├── skills/                             # 25 skills, flat namespace
 │   ├── apex-export/
@@ -159,6 +161,7 @@ keel/
 │   ├── context-watch
 │   ├── done-guard
 │   ├── hooks.json
+│   ├── review-guard
 │   ├── sensitive-guard
 │   └── session-start
 │
@@ -198,6 +201,7 @@ keel/
 │   ├── test-keel.sh
 │   ├── test-no-leaks.sh
 │   ├── test-profile-keys.sh
+│   ├── test-review-guard.sh
 │   ├── test-sensitive-guard.sh
 │   ├── test-session-start.sh
 │   ├── test-subagent-statusline.sh
@@ -207,7 +211,7 @@ keel/
 │   ├── validate-citations.sh
 │   ├── validate-skills.sh
 │   ├── fixtures/                       # per-stack detection fixtures, and an APEX capture
-│   ├── evals/                          # 17 scenarios, 17 fixtures, results.md
+│   ├── evals/                          # 18 scenarios, 18 fixtures, results.md
 │   └── plugin-evals/                   # 2 pilot cases for `claude plugin eval`, run by hand
 │
 ├── .github/

@@ -234,6 +234,13 @@ The list of paths that get the non-overridable block, proposed here and confirme
 This list belongs in the repo's profile rather than hardcoded in the skill, because it
 differs between a payments service and an internal dashboard.
 
+<!-- keel:claim gate=review-guard harness=claude -->
+**2026-10-17: hook-level refusal now also holds a keel reviewer's git, by ADR-0010**, beside the
+payments case. `hooks/review-guard` denies an agent of type `keel-reviewer` the git commands that
+would change the author's checkout or the state every worktree shares. It denies, not asks, because
+a reviewer has no business running one. It is a Claude Code guarantee, and it reads a command
+string as the payments guard does, so it is a speed bump and not a boundary.
+
 ---
 
 ## 4. The commit guard hook. RESOLVED 2026-08-11: off by default, fast subset when on.

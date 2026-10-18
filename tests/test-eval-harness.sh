@@ -891,6 +891,323 @@ else
 suite=$suite_rc coded='$coded'"
 fi
 
+# 38. add-ci-that-gates is a bash project with a green suite and no pipeline at all.
+#
+# Added 2026-10-17 with the scenario that pays setup-deployment's arm. The profile's verify.test is
+# the command a gating test step has to run, so a profile without it leaves Step 2's null branch as
+# the honest reply and the scenario scoring something else. A .github directory would be a pipeline
+# the arm is reading rather than writing, and Step 1's "does the pipeline gate?" would become the
+# exercise. A setup.sh would make it a repository, which nothing here needs. And the suite passes,
+# because a red suite is a reason to keep the step from blocking that the prompt did not give.
+fx4="tests/evals/fixtures/add-ci-that-gates"
+d="$(tests/evals/stage.sh add-ci-that-gates 2>/dev/null)"; staged+=("$d")
+suite_rc=1
+[ -n "$d" ] && ( cd "$d/project" 2>/dev/null && bash tests/run-tests.sh >/dev/null 2>&1 ) \
+    && suite_rc=0
+if [ -f "$fx4/.keel/profile.json" ] \
+   && /usr/bin/grep -q '"test": "tests/run-tests.sh"' "$fx4/.keel/profile.json" \
+   && [ ! -e "$fx4/.github" ] && [ ! -e "$fx4/setup.sh" ] && [ "$suite_rc" -eq 0 ]; then
+    ok "add-ci-that-gates: verify.test set, no .github, no setup.sh, and a green suite"
+else
+    vt=no; /usr/bin/grep -qs '"test": "tests/run-tests.sh"' "$fx4/.keel/profile.json" && vt=yes
+    bad "add-ci-that-gates: verify.test set, no .github, no setup.sh, and a green suite" \
+        "profile=$([ -f "$fx4/.keel/profile.json" ] && echo yes || echo no) test=$vt \
+github=$([ -e "$fx4/.github" ] && echo yes || echo no) setup=$([ -e "$fx4/setup.sh" ] && echo yes || echo no) \
+suite=$suite_rc"
+fi
+
+# 39. A review scenario's git baseline is recorded by the stager, beside project/.
+#
+# Added 2026-10-18 (results.md, "the prune-to-the-target arms", follow-up 2).
+# review-a-sensitive-change scores the staged tree's git state against head.txt, stash.txt and a
+# marker, and a dispatch did not record them, so the scoring had nothing to compare with. The
+# stager records them after setup.sh has built the repository, because only then is there a HEAD to
+# record. They sit beside project/, not in it, for the reason prompt.md does: a file in the project
+# is one the arm finds lying around and one `git status` would report.
+#
+# The marker is also checked from the other side: right after staging, nothing in project/ (the
+# repository's own .git pruned, which git rewrites as it likes) is newer than it. A marker touched
+# before setup.sh finished would call the arm's starting tree an edit.
+d="$(tests/evals/stage.sh review-a-sensitive-change 2>/dev/null)"; staged+=("$d")
+want_head="$( cd "$d/project" 2>/dev/null && git rev-parse HEAD 2>/dev/null )"
+newer="$( [ -e "$d/marker" ] && find "$d/project" -path "$d/project/.git" -prune -o -type f \
+    -newer "$d/marker" -print 2>/dev/null | head -3 | tr '\n' ' ' )"
+if [ -n "$want_head" ] && [ "$(cat "$d/head.txt" 2>/dev/null)" = "$want_head" ] \
+   && [ -f "$d/stash.txt" ] && [ ! -s "$d/stash.txt" ] && [ -e "$d/marker" ] && [ -z "$newer" ]; then
+    ok "review-a-sensitive-change: the stager records HEAD, an empty stash list and a marker"
+else
+    bad "review-a-sensitive-change: the stager records HEAD, an empty stash list and a marker" \
+        "head='$(cat "$d/head.txt" 2>/dev/null)' want='$want_head' \
+stash=$([ -f "$d/stash.txt" ] && { [ -s "$d/stash.txt" ] && echo nonempty || echo empty; } || echo absent) \
+marker=$([ -e "$d/marker" ] && echo yes || echo no) newer_than_marker='$newer'"
+fi
+
+# 40. A fixture that is not a repository gets none of the three. A guard, not a regression test: it
+# passes before the stager records anything and must still pass after, because a HEAD recorded for
+# a directory with no .git would be an empty file that reads as a baseline.
+d="$(tests/evals/stage.sh add-ci-that-gates 2>/dev/null)"; staged+=("$d")
+if [ -n "$d" ] && [ ! -e "$d/project/.git" ] && [ ! -e "$d/head.txt" ] \
+   && [ ! -e "$d/stash.txt" ] && [ ! -e "$d/marker" ]; then
+    ok "add-ci-that-gates: no .git, so no head.txt, stash.txt or marker"
+else
+    bad "add-ci-that-gates: no .git, so no head.txt, stash.txt or marker" \
+        "git=$([ -e "$d/project/.git" ] && echo yes || echo no) head=$([ -e "$d/head.txt" ] && echo yes || echo no) \
+stash=$([ -e "$d/stash.txt" ] && echo yes || echo no) marker=$([ -e "$d/marker" ] && echo yes || echo no)"
+fi
+
+# 40b. A repository fixture whose scenario does not score against a baseline gets none of the three.
+#
+# Added 2026-10-18 (the fix pass after the final review of the prune's follow-ups). The baseline is
+# recorded for a scenario that mentions head.txt, because only those score against it. Recording it
+# for every fixture with a .git put three files beside project/ of a scenario that never reads them,
+# which an arm listing its staged directory finds lying around. snapshot-against-a-standard is a
+# repository (it has a .git) and is scored on its reply, so it is the case that tells the two apart.
+d="$(tests/evals/stage.sh snapshot-against-a-standard 2>/dev/null)"; staged+=("$d")
+if [ -n "$d" ] && [ -e "$d/project/.git" ] && [ ! -e "$d/head.txt" ] \
+   && [ ! -e "$d/stash.txt" ] && [ ! -e "$d/marker" ]; then
+    ok "snapshot-against-a-standard: a repository the scenario does not score, so no baseline files"
+else
+    bad "snapshot-against-a-standard: a repository the scenario does not score, so no baseline files" \
+        "git=$([ -e "$d/project/.git" ] && echo yes || echo no) head=$([ -e "$d/head.txt" ] && echo yes || echo no) \
+stash=$([ -e "$d/stash.txt" ] && echo yes || echo no) marker=$([ -e "$d/marker" ] && echo yes || echo no)"
+fi
+
+# 41. Each stage prints a recipe with its own TMPDIR, and the directory exists.
+#
+# Added 2026-10-18 (same entry, follow-up 2). Four concurrent review runs met at one fixed worktree
+# path under the shared temp directory and one edited another's tree through it. A TMPDIR per
+# staged directory is what makes the path unique to the arm. A recipe that names a directory the
+# stager did not create sends the arm into a TMPDIR that does not exist, so both halves are checked.
+errf="$(mktemp "${TMPDIR:-/tmp}/keel-stage-err-XXXXXX")"; selftest_paths+=("$errf")
+d="$(tests/evals/stage.sh review-a-sensitive-change 2>"$errf")"; staged+=("$d")
+if [ -n "$d" ] && grep -qF "cd $d/project && TMPDIR=$d/tmp claude -p" "$errf" && [ -d "$d/tmp" ]; then
+    ok "the printed recipe names TMPDIR=<staged dir>/tmp, and that directory exists"
+else
+    bad "the printed recipe names TMPDIR=<staged dir>/tmp, and that directory exists" \
+        "tmp=$([ -d "$d/tmp" ] && echo yes || echo no) recipe=$(grep -F 'claude -p' "$errf" | head -1)"
+fi
+
+# 41b. The Codex recipe carries the same per-arm TMPDIR. --harness changes only the recipe, and a
+# recipe that dropped the TMPDIR for one harness would be a difference in treatment between the two
+# arms of a comparison, which is the fault stage.sh's --harness comment says it exists to avoid.
+errf="$(mktemp "${TMPDIR:-/tmp}/keel-stage-err-XXXXXX")"; selftest_paths+=("$errf")
+d="$(tests/evals/stage.sh --harness codex review-a-sensitive-change 2>"$errf")"; staged+=("$d")
+if [ -n "$d" ] && grep -qF "cd $d/project && TMPDIR=$d/tmp codex exec" "$errf" && [ -d "$d/tmp" ]; then
+    ok "the Codex recipe names TMPDIR=<staged dir>/tmp, and that directory exists"
+else
+    bad "the Codex recipe names TMPDIR=<staged dir>/tmp, and that directory exists" \
+        "tmp=$([ -d "$d/tmp" ] && echo yes || echo no) recipe=$(grep -F 'codex exec' "$errf" | head -1)"
+fi
+
+# 41c. Both recipes close the arm's stdin and say this dispatch runs no isolation check. A dispatch
+# that is pasted from here has none of the dispatch.sh a gate gets, so the guide says to run the
+# check by hand first, from a disposable workspace (L-01 of docs/audits/2026-10-18-security.md). The
+# README's single-arm recipe is the same dispatch and closes stdin the same way.
+s4_bad=""
+for h in claude codex; do
+    errf="$(mktemp "${TMPDIR:-/tmp}/keel-stage-err-XXXXXX")"; selftest_paths+=("$errf")
+    d="$(tests/evals/stage.sh --harness "$h" review-a-sensitive-change 2>"$errf")"; staged+=("$d")
+    grep -q '< /dev/null$' "$errf" || s4_bad="$s4_bad $h:no-redirect"
+    grep -qF 'no isolation check' "$errf" || s4_bad="$s4_bad $h:no-sentence"
+    grep -qF 'tests/evals/isolation-check.sh' "$errf" || s4_bad="$s4_bad $h:no-script"
+done
+# The single quotes are the point: the README holds the literal text `$dir`.
+# shellcheck disable=SC2016
+grep -qF -- '--output-format json > "$dir/result.json" < /dev/null' tests/evals/README.md \
+    || s4_bad="$s4_bad readme:no-redirect"
+if [ -z "$s4_bad" ]; then
+    ok "both printed recipes and the README's single-arm recipe close stdin, and the guide says to run the check by hand"
+else
+    bad "both printed recipes and the README's single-arm recipe close stdin, and the guide says to run the check by hand" "$s4_bad"
+fi
+
+# 42 to 52. tests/evals/isolation-check.sh reports what an arm searching the machine could find.
+#
+# Added 2026-10-18 (results.md, "the prune-to-the-target arms", follow-up 5). Arms search with
+# `find /` and not the ../skills/ path their prompt names, so staging outside the repository is not
+# enough while another copy of keel sits elsewhere on the machine. Each case plants its tree under
+# a temp KEEL_ISOLATION_ROOT, so nothing here searches the real machine and nothing real is found.
+# The root is resolved with pwd -P because the script reports physical paths: on macOS mktemp
+# returns /var/..., which is /private/var/....
+ISO="$REPO/tests/evals/isolation-check.sh"
+iso_root() {
+    local r
+    r="$(mktemp -d "${TMPDIR:-/tmp}/keel-iso-root-XXXXXX")" || return 1
+    selftest_paths+=("$r")
+    ( cd "$r" && pwd -P )
+}
+
+# 42. A skill tree is reported as the directory that holds skills/, and the exit is 1.
+iso="$(iso_root)"
+mkdir -p "$iso/x/skills/review-code" && : > "$iso/x/skills/review-code/SKILL.md"
+iso_out="$(KEEL_ISOLATION_ROOT="$iso" "$ISO" 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 1 ] && printf '%s\n' "$iso_out" | grep -qFx "$iso/x"; then
+    ok "isolation-check reports a skills/review-code/SKILL.md tree and exits 1"
+else
+    bad "isolation-check reports a skills/review-code/SKILL.md tree and exits 1" \
+        "rc=$rc out=${iso_out:0:200}"
+fi
+
+# 43. A scenario's file is reported when --names lists it.
+iso="$(iso_root)"
+mkdir -p "$iso/y" && : > "$iso/y/add-ci-that-gates.md"
+printf 'add-ci-that-gates\n' > "$iso/names.txt"
+iso_out="$(KEEL_ISOLATION_ROOT="$iso" "$ISO" --names "$iso/names.txt" 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 1 ] && printf '%s\n' "$iso_out" | grep -qFx "$iso/y/add-ci-that-gates.md"; then
+    ok "isolation-check reports <scenario>.md when --names lists the scenario"
+else
+    bad "isolation-check reports <scenario>.md when --names lists the scenario" \
+        "rc=$rc out=${iso_out:0:200}"
+fi
+
+# 44. A leftover staged directory is reported by its keel-eval- name.
+iso="$(iso_root)"
+mkdir -p "$iso/z/keel-eval-AbC123"
+iso_out="$(KEEL_ISOLATION_ROOT="$iso" "$ISO" 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 1 ] && printf '%s\n' "$iso_out" | grep -qFx "$iso/z/keel-eval-AbC123"; then
+    ok "isolation-check reports a leftover keel-eval- directory"
+else
+    bad "isolation-check reports a leftover keel-eval- directory" "rc=$rc out=${iso_out:0:200}"
+fi
+
+# 45. A skill the check does not name is not reported. A guard: it passes before the script exists
+# and must still pass after, because a check that flagged every skills/ directory would be
+# unusable on a machine that has any other plugin.
+iso="$(iso_root)"
+mkdir -p "$iso/w/skills/docx/references" && : > "$iso/w/skills/docx/SKILL.md" \
+    && : > "$iso/w/skills/docx/references/a.md"
+iso_out="$(KEEL_ISOLATION_ROOT="$iso" "$ISO" 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 0 ] && ! printf '%s\n' "$iso_out" | grep -qF "$iso/w"; then
+    ok "isolation-check does not report a skills/docx tree"
+else
+    bad "isolation-check does not report a skills/docx tree" "rc=$rc out=${iso_out:0:200}"
+fi
+
+# 46. A tree passed as a staged dir is not reported, a root holding only case 45's tree exits 0, and
+# a sibling whose name merely begins with the staged dir's is still reported: "under" is a path
+# boundary, not a string prefix.
+iso="$(iso_root)"
+mkdir -p "$iso/w/skills/docx/references" && : > "$iso/w/skills/docx/SKILL.md"
+out_only="$(KEEL_ISOLATION_ROOT="$iso" "$ISO" 2>/dev/null)"; rc_only=$?
+mkdir -p "$iso/v/skills/review-code/references" "$iso/v/keel-eval-Q1" \
+    && : > "$iso/v/skills/review-code/SKILL.md"
+out_staged="$(KEEL_ISOLATION_ROOT="$iso" "$ISO" "$iso/v" 2>/dev/null)"; rc_staged=$?
+mkdir -p "$iso/vv/skills/review-code" && : > "$iso/vv/skills/review-code/SKILL.md"
+out_sib="$(KEEL_ISOLATION_ROOT="$iso" "$ISO" "$iso/v" 2>/dev/null)"; rc_sib=$?
+if [ "$rc_only" -eq 0 ] && [ "$out_only" = "OK    nothing keel-shaped outside the staged dirs" ] \
+   && [ "$rc_staged" -eq 0 ] && [ "$out_staged" = "$out_only" ] \
+   && [ "$rc_sib" -eq 1 ] && [ "$out_sib" = "$iso/vv" ]; then
+    ok "isolation-check skips a staged dir, exits 0 on a clean root, and still reports a sibling"
+else
+    bad "isolation-check skips a staged dir, exits 0 on a clean root, and still reports a sibling" \
+        "only=$rc_only '${out_only:0:80}' staged=$rc_staged '${out_staged:0:80}' sibling=$rc_sib '${out_sib:0:80}'"
+fi
+
+# 47. Every rule the header lists is reported, and a plugin.json is matched on its top-level name.
+#
+# Added 2026-10-18 (the fix pass after the final review). Cases 42 to 46 exercised four of the
+# rules; a rule with no case can be deleted without a test going red. This plants one of each
+# remaining shape: a references directory with no SKILL.md beside it (r), a tests/evals/scenarios
+# directory (s), a plugin whose top-level name is keel (p), and two that are not keel but mention
+# the word: one whose author is named keel (q), and the same on a single line (q1). The last two
+# are the false positives the old pattern, which matched a "name": "keel" anywhere in the file,
+# reported.
+iso="$(iso_root)"
+mkdir -p "$iso/r/skills/write-plan/references" "$iso/s/tests/evals/scenarios" \
+    "$iso/p/.claude-plugin" "$iso/q/.claude-plugin" "$iso/q1/.claude-plugin"
+printf '{\n  "name": "keel",\n  "version": "1"\n}\n' > "$iso/p/.claude-plugin/plugin.json"
+printf '{\n  "name": "other",\n  "author": {"name": "keel"}\n}\n' > "$iso/q/.claude-plugin/plugin.json"
+printf '{"name":"other","author":{"name":"keel"}}\n' > "$iso/q1/.claude-plugin/plugin.json"
+iso_out="$(KEEL_ISOLATION_ROOT="$iso" "$ISO" 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 1 ] \
+   && printf '%s\n' "$iso_out" | grep -qFx "$iso/r/skills/write-plan/references" \
+   && printf '%s\n' "$iso_out" | grep -qFx "$iso/s/tests/evals/scenarios" \
+   && printf '%s\n' "$iso_out" | grep -qFx "$iso/p/.claude-plugin/plugin.json" \
+   && ! printf '%s\n' "$iso_out" | grep -qF "$iso/q"; then
+    ok "isolation-check reports a references dir, a scenarios dir and a keel plugin, not a plugin by an author named keel"
+else
+    bad "isolation-check reports a references dir, a scenarios dir and a keel plugin, not a plugin by an author named keel" \
+        "rc=$rc out=$(printf '%s' "$iso_out" | tr '\n' ' ' | cut -c1-300)"
+fi
+
+# 48. With no --names the scenario names come from scenarios/*.md beside the script. The script is
+# copied into a temp tree that has tests/evals/scenarios/x.md beside it, so the real scenarios are
+# not what is being read, and a file named x.md in the root is the hit.
+iso="$(iso_root)"
+tree="$(iso_root)"
+mkdir -p "$tree/tests/evals/scenarios" "$iso/y"
+cp "$ISO" "$tree/tests/evals/isolation-check.sh"
+: > "$tree/tests/evals/scenarios/x.md"; : > "$iso/y/x.md"
+iso_out="$(KEEL_ISOLATION_ROOT="$iso" bash "$tree/tests/evals/isolation-check.sh" 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 1 ] && printf '%s\n' "$iso_out" | grep -qFx "$iso/y/x.md"; then
+    ok "isolation-check takes its scenario names from scenarios/*.md beside the script by default"
+else
+    bad "isolation-check takes its scenario names from scenarios/*.md beside the script by default" \
+        "rc=$rc out=${iso_out:0:200}"
+fi
+
+# 49. With neither source the <scenario>.md rule is skipped, and stderr says so. A copy run from
+# outside the repository with no --names would otherwise check less than it appears to, silently.
+iso="$(iso_root)"
+tree="$(iso_root)"
+mkdir -p "$tree/tests/evals" "$iso/y"
+cp "$ISO" "$tree/tests/evals/isolation-check.sh"
+: > "$iso/y/x.md"
+iso_err="$(KEEL_ISOLATION_ROOT="$iso" bash "$tree/tests/evals/isolation-check.sh" 2>&1 >/dev/null)"
+printf '' > "$iso/empty-names.txt"
+iso_err2="$(KEEL_ISOLATION_ROOT="$iso" bash "$tree/tests/evals/isolation-check.sh" \
+    --names "$iso/empty-names.txt" 2>&1 >/dev/null)"
+if grep -qF 'no --names given and no scenarios' <<< "$iso_err" && grep -qF 'skipping' <<< "$iso_err" \
+   && grep -qF 'no usable names' <<< "$iso_err2" && ! grep -qF 'no --names' <<< "$iso_err2"; then
+    ok "isolation-check says on stderr why it skips the <scenario>.md rule, for either missing source"
+else
+    bad "isolation-check says on stderr why it skips the <scenario>.md rule, for either missing source" \
+        "none='${iso_err:0:160}' empty='${iso_err2:0:160}'"
+fi
+
+# 50. The macOS data volume is pruned. From 10.15 on, `find /` walks the data volume a second time
+# under /System/Volumes/Data, so a hit would be reported twice and a staged dir under its second
+# name. The planted tree is under the pruned path and must not be reported.
+iso="$(iso_root)"
+mkdir -p "$iso/System/Volumes/Data/h/skills/review-code" "$iso/System/Volumes/Data/keel-eval-Dup1"
+: > "$iso/System/Volumes/Data/h/skills/review-code/SKILL.md"
+iso_out="$(KEEL_ISOLATION_ROOT="$iso" "$ISO" 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 0 ] && [ "$iso_out" = "OK    nothing keel-shaped outside the staged dirs" ]; then
+    ok "isolation-check prunes System/Volumes/Data"
+else
+    bad "isolation-check prunes System/Volumes/Data" "rc=$rc out=${iso_out:0:200}"
+fi
+
+# 51. Fail closed: a staged dir under the root that the walk found nothing in is a walk that did
+# not cover it, and the check says so with exit 2 and no OK line. The first is a staged dir under
+# the pruned data volume; the second is an empty directory the walk cannot match by name. Real
+# staged directories always match, by their keel-eval- name.
+iso="$(iso_root)"
+mkdir -p "$iso/System/Volumes/Data/keel-eval-Zz9" "$iso/n"
+iso_out="$(KEEL_ISOLATION_ROOT="$iso" "$ISO" "$iso/System/Volumes/Data/keel-eval-Zz9" 2>&1)"; rc1=$?
+iso_out2="$(KEEL_ISOLATION_ROOT="$iso" "$ISO" "$iso/n" 2>&1)"; rc2=$?
+if [ "$rc1" -eq 2 ] && [ "$rc2" -eq 2 ] && ! grep -qF 'OK ' <<< "$iso_out$iso_out2" \
+   && grep -qF 'did not cover' <<< "$iso_out"; then
+    ok "isolation-check exits 2 when a staged dir under the root was not covered by the walk"
+else
+    bad "isolation-check exits 2 when a staged dir under the root was not covered by the walk" \
+        "rc1=$rc1 rc2=$rc2 out='${iso_out:0:160}' out2='${iso_out2:0:160}'"
+fi
+
+# 52. A staged dir named keel-eval- is covered by its own name, so the fail-closed rule does not
+# trip on a real one, and a clean root with it exits 0. A staged dir outside the root is not
+# checked: the root there is a test's, not the machine's.
+iso="$(iso_root)"
+mkdir -p "$iso/t/keel-eval-Ok1234" "$iso/elsewhere"
+outside="$(iso_root)"
+iso_out="$(KEEL_ISOLATION_ROOT="$iso" "$ISO" "$iso/t/keel-eval-Ok1234" "$outside" 2>&1)"; rc=$?
+if [ "$rc" -eq 0 ] && [ "$iso_out" = "OK    nothing keel-shaped outside the staged dirs" ]; then
+    ok "isolation-check accepts a keel-eval- staged dir, and one outside the root is not checked"
+else
+    bad "isolation-check accepts a keel-eval- staged dir, and one outside the root is not checked" \
+        "rc=$rc out=${iso_out:0:200}"
+fi
+
 # ---- the release-gate scenario set is a file, not prose -----------------------------------------
 #
 # It existed in no file until 2026-09-06. README said six, results.md said "The gate stays at seven
@@ -935,6 +1252,581 @@ if [ -f "$GATE" ]; then
         ok "the release runbook dispatches the pinned count ($n)"
     else
         bad "the release runbook dispatches the pinned count" "the runbook does not say all $n"
+    fi
+fi
+
+# ---- tests/evals/gate.sh dispatches the gate, and its dry run dispatches nothing ----------------
+#
+# gate.sh replaces a script that lived pasted in the release runbook and had produced two gates from
+# a scratch directory with no test. These cases stage real scenarios, so each one hands its staged
+# directories to this suite's cleanup trap: `.dir` files name them, and nothing else would ever
+# remove them. A stub `claude` is first on PATH and records every call, so the dry run is proved to
+# dispatch nothing by an empty record rather than by trusting the flag.
+GATESH="$REPO/tests/evals/gate.sh"
+# A macOS TMPDIR ends in /, and mktemp keeps the // that makes while cd drops it, so an arm's $PWD
+# and the .dir file naming its directory would differ in spelling alone.
+gate_root="${TMPDIR:-/tmp}"
+gate_tmp="$(mktemp -d "${gate_root%/}/keel-gate-test-XXXXXX")"
+selftest_paths+=("$gate_tmp")
+# The directories the refusal cases name inside the repository. A gate.sh that creates a refused path
+# would leave it in the tree it was refused for, so each is registered for cleanup, but only when it
+# is absent now: this suite must never delete a directory that was there before it ran, and a
+# tests/evals/out someone is using holds gate artifacts they paid for. Where one exists, the case
+# uses a name that does not.
+inrepo="out"
+[ -e "$REPO/tests/evals/$inrepo" ] && inrepo="out-$$"
+selftest_paths+=("$REPO/tests/evals/$inrepo")
+inrepo2="out2"
+[ -e "$REPO/tests/evals/$inrepo2" ] && inrepo2="out2-$$"
+selftest_paths+=("$REPO/tests/evals/$inrepo2")
+
+adopt_dirs() {
+    local f
+    for f in "$1"/*.dir; do
+        [ -f "$f" ] || continue
+        staged+=("$(cat "$f")")
+    done
+    return 0
+}
+
+stubbin="$gate_tmp/bin"
+stublog="$gate_tmp/claude-calls.log"
+mkdir -p "$stubbin"
+cat > "$stubbin/claude" <<'STUB'
+#!/usr/bin/env bash
+printf 'cwd=%s tmp=%s args=%s\n' "$PWD" "${TMPDIR:-}" "$*" >> "${GATE_STUB_LOG:?}"
+printf '{"type":"result","model":"stub","total_cost_usd":0}\n'
+STUB
+chmod +x "$stubbin/claude"
+
+# One scenario, for the cases that need a gate and not a matrix.
+one="$gate_tmp/one-scenario"
+printf 'tdd-under-deadline\n' > "$one"
+
+# Behaviours 1 and 3: --runs 2 stages every scenario twice, each in its own directory outside the
+# repository, writes one .dir file per arm, and the dry run calls no claude.
+want=$(( $(grep -cvE '^$|^#' "$GATE") * 2 ))
+dry="$gate_tmp/dry"
+rm -f "$stublog"
+dry_out="$(PATH="$stubbin:$PATH" GATE_STUB_LOG="$stublog" "$GATESH" --dry-run --runs 2 "$dry" 2>&1)"; rc=$?
+adopt_dirs "$dry"
+have="$(find "$dry" -name '*.dir' 2>/dev/null | wc -l | tr -d ' ')"
+bad_dirs=""
+for f in "$dry"/*.dir; do
+    [ -f "$f" ] || continue
+    d="$(cat "$f")"
+    case "$d" in "$REPO"/*) bad_dirs="$bad_dirs $(basename "$f")(inside)"; continue ;; esac
+    [ -d "$d/project" ] || bad_dirs="$bad_dirs $(basename "$f")(no project/)"
+done
+distinct="$(cat "$dry"/*.dir 2>/dev/null | sort -u | wc -l | tr -d ' ')"
+if [ "$rc" -eq 0 ] && [ "$have" = "$want" ] && [ "$distinct" = "$want" ] && [ -z "$bad_dirs" ] \
+   && [ -f "$dry/tdd-under-deadline.1.dir" ] && [ -f "$dry/commit-outside-a-worktree.2.dir" ]; then
+    ok "gate.sh --runs 2 stages every scenario twice, each arm in its own directory ($want)"
+else
+    bad "gate.sh --runs 2 stages every scenario twice, each arm in its own directory" \
+        "rc=$rc dirs=$have distinct=$distinct want=$want bad='$bad_dirs' out=${dry_out:0:160}"
+fi
+
+# Read into variables rather than piped into grep: under pipefail a producer cut short by `grep -q`
+# leaving at its first match fails the pipeline, and the check reads as a miss
+# (docs/runbooks/cutting-a-release.md "Symptoms").
+printed="$(grep -c 'claude -p' <<< "$dry_out")"
+streams="$(find "$dry" -name '*.jsonl' 2>/dev/null)"
+tmpd="$(grep -c 'TMPDIR=' <<< "$dry_out")"
+if [ ! -e "$stublog" ] && [ "$printed" -eq "$want" ] && [ -z "$streams" ] && [ "$tmpd" -eq "$want" ]; then
+    ok "gate.sh --dry-run prints each dispatch, with its TMPDIR, and runs no claude"
+else
+    bad "gate.sh --dry-run prints each dispatch, with its TMPDIR, and runs no claude" \
+        "calls=$(wc -l 2>/dev/null < "$stublog" | tr -d ' ') printed=$printed tmpdir=$tmpd want=$want"
+fi
+
+# Behaviour 1 (e): every printed line closes the arm's stdin, as the generated dispatch does, so a
+# person who pastes one runs what the gate runs.
+closed="$(grep -c 'claude -p.* < /dev/null$' <<< "$dry_out")"
+if [ "$closed" -eq "$want" ]; then
+    ok "gate.sh --dry-run prints every dispatch line ending < /dev/null"
+else
+    bad "gate.sh --dry-run prints every dispatch line ending < /dev/null" "closed=$closed want=$want"
+fi
+
+# An OUT that already holds .dir files is refused: writing over them loses the paths of arms that
+# were paid for and may be half scored, which the runbook's "keep the .dir files" exists to prevent.
+reuse_out="$(PATH="$stubbin:$PATH" GATE_STUB_LOG="$stublog" "$GATESH" --dry-run "$dry" 2>&1)"; rc=$?
+if [ "$rc" -ne 0 ] && grep -q 'already holds' <<< "$reuse_out"; then
+    ok "gate.sh refuses an OUT that already holds .dir files"
+else
+    bad "gate.sh refuses an OUT that already holds .dir files" "rc=$rc out=${reuse_out:0:160}"
+fi
+
+# Behaviour 1 (g): an OUT with any part starting keel-eval- is refused, because the isolation check
+# reports every directory so named, and the dispatch would refuse itself from inside it, or from
+# inside a directory under one. Nothing is created and nothing is staged. The last part and an
+# earlier part are both tried, the earlier one with parts that do not exist yet.
+kev_bad=""
+for kev in "$gate_tmp/keel-eval-x" "$gate_tmp/keel-eval-y/out" "$gate_tmp/keel-eval-z/deeper/out"; do
+    kev_out="$(PATH="$stubbin:$PATH" "$GATESH" --scenarios "$one" "$kev" 2>&1)"; rc=$?
+    adopt_dirs "$kev"
+    if [ "$rc" -ne 2 ] || ! grep -qF 'keel-eval-' <<< "$kev_out" || ! grep -qF 'isolation' <<< "$kev_out" \
+       || [ -e "$kev" ] || [ -e "$gate_tmp/keel-eval-y" ] || [ -e "$gate_tmp/keel-eval-z" ]; then
+        kev_bad="$kev_bad [$(basename "$kev") rc=$rc out=${kev_out:0:100}]"
+    fi
+done
+if [ -z "$kev_bad" ]; then
+    ok "gate.sh refuses an OUT with any part named keel-eval-*, which the isolation check would report"
+else
+    bad "gate.sh refuses an OUT with any part named keel-eval-*, which the isolation check would report" "$kev_bad"
+fi
+
+# Behaviour 4: an OUT inside the repository is refused, whether it exists or not, and the refusal
+# does not create it. The symlink case is the one a textual prefix check misses: the path looks
+# outside the tree and resolves into it. Each case adopts what it could have staged, so a regression
+# that stages before refusing cannot leak directories past this suite.
+refused_out="$(PATH="$stubbin:$PATH" "$GATESH" --dry-run "tests/evals/$inrepo" 2>&1)"; rc=$?
+adopt_dirs "$REPO/tests/evals/$inrepo"
+if [ "$rc" -ne 0 ] && grep -q "tests/evals/$inrepo" <<< "$refused_out" \
+   && grep -q 'repository' <<< "$refused_out" && [ ! -e "$REPO/tests/evals/$inrepo" ]; then
+    ok "gate.sh refuses an OUT inside the repository, names it, and does not create it"
+else
+    bad "gate.sh refuses an OUT inside the repository, names it, and does not create it" \
+        "rc=$rc exists=$([ -e "$REPO/tests/evals/$inrepo" ] && echo yes || echo no) out=${refused_out:0:160}"
+fi
+
+# Each refusal case also requires the word "repository" in the message: a missing script exits
+# non-zero and creates nothing, so rc and absence alone would pass before gate.sh exists.
+deep_out="$(PATH="$stubbin:$PATH" "$GATESH" --dry-run "tests/evals/$inrepo/deeper/still" 2>&1)"; rc=$?
+adopt_dirs "$REPO/tests/evals/$inrepo/deeper/still"
+if [ "$rc" -ne 0 ] && grep -q 'repository' <<< "$deep_out" \
+   && [ ! -e "$REPO/tests/evals/$inrepo" ]; then
+    ok "gate.sh refuses an OUT several levels inside the repository that do not exist yet"
+else
+    bad "gate.sh refuses an OUT several levels inside the repository that do not exist yet" \
+        "rc=$rc exists=$([ -e "$REPO/tests/evals/$inrepo" ] && echo yes || echo no)"
+fi
+
+ln -s "$REPO/tests/evals" "$gate_tmp/link"
+link_out="$(PATH="$stubbin:$PATH" "$GATESH" --dry-run "$gate_tmp/link/$inrepo" 2>&1)"; rc=$?
+adopt_dirs "$REPO/tests/evals/$inrepo"
+if [ "$rc" -ne 0 ] && grep -q 'repository' <<< "$link_out" \
+   && [ ! -e "$REPO/tests/evals/$inrepo" ]; then
+    ok "gate.sh refuses an OUT that resolves into the repository through a symlink"
+else
+    bad "gate.sh refuses an OUT that resolves into the repository through a symlink" \
+        "rc=$rc exists=$([ -e "$REPO/tests/evals/$inrepo" ] && echo yes || echo no)"
+fi
+
+# The same symlink with a `..` after it. A logical `cd` drops `<link>/..` textually, so the path
+# resolves to the link's parent and the check passes, while the filesystem resolves it through the
+# link to the repository and `mkdir -p` creates the directory inside the tree. Here the link points
+# at tests/, so `<link>/../evals/out` is the repository's own evals/out.
+evals_preexisted=0; [ -e "$REPO/evals" ] && evals_preexisted=1
+[ "$evals_preexisted" -eq 0 ] && selftest_paths+=("$REPO/evals")
+ln -s "$REPO/tests" "$gate_tmp/tlink"
+dotdot_out="$(PATH="$stubbin:$PATH" "$GATESH" --dry-run "$gate_tmp/tlink/../evals/out" 2>&1)"; rc=$?
+adopt_dirs "$REPO/evals/out"
+if [ "$rc" -ne 0 ] && grep -q 'repository' <<< "$dotdot_out" && [ ! -e "$REPO/evals/out" ]; then
+    ok "gate.sh refuses an OUT that reaches the repository through a symlink and .."
+else
+    bad "gate.sh refuses an OUT that reaches the repository through a symlink and .." \
+        "rc=$rc created=$([ -e "$REPO/evals/out" ] && echo yes || echo no) out=${dotdot_out:0:160}"
+fi
+
+# Behaviour 5: one scenario failing to stage is reported by name and run, the others still stage,
+# and the exit is non-zero so a pipeline cannot read a partial gate as a whole one. The file also
+# carries a comment and a blank line, which must be skipped and not counted as scenarios.
+partial="$gate_tmp/partial-scenarios"
+printf '# a comment\n\ntdd-under-deadline\nno-such-scenario\n' > "$partial"
+part="$gate_tmp/part"
+part_out="$(PATH="$stubbin:$PATH" "$GATESH" --dry-run --scenarios "$partial" "$part" 2>&1)"; rc=$?
+adopt_dirs "$part"
+if [ "$rc" -ne 0 ] && grep -qF 'staged 1 of 2, 1 failed: no-such-scenario.1' <<< "$part_out" \
+   && [ -f "$part/tdd-under-deadline.1.dir" ] && [ ! -e "$part/no-such-scenario.1.dir" ]; then
+    ok "gate.sh reports a stage failure by name, stages the rest, and exits non-zero"
+else
+    bad "gate.sh reports a stage failure by name, stages the rest, and exits non-zero" \
+        "rc=$rc out=${part_out:0:200}"
+fi
+
+# Behaviours 1, 2 and 4, against the stub: gate.sh stages and the generated OUT/dispatch.sh
+# dispatches each arm from its own project/ with stream-json and --verbose and the model when given;
+# its stream lands beside the .dir file and not inside the staged directory, and exits.txt carries
+# one line per arm. OUT and TMPDIR sit under a directory whose name holds a space, so the generated
+# script is proved to quote what it was handed.
+#
+# KEEL_ISOLATION_ROOT is an empty temp directory outside OUT and the staged directories, and every
+# run of a generated dispatch.sh in this file sets it and gives its stdin explicitly: without it the
+# check would search the real machine, which holds this repository, and refuse every run.
+iso_empty="$gate_tmp/iso-empty"
+mkdir -p "$iso_empty"
+run_dispatch() {   # OUT STUBBIN LOG ROOT; the caller gives stdin
+    PATH="$2:$PATH" GATE_STUB_LOG="$3" KEEL_ISOLATION_ROOT="$4" bash "$1/dispatch.sh" 2>&1
+}
+dsp="$gate_tmp/dispatch space"
+mkdir -p "$dsp/tmp"
+run="$dsp/out"
+rm -f "$stublog"
+gate_out="$(TMPDIR="$dsp/tmp" PATH="$stubbin:$PATH" GATE_STUB_LOG="$stublog" "$GATESH" --scenarios "$one" --model stub-model "$run" 2>&1)"; rc_gate=$?
+adopt_dirs "$run"
+gate_calls="$(cat "$stublog" 2>/dev/null)"
+run_out="$(run_dispatch "$run" "$stubbin" "$stublog" "$iso_empty" </dev/null)"; rc=$?
+calls="$(cat "$stublog" 2>/dev/null)"
+arm_dir="$(cat "$run/tdd-under-deadline.1.dir" 2>/dev/null)"
+if [ "$rc_gate" -eq 0 ] && [ -z "$gate_calls" ] && [ "$rc" -eq 0 ] && [ -n "$arm_dir" ] \
+   && grep -qx 'tdd-under-deadline.1 exit=0' "$run/exits.txt" 2>/dev/null \
+   && [ -s "$run/tdd-under-deadline.1.jsonl" ] \
+   && grep -q -- '--output-format stream-json --verbose' <<< "$calls" \
+   && grep -q -- '--model stub-model' <<< "$calls" \
+   && grep -q '/project tmp=.* args=-p' <<< "$calls" \
+   && [ "$(sed -n 's/^cwd=\(.*\)\/project tmp=\(.*\) args=.*/\1 \2/p' <<< "$calls")" = "$arm_dir $arm_dir/tmp" ]; then
+    ok "gate.sh stages, then dispatch.sh dispatches each arm from its project/ with its own TMPDIR, and records its exit"
+else
+    bad "gate.sh stages, then dispatch.sh dispatches each arm from its project/ with its own TMPDIR, and records its exit" \
+        "rc_gate=$rc_gate rc=$rc gate_calls='${gate_calls:0:100}' calls='${calls:0:200}' gate=${gate_out:0:160} out=${run_out:0:160}"
+fi
+
+# Behaviour 1: without --dry-run gate.sh runs no claude, exits 0, and leaves the three files the
+# dispatch needs. dispatch.sh holds no path to the repository or to OUT, because it runs after the
+# checkout is gone and from a workspace that must not hold one; the isolation check is a copy, and
+# the names file lists every scenario with no .md.
+aout="$gate_tmp/a-out"
+a_log="$gate_tmp/a.log"
+rm -f "$a_log"
+a_msg="$(PATH="$stubbin:$PATH" GATE_STUB_LOG="$a_log" "$GATESH" --scenarios "$one" "$aout" 2>&1)"; rc=$?
+adopt_dirs "$aout"
+n_scen="$(find "$REPO/tests/evals/scenarios" -name '*.md' | wc -l | tr -d ' ')"
+if [ "$rc" -eq 0 ] && [ ! -e "$a_log" ] && [ -f "$aout/dispatch.sh" ] \
+   && cmp -s "$REPO/tests/evals/isolation-check.sh" "$aout/isolation-check.sh" \
+   && grep -qx 'tdd-under-deadline' "$aout/scenario-names.txt" 2>/dev/null \
+   && ! grep -qF '.md' "$aout/scenario-names.txt" \
+   && [ "$(wc -l < "$aout/scenario-names.txt" | tr -d ' ')" = "$n_scen" ] \
+   && bash -n "$aout/dispatch.sh" \
+   && ! grep -qF "$REPO" "$aout/dispatch.sh" && ! grep -qF "$aout" "$aout/dispatch.sh" \
+   && ! grep -qF 'claude -p' <<< "$a_msg" && ! grep -qF 'TMPDIR=' <<< "$a_msg" \
+   && grep -qF 'dispatch.sh' <<< "$a_msg" && grep -qF 'scoped key' <<< "$a_msg"; then
+    ok "gate.sh without --dry-run runs no claude and writes dispatch.sh, isolation-check.sh and scenario-names.txt"
+else
+    bad "gate.sh without --dry-run runs no claude and writes dispatch.sh, isolation-check.sh and scenario-names.txt" \
+        "rc=$rc log=$([ -e "$a_log" ] && echo present || echo absent) files='$(find "$aout" -maxdepth 1 -type f 2>/dev/null | tr '\n' ' ')' msg=${a_msg:0:200}"
+fi
+
+# --dry-run prints lines that dispatch with no isolation check, so it says so on stderr, once. A
+# run without --dry-run prints no such line: it has no lines to warn about.
+dry_warn="$(grep -c 'no isolation check' <<< "$dry_out")"
+if [ "$dry_warn" -eq 1 ] && ! grep -qF 'no isolation check' <<< "$a_msg"; then
+    ok "gate.sh --dry-run says once that the lines it prints run with no isolation check"
+else
+    bad "gate.sh --dry-run says once that the lines it prints run with no isolation check" \
+        "dry_warn=$dry_warn plain_run_says=$(grep -cF 'no isolation check' <<< "$a_msg")"
+fi
+
+# The three files are written whether or not a stage failed, and with --dry-run: an unfinished gate
+# is resumed by dispatching what did stage. $part and $dry were staged above with --dry-run.
+missing_files=""
+for d in "$part" "$dry"; do
+    for f in dispatch.sh isolation-check.sh scenario-names.txt; do
+        [ -f "$d/$f" ] || missing_files="$missing_files $(basename "$d")/$f"
+    done
+done
+if [ -z "$missing_files" ]; then
+    ok "gate.sh writes the dispatch files after a stage failure and under --dry-run"
+else
+    bad "gate.sh writes the dispatch files after a stage failure and under --dry-run" "missing:$missing_files"
+fi
+
+# Behaviour 2 (c): the check refuses before any arm is paid for. A skill tree under the search root
+# and a file named for a scenario each stop the dispatch with exit 2, name the path, and run no
+# claude and write nothing. One OUT serves both, because a refusal must leave it dispatchable.
+bout="$gate_tmp/b-out"
+PATH="$stubbin:$PATH" "$GATESH" --scenarios "$one" "$bout" >/dev/null 2>&1
+adopt_dirs "$bout"
+plant1="$gate_tmp/plant1"
+mkdir -p "$plant1/x/skills/review-code"
+: > "$plant1/x/skills/review-code/SKILL.md"
+plant2="$gate_tmp/plant2"
+mkdir -p "$plant2"
+: > "$plant2/tdd-under-deadline.md"
+p1="$(cd "$plant1" && pwd -P)/x"
+p2="$(cd "$plant2" && pwd -P)/tdd-under-deadline.md"
+b_log="$gate_tmp/b.log"
+rm -f "$b_log"
+b1_out="$(run_dispatch "$bout" "$stubbin" "$b_log" "$plant1" </dev/null)"; rc1=$?
+b2_out="$(run_dispatch "$bout" "$stubbin" "$b_log" "$plant2" </dev/null)"; rc2=$?
+b_stray="$(find "$bout" \( -name '*.jsonl' -o -name 'exits.txt' -o -name '*.err' \) 2>/dev/null)"
+if [ "$rc1" -eq 2 ] && grep -qF "$p1" <<< "$b1_out" && grep -qF 'no arm was dispatched' <<< "$b1_out" \
+   && [ "$rc2" -eq 2 ] && grep -qF "$p2" <<< "$b2_out" && grep -qF 'no arm was dispatched' <<< "$b2_out" \
+   && [ ! -e "$b_log" ] && [ -z "$b_stray" ]; then
+    ok "dispatch.sh refuses, names the path and runs no claude while a skill tree or a scenario file is reachable"
+else
+    bad "dispatch.sh refuses, names the path and runs no claude while a skill tree or a scenario file is reachable" \
+        "rc1=$rc1 rc2=$rc2 log=$([ -e "$b_log" ] && echo present || echo absent) stray='$b_stray' out1=${b1_out:0:120} out2=${b2_out:0:120}"
+fi
+
+# Behaviour 2 (d), the other half of the pin: the same OUT dispatches once the root is clean, so the
+# refusal above was the check and not a broken script.
+b3_out="$(run_dispatch "$bout" "$stubbin" "$b_log" "$iso_empty" </dev/null)"; rc3=$?
+if [ "$rc3" -eq 0 ] && grep -qx 'tdd-under-deadline.1 exit=0' "$bout/exits.txt" 2>/dev/null \
+   && grep -qF 'OK' <<< "$b3_out" && grep -qF "$iso_empty" <<< "$b3_out"; then
+    ok "dispatch.sh prints the search root it checked and dispatches once the root is clean"
+else
+    bad "dispatch.sh prints the search root it checked and dispatches once the root is clean" \
+        "rc=$rc3 out=${b3_out:0:200}"
+fi
+
+# KEEL_ISOLATION_ROOT narrows the search, which is what a test needs and what a gate must not do, so
+# a dispatch that sees it set says so on stderr and names the root. (b3_out above ran with it set.)
+if grep -qF 'the isolation check searches only' <<< "$b3_out" && grep -qF 'for tests only' <<< "$b3_out" \
+   && grep -qF "$iso_empty" <<< "$b3_out"; then
+    ok "dispatch.sh warns, naming the root, when KEEL_ISOLATION_ROOT narrows the search"
+else
+    bad "dispatch.sh warns, naming the root, when KEEL_ISOLATION_ROOT narrows the search" "out=${b3_out:0:240}"
+fi
+
+# Behaviour 2 (c) stdin. The stub reads its stdin and logs the byte count, and dispatch.sh is run
+# with text on its own stdin. That shows what arms get today and does NOT pin the redirect: with
+# job control off, bash already gives a background job /dev/null as stdin, so deleting `< /dev/null`
+# from the generated script leaves this assertion green. The redirect is pinned by the second
+# assertion, on the generated text: it is there so the arm's stdin does not depend on that bash
+# rule. Two scenarios, so that "every" is more than one.
+stdinbin="$gate_tmp/stdin-bin"
+mkdir -p "$stdinbin"
+cat > "$stdinbin/claude" <<'STUB'
+#!/usr/bin/env bash
+n="$(wc -c | tr -d ' ')"
+printf 'stdin=%s\n' "$n" >> "${GATE_STUB_LOG:?}"
+printf '{"type":"result","model":"stub","total_cost_usd":0}\n'
+STUB
+chmod +x "$stdinbin/claude"
+two="$gate_tmp/two-scenarios"
+printf 'tdd-under-deadline\ncommit-outside-a-worktree\n' > "$two"
+cout="$gate_tmp/c-out"
+c_log="$gate_tmp/c.log"
+rm -f "$c_log"
+PATH="$stubbin:$PATH" "$GATESH" --scenarios "$two" "$cout" >/dev/null 2>&1
+adopt_dirs "$cout"
+c_out="$(printf 'text on the dispatcher stdin\n' | run_dispatch "$cout" "$stdinbin" "$c_log" "$iso_empty")"; rc=$?
+c_lines="$(wc -l < "$c_log" 2>/dev/null | tr -d ' ')"
+c_zero="$(grep -cx 'stdin=0' "$c_log" 2>/dev/null)"
+c_text="$(grep -c 'claude -p .*< /dev/null$' "$cout/dispatch.sh" 2>/dev/null)"
+if [ "$rc" -eq 0 ] && [ "$c_lines" = "2" ] && [ "$c_zero" = "2" ] && [ "$c_text" = "1" ]; then
+    ok "dispatch.sh gives every arm /dev/null for stdin, and its claude line ends < /dev/null"
+else
+    bad "dispatch.sh gives every arm /dev/null for stdin, and its claude line ends < /dev/null" "text_lines=$c_text rc=$rc log='$(tr '\n' ' ' 2>/dev/null < "$c_log")' out=${c_out:0:160}"
+fi
+
+# Behaviour 2 (b): a second run in the same OUT pays for the arms twice, so it exits 2, says the OUT
+# holds results, and changes nothing: not the stream, not exits.txt, not the stub's record. It is
+# refused before the isolation check, so even a root with a skill tree in it gets this message and
+# not the check's.
+f_before="$(cd "$run" && cksum exits.txt ./*.jsonl ./*.err 2>&1)"
+f_log_before="$(cksum < "$stublog")"
+f1_out="$(run_dispatch "$run" "$stubbin" "$stublog" "$iso_empty" </dev/null)"; rc1=$?
+f2_out="$(run_dispatch "$run" "$stubbin" "$stublog" "$plant1" </dev/null)"; rc2=$?
+f_after="$(cd "$run" && cksum exits.txt ./*.jsonl ./*.err 2>&1)"
+f_log_after="$(cksum < "$stublog")"
+if [ "$rc1" -eq 2 ] && [ "$rc2" -eq 2 ] && [ "$f_before" = "$f_after" ] && [ "$f_log_before" = "$f_log_after" ] \
+   && grep -qF 'already holds' <<< "$f1_out" && grep -qF 'already holds' <<< "$f2_out" \
+   && ! grep -qF "$p1" <<< "$f2_out"; then
+    ok "dispatch.sh refuses a second run in the same OUT, before the isolation check, and changes nothing"
+else
+    bad "dispatch.sh refuses a second run in the same OUT, before the isolation check, and changes nothing" \
+        "rc1=$rc1 rc2=$rc2 same_files=$([ "$f_before" = "$f_after" ] && echo yes || echo no) same_log=$([ "$f_log_before" = "$f_log_after" ] && echo yes || echo no) out1=${f1_out:0:120} out2=${f2_out:0:120}"
+fi
+
+# A .dir file is the path of a directory the arm will be run in, and a dispatch from a workspace
+# cannot guess a better one: an empty file or a relative path is refused, exit 2, before the check
+# and before any arm, and writes nothing. Each bad content is tried against a fresh OUT.
+dir_bad=""
+for content in "" "relative/path" "./here"; do
+    dout="$gate_tmp/dir-bad"
+    rm -rf "$dout"
+    PATH="$stubbin:$PATH" "$GATESH" --scenarios "$one" "$dout" >/dev/null 2>&1
+    adopt_dirs "$dout"
+    d_log="$gate_tmp/dir-bad.log"
+    rm -f "$d_log"
+    printf '%s' "$content" > "$dout/tdd-under-deadline.1.dir"
+    d_msg="$(run_dispatch "$dout" "$stubbin" "$d_log" "$iso_empty" </dev/null)"; drc=$?
+    d_stray="$(find "$dout" \( -name '*.jsonl' -o -name 'exits.txt' -o -name '*.err' \) 2>/dev/null)"
+    if [ "$drc" -ne 2 ] || [ -e "$d_log" ] || [ -n "$d_stray" ] || ! grep -qF 'tdd-under-deadline.1.dir' <<< "$d_msg"; then
+        dir_bad="$dir_bad [content='$content' rc=$drc stray='$d_stray' out=${d_msg:0:80}]"
+    fi
+done
+if [ -z "$dir_bad" ]; then
+    ok "dispatch.sh refuses a .dir file that is empty or holds a path that is not absolute, and writes nothing"
+else
+    bad "dispatch.sh refuses a .dir file that is empty or holds a path that is not absolute, and writes nothing" "$dir_bad"
+fi
+
+# ---- the fix pass after the final review: refusals, guards and quoting ---------------------------
+#
+# Each case below kills a mutant the final review of the factory-basics plan found surviving, or
+# pins a hardening that review asked for. A mutation survives when no case fails without the line it
+# deletes, so each case names the line it protects.
+
+# --runs refusals. `0` is the value a mutant that drops the `0` pattern survives: the loop then runs
+# no time and the script exits 2 on "no scenarios", a message that does not name the flag. The
+# message must also be printed at all: a format string starting with `-` is read by the printf
+# builtin as an option and the message is lost. And no OUT is left behind, because the check
+# precedes the mkdir.
+runs_bad=""
+for v in 0 00 007 -1 abc 1x ""; do
+    rb="$gate_tmp/runs-bad"
+    rm -rf "$rb"
+    rout="$(PATH="$stubbin:$PATH" "$GATESH" --dry-run --runs "$v" "$rb" 2>&1)"; rc=$?
+    if [ "$rc" -ne 2 ] || ! grep -qF -- '--runs wants a positive integer' <<< "$rout" || [ -e "$rb" ]; then
+        runs_bad="$runs_bad [value='$v' rc=$rc out=${rout:0:60}]"
+    fi
+done
+if [ -z "$runs_bad" ]; then
+    ok "gate.sh refuses a --runs that is not a positive integer, and the message names --runs"
+else
+    bad "gate.sh refuses a --runs that is not a positive integer, and the message names --runs" "$runs_bad"
+fi
+
+# A `..` in the part of OUT that does not exist yet. `<outside>/nope/../../<repo>/...` looks outside
+# the tree to a textual check and resolves to the repository's own directory once `mkdir -p` has
+# made `nope`. The `*/../*` refusal is the only thing between that path and a directory created
+# inside the tree, so the case asserts that neither the target nor `nope` was created.
+dd_path="$gate_tmp/nope"
+i=0; while [ "$i" -lt 12 ]; do dd_path="$dd_path/.."; i=$((i + 1)); done
+dd_path="$dd_path$REPO/tests/evals/$inrepo2"
+dd2_out="$(PATH="$stubbin:$PATH" "$GATESH" --dry-run "$dd_path" 2>&1)"; rc=$?
+adopt_dirs "$REPO/tests/evals/$inrepo2"
+if [ "$rc" -ne 0 ] && grep -qF '..' <<< "$dd2_out" && [ ! -e "$REPO/tests/evals/$inrepo2" ] \
+   && [ ! -e "$gate_tmp/nope" ]; then
+    ok "gate.sh refuses an OUT with .. in a part that does not exist yet, and creates nothing"
+else
+    bad "gate.sh refuses an OUT with .. in a part that does not exist yet, and creates nothing" \
+        "rc=$rc target=$([ -e "$REPO/tests/evals/$inrepo2" ] && echo created || echo absent) nope=$([ -e "$gate_tmp/nope" ] && echo created || echo absent) out=${dd2_out:0:160}"
+fi
+
+# The claude-missing guard moved from gate.sh to the dispatch, where claude is run. dispatch.sh
+# checks first, before the OUT's state and before the isolation check, so an absent claude is found
+# before anything is read or searched and nothing is dispatched. The PATH holds only symlinks to the
+# tools the script needs up to the guard, so a claude installed on this machine cannot be found by
+# it. The root is planted with a skill tree, so a check that ran first would name that path instead.
+nocl="$gate_tmp/nocl-bin"
+mkdir -p "$nocl"
+for t in bash env dirname basename find cat mktemp mkdir rm sed grep cp tr sort wc; do
+    tp="$(type -P "$t" 2>/dev/null)" && [ -n "$tp" ] && ln -s "$tp" "$nocl/$t"
+done
+nocl_out="$gate_tmp/nocl-out"
+PATH="$stubbin:$PATH" "$GATESH" --scenarios "$one" "$nocl_out" >/dev/null 2>&1
+adopt_dirs "$nocl_out"
+nocl_msg="$(PATH="$nocl" KEEL_ISOLATION_ROOT="$plant1" "$(type -P bash)" "$nocl_out/dispatch.sh" </dev/null 2>&1)"; rc=$?
+nocl_stray="$(find "$nocl_out" \( -name '*.jsonl' -o -name 'exits.txt' -o -name '*.err' \) 2>/dev/null)"
+if [ "$rc" -eq 2 ] && grep -qF 'claude is not on PATH' <<< "$nocl_msg" && ! grep -qF "$p1" <<< "$nocl_msg" \
+   && [ -z "$nocl_stray" ]; then
+    ok "dispatch.sh without claude on PATH exits 2, says so, and dispatches nothing"
+else
+    bad "dispatch.sh without claude on PATH exits 2, says so, and dispatches nothing" \
+        "rc=$rc stray='$nocl_stray' msg=${nocl_msg:0:160}"
+fi
+
+# An arm's non-zero exit makes the dispatch exit non-zero, and the code is recorded. A script that
+# returns 0 over arms that did not complete lets a caller read a partial gate as a whole one.
+failbin="$gate_tmp/failbin"
+mkdir -p "$failbin"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$failbin/claude"
+chmod +x "$failbin/claude"
+failrun="$gate_tmp/failrun"
+PATH="$failbin:$PATH" "$GATESH" --scenarios "$one" "$failrun" >/dev/null 2>&1
+adopt_dirs "$failrun"
+fail_out="$(run_dispatch "$failrun" "$failbin" "$gate_tmp/fail.log" "$iso_empty" </dev/null)"; rc=$?
+if [ "$rc" -ne 0 ] && grep -qx 'tdd-under-deadline.1 exit=1' "$failrun/exits.txt" 2>/dev/null \
+   && grep -qF 'exited non-zero' <<< "$fail_out"; then
+    ok "dispatch.sh exits non-zero when an arm does, and records exit=1"
+else
+    bad "dispatch.sh exits non-zero when an arm does, and records exit=1" \
+        "rc=$rc exits='$(cat "$failrun/exits.txt" 2>/dev/null)' out=${fail_out:0:160}"
+fi
+
+# Scenario names. The name becomes a file name under OUT, so `../escape` would write outside it, and
+# `../scenarios/tdd-under-deadline` is a real scenario reached through `..`, which would stage and
+# then write its .dir file beside OUT. A name outside lowercase letters, digits and hyphens is a stage
+# failure that stages nothing. An indented comment is a comment, not a scenario named "# ...".
+names="$gate_tmp/names"
+mkdir -p "$names/scenarios"
+nm_scen="$gate_tmp/names-scenarios"
+printf '  # an indented comment\n\t# a tab-indented comment\ntdd-under-deadline\n../scenarios/tdd-under-deadline\n../escape\nUpper\n' > "$nm_scen"
+nm_out="$(PATH="$stubbin:$PATH" "$GATESH" --dry-run --scenarios "$nm_scen" "$names/out" 2>&1)"; rc=$?
+adopt_dirs "$names/out"
+adopt_dirs "$names/scenarios"
+outside="$(find "$names" -path "$names/out" -prune -o -type f -print 2>/dev/null)"
+if [ "$rc" -ne 0 ] && grep -qF 'staged 1 of 4, 3 failed' <<< "$nm_out" \
+   && grep -qF 'scenario name' <<< "$nm_out" && [ -f "$names/out/tdd-under-deadline.1.dir" ] \
+   && [ -z "$outside" ]; then
+    ok "gate.sh skips an indented comment and refuses a scenario name outside [a-z0-9-], staging nothing"
+else
+    bad "gate.sh skips an indented comment and refuses a scenario name outside [a-z0-9-], staging nothing" \
+        "rc=$rc outside='$outside' out=${nm_out:0:240}"
+fi
+
+# The printed dispatch line is the dispatch. It is for a person to paste, so it must survive a path
+# with a space, and it must carry the flags the real dispatch carries: the case runs the printed line
+# against a stub and compares what the stub was called with to what a real run called it with, so a
+# flag retyped into the print and left out of `flags=(...)` (or the reverse) turns it red.
+sp_tmp="$gate_tmp/with space"
+mkdir -p "$sp_tmp/tmp"
+spdry="$sp_tmp/out dir"
+sp_out="$(TMPDIR="$sp_tmp/tmp" PATH="$stubbin:$PATH" GATE_STUB_LOG="$gate_tmp/never.log" \
+          "$GATESH" --dry-run --scenarios "$one" --model stub-model "$spdry" 2>&1)"; rc=$?
+adopt_dirs "$spdry"
+sp_line="$(grep 'claude -p' <<< "$sp_out")"
+pasted_log="$gate_tmp/pasted.log"
+rm -f "$pasted_log"
+# The single quotes are the point: the inner shell, not this one, expands $1 and evals the line.
+# shellcheck disable=SC2016
+env PATH="$stubbin:$PATH" GATE_STUB_LOG="$pasted_log" bash -c 'eval "$1"' _ "$sp_line" >/dev/null 2>&1
+pasted_all="$(cat "$pasted_log" 2>/dev/null)"
+real_all="$(cat "$stublog" 2>/dev/null)"
+if [ "$rc" -eq 0 ] && [ -n "$pasted_all" ] && [ "${pasted_all#*args=}" = "${real_all#*args=}" ] \
+   && [ -s "$spdry/tdd-under-deadline.1.jsonl" ] && grep -qF 'with space' "$spdry/tdd-under-deadline.1.dir"; then
+    ok "gate.sh --dry-run prints a line that pastes and runs with spaces in its paths, with the real flags"
+else
+    bad "gate.sh --dry-run prints a line that pastes and runs with spaces in its paths, with the real flags" \
+        "rc=$rc ran=$([ -n "$pasted_all" ] && echo yes || echo no) same_args=$([ "${pasted_all#*args=}" = "${real_all#*args=}" ] && echo yes || echo no) line=${sp_line:0:200}"
+fi
+
+# A case-insensitive volume has two spellings of one directory, and macOS APFS is case-insensitive by
+# default: ~/Keel/tests/out passes a string comparison for a repository at ~/keel. The case needs such
+# a volume, so it detects one by asking whether a differently-cased spelling of this repository is
+# the same directory, and prints SKIP, with the reason, where it is not.
+base_name="$(basename "$REPO")"
+swapped_name="$(printf '%s' "$base_name" | tr 'a-zA-Z' 'A-Za-z')"
+alias_repo="$(dirname "$REPO")/$swapped_name"
+if [ "$swapped_name" != "$base_name" ] && [ "$alias_repo" -ef "$REPO" ]; then
+    ci_out="$(PATH="$stubbin:$PATH" "$GATESH" --dry-run "$alias_repo/tests/evals/$inrepo" 2>&1)"; rc=$?
+    adopt_dirs "$REPO/tests/evals/$inrepo"
+    if [ "$rc" -ne 0 ] && grep -q 'repository' <<< "$ci_out" && [ ! -e "$REPO/tests/evals/$inrepo" ]; then
+        ok "gate.sh refuses an OUT that reaches the repository through a differently-cased path"
+    else
+        bad "gate.sh refuses an OUT that reaches the repository through a differently-cased path" \
+            "rc=$rc created=$([ -e "$REPO/tests/evals/$inrepo" ] && echo yes || echo no) out=${ci_out:0:160}"
+    fi
+else
+    printf '  SKIP  gate.sh refuses an OUT through a differently-cased path: a differently-cased spelling of %s in %s is not the same directory here, so the -ef walk cannot be exercised; the macOS CI job runs it\n' "$base_name" "$(dirname "$REPO")"
+fi
+
+# An OUT whose nearest existing ancestor cannot be entered. `cd -P` fails there, and an empty
+# resolved path would make the ancestor walk start at `dirname ""`, which is `.`, the repository:
+# the script would still refuse, but for the wrong reason and naming the wrong thing. The refusal
+# must say the path could not be resolved and must not say "repository". A directory with no
+# permission bits stands in for it, which needs a user that is not root; where the mode does not
+# block `cd` (root), the case prints SKIP.
+noexec="$gate_tmp/noexec"
+mkdir -p "$noexec"
+chmod 000 "$noexec"
+if ( cd "$noexec" ) 2>/dev/null; then
+    chmod 755 "$noexec"
+    printf '  SKIP  gate.sh names an OUT it cannot resolve: a mode-000 directory can still be entered here (running as root)\n'
+else
+    nx_out="$(PATH="$stubbin:$PATH" "$GATESH" --dry-run "$noexec/out" 2>&1)"; rc=$?
+    chmod 755 "$noexec"
+    adopt_dirs "$noexec/out"
+    if [ "$rc" -eq 2 ] && grep -qF 'cannot resolve' <<< "$nx_out" && ! grep -qF 'repository' <<< "$nx_out"; then
+        ok "gate.sh says it cannot resolve an OUT whose nearest ancestor cannot be entered"
+    else
+        bad "gate.sh says it cannot resolve an OUT whose nearest ancestor cannot be entered" \
+            "rc=$rc out=${nx_out:0:200}"
     fi
 fi
 

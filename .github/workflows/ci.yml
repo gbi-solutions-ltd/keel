@@ -2,7 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # sandbox is built as well as main, because on 2026-10-17 the release commit 5f09164 reached
+    # sandbox and was first built on macOS only once a pull request existed, where
+    # `keel plan batches` failed (5b50a83). A build on the push finds that before the release.
+    branches: [main, sandbox]
   pull_request:
 
 # Stated here because otherwise the token's scope is a repository setting nobody can see from this
@@ -48,6 +51,17 @@ jobs:
 
       - name: Record which timeout binary exists
         run: command -v timeout gtimeout || echo "neither timeout nor gtimeout"
+
+      # The plan tests' dash cases need a UTF-8 locale that exists on the runner: macOS awk splits a
+      # multibyte dash under UTF-8 and a C locale hides that. Whether C.UTF-8 exists on macOS was
+      # not known when this step was added (2026-10-17), so the run records the locales the runner
+      # has rather than assuming one. It only records, so it must not fail the job, even if this
+      # step is ever run with pipefail (`shell: bash`): `|| true` covers no match, and sed reads
+      # all its input where head would hand grep a SIGPIPE.
+      - name: Record the runner's locales
+        run: |
+          locale || true
+          locale -a | grep -i -E 'utf-?8' | sed -n 1,20p || true
 
       - name: Run tests
         run: tests/run-tests.sh

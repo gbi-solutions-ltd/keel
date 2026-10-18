@@ -3,6 +3,12 @@
 Dispatch this once, after step 5's self-review passes, before handing off. Model `inherit`: this is
 judgement about whether a plan is buildable, which is the work least worth making cheaper.
 
+Dispatch it as agent type `keel-reviewer` where the harness has it, keeping the `inherit: `
+description. On Claude Code a hook, `hooks/review-guard`, refuses that agent type the git commands
+that would change the author's tree, and the hook sees the agent type, not the description. Where
+the agent type does not exist, on Codex or in a session without the plugin, dispatch a general agent
+with the same brief.
+
 ## Why a dispatch and not another checklist item
 
 The self-review in [plan-template.md](plan-template.md) compares the plan to itself. Story coverage

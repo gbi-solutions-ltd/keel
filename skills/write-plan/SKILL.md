@@ -14,16 +14,17 @@ knowledge of the problem domain, and an aversion to testing.
 **Core principle:** every step is executable as written. If a step requires the reader to
 decide something, you have not finished planning.
 
+Why each step is as it is: [references/rationale.md](references/rationale.md). Read it before
+changing a step.
+
 ## Step 1: Read the inputs
 
 Check `profile.artifacts` for mapped paths first. Otherwise stories at
 `<docs_root>/stories/<slug>.md`, architecture at `<docs_root>/architecture/<slug>.md`
-if it exists, and `.keel/profile.json` for the verify commands. Read the ADRs the stories point
-at; a plan that contradicts an accepted decision is worse than no plan.
+if it exists, and `.keel/profile.json` for the verify commands. Read the ADRs the stories point at.
 
 If no stories exist, stop and name `keel:write-user-stories` as next; it routes to `write-prd` where
-no PRD exists. A plan cannot be written in the same pass as the requirements it rests on.
-Small work with no stories follows `references/short-path.md` instead.
+no PRD exists. Small work with no stories follows `references/short-path.md` instead.
 
 On a greenfield project every verify command is `null`. Task 1 creates the toolchain and writes them
 into the profile; the template says how.
@@ -39,16 +40,14 @@ fails.
 
 ## Step 2: Map the files before writing tasks
 
-List every file to create or modify and what each is responsible for. Decomposition decisions
-get locked in here, and they are much cheaper to change now than inside task 7.
+List every file to create or modify and what each is responsible for.
 
 **Where the area to map is larger than you can hold, delegate the reading**: subagents in one
 message, delegation profile `keel-fanout`, with each dispatch's description starting
-`keel-fanout: `, each citing `path:line`. The predicate is the tree, not the mood: more directories
-than you can list from memory. Under that, read it yourself.
+`keel-fanout: `, each citing `path:line`. The predicate is the tree: more directories than you can
+list from memory. Under that, read it yourself.
 
-Their findings are leads; the decomposition stays yours. Step 4 forbids naming a function no task
-defines, and second-hand knowledge is how that creeps in.
+Their findings are leads; the decomposition stays yours.
 
 Prefer small focused files. Files that change together belong together. In an existing codebase,
 follow the established pattern even where you would do it differently.
@@ -69,19 +68,13 @@ Every task carries a `**Behaviours:**` list: each behaviour, with at least one e
 and the result it must give, such as "a net payout of 1000 at 3% is 970". The only verbatim code a
 plan carries is a form another task consumes, in `**Interfaces:**`.
 
-**Every task carries a `Depends on:` line** naming the tasks that must land first, or `none`;
-absent is read as unknown and runs alone. Once the tasks are written, run `keel plan batches` and
-declare every batch it prints in the header, because the approver can only approve overlap they can
-see. The template says how.
-
-Every task follows the same five steps: write the failing test, run it and watch it fail, write
-minimal code, run it and watch it pass, then run the suite at the unit boundary and hand over by
-staging the named paths. Only a task in a declared concurrent batch commits, inside its own
-worktree.
+**Every task carries a `Depends on:` line** naming the tasks that must land first, or `none`.
+Once the tasks are written, run `keel plan batches` and declare every batch it prints in the
+header. The template says how.
 
 ## Step 4: No placeholders
 
-These are plan failures, not shortcuts. Never write them:
+Never write these placeholders:
 
 - "TBD", "implement later", "fill in details"
 - A behaviour with no example
@@ -90,26 +83,19 @@ These are plan failures, not shortcuts. Never write them:
 - "Similar to Task 3" instead of restating the behaviours. Tasks are read out of order
 - A type, function, or method that no task defines
 
-Each one moves a decision from you to someone with less context. That is the opposite of
-planning.
-
 ## Step 5: Self-review, then have it reviewed
 
-**Run the self-review in [references/plan-template.md](references/plan-template.md) yourself.** It is
-mechanical, and a dispatch is slower and no more reliable.
+**Run the self-review in [references/plan-template.md](references/plan-template.md) yourself.**
 
-**Then dispatch a reviewer.** Those checks compare the plan to itself; none opens the codebase, so a
-plan can pass every one and still be unbuildable. Brief in
-[references/plan-review.md](references/plan-review.md), model `inherit`, with the dispatch's
-description starting `inherit: `. Fix what it returns, or record why not.
+**Then dispatch a reviewer.** Brief in [references/plan-review.md](references/plan-review.md), model
+`inherit`, with the dispatch's description starting `inherit: `. Fix what it returns, or record why
+not.
 
 ## Step 6: Hand off
 
 Report task count, story coverage, any concurrent batches and anything the plan could not settle.
 Then ask one question carrying the routing and the delivery choice, for example "Approve, implement
 on keel-implementer, deliver to a pull request", and write the answer into `**Implementer
-routing:**` and `**Delivery:**`, because `execute-plan` reads those lines, not this conversation.
-Commit the plan alone, `docs(plans): <slug>`. On the default branch, leave it uncommitted, start
-nothing and say so: a delivery run records its progress in a committed plan. Otherwise, on
-`pull-request`, start `execute-plan`, because approval chose the pull request as the next gate; on
-`hand-off`, name it and do not start it.
+routing:**` and `**Delivery:**`. Commit the plan alone, `docs(plans): <slug>`. On the default
+branch, leave it uncommitted, start nothing and say so. Otherwise, on `pull-request`, start
+`execute-plan`; on `hand-off`, name it and do not start it.

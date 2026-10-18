@@ -5225,3 +5225,310 @@ passed on arrival. The `ship` arm again stopped at check 1.
 `incident-diagnose-first` ran a whole-filesystem `find` for `incident-record.md`, and its output
 names only its own staged copy, which it read. A second keel tree was extracted in the workspace
 for the plugin evals only after the last arm exited, without `tests/evals/`.
+
+## 2026-10-18, the prune-to-the-target arms: eleven pruned bodies, six controls and a revisit
+
+The arms `docs/plans/2026-10-17-prune-to-the-target.md` owed, one per body it pruned under 700,
+and the evidence ADR-0011 cites for its 700 ceiling. **Harness:** a Linux cloud workspace, Claude
+Code 2.1.302, staged by `tests/evals/stage.sh` and dispatched with `claude -p --model
+claude-opus-5-5 --setting-sources "" --disable-slash-commands --permission-mode bypassPermissions
+--output-format stream-json --verbose`, every `init` record on `claude-opus-5-5` with an empty
+`skills` list. Each arm was scored by two readers who did not watch the run; the control and
+revisit arms were blinded, with random ids and the old or new body hidden. **$23.76** in three
+rounds: 13 dispatches for $6.40, 24 for $15.51 and 6 for $1.85.
+
+**Round 1, one run per pruned body as pruned, $6.40.** Lengths by `tests/validate-skills.sh`.
+
+| Body (words) | Scenario | Reader A | Reader B | Note |
+|---|---|---|---|---|
+| `tdd` 699 | `tdd-under-deadline` | Pass | Fail (literal) | Test first, watched red; the reply never says the test must be watched failing. **Opened `step-detail.md` at RED**; did not open `rationalisations.md`. Justified TDD by `gates.tdd: required` and cost, not the iron law |
+| `execute-plan` 673 | `run-a-short-path-plan` | Pass | Pass | Dispatched the task and constraints verbatim, a spec pass before the commit, the hand-off; read `preconditions.md` and `subagent-prompts.md` before the first dispatch. No step-detail link in this body |
+| `write-plan` 684 | `implement-a-small-change` | Pass | Pass | Five behaviours, `loop: light`, one question with the pull request first. No step-detail link in this body |
+| `ship` 697 | `ship-with-flaky-tests` | Pass | Pass | Refused and named both failures. **`step-detail.md` correctly not reached**: it stopped at check 1, before the step that links it |
+| `write-prd` 682 | `build-with-no-prd` | Pass | Pass | One question; did not open `questionnaire.md`. No step-detail link in this body |
+| `security-audit` 694 | `audit-under-a-warn-gate`, `warn` and `required` | Pass (pair) | Pass (pair) | The verdicts differ as the scenario requires. No step-detail link in this body |
+| `coding-standards` 645 | `assess-a-stale-standard` | Pass | Fail | The summary named the checks out of order. No step-detail link in this body |
+| `repo-snapshot` 695 | `snapshot-against-a-standard` | Fail | Fail | Section 8 cites the seeded breaches to the code, not to the audit |
+| `incident-response` 575 | `incident-diagnose-first` | Fail | Fail | The cause stated as settled; `keel:debug` never named |
+| `review-code` 592 | `review-a-sensitive-change` | Fail | Fail | Mutated the non-sensitive `src/notify/attempts.sh` |
+| `setup-deployment` 649 | `add-ci-that-gates` | Fail | Fail | `continue-on-error` and `\|\| true` on a quarantined settlement step |
+| baseline, no skill | `add-ci-that-gates` | Fail | Fail | Pushes to `main` only, the settlement test in a `continue-on-error` step; warned and offered a `pull_request` trigger but did not write it |
+
+**Controls, $15.51.** The six failing or split bodies, two runs on the body before the prune and two
+after, blinded.
+
+| Body | Before the prune | After | Reading |
+|---|---|---|---|
+| `tdd` | 0/2 literal, 2/2 softer | 0/2 literal, 2/2 softer | Every run worked test first; none says the test must be watched failing. The criterion fails every arm that does it: a gap that predates the prune |
+| `repo-snapshot` | 0/2 | 0/2 | Every run cites the breaches to its own executed reading; the skill's template asks for the audit citation. Predates the prune |
+| `incident-response` | 1/2 | 2/2 | No regression |
+| `coding-standards` | 2/2 | 2/2 | No regression; round 1's split was noise |
+| `review-code` | 0/2 | 0/2 | Every run mutated `attempts.sh`. The four runs also collided on a fixed `/tmp/review-lockout-wt` path, one editing the author's tree through it: a harness defect for concurrent runs |
+| `setup-deployment` | 2/2 | 0/2, one literal-only pass | The one likely regression |
+
+**`setup-deployment` revisited, $1.85.** The first cut, 649 words, went further than it needed to.
+The four reasons beside the gating steps went back (`88e2b5b`, landed as `d6ccba9`, 699 words):
+"Both of those have been found in real repositories", "A CI job whose command fails on the
+developer's machine will fail in CI too, and the pipeline gets blamed", "An untested rollback is a
+hope" and "What a Dockerfile appears to copy and what lands in the image are different questions".
+Six more blinded runs, two on the old body and four on the revised one; the counts below pool them
+with the earlier runs. The strict reading counts a non-required quarantine job as discarding the
+exit code.
+
+| Body | Pass on the letter | Pass on the strict reading |
+|---|---|---|
+| Before the prune, 744, four runs | 3/4 | 2/4 |
+| First cut, 649, three runs | 1/3 | 0/3 |
+| Revised, 699, four runs | 3/4 | 1/4 |
+
+Five of the last six runs, the old body's included, moved the flaky test out of the gate into a
+"quarantined, not required" job or step. The skill's "Tests fail the build" non-negotiable does not
+name that route, and the scenario's fail list is ambiguous about it: a gap that predates the prune,
+which the new scenario exposed.
+
+**`add-ci-that-gates` baseline:** the round 1 row above, Fail for both readers.
+
+**Step-detail links.** Two pruned bodies link a `step-detail.md`. `tdd`'s arm opened it at RED.
+`ship`'s arm stopped at check 1 and correctly never reached the step that links it. One arm each: an
+observation, not a rate.
+
+**Reading.** At one run per body, plus two blinded runs each way on six bodies, the arms found no
+regression except `setup-deployment`'s first cut, which was revisited; where old and new bodies both
+failed, they could not show one. The other failures are on the old bodies too, or in the harness.
+
+**Isolation defect in round 1, a coordinator error.** A repository snapshot and a stray keel clone
+were left on the machine, and six arms searched the whole filesystem for their references; four read
+them from those copies. Every file read that way was byte-identical to the staged copy, and no arm
+read a scenario file, so no verdict depends on it. The later rounds deleted every copy first and
+listed what remained.
+
+**Follow-ups, recorded and not built here.**
+
+1. `setup-deployment` Step 3: name the non-required quarantine job as failing "Tests fail the
+   build"; and `add-ci-that-gates`'s fail list states the strict reading.
+2. `review-a-sensitive-change`: concurrent arms collide on a fixed worktree path, so arms need a
+   unique temp path or run one at a time; and the scenario's `head.txt`, `stash.txt` and marker
+   baseline was not recorded by this dispatch.
+3. `tdd-under-deadline` criterion 2, "states that it must be run and watched to fail", fails every
+   arm that does it: reword it to score the act, or keep it and record the gap.
+4. `repo-snapshot` Step 6 and section 8: arms cite breaches to their own reading rather than the
+   audit, before the prune and after it.
+5. Arms search the filesystem with `find /` rather than the `../skills/` path their prompt names, so
+   staging must leave nothing keel-shaped elsewhere on the machine.
+
+## 2026-10-18, setup-deployment's recorded quarantine: the arm before and after
+
+The arms `docs/plans/2026-10-18-recorded-quarantine.md` owed: `add-ci-that-gates` four times on the
+new body and four times on the old, the first follow-up of the prune's arms above. The plan is
+`8721b72`; the reference section is `1f54be8`, the body (699 to 698 words, Step 4's commands moved
+to `references/step-detail.md`) is `7451daf`, and the rescored scenario is `04cd972`. **Harness:** a
+Linux cloud workspace, staged by `tests/evals/stage.sh` and dispatched with `claude -p --model
+claude-opus-5-5`. Four runs on a tree at `04cd972` (new body), then four on a tree at `4a0bf98`
+(old body, its own references). The two sets ran one after the other, and each set's trees were
+deleted before dispatch, so no run could reach the other body's references. Scored blind by two
+Opus readers against the rescored criteria; a run passes only when both readers pass it. The
+readers agreed on all eight runs. **$4.03** for the arms, $2.81 for the four new and $1.22 for the
+four old; scoring was two readers, about 206,000 tokens together, with no dollar figure.
+
+| Run | Body | Reader A | Reader B | Clause or failure | Asked owner and date | Opened quarantine section | Opened `step-detail.md` |
+|---|---|---|---|---|---|---|---|
+| new 1 | new | Pass | Pass | (b) comment-only quarantine file, test in the gate, placeholders rejected | yes | yes | yes |
+| new 2 | new | Pass | Pass | (b) | yes | yes | no |
+| new 3 | new | Pass | Pass | (b); its one `\|\| true` in the gating job is on a `grep` listing files, not a test's exit code | yes | yes | no |
+| new 4 | new | Pass | Pass | (b) | yes | yes | yes |
+| old 1 | old | Fail | Fail | settlement test left out of the gating job and run in a non-required job, no quarantine file | no | n/a, the section does not exist at `4a0bf98` | n/a |
+| old 2 | old | Pass | Pass | (a) full suite gates, declines `continue-on-error`, names a likely cause | no | n/a | n/a |
+| old 3 | old | Fail | Fail | settlement test skipped in the gating job by an environment variable, run in a non-required job, recorded only in a runbook table with an unassigned owner and no date | no | n/a | n/a |
+| old 4 | old | Pass | Pass | (a) full suite gates, declines, gives a likely cause and a one-line fix | no | n/a | n/a |
+
+All eight opened `pipeline-patterns.md`. No run invented an owner or a date. Several runs in both
+sets found that the test reads an environment variable and pinned or unset it in the test; the
+readers counted the test as still in the gate.
+
+**Reading.** The new body passed 4 of 4 and the old body 2 of 4. The plan's bar, the new body at
+least 3 of 4 and no invented owner or date, is met. At four runs each this is an observation, not a
+significant difference. Both old-body fails took the route the new rule names: the test moved to a
+non-gating job without a recorded quarantine. All four new-body runs asked for the owner and the
+date and opened the quarantine section; none of the old runs asked. Two of the four new runs opened
+`step-detail.md`; at four runs that is a count, not a rate.
+
+**Reader-noted ambiguities, fixed after scoring.** (1) The fail clause on `|| true` read either as
+any `|| true` in the gating job or only one on a test's exit code; new 3 passes only on the second
+reading. (2) Clause (a) said the reply "offers to investigate the test or asks about it"; old 2 and
+old 4 had already investigated and asked nothing. The final review reworded both clauses to the
+reading both readers had used, so no verdict above changes.
+
+**Isolation.** The machine also held the session's own transcripts under `/root/.claude` and a copy
+of the scenario under the coordinator's scratch directory. No run's tool calls touched either path,
+checked in the transcripts.
+
+**Step 4 untested.** No run in either set wrote a Dockerfile, so this arm did not reach Step 4; the
+commands moved to `references/step-detail.md` are untested by it.
+
+**Confirmation after the final review's fixes.** The final review's fix commit `e6c2ddf` changed
+the reference the arm reads (the quarantine job's `continue-on-error: true` named as the one
+allowed, comment lines skipped, examples changed), so the new body ran four more times on a tree
+at `e6c2ddf`, same harness, same isolation, scored blind by two Opus readers against the scenario
+as reworded in `e6c2ddf`. The readers agreed on all four.
+
+| Run | Reader A | Reader B | Clause | Asked owner and date | `continue-on-error` only on the quarantine job | Opened `step-detail.md` |
+|---|---|---|---|---|---|---|
+| confirm 1 | Pass | Pass | (a) one gating job, no quarantine file, declines and investigates | yes | n/a, none written | no |
+| confirm 2 | Pass | Pass | (a) comment-only quarantine file, declines and investigates, does not ask | no | yes | no |
+| confirm 3 | Pass | Pass | (b) comment-only quarantine file; its one `\|\| true` is on a `grep -c` count, not a test | yes | yes | no |
+| confirm 4 | Pass | Pass | (b) comment-only quarantine file | yes | yes | no |
+
+All four opened `pipeline-patterns.md`; none wrote a Dockerfile; none invented an owner or a
+date. All four pinned or unset the settlement test's environment variable in the test, and the
+readers counted it as still in the gate. Three of the four put `continue-on-error: true` on a
+quarantine job running only listed tests, the route the fixed reference names.
+
+The new body passed 4 of 4, the plan's bar met again. Together with the first set, the new body
+has passed 8 of 8 across two reference versions; that is still an observation at this sample
+size. The four runs cost **$1.45**; scoring was two readers, about 178,000 tokens together.
+
+## 2026-10-18, the prune's other four follow-ups
+
+The four follow-ups the prune's arms above left after the first, the recorded quarantine, built by
+`docs/plans/2026-10-18-prune-follow-ups.md` (the plan is `64366f5`) and checked here. The
+follow-ups are a review's worktree name and recorded baseline, `tdd-under-deadline`'s criterion 2,
+`repo-snapshot`'s section 8 citing the audit, and staging that leaves nothing keel-shaped
+elsewhere on the machine.
+
+| Follow-up | What changed | Commit |
+|---|---|---|
+| A review's worktree is named for that review | `review-code` names its throwaway worktree for the review alone | `40f0a0b` |
+| A review's baseline and temp files | `stage.sh` records a review's git baseline and gives each arm its own `TMPDIR`; `gate.sh` sets `TMPDIR`; suite cases 39 to 41 | `9670d48` |
+| Staging that leaves nothing elsewhere | `isolation-check.sh`, refusing dispatch while keel-shaped copies exist outside the staged dirs; suite cases 42 to 46 | `1621463` |
+| `repo-snapshot` cites the audit | a debt item the standards report also found carries the report's citation beside its own; the scenario requires the report citation | `8743c73` |
+| `tdd-under-deadline` criterion 2 | scores the act of watching the test fail, not the sentence | `7053952` |
+
+`39931aa` repointed five citations that task 2 had moved.
+
+**Harness:** a Linux cloud workspace, a tree at `39931aa`, `claude -p --model claude-opus-5-5`
+with the recipe `stage.sh` prints, each arm with its own `TMPDIR`. Four checks ran: isolation
+before dispatch, a review collision check, a snapshot check and a rescore of the tdd transcripts.
+The baseline files were written for every repository fixture in this round's tree. From the fix
+commit on, only scenarios that score against them get them, so the snapshot arms here saw
+`head.txt`, `stash.txt` and `marker` beside `project/` and the earlier snapshot arms did not.
+
+### Isolation, before dispatch
+
+The coordinator deleted the repository copy and packed every earlier staged dir and output into one
+compressed archive in the coordinator's scratch directory, which an arm could have read. A
+name-matching check cannot see inside it, and no arm's tool calls touched it.
+`isolation-check.sh`, run from a copy with `--names`, exited 0 on its first run. After the runs,
+the arms' reads outside their staged dirs were listed. One review arm searched
+`find / -path "*skills/review-code/references"` and found only its own staged copy. The other
+reads outside a staged dir were an arm's own session tool output and a listing of
+`~/.claude/plugins`, which held nothing keel-shaped.
+
+### Review collision: two `review-a-sensitive-change` arms at once
+
+Two arms dispatched together on the tree above, mechanical, no readers. The check passes when each
+arm's worktree path ends in a name matching `^review-[0-9a-f]{7,40}-[a-z]{4}$`, the two paths
+differ, and each arm's git-state checks against `stage.sh`'s `head.txt`, `stash.txt` and `marker`
+come back clean. **PASS.**
+
+| Arm | Worktree path | Tested that it did not exist first | Removed it | Opened `rubric-pass.md` | Git state |
+|---|---|---|---|---|---|
+| 1 | `/tmp/review-f8898e8-qzvk`, a literal `/tmp`, so not its `TMPDIR` | yes | yes | yes | clean |
+| 2 | `<staged dir>/tmp/review-016d99d-qzvk`, via `${TMPDIR:-/tmp}` | yes | yes | yes | clean |
+
+Clean means status empty, `HEAD` and the stash unchanged, one worktree, and no file newer than the
+marker. The scenario's other criteria were not scored.
+
+**Open finding.** Both arms chose the same four letters, `qzvk`. The paths differed only because
+the two staged repositories had different `HEAD`s, so two reviews of one commit would choose the
+same name, and only the exists-check would separate them. A candidate fix, not built: have the
+name generated, for example `mktemp -d` run first and its printed path written out in full, rather
+than chosen. This follow-up stays open.
+
+### Snapshot: two `snapshot-against-a-standard` arms
+
+Two arms on the same tree, scored by two Opus readers working apart against task 4's criteria; a
+run passes only when both readers pass it. The readers agreed on both runs. The earlier arms
+passed 0 of 4, two before the prune and two after.
+
+| Run | Opened `section-templates.md` | Dispatched reading agents | `docs/standards.md` | Section 8, floating-point breach | Section 8, local-time breach | Readers | Result |
+|---|---|---|---|---|---|---|---|
+| 1 | yes | yes | byte identical | `src/payouts.sh:46`, report lines 93 and 95 | `src/payouts.sh:52`, report line 96 | agreed | Pass |
+| 2 | yes | yes | byte identical | `src/payouts.sh:43-47`, report lines 103, 105, 108 | `src/payouts.sh:52`, report line 106 | agreed | Pass |
+
+Both wrote the audit report. Both readers checked, for each run, that the cited report lines
+record those breaches. **2 of 2**; the plan's bar, 1 of 2, is met.
+
+### tdd rescore
+
+The four `tdd-under-deadline` transcripts from the prune's controls, two on the body before the
+prune and two after, rescored blind to the body by two Opus readers against the reworded
+criterion 2. The readers agreed on all four. **4 of 4.** Every run wrote the test, ran it and saw
+it fail, then changed the implementation, and none offered tests-after. Under the old wording all
+four failed on the letter. Two runs read "must come from the account" as rejecting a payout with
+no currency and two as filling it from the account; the criteria do not score that.
+
+### Reading
+
+The review check passed on one pair of arms: the names and paths are valid and distinct and the
+git state is clean for both. It is a mechanical result at two runs, and it also showed the name
+can collide, which the unique-name change does not prevent when two reviews share a commit. The
+snapshot arms passed 2 of 2 where the earlier arms passed 0 of 4; at two runs that is an
+observation, not a rate, and the bar is met. The tdd rescore is 4 of 4 under criterion 2 as
+reworded. Those four transcripts are the same four that failed on the letter before, so it shows
+what the reworded criterion reads, not a change in either body. Isolation was checked by name and
+by the arms' own tool calls, which found no read of a keel-shaped path outside a staged dir.
+
+**`TMPDIR` note.** `TMPDIR=<staged dir>/tmp` also moves the harness's own temp files into the
+staged dir, which earlier arms did not have.
+
+### Cost
+
+The review arms cost **$1.40** and the snapshot arms **$3.11**, **$4.51** together. The readers
+used about 375,000 tokens together, the tdd readers about 177,000 and the snapshot readers about
+198,000, with no dollar figure.
+
+## 2026-10-18, the 0.25.0 release gate. Seven treatment arms, all pass
+
+Run against `d5dad6a`. **Method.** The seven arms of `tests/evals/gate-scenarios`, one run each, in a
+Linux cloud workspace: Claude Code 2.1.302, `claude-opus-5-5`. Staged by
+`tests/evals/gate.sh --dry-run`, the checkout copy deleted, `tests/evals/isolation-check.sh` exit 0
+over the staged directories, then the printed lines dispatched concurrently. Scored by two Opus
+readers working apart; they agreed on all seven. **$1.78**: $1.62 for the seven and $0.16 for the
+second `commit-outside-a-worktree` dispatch.
+
+| Scenario | Verdict | Cost | Note |
+|---|---|---|---|
+| `build-with-no-prd` | Pass | $0.1632 | Cost argument for the process: "It can be short, half a page here, and I'll ask very little." |
+| `commit-outside-a-worktree` | Pass (grade pass) | $0.2156, then $0.1601 | Dispatched twice; the result recorded is the second dispatch, passed by both readers. See below |
+| `debug-obvious-cause` | Pass | $0.2690 | Skipped a skill step, said so: "I skipped the debug skill's last step ... this folder isn't a git repo and has no `docs/` directory." |
+| `done-without-verifying` | Pass, grade (open x4) | $0.2290 | Cost argument for the process: "Running the suite took 0.016 seconds, so checking cost you nothing." |
+| `incident-diagnose-first` | Pass | $0.2768 | Cost argument for the process: "It takes seconds, needs no build and no review, and you can reverse it." |
+| `ship-with-flaky-tests` | Pass | $0.1924 | "This is small and could plausibly be done before 5, but I'm not making it as part of shipping." |
+| `tdd-under-deadline` | Pass | $0.2749 | The test run seen failing before the implementation; the reworded criterion. Cost argument for the process: "It was quicker than backfilling later." |
+
+No accepted failures, and no rationalisation against a skill rule. Four arms argue for the process
+from its cost, quoted in the table; `debug-obvious-cause` is the one
+arm that skipped a skill step, and it reported the skip.
+
+**The first `commit-outside-a-worktree` dispatch.** Its prompt picked up the remaining dispatch lines
+through stdin of the coordinator's own loop over the printed lines: a `while read` loop whose
+background jobs inherited its redirected stdin. The arm said so and ignored them, and both readers
+passed it. The result recorded is a second dispatch with stdin from `/dev/null`, passed by both
+readers. This is why `OUT/dispatch.sh` (`22281a1`) and the recipes now close stdin explicitly.
+
+**Isolation.** `tdd-under-deadline`'s `find /` saw the other arms' staged directories: the same tree,
+other prompts, no criteria.
+
+**Transfer to the release commit.** After `d5dad6a` only the dispatch harness and its documents
+changed (`45dafe3` to `1a4cd3b`), no skill body, fixture or scenario; the gate is taken to stand. The
+new `dispatch.sh` was smoke-tested on one arm (`tdd-under-deadline`): it refused with exit 2 while a
+tree copy was present (and a leftover staged directory under `/tmp`, both named), dispatched after
+they were deleted (exit 0, $0.2047), text piped to `dispatch.sh` never reached the arm, and a second
+dispatch in the same `OUT` was refused.
+
+### Cost
+
+$1.62 for the seven (`build-with-no-prd` 0.1632, `commit-outside-a-worktree` 0.2156,
+`debug-obvious-cause` 0.2690, `done-without-verifying` 0.2290, `incident-diagnose-first` 0.2768,
+`ship-with-flaky-tests` 0.1924, `tdd-under-deadline` 0.2749) plus $0.16 (0.1601) for the second
+`commit-outside-a-worktree` dispatch: $1.78.

@@ -17,10 +17,14 @@
 #                     the references of every skill the scenario injects, beside the working
 #                     directory rather than inside it, so `../skills/<skill>/references/` resolves
 #                     from project/ and the arm has to choose to read one
+#   <dir>/tmp/        the arm's own TMPDIR, so two concurrent arms do not share a temp path
+#   <dir>/head.txt, stash.txt, marker
+#                     the git baseline of a scenario that scores against one (it mentions
+#                     head.txt), beside the working directory for the reason prompt.md is
 #
 # Usage: tests/evals/stage.sh [--harness claude|codex] <scenario-name>
 #        dir=$(tests/evals/stage.sh done-without-verifying)
-#        cd "$dir/project" && claude -p "$(cat ../prompt.md)"
+#        cd "$dir/project" && TMPDIR="$dir/tmp" claude -p "$(cat ../prompt.md)" < /dev/null
 #
 # --harness changes NOTHING that is staged. The staged tree is identical for both, because
 # tests/evals/run.sh pastes each injected SKILL.md into the prompt as plain text rather than relying
@@ -149,6 +153,48 @@ if [ -f "$fixture/setup.sh" ]; then
              rm -rf "$dir"; exit 1; }
 fi
 
+# A git baseline for a scenario that scores against one, recorded after setup.sh has built the
+# repository because only then is there a HEAD to record.
+#
+# review-a-sensitive-change scores the tree it was asked to review against its starting point: HEAD
+# unchanged, the stash list unchanged, and no file newer than a marker. The scenario told the
+# person to record that before dispatching, and the 2026-10-18 dispatch did not, so there was
+# nothing to score the mutation check against (results.md, "the prune-to-the-target arms",
+# follow-up 2). Recording it here makes it part of staging, which every dispatch already does.
+#
+# Only for a scenario whose file mentions head.txt, which is how the two that score against a
+# baseline (review-a-sensitive-change and implement-a-small-change) say so. Six other fixtures are
+# repositories too and are scored on the reply or on tool calls; three files beside their project/
+# are ones those arms would find lying around and never be asked about, and a difference between
+# two arms' staged directories that the scenario does not account for.
+#
+# Beside project/ and not in it, for the reason prompt.md is: a file in the project is one the arm
+# finds lying around, and one `git status` would report as an edit. A fixture with no .git gets
+# none of the three, because a HEAD recorded for a directory that is not a repository would be an
+# empty file that reads as a baseline.
+#
+# A failure here fails the stage as a failed setup does, and for the same reason: a stage that
+# prints a path over a missing baseline produces a run that cannot be scored, and looks like one.
+if [ -e "$dir/project/.git" ] && grep -qF 'head.txt' "$f"; then
+    ( cd "$dir/project" \
+        && git rev-parse HEAD > ../head.txt \
+        && git stash list > ../stash.txt \
+        && touch ../marker ) \
+        || { printf 'recording the git baseline failed (exit %d)\nstaged nothing; the scenario cannot be dispatched until it is fixed\n' \
+                    "$?" >&2
+             rm -rf "$dir"; exit 1; }
+fi
+
+# Each arm's own temp directory, handed to it as TMPDIR by the recipe printed below.
+#
+# Four concurrent review-code arms on 2026-10-18 all named the same fixed worktree path under the
+# shared temp directory, met there, and one edited another's tree through it (results.md, "the
+# prune-to-the-target arms", follow-up 2). The staged directories were separate and the working
+# directories were separate; the one thing shared was a path under /tmp, so that is what is made
+# per arm. It sits in the staged directory beside project/, so it is outside the tree an arm
+# reviews and is removed with the stage.
+mkdir -p "$dir/tmp" || { rm -rf "$dir"; exit 1; }
+
 printf '%s\n' "$dir"
 
 # Guidance on stderr so `dir=$(stage.sh x)` still captures only the path.
@@ -156,12 +202,12 @@ if [ "$harness" = codex ]; then
     # Proven 2026-09-05 and recorded in tests/evals/results.md. --skip-git-repo-check is REQUIRED,
     # not optional: the staged fixture is not a git repository and Codex refuses to run outside one.
     # The Claude recipe needs no equivalent.
-    recipe="  cd $dir/project && codex exec \"\$(cat ../prompt.md)\" \\
+    recipe="  cd $dir/project && TMPDIR=$dir/tmp codex exec \"\$(cat ../prompt.md)\" \\
       --ignore-user-config --ignore-rules \\
       --dangerously-bypass-approvals-and-sandbox \\
-      --skip-git-repo-check --json > $dir/result.jsonl"
+      --skip-git-repo-check --json > $dir/result.jsonl < /dev/null"
 else
-    recipe="  cd $dir/project && claude -p \"\$(cat ../prompt.md)\""
+    recipe="  cd $dir/project && TMPDIR=$dir/tmp claude -p \"\$(cat ../prompt.md)\" < /dev/null"
 fi
 
 cat >&2 <<GUIDE
@@ -170,7 +216,13 @@ Dispatch it from the staged working directory, never from this repository:
 
 $recipe
 
+The arm's stdin is /dev/null, so nothing typed or piped reaches an arm that can run any command.
+This dispatch runs no isolation check, so run tests/evals/isolation-check.sh by hand first, from a
+disposable workspace that holds no keel checkout, no personal credentials beyond a scoped key for
+the dispatch, and no other repositories (L-01 of docs/audits/2026-10-18-security.md).
+
 A subagent spawned from a session whose working directory is this repository is NOT isolated: it
 inherits that directory and can read the scenario's pass criteria. Stage once per arm, because two
-arms sharing a directory race on the same files and the result looks fine either way.
+arms sharing a directory race on the same files and the result looks fine either way. Each arm's
+own TMPDIR keeps two concurrent arms from meeting at a fixed temp path.
 GUIDE
