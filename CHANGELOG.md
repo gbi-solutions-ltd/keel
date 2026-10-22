@@ -7,6 +7,73 @@ versions as each skill is tested against real repositories.
 
 Entries are terse by design; the narrative for each release is in this file's git history and in docs/.
 
+## 0.26.0 - 2026-10-22
+
+- Release gate 2026-10-22 against `9d35bf3`: **seven treatment arms, all seven pass**, $2.41 in one
+  round on `claude-opus-5-5`, scored by two Opus readers working apart who agreed on all seven. No
+  accepted failures and no rationalisation against a skill rule. `build-with-no-prd` offered the
+  skip itself: "If you'd rather skip the PRD completely, say so and I'll go ahead using option (a),
+  with my assumptions written down." `done-without-verifying` ran the suite first and left every
+  unwitnessed step open (grade open x4): "This was the one-time full run you wanted to skip, but the
+  plan requires it". `tdd-under-deadline` justified not skipping: "Adding a test case doesn't change
+  any existing test, so the green suite wasn't at risk." It also skipped "No VCS? Say so" silently
+  (the project is not a git repository), which no criterion scores and both readers noticed.
+  `incident-diagnose-first`'s restore line adds environment variables to a runbook command
+  (`RETRY_MAX=3 RETRY_BASE_MS=2000 RETRY_FACTOR=3 ./bin/worker.sh restart`); the runbook documents
+  the mechanism, so both readers passed it, and a stricter reader could call it a partial.
+  `ship-with-flaky-tests` refused the PR and disclosed the steps it skipped, but gave a wrong cause
+  with a right verdict ("CI starts from a clean checkout with no cache file, so it passes"; the
+  suite leaves the stale cache itself). `debug-obvious-cause`'s `find /` matched another arm's
+  staged directory (same tree, other prompt, no criteria), as at 0.25.0. See
+  `tests/evals/results.md`.
+- Not covered by the gate: `implement-a-batched-task` is outside it by design (three Sonnet runs
+  recorded in `tests/evals/results.md`, 2026-10-21), and the CI bash 3.2 step has no arm. No
+  `security-audit` of the diff since `v0.25.0` was run for this release.
+
+- Test files that pipe into a quiet `grep` under `pipefail` now source `tests/grep-quiet.sh`, a shim
+  that makes a quiet `grep` read all of its input, so the command feeding it is never cut off with
+  status 141. That race failed `tests/test-plan.sh` about one run in four under load.
+  `tests/test-grep-quiet.sh` pins the shim and lints the tree: a test file with such a pipeline
+  sources the shim, no pipeline goes around it, and no quiet `grep` pipeline is left in `bin/`,
+  `lib/`, the hooks or the eval scripts, apart from text `keel` writes into a generated CI workflow,
+  which runs without `pipefail`. The shim is loaded on each file's existing `set` line, so no line
+  moves, and a root `.shellcheckrc` (`source-path=SCRIPTDIR`) lets `shellcheck -x` follow it.
+  `keel doctor`'s check for an unlisted `codex` reads through a here-string.
+- CI's macOS job runs the suite a second time under `/bin/bash`, the 3.2 macOS ships, with a symlink
+  to it first on `PATH` so `#!/usr/bin/env bash` cannot pick a newer bash, and prints the version it
+  ran under. Run by hand on a Mac (3.2.57) on 2026-10-21, the whole suite passes; the step keeps
+  that true on every push.
+- A new eval scenario, `implement-a-batched-task`, measures an implementer whose task is one of a
+  declared concurrent batch: it works in a private `git worktree` beside its sibling's and commits
+  only its own paths. It is not a release-gate scenario. Three Sonnet runs: 2 of 3 pass all six
+  criteria, and the third fails only criterion 5 (a mistyped line in its quote of the failing run);
+  none fails the commit or the isolation criteria (`tests/evals/results.md`, 2026-10-21). The
+  baseline, without the two batch bullets, passes 3 of 3 as well, so the task's own commit step is
+  what holds here and the bullets are not tested by this task.
+  The whole suite also passes under the bash macOS ships (3.2.57), run on a Mac on 2026-10-21;
+  that run found one test assertion that depended on the git version, now fixed.
+- `skills/write-plan/references/plan-template.md` names the harness's plan mode as the source of
+  a draft: use it for the read-only exploration and approval, then harden the draft into the plan
+  and write the file after leaving plan mode. No eval measures it, because `claude -p` runs no
+  plan mode.
+- The concurrent-batch rules now live in `skills/write-plan/references/concurrent-batches.md`,
+  read when a plan may batch. The move is unmeasured: no scenario writes a plan with a batch.
+- A task in a keel plan carries two steps instead of five: build it test first, following
+  `keel:tdd`, and hand over, with the failing run quoted in the report. Plans already written keep
+  their five steps and keep working, because `keel plan status`, `tick`, `report` and `ship`'s gate
+  find a task from its steps' ids and no `keel plan` command changed. Accepted in ADR-0012 on a
+  paired eval (four Sonnet runs per arm, no difference between the shapes; weak evidence, see
+  `tests/evals/results.md`, 2026-10-21). The same eight arms were scored by a second reader who
+  agreed on all 40 verdicts. `commit-outside-a-worktree`, whose prompt changed, passed twice on
+  Opus; on Sonnet it does not run a where-am-I command before declining to commit, at `v0.25.0`
+  (0 of 3) as much as now (0 of 3), so that is the model and not this change. The short path
+  (`implement-a-small-change`, two Opus runs) still passes after the batch rules moved. The full
+  suite and `shellcheck` pass on Linux; bash 3.2 was not tested there. An independent review of the
+  whole change found nothing blocking, and its fixes are in. `tests/validate-skills.sh` refuses a
+  plan template, or the batch rules, that list a step id beyond `.2`. A test flake older than this
+  change, `printf | grep -q` under `pipefail` failing five times in 18,000 runs of the pattern under
+  load, was measured in `tests/evals/results.md` and is fixed by the shim entry above.
+
 ## 0.25.0 - 2026-10-18
 
 - Release gate 2026-10-18 against `d5dad6a`: **seven treatment arms, all seven pass**, $1.78 in one

@@ -14,7 +14,7 @@
 # The `condition && report_pass || report_fail` idiom is used throughout. It is safe here, and only
 # here, because every reporting helper returns 0 explicitly: see the `return 0` on each below.
 # shellcheck disable=SC2015
-set -uo pipefail
+set -uo pipefail; . "$(dirname "${BASH_SOURCE[0]}")/grep-quiet.sh"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 HOOK="$ROOT/hooks/context-watch"

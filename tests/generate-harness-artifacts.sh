@@ -123,7 +123,7 @@ if [ "$harness" = subagent-settings ]; then subagent_settings; exit 0; fi
 harness_known "$harness" || { printf 'unknown harness: %s\n' "$harness" >&2; exit 1; }
 
 active="$(harness_active_gates "$harness")"
-is_active() { printf '%s\n' "$active" | grep -qx "$1"; }
+is_active() { grep -qx -e "$1" <<< "$active"; }
 
 # One entry, at the indentation hooks/hooks.json already uses. `async` is false on every entry and
 # is not a parameter: a hook that cannot apply control effects is advisory, and an advisory

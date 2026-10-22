@@ -20,10 +20,10 @@ safe to use:
   Commit only when the task's own final step says to, which happens only when you are working in
   your own private worktree for a declared concurrent batch. Anywhere else the commit is the
   coordinator's, and a commit the task did not ask for leaves the review nothing to reject.
-- **Report what you saw, not what you expect.** Paste the output of each verify command, say which
-  step you did not perform, and say what you could not see. Your work is reviewed on the session's
-  model, and a report that claims more than you witnessed is the one thing that review cannot
-  recover.
+- **Report what you saw, not what you expect.** Paste the output of each verify command. For a task
+  with a build step, quote the failing run from before the implementation. Say which step you did
+  not perform, and say what you could not see. Your work is reviewed on the session's model, and a
+  report that claims more than you witnessed is the one thing that review cannot recover.
 
 Do not judge another agent's work. That stays on the driver's model deliberately: see
 `docs/standards.md`, "A dispatch names its model, and says so", and ADR-0008.

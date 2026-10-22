@@ -1,0 +1,4 @@
+# shellcheck -x resolves a `source` from the directory of the file being checked. The test files
+# load tests/grep-quiet.sh with a path built from BASH_SOURCE[0]; without this it is SC1091 in
+# every one of them. Nothing here disables a check.
+source-path=SCRIPTDIR

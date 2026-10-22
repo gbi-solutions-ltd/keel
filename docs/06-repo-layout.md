@@ -187,6 +187,7 @@ keel/
 ├── tests/
 │   ├── export-public.sh
 │   ├── generate-profile-keys.sh
+│   ├── grep-quiet.sh
 │   ├── no-internal-leaks.sh
 │   ├── run-tests.sh
 │   ├── supply-chain-scan.sh
@@ -198,6 +199,7 @@ keel/
 │   ├── test-doc-claims.sh
 │   ├── test-done-guard.sh
 │   ├── test-eval-harness.sh
+│   ├── test-grep-quiet.sh
 │   ├── test-keel.sh
 │   ├── test-no-leaks.sh
 │   ├── test-profile-keys.sh
@@ -211,7 +213,7 @@ keel/
 │   ├── validate-citations.sh
 │   ├── validate-skills.sh
 │   ├── fixtures/                       # per-stack detection fixtures, and an APEX capture
-│   ├── evals/                          # 18 scenarios, 18 fixtures, results.md
+│   ├── evals/                          # 21 scenarios, 21 fixtures, results.md
 │   └── plugin-evals/                   # 2 pilot cases for `claude plugin eval`, run by hand
 │
 ├── .github/
@@ -246,6 +248,7 @@ keel/
 │   └── settings.json
 │
 ├── .gitignore
+├── .shellcheckrc                       # shellcheck -x resolves a source from the script's directory
 ├── AGENTS.md
 ├── CHANGELOG.md
 ├── CLAUDE.md

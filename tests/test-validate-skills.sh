@@ -11,7 +11,7 @@
 # literal {{DOCS_ROOT}}, and literal docs/keel for the validator to find them.
 # shellcheck disable=SC2016
 
-set -uo pipefail
+set -uo pipefail; . "$(dirname "${BASH_SOURCE[0]}")/grep-quiet.sh"
 
 VALIDATOR="$(cd "$(dirname "$0")/.." && pwd)/tests/validate-skills.sh"
 pass=0
@@ -412,6 +412,49 @@ m_plan_template_no_steps() {
       > "$1/skills/write-plan/references/plan-template.md"
 }
 run "a plan template with no step at all is rejected" 1 m_plan_template_no_steps
+
+# A task carries two steps, so the template lists no step id beyond .2. A template that lists
+# 3.1 and 3.2 passes, and one that adds 3.3 is refused: the second case is what fails if that
+# check is deleted.
+m_plan_template_two_steps() {
+    mkdir -p "$1/skills/write-plan/references"
+    printf '# Plan template\n\n**Done when:** `npm test` passes.\n\n- [ ] **Step 3.1: Build it test first**\n\n- [ ] **Step 3.2: Hand over**\n' \
+      > "$1/skills/write-plan/references/plan-template.md"
+}
+run "a plan template whose task has two steps passes" 0 m_plan_template_two_steps
+
+m_plan_template_third_step() {
+    mkdir -p "$1/skills/write-plan/references"
+    printf '# Plan template\n\n**Done when:** `npm test` passes.\n\n- [ ] **Step 3.1: Build it test first**\n\n- [ ] **Step 3.2: Hand over**\n\n- [ ] **Step 3.3: Write the minimal implementation**\n' \
+      > "$1/skills/write-plan/references/plan-template.md"
+}
+run "a plan template with a step beyond .2 is rejected" 1 m_plan_template_third_step
+
+# The nested example commit step lives in concurrent-batches.md, so the same two refusals apply
+# there when the file exists: an id beyond .2 and the old form. The template is valid in each case,
+# so only the batches file can make them fail. A file holding a .2 step passes.
+m_batches_step_beyond_two() {
+    m_plan_template_two_steps "$1"
+    printf '# Concurrent batches\n\n- [ ] **Step 1.5: Commit**\n' \
+      > "$1/skills/write-plan/references/concurrent-batches.md"
+}
+run_out "a step beyond .2 in concurrent-batches.md is rejected" 1 m_batches_step_beyond_two \
+  "concurrent-batches.md" yes
+
+m_batches_old_form() {
+    m_plan_template_two_steps "$1"
+    printf '# Concurrent batches\n\n- [ ] **Step 5: Commit**\n' \
+      > "$1/skills/write-plan/references/concurrent-batches.md"
+}
+run_out "an old-form step in concurrent-batches.md is rejected" 1 m_batches_old_form \
+  "concurrent-batches.md" yes
+
+m_batches_step_two() {
+    m_plan_template_two_steps "$1"
+    printf '# Concurrent batches\n\n- [ ] **Step 1.2: Commit**\n' \
+      > "$1/skills/write-plan/references/concurrent-batches.md"
+}
+run_out "a .2 step in concurrent-batches.md passes" 0 m_batches_step_two "concurrent-batches.md" no
 
 # A dispatch that names no model at all inherits whatever the driver is paying for, silently, and
 # the output looks like output either way. That is why the rule exists. What it accepts changed on

@@ -12,7 +12,7 @@
 #
 # Usage: tests/test-doc-claims.sh   (from the repository root)
 
-set -uo pipefail
+set -uo pipefail; . "$(dirname "${BASH_SOURCE[0]}")/grep-quiet.sh"
 cd "$(dirname "$0")/.." || exit 1
 
 pass=0

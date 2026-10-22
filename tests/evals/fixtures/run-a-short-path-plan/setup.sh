@@ -51,4 +51,11 @@ rm -rf ../keel/lib/__pycache__
 sed 's#tests/evals/results.md#the eval results#' ../keel/lib/harness/capabilities > ../keel/cap.tmp
 mv ../keel/cap.tmp ../keel/lib/harness/capabilities
 if grep -rq 'tests/evals' ../keel; then exit 1; fi
-../keel/bin/keel plan status docs/plans/2026-10-17-currency-code.md | grep -q '^next: 1.1'
+# The output is captured and matched with case, so a failing keel ends the script under set -e.
+out="$(../keel/bin/keel plan status docs/plans/2026-10-17-currency-code.md)"
+case "
+$out" in
+  *"
+next: 1.1"*) ;;
+  *) exit 1 ;;
+esac

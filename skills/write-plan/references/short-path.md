@@ -61,8 +61,8 @@ behaviours with examples, on a project whose profile has `verify.test` and `veri
    - One task, with its `**Files:**`, `**Depends on:** none`, `**Behaviours:**` and
      `**Done when:**`, and its steps. The `Done when:` is the profile's `test_one` command and its
      passing result, scoped to the task's own test as the template requires. The steps are the
-     template's five, `Step 1.1` to `Step 1.5`, the last staging the named paths and stopping, with
-     the commit the coordinator will make after both review passes.
+     template's two, `Step 1.1` (build it test first) and `Step 1.2` (stage the named paths and
+     stop), with the commit the coordinator will make after both review passes.
    - Each behaviour carries an example, such as "a refund larger than the payment is refused with
      `refund_exceeds_payment`", with the values: refunding 1500 on a payment of 1000 gives
      `refund_exceeds_payment`.

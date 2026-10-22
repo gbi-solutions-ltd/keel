@@ -9,7 +9,7 @@
 # makes the invariant shellcheck cannot see a stated fact in the code rather than an assumption.
 # shellcheck disable=SC2015
 # shellcheck disable=SC2016
-set -uo pipefail
+set -uo pipefail; . "$(dirname "${BASH_SOURCE[0]}")/grep-quiet.sh"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 KEEL="$ROOT/bin/keel"
@@ -5668,6 +5668,13 @@ bindir="$(mktemp -d)"; printf '#!/bin/sh\nexit 0\n' > "$bindir/codex"; chmod +x 
 out="$( cd "$v" && env -u CODEX_VERSION -u CLAUDECODE PATH="$bindir:$PATH" CODEX_HOME="$th_trusted" "$ROOT/bin/keel" doctor 2>&1 )"
 printf '%s' "$out" | grep -qi 'installed on this machine' && ok "doctor names a harness installed here that the repository omits" \
   || bad "doctor names a harness installed here that the repository omits" "no such line"
+# The same stub, a repository that lists codex: no warning.
+v2="$(mktemp -d)"; ( cd "$v2" && git init -q -b main . && "$ROOT/bin/keel" init --harness claude,codex -y >/dev/null 2>&1 )
+out="$( cd "$v2" && env -u CODEX_VERSION -u CLAUDECODE PATH="$bindir:$PATH" CODEX_HOME="$th_trusted" "$ROOT/bin/keel" doctor 2>&1 )"
+printf '%s' "$out" | grep -qi 'installed on this machine' \
+  && bad "doctor stays quiet about a harness the repository lists" "${out:0:120}" \
+  || ok "doctor stays quiet about a harness the repository lists"
+rm -rf "$v2"
 rm -rf "$bindir"
 
 # The two context window messages were Claude Code numbers. A Codex rollout states its own window,

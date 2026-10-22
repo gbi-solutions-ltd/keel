@@ -90,7 +90,7 @@ check_patterns() {
     local id scope flags pat why rc
     while IFS=$'\t' read -r id scope flags pat why; do
         [ -n "$id" ] || continue
-        printf '' | grep -qE "$pat" >/dev/null 2>&1
+        grep -qE "$pat" </dev/null >/dev/null 2>&1
         rc=$?
         # 0 matched, 1 did not match: both mean the regex compiled. 2 and above is a rejection.
         [ "$rc" -ge 2 ] && report "rule '$id' has a regex this grep rejects, so it matches nothing: $pat"

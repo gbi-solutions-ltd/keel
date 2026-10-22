@@ -10,8 +10,10 @@
 # scenario testing a subagent's behaviour, and that path is exercised by nothing else.
 #
 # review-a-live-schema and assess-a-stale-standard are deliberately OUT, recorded as not gate
-# scenarios before this file existed. So are the other nine. Eighteen scenarios exist and seven
-# run at the gate; a scenario is not in the gate by virtue of existing.
+# scenarios before this file existed. So are the other twelve. Twenty-one scenarios exist and
+# seven run at the gate; a scenario is not in the gate by virtue of existing.
+# implement-a-batched-task is OUT until its first runs are recorded: it measures the routed
+# implementer, which a release gate on the default model does not dispatch.
 #
 # tests/test-eval-harness.sh fails the build when a name here has no scenario file, when
 # tests/evals/README.md states a different count, or when docs/runbooks/cutting-a-release.md tells

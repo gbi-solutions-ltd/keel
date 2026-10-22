@@ -37,7 +37,8 @@ task that says it has no test, its examples are checked by its check command or 
 test for them. A task with no behaviours list, in the older shape, is followed as written.
 
 === RULES ===
-- Follow the steps in order. Do not skip the step that runs the test and watches it fail.
+- Follow the steps in order. Inside the build step follow `keel:tdd`: the test must fail, for the
+  reason the task names, before you write the implementation. Do not skip that run.
 - Use only the verify commands above. Do not substitute the command you would expect this stack to
   use; this project's real one is frequently not the obvious one. **If one of them does not run at
   all** (a missing config, an uninstalled runner, a path that is not there) and this task's own
@@ -61,7 +62,8 @@ test for them. A task with no behaviours list, in the older shape, is followed a
 
 === REPORT ===
 Finish with: which steps you completed, the exact output of each verify command, anything you
-noticed and deliberately left alone, and anything that blocked you.
+noticed and deliberately left alone, and anything that blocked you. Quote the output of the failing
+run that came before the implementation.
 
 Name separately any step you did not perform, or whose outcome you did not see: a test passing on
 arrival is not "watch it fail". It is not completed, and whoever ticks the box needs to know.
@@ -107,7 +109,7 @@ as one held in `"$wt"`, and `TMPDIR` is often unset on Linux.
 On 2026-10-12 a spec reviewer ran `git stash` on the tree under review to measure a baseline, and a
 quality reviewer left a worktree behind.
 
-Answer five questions:
+Answer six questions:
 1. Is every step's stated outcome actually present?
 2. Is anything here that no step asked for? Name it.
 3. Does each listed behaviour have a test asserting its example, and does no test assert something
@@ -117,12 +119,15 @@ Answer five questions:
 4. Did the verify commands run, and did they pass? Quote the output rather than the claim.
 5. Is the output of the task's `Done when:` command in the report? Absence is DEVIATES on its own,
    however good the code looks: an unrun done condition means nothing here has been checked.
+6. Does the report quote a failing run from before the implementation, for the reason the task
+   names? Only passing output means the red was not witnessed: DEVIATES, unless the report names
+   the behaviour as already satisfied on arrival. A task with no test is exempt.
 
 Verdict: COMPLIES or DEVIATES, then the reasons. Deviating is not a failure to be softened; it is
 the finding.
 ```
 
-Questions four and five cannot be answered by reading the diff, and five is the cheapest of all,
+Questions four to six cannot be answered by reading the diff, and five is the cheapest of all,
 which is exactly why a reviewer under time pressure skips it. Question three is the one that catches
 most real problems. A test that passes while asserting something adjacent to the requirement is the
 most common way a task looks done and is not.

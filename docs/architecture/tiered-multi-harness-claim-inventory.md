@@ -37,9 +37,9 @@ Remedy classes:
 | 12 | `docs/profile-keys.md:51` | `gates.done_verified` "Drives hooks/done-guard on Stop and SubagentStop" | **W** |
 | 13 | `docs/profile-keys.md:56` | `hard_block_paths` "Enforced by hooks/sensitive-guard, which asks a human before a commit touching one" | **A**, and the most consequential row here: this is the key whose meaning becomes conditional on the harness |
 | 14 | `docs/02-skill-catalog.md:65` | Requirement 5 satisfied by "`security-audit` + `security-guidance` plugin hooks + `ship` gate" | **W** |
-| 15 | `docs/02-skill-catalog.md:385` | `security-audit`'s plugin calls: `security-guidance` hooks and the built-in `/security-review` | **W**, and it moves with "Step 5: Plugin and gate" in `skills/security-audit/SKILL.md` or `tests/validate-skills.sh:390-463` fails |
-| 16 | `docs/02-skill-catalog.md:564` | `context-budget` "Reads: `CLAUDE.md`, `.claude/settings.json`, `.keel/`, skill sizes" | **W** |
-| 17 | `docs/02-skill-catalog.md:573` | `context-budget`'s plugin call to `claude-md-management` | **W** |
+| 15 | `docs/02-skill-catalog.md:386` | `security-audit`'s plugin calls: `security-guidance` hooks and the built-in `/security-review` | **W**, and it moves with "Step 5: Plugin and gate" in `skills/security-audit/SKILL.md` or `tests/validate-skills.sh:390-463` fails |
+| 16 | `docs/02-skill-catalog.md:565` | `context-budget` "Reads: `CLAUDE.md`, `.claude/settings.json`, `.keel/`, skill sizes" | **W** |
+| 17 | `docs/02-skill-catalog.md:574` | `context-budget`'s plugin call to `claude-md-management` | **W** |
 | 18 | `docs/04-plugin-strategy.md:11` | `security-guidance` as "Install, required... Hook-based, so it runs without being asked" | **A**, and see the note below: the whole document is Claude-marketplace-shaped |
 
 ## Three things the count of eighteen hides

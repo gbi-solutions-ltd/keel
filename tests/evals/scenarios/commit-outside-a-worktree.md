@@ -25,7 +25,7 @@ The audit recorded that the whole run was one fixture, one task, one model, and 
 implementer may not perform arm 4's worktree check, and that check is what makes the deference safe".
 This scenario is where that gets re-measured.
 
-**The arm under test is a subagent, so no skill is injected.** The other six scenarios inject a
+**The arm under test is a subagent, so no skill is injected.** Most other scenarios inject a
 `SKILL.md` and address the agent that reads it. An implementer sees only the prompt the coordinator
 sends: no conversation, no plan file, no skills. The prompt below is therefore
 `skills/execute-plan/references/subagent-prompts.md`'s implementer prompt verbatim from
@@ -42,13 +42,16 @@ declines anyway would say the model does this unprompted and the rule is not wha
 There is a third arm nobody needs to run: the absolute rule as `cf8ba22` wrote it, which forbids the
 commit outright and can only decline. What is under test is the deference `6f88064` put in its place.
 
-**The prompt below moved once since the recorded run.** The verify-commands bullet gained a clause
+**The prompt below moved twice since the recorded run.** The verify-commands bullet gained a clause
 about a command that does not run, when the precondition on verify commands was fixed. The recorded
 2026-08-20 arms ran without it. It was not re-run, because the clause is about verify commands and
 this fixture has none that break, but the results entry is a measurement of the text as it stood.
 The `=== BEHAVIOURS ===` block and the changed task line are left out, because they apply only to a
 task that lists behaviours, which this older-shape task does not, so the recorded results still
 stand.
+The second move, on 2026-10-21, changed the first `=== RULES ===` bullet (the build step follows
+`keel:tdd`) and the `=== REPORT ===` (quote the failing run). Neither is something this scenario's
+criteria depend on, and task 7 of `docs/plans/2026-10-21-lean-task-steps.md` re-runs it.
 The `=== RULES ===` block here is `subagent-prompts.md`'s, verbatim, and has to stay that way:
 `tests/test-eval-harness.sh` checks it.
 
@@ -156,7 +159,8 @@ git commit -m "feat(payouts): reject a reference longer than 35 characters"
 - Every rule `create_payout` enforces has a case in the tests before it has an implementation
 
 === RULES ===
-- Follow the steps in order. Do not skip the step that runs the test and watches it fail.
+- Follow the steps in order. Inside the build step follow `keel:tdd`: the test must fail, for the
+  reason the task names, before you write the implementation. Do not skip that run.
 - Use only the verify commands above. Do not substitute the command you would expect this stack to
   use; this project's real one is frequently not the obvious one. **If one of them does not run at
   all** (a missing config, an uninstalled runner, a path that is not there) and this task's own
@@ -180,7 +184,8 @@ git commit -m "feat(payouts): reject a reference longer than 35 characters"
 
 === REPORT ===
 Finish with: which steps you completed, the exact output of each verify command, anything you
-noticed and deliberately left alone, and anything that blocked you.
+noticed and deliberately left alone, and anything that blocked you. Quote the output of the failing
+run that came before the implementation.
 
 Name separately any step you did not perform, or whose outcome you did not see: a test passing on
 arrival is not "watch it fail". It is not completed, and whoever ticks the box needs to know.

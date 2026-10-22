@@ -1570,7 +1570,7 @@ PY
     fi
     # A harness installed here that the repository does not list. A machine fact, so it belongs in
     # doctor and never in init, which writes a committed team fact.
-    command -v codex >/dev/null 2>&1 && ! printf '%s\n' "$HARNESS_SET" | grep -qx codex \
+    command -v codex >/dev/null 2>&1 && ! grep -qx codex <<< "$HARNESS_SET" \
       && warn "codex is installed on this machine but this repository does not list it in harnesses"
 
     local root; root="$(docs_root)"
@@ -2893,11 +2893,11 @@ cmd_guard() {
     esac
 }
 
-# `keel plan status` and `keel plan tick` read and tick an implementation plan's steps by id. A step
-# is a checkbox line whose bold title opens with its id, `- [ ] **Step 3.2: Run it and watch it
-# fail**`, the form skills/write-plan/references/plan-template.md writes. Its box is ` ` open, `x`
-# done, `-` deferred or `~` not applicable, and anything after the closing ** is its tail: a note,
-# or a deferred step's reason. A line inside a fenced code block is an example, as the template's own
+# `keel plan status` and `keel plan tick` read and tick an implementation plan's steps by id. A
+# step is a checkbox line whose bold title opens with its id, `- [ ] **Step 3.2: Hand over**`, the
+# form skills/write-plan/references/plan-template.md writes. Its box is ` ` open, `x` done, `-`
+# deferred or `~` not applicable, and anything after the closing ** is its tail: a note, or a
+# deferred step's reason. A line inside a fenced code block is an example, as the template's own
 # are, so it is never a step.
 #
 # PLAN_AWK_LIB is prepended to both commands' awk programs so they cannot disagree about what a step

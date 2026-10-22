@@ -28,7 +28,7 @@
 # makes the invariant shellcheck cannot see a stated fact in the code rather than an assumption.
 # shellcheck disable=SC2015
 # shellcheck disable=SC2016
-set -uo pipefail
+set -uo pipefail; . "$(dirname "${BASH_SOURCE[0]}")/grep-quiet.sh"
 
 SCANNER="$(cd "$(dirname "$0")/.." && pwd)/tests/no-internal-leaks.sh"
 pass=0

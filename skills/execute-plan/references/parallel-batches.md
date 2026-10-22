@@ -67,13 +67,13 @@ race:
 | The reviewer sees the wrong diff | Pass one is fed `git diff` from a shared tree, sees both tasks, answers "is anything here that no step asked for" with YES, and returns a spurious DEVIATES that re-dispatches correct work |
 
 **Before dispatching, check each batched task's final step actually commits.**
-[plan-template.md](../../write-plan/references/plan-template.md) requires it (rule 2 under "Tasks
-that run concurrently"), and a task still carrying a hand-over step is the defect this check exists
-to catch: the implementer stages, commits nothing, and the join diff below is empty. **Fix the task
-text, do not patch it at dispatch time.** Tried on 2026-08-20 and it does not work: a real
-implementer handed a hand-over step plus a rule saying to commit staged its paths and reported "not
-committed, per instructions", naming neither rule. The standard rules tell the implementer that its
-task's final step decides, so a contradicting line added here loses.
+[concurrent-batches.md](../../write-plan/references/concurrent-batches.md) requires it (rule 2), and
+a task still carrying a hand-over step is the defect this check exists to catch: the implementer
+stages, commits nothing, and the join diff below is empty. **Fix the task text, do not patch it at
+dispatch time.** Tried on 2026-08-20 and it does not work: a real implementer handed a hand-over
+step plus a rule saying to commit staged its paths and reported "not committed, per instructions",
+naming neither rule. The standard rules tell the implementer that its task's final step decides, so
+a contradicting line added here loses.
 
 Add to each implementer prompt:
 

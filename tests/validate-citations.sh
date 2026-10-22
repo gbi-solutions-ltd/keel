@@ -42,7 +42,7 @@
 # a path there is an argument to a command rather than a claim, and the tree already holds an
 # assertion on the literal string "untagged.md:2 fenced.md:5". Trailing comments, because separating
 # a real one from a `#` inside a quoted string needs a shell parser, and no citation in the tree is
-# written that way. tests/evals/fixtures/, because those eleven stand-in projects are wrong on
+# written that way. tests/evals/fixtures/, because those stand-in projects are wrong on
 # purpose and their paths name their own trees. And tests/evals/results.md, for the same reason at
 # one remove: it records what an arm did inside a staged fixture, in that fixture's paths, and two
 # of its citations name `docs/runbooks/payout-worker.md`, which exists under a fixture and not here.

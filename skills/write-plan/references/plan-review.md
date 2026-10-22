@@ -59,8 +59,9 @@ Answer six questions.
    clause against the code.
 3. Are the steps executable as written? A behaviour with no example, or an example that neither a
    test nor, for a no-test task, a check command or a reader could assert, is not executable, nor is
-   "run it and watch it fail" naming no command and no expected output, however clean the plan
-   looks. Count them.
+   a build step naming no command and no expected output for the failing run, however clean the plan
+   looks. Count them. A task has a build step and a hand-over step; a plan written now with
+   five-step tasks is a defect, and one written before 2026-10-21 that is being resumed is not.
 4. Does the decomposition match this codebase's established patterns? Name any task that puts a
    file somewhere the repo does not otherwise put files, or splits work the repo keeps together.
    Also say whether the task count looks right, and why.

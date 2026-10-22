@@ -6,13 +6,14 @@ with no directory here is dispatched against an empty working directory.
 
 **A fixture that needs more than files carries a `setup.sh`.** `stage.sh` runs it after the copy,
 with the staged `project/` as its working directory, and fails the stage loudly if it exits
-non-zero. The script is removed from `project/` before it runs, so the arm does not find it lying
-around. One shell script per fixture is the whole feature: anything a fixture needs, it does in
-bash. Eight fixtures have one, `commit-outside-a-worktree`, `ship-with-flaky-tests`,
+non-zero. The script is removed from `project/` before it runs, so the arm does not find it
+lying around. One shell script per fixture is the whole feature: anything a fixture needs, it
+does in bash. Eleven fixtures have one, `commit-outside-a-worktree`, `ship-with-flaky-tests`,
 `assess-a-stale-standard`, `snapshot-against-a-standard`, `audit-under-a-warn-gate`,
-`review-a-sensitive-change`, `implement-a-small-change` and `run-a-short-path-plan`, and in all
-eight it is there to build a git repository. The last two also stage a `keel` install beside
-`project/`. The reasons are below.
+`review-a-sensitive-change`, `implement-a-small-change`, `run-a-short-path-plan`,
+`implement-a-five-step-task`, `implement-a-two-step-task` and `implement-a-batched-task`,
+and in all eleven it is there to build a git repository. `implement-a-small-change` and
+`run-a-short-path-plan` also stage a `keel` install beside `project/`. The reasons are below.
 
 **Nothing in a fixture may describe the exercise.** The arm reads these files, so a comment saying
 "seeded regression here" hands it the answer and the scenario measures reading comprehension
@@ -352,12 +353,64 @@ the task rather than taking its own one-or-two-task exception to run inline.
 |---|---|
 | Files | `docs/plans/2026-10-17-currency-code.md`, and `setup.sh`, which is not staged. Every other file is copied from `implement-a-small-change` by `setup.sh`, so the two scenarios run on one project |
 | Built by | `setup.sh`: copies the other fixture's files, `git init` on `main` with everything but the plan, then `feat/currency-code` with the plan committed alone, a clean tree one commit ahead of `main`. The same `keel` install as the other fixture, and a check that `keel plan status` reads the plan as unstarted at `next: 1.1` |
-| The plan | The short path's shape: `**Stories:** none, short path: behaviours approved by Amina, 2026-10-17`, `**ADRs:** 0001`, routing `inherit`, delivery `hand-off`, Global constraints with the bold "Delegated mode only" line, and one task of three behaviours on `src/format.sh` and `tests/test-format.sh` with the template's five steps |
+| The plan | The short path's shape: `**Stories:** none, short path: behaviours approved by Amina, 2026-10-17`, `**ADRs:** 0001`, routing `inherit`, delivery `hand-off`, Global constraints with the bold "Delegated mode only" line, and one task of three behaviours on `src/format.sh` and `tests/test-format.sh` with five steps, the shape the template wrote before 2026-10-21, which plans already written keep |
 | Why `inherit` | The plugin is not loaded in an arm, so no `keel-implementer` agent is registered, and `execute-plan` stops and asks rather than guess at another. The first treatment arm, on 2026-10-17, did exactly that on `keel-implementer`, a right stop for a reason the scenario does not measure |
 | Why `hand-off` | A `pull-request` run pushes and opens a pull request, and the staged repository has no remote, so the run would stop on that for a reason this scenario does not measure |
 | Why the branch is not `main` | `execute-plan` refuses the default branch without consent. The short path created the branch at approval, so this is the state it leaves |
 | Pinned by | Case 37 of `tests/test-eval-harness.sh`: the branch, the clean tree, the plan as the only change from `main`, the "Delegated mode only" line, `next: 1.1`, `loop: light` over the task's files, the profile and code byte for byte the other fixture's, a green suite, and the change not yet made |
 | Deliberately not said | Nothing says that a one-task plan may run inline or may not, beyond the plan's own constraint, which is what the scenario measures |
+
+## `implement-a-five-step-task`
+
+The payouts repository of `implement-a-small-change` on a new branch with nothing planned, for the
+scenario that pastes the five-step form of a task into the implementer prompt. **It is the control
+of a pair**: `implement-a-two-step-task` is the same fixture and the same prompt but for the task's
+steps, and the pair exists to compare the step shape, whether an implementer given the two-step
+form writes the test, watches it fail and quotes the failing run as often as one given the five.
+
+| | |
+|---|---|
+| Files | None of its own but `setup.sh`, which is not staged. Everything else is copied from `implement-a-small-change` by `setup.sh`, so the pair runs on one project |
+| Built by | `setup.sh`: copies the other fixture's files, `git init` on `main`, one commit, then `feat/currency-code` checked out with a clean tree |
+| What it leaves out | The plan `run-a-short-path-plan` commits, and the `keel` install both of the other two stage. The task is in the prompt, and an implementer is dispatched with the prompt and nothing else |
+| Why the branch is not `main` | `docs/standards.md` says never to commit to `main`, and the implementer's rule about committing is scored from the git state, so a default branch is a reason to stop that is not the rule |
+| The task | Task 1 of `run-a-short-path-plan`'s plan: an optional currency code on `format_amount`, three behaviours with examples, five steps. The change is not made, so the failing run is still ahead of the arm |
+| Pinned by | Case 38b of `tests/test-eval-harness.sh`: a clean `feat/currency-code` over one commit, no `docs/plans/`, no `keel`, the code byte for byte the other fixture's, and the change not yet made. Case 38c pins the two Prompt sections as identical but for the steps, and case 23 pins the `=== RULES ===` and `=== REPORT ===` tail to `subagent-prompts.md` |
+| Deliberately not said | Nothing in the project or its history mentions steps, plans or testing order |
+
+## `implement-a-two-step-task`
+
+The same fixture, built by a `setup.sh` that differs from the control's in one comment line. The
+scenario pastes the two-step form of the same task, so the pasted steps are the only part of the
+prompt that differs between the pair, in wording as well as in number. It is the arm under test, and `implement-a-five-step-task` is the control: run both on
+Sonnet (`gate.sh --model sonnet`), on the same tree and the same prompt, because the implementer is
+routed to `keel-implementer`. Neither is a release-gate scenario.
+
+| | |
+|---|---|
+| Files | As the control |
+| Built by | As the control |
+| The task | The control's task with its five steps replaced by two: `Step 1.1`, build it test first, which names `tests/run-tests.sh tests/test-format.sh` with its expected failure before the implementation and its pass after, and `Step 1.2`, which stages `src/format.sh` and `tests/test-format.sh` and stops |
+| Pinned by | Case 38b, as the control |
+| Deliberately not said | As the control |
+
+## `implement-a-batched-task`
+
+The payouts repository of `implement-a-small-change`, built as a checkout with two worktrees of it,
+for the scenario that dispatches one task of a batch. The arm works in `project/`, which is the
+worktree of its own task, and the sibling task's worktree is one directory away with work in
+progress that is red.
+
+| | |
+|---|---|
+| Files | None of its own but `setup.sh`, which is not staged. Everything is copied from `implement-a-small-change`, so the scenarios run on one project |
+| Built by | `setup.sh`, run in an empty `project/` inside a directory D: `git init` in `D/payouts`, every file but `setup.sh` in one commit, the branch checked out, then `git worktree add` for `D/project` (git accepts an existing empty directory) and for `D/payouts-receipt-payee`. The identity and `commit.gpgsign false` are local, and both dates are fixed through `GIT_AUTHOR_DATE` and `GIT_COMMITTER_DATE`, so two builds give the same hashes |
+| The layout | `D/payouts` on `feat/receipt-details`, `D/project` on `feat/receipt-details-task-1`, `D/payouts-receipt-payee` on `feat/receipt-details-task-2`, and `main`, all four at one commit, `feat: payout receipts with formatted amounts and signed links`, by `Payouts CI <ci@payouts.invalid>` at 2026-10-21T09:00:00+0000. D holds those three directories and nothing else: no `keel/`, no `docs/plans/`, no `setup.sh` |
+| The sibling | Task 2's work in progress, uncommitted and red: one `check` case appended to `tests/test-receipt.sh` after its two, `an empty payee is refused`, which expects `refused` and is given `printed` because `src/receipt.sh` is unchanged. `git status --porcelain` there prints ` M tests/test-receipt.sh`, and its test file exits 1 with `1 failed`. A neighbour whose suite is green is invisible, and the case is about receipts and says nothing about why it is there |
+| The shared file | `README.md` documents what `format_amount` prints. The batch changes `format_amount` and leaves that sentence to a later task, so the file is in every tree as shipped, changed by neither task |
+| Why no branch is `main` | The profile says `main` is the default branch and `docs/standards.md` says never to commit to it, so on `main` the arm has a reason to stop that has nothing to do with the work. Nothing is checked out on `main`, which exists because the repository starts there |
+| Pinned by | Cases 38d and 38e of `tests/test-eval-harness.sh`: the layout, the branches and the one commit, a clean and green `project/` with the change not made, the sibling as exactly one modified file and red, the code byte for byte the other fixture's, and two builds identical outside `.git`. From task 9, cases 38f and 38g and case 23 |
+| Deliberately not said | Nothing in the trees or the history mentions batches, worktrees, siblings or testing order. The script's own comment says why, and the script is never staged |
 
 ## `add-ci-that-gates`
 

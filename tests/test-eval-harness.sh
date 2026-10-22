@@ -15,7 +15,7 @@
 # bearing properties, that the narrow command really passes against real code and the full suite
 # really fails, so it cannot rot back into a stub without a test going red.
 
-set -uo pipefail
+set -uo pipefail; . "$(dirname "${BASH_SOURCE[0]}")/grep-quiet.sh"
 cd "$(dirname "$0")/.." || exit 1
 REPO="$(pwd)"
 
@@ -410,6 +410,9 @@ fi
 # fence that closes its prompt.
 verbatim=(
     "commit-outside-a-worktree|skills/execute-plan/references/subagent-prompts.md|=== RULES ==="
+    "implement-a-five-step-task|skills/execute-plan/references/subagent-prompts.md|=== RULES ==="
+    "implement-a-two-step-task|skills/execute-plan/references/subagent-prompts.md|=== RULES ==="
+    "implement-a-batched-task|skills/execute-plan/references/subagent-prompts.md|=== RULES ==="
 )
 for row in "${verbatim[@]}"; do
     IFS='|' read -r sc src marker <<< "$row"
@@ -1255,6 +1258,260 @@ if [ -f "$GATE" ]; then
     fi
 fi
 
+# 38b. implement-a-five-step-task and implement-a-two-step-task each stage the payouts repository on
+# a new branch, clean, with no plan and no keel install.
+#
+# Added 2026-10-21 with the pair of scenarios that measure the shape of a task's steps. The pair
+# differs only in the task its prompt pastes, so the project has to be the same project, byte for
+# byte, as implement-a-small-change's: a fixture that drifted would put a second variable into the
+# comparison. The branch is not main, because the implementer's rule about committing is scored
+# from the git state and a default branch hands the arm a reason to stop that is not the rule. The
+# tree is clean for the same reason case 21 requires it: "was anything staged" has to be a plain
+# question. There is no docs/plans/, because the task is pasted into the prompt and a plan on disk
+# is a second copy an arm could read instead; and no keel install, because an implementer is
+# dispatched with the prompt and nothing else, and a keel beside the project is a tool the prompt
+# does not mention. The failing run is still ahead of the arm: the change is not made.
+fx1="tests/evals/fixtures/implement-a-small-change"
+for name in implement-a-five-step-task implement-a-two-step-task; do
+    d="$(tests/evals/stage.sh "$name" 2>/dev/null)"; staged+=("$d")
+    p="$d/project"
+    branch="$( cd "$p" 2>/dev/null && git rev-parse --abbrev-ref HEAD 2>/dev/null )"
+    dirty="$( cd "$p" 2>/dev/null && git status --porcelain 2>/dev/null | wc -l | tr -d ' ' )"
+    ncommits="$( cd "$p" 2>/dev/null && git rev-list --count HEAD 2>/dev/null )"
+    same=1
+    for f in .keel/profile.json src/format.sh tests/test-format.sh src/auth/link.sh docs/standards.md; do
+        cmp -s "$fx1/$f" "$p/$f" || same=0
+    done
+    coded="$( cd "$p" 2>/dev/null && bash -c '. src/format.sh; format_amount 1500 UGX' 2>/dev/null )"
+    if [ -n "$d" ] && [ -d "$p/.git" ] && [ "$branch" = "feat/currency-code" ] && [ "$dirty" = "0" ] \
+       && [ "$ncommits" = "1" ] && [ ! -e "$p/docs/plans" ] && [ ! -e "$d/keel" ] \
+       && [ ! -e "$p/setup.sh" ] && [ "$same" -eq 1 ] && [ "$coded" != "UGX 1,500" ]; then
+        ok "$name: a clean repository on feat/currency-code, no plan, no keel, change not made"
+    else
+        bad "$name: a clean repository on feat/currency-code, no plan, no keel, change not made" \
+            "branch=$branch dirty=$dirty commits=$ncommits same=$same coded='$coded' \
+plans_dir=$([ -e "$p/docs/plans" ] && echo yes || echo no) keel=$([ -e "$d/keel" ] && echo yes || echo no)"
+    fi
+done
+
+# 38c. The two Prompt sections are identical once the task's steps are deleted.
+#
+# The pair exists to compare the step shape, so the step lines are the only variable: the header, the
+# task's behaviours, the constraints and the rules and report that follow must not drift apart, or a
+# difference between the two arms could be a difference in the prompt. The deletion runs from the
+# line that opens Step 1.1 up to the next === marker, which is the task's whole step list and its
+# hand-over text. Each side is checked to have lost something, so a rename of the step line cannot
+# turn this into a comparison of two untouched prompts.
+prompt_of() {   # scenario name: its Prompt section, as run.sh prints it
+    sed -n '/^## Prompt$/,$p' "tests/evals/scenarios/$1.md" 2>/dev/null | tail -n +2
+}
+strip_steps() {
+    awk '/^- \[ \] \*\*Step 1\.1/{skip=1} /^===/{skip=0} !skip{print}'
+}
+five_raw="$(prompt_of implement-a-five-step-task)"
+two_raw="$(prompt_of implement-a-two-step-task)"
+five_cut="$(printf '%s\n' "$five_raw" | strip_steps)"
+two_cut="$(printf '%s\n' "$two_raw" | strip_steps)"
+if [ -z "$five_raw" ] || [ -z "$two_raw" ]; then
+    bad "the pair's Prompt sections are identical but for the task's steps" \
+        "a Prompt section is empty: five=${#five_raw} two=${#two_raw}"
+elif [ "$five_cut" = "$five_raw" ] || [ "$two_cut" = "$two_raw" ]; then
+    bad "the pair's Prompt sections are identical but for the task's steps" \
+        "the deletion found no Step 1.1 line in one of them"
+elif [ "$five_cut" = "$two_cut" ] && [ "$five_raw" != "$two_raw" ]; then
+    ok "the pair's Prompt sections are identical but for the task's steps"
+else
+    bad "the pair's Prompt sections are identical but for the task's steps" \
+        "$(diff <(printf '%s\n' "$five_cut") <(printf '%s\n' "$two_cut") | head -6 | tr '\n' ' ')"
+fi
+
+# 38d. implement-a-batched-task builds the payouts repository with one task's private worktree
+# beside its sibling's, the sibling mid-task and red.
+#
+# Added 2026-10-21 with the scenario that dispatches one task of a batch. The script is run directly
+# here, from an empty project/ inside a directory of its own, because that is the only thing it
+# needs and it is what stage.sh does. The directory joins `staged` so the exit trap removes it. The
+# layout is the fixture's whole value: the arm works in project/, a worktree of payouts/ on its own
+# branch, with the sibling task's worktree one directory away holding a test that is red because the
+# code it asks for is not written. So the case asserts the layout (three directories and nothing
+# else), the branches and the one commit, that project/ is clean and green with the change not made,
+# that the sibling is exactly one modified file and red for the reason it should be, and that the
+# project is the other fixture's byte for byte, so the two scenarios cannot drift onto different
+# code. Nothing may describe the exercise, so there is no keel, no plan and no setup.sh anywhere.
+batched_setup="$REPO/tests/evals/fixtures/implement-a-batched-task/setup.sh"
+fx1="tests/evals/fixtures/implement-a-small-change"
+b="$(mktemp -d)"; staged+=("$b")
+mkdir "$b/project"
+b_out="$( cd "$b/project" && bash "$batched_setup" 2>&1 )"; b_rc=$?
+bg() { git -C "$1" "${@:2}" 2>/dev/null; }
+b_msg="feat: payout receipts with formatted amounts and signed links"
+b_who="Payouts CI <ci@payouts.invalid>"
+# The dates are read with strftime's %z, which prints +0000 on every git. %aI prints +00:00 on older
+# gits and Z on newer ones, and this case failed on a Mac whose git is the newer kind.
+b_when="2026-10-21T09:00:00+0000"
+b_df='--date=format:%Y-%m-%dT%H:%M:%S%z'
+b_log="$(bg "$b/payouts" log "$b_df" --format='%an %ad')"
+b_full="$(bg "$b/payouts" log "$b_df" --format='%an <%ae> %cn <%ce> %ad %cd %s')"
+b_head="$(bg "$b/payouts" rev-parse --abbrev-ref HEAD)"
+b_dirty="$(bg "$b/payouts" status --porcelain)"
+b_revs="$(for r in main feat/receipt-details feat/receipt-details-task-1 \
+                   feat/receipt-details-task-2; do bg "$b/payouts" rev-parse "$r"; done \
+          | sort -u | wc -l | tr -d ' ')"
+b_trees="$(for t in payouts project payouts-receipt-payee; do
+               bg "$b/$t" rev-list --count HEAD
+           done | tr '\n' ' ')"
+b_pbranch="$(bg "$b/project" rev-parse --abbrev-ref HEAD)"
+b_pdirty="$(bg "$b/project" status --porcelain)"
+b_suite=1; ( cd "$b/project" 2>/dev/null && tests/run-tests.sh >/dev/null 2>&1 ) && b_suite=0
+b_coded="$( cd "$b/project" 2>/dev/null \
+            && bash -c '. src/format.sh; format_amount 1500 UGX' 2>/dev/null )"
+b_sbranch="$(bg "$b/payouts-receipt-payee" rev-parse --abbrev-ref HEAD)"
+b_sdirty="$(bg "$b/payouts-receipt-payee" status --porcelain)"
+b_sout="$( cd "$b/payouts-receipt-payee" 2>/dev/null \
+           && tests/run-tests.sh tests/test-receipt.sh 2>&1 )"
+b_src=$?
+b_trees_list="$(bg "$b/payouts" worktree list --porcelain | sed -n 's/^worktree //p' \
+                | while read -r w; do basename "$w"; done | sort | tr '\n' ' ')"
+b_ls="$( cd "$b" && for e in *; do printf '%s ' "$e"; done )"
+b_stray=""
+for t in payouts project payouts-receipt-payee; do
+    for f in keel docs/plans setup.sh; do
+        [ -e "$b/$t/$f" ] && b_stray="$b_stray $t/$f"
+    done
+done
+b_same=1
+for t in payouts project; do
+    for f in src/format.sh src/receipt.sh tests/test-format.sh .keel/profile.json README.md \
+             docs/standards.md; do
+        cmp -s "$fx1/$f" "$b/$t/$f" || b_same=0
+    done
+done
+if [ "$b_rc" -eq 0 ] && [ "$b_log" = "Payouts CI $b_when" ] \
+   && [ "$b_full" = "$b_who $b_who $b_when $b_when $b_msg" ] \
+   && [ "$b_head" = "feat/receipt-details" ] && [ -z "$b_dirty" ] && [ "$b_revs" = "1" ] \
+   && [ "$b_trees" = "1 1 1 " ] \
+   && [ -f "$b/project/.git" ] && [ "$b_pbranch" = "feat/receipt-details-task-1" ] \
+   && [ -z "$b_pdirty" ] && [ "$b_suite" -eq 0 ] && [ "$b_coded" != "UGX 1,500" ] \
+   && [ "$b_sbranch" = "feat/receipt-details-task-2" ] \
+   && [ "$b_sdirty" = " M tests/test-receipt.sh" ] \
+   && [ "$b_src" -eq 1 ] && printf '%s\n' "$b_sout" | grep -q '1 failed' \
+   && grep -q 'an empty payee is refused' "$b/payouts-receipt-payee/tests/test-receipt.sh" \
+   && [ "$b_trees_list" = "payouts payouts-receipt-payee project " ] \
+   && [ "$b_ls" = "payouts payouts-receipt-payee project " ] && [ -z "$b_stray" ] \
+   && [ "$b_same" -eq 1 ]; then
+    ok "implement-a-batched-task: a task's worktree beside its red sibling, one commit"
+else
+    bad "implement-a-batched-task: a task's worktree beside its red sibling, one commit" \
+        "rc=$b_rc out='${b_out:0:200}' log='$b_log' head=$b_head dirty='$b_dirty' revs=$b_revs \
+counts='$b_trees' project=$b_pbranch/'$b_pdirty'/suite=$b_suite/coded='$b_coded' \
+sibling=$b_sbranch/'$b_sdirty'/rc=$b_src worktrees='$b_trees_list' ls='$b_ls' stray='$b_stray' \
+same=$b_same"
+fi
+
+# 38e. Two runs of the batched fixture's script give the same commit and the same files.
+#
+# The scenario is compared across arms and across releases, so a fixture that differs by run is a
+# second variable. The identity and the dates are fixed in the script, so the commit hash is the
+# same, and the trees are compared with diff -r outside .git, which is a file in a worktree and
+# holds an absolute path that differs by directory.
+b2="$(mktemp -d)"; staged+=("$b2")
+mkdir "$b2/project"
+( cd "$b2/project" && bash "$batched_setup" >/dev/null 2>&1 )
+b_det=1; b_why=""
+for t in payouts project payouts-receipt-payee; do
+    r1="$(bg "$b/$t" rev-parse HEAD)"; r2="$(bg "$b2/$t" rev-parse HEAD)"
+    if [ -z "$r1" ] || [ "$r1" != "$r2" ]; then b_det=0; b_why="$b_why $t:rev"; fi
+    if ! diff -r -x .git "$b/$t" "$b2/$t" >/dev/null 2>&1; then b_det=0; b_why="$b_why $t:files"; fi
+done
+if [ "$b_det" -eq 1 ]; then
+    ok "implement-a-batched-task: two runs give the same commits and the same files"
+else
+    bad "implement-a-batched-task: two runs give the same commits and the same files" \
+        "differs in:$b_why"
+fi
+
+# 38f. Staging implement-a-batched-task through stage.sh gives the arm a worktree of its own, with
+# the baseline recorded beside it.
+#
+# Case 38d runs the fixture's script directly. This one goes through the script an arm is actually
+# staged by, because the scenario is scored on the git state and on what sits beside project/: the
+# marker and head.txt exist only if stage.sh records them, which it does for a scenario that
+# mentions head.txt. stash.txt is empty because a repository's stash list is shared by all of its
+# worktrees, and the scenario forbids `git stash` in any form. project/setup.sh and keel/ must not
+# exist, for the reason 38b gives.
+bd="$(tests/evals/stage.sh implement-a-batched-task 2>/dev/null)"; staged+=("$bd")
+bd_branch="$(git -C "$bd/project" rev-parse --abbrev-ref HEAD 2>/dev/null)"
+bd_head="$(git -C "$bd/payouts" rev-parse HEAD 2>/dev/null)"
+bd_rec="$(cat "$bd/head.txt" 2>/dev/null)"
+bd_stash="$(cat "$bd/stash.txt" 2>/dev/null)"
+if [ -n "$bd" ] && [ -d "$bd" ] && [ -f "$bd/project/.git" ] \
+   && [ "$bd_branch" = "feat/receipt-details-task-1" ] \
+   && [ -n "$bd_head" ] && [ "$bd_rec" = "$bd_head" ] \
+   && [ -f "$bd/stash.txt" ] && [ -z "$bd_stash" ] && [ -e "$bd/marker" ] \
+   && [ -d "$bd/payouts-receipt-payee" ] && [ ! -e "$bd/project/setup.sh" ] \
+   && [ ! -e "$bd/keel" ]; then
+    ok "implement-a-batched-task: staged on its branch, with head.txt, an empty stash.txt, a marker"
+else
+    bad "implement-a-batched-task: staged on its branch, with head.txt, an empty stash.txt, a marker" \
+        "dir='$bd' git_file=$([ -f "$bd/project/.git" ] && echo yes || echo no) branch=$bd_branch \
+head='$bd_head' recorded='$bd_rec' stash='$bd_stash' \
+marker=$([ -e "$bd/marker" ] && echo yes || echo no) \
+sibling=$([ -d "$bd/payouts-receipt-payee" ] && echo yes || echo no) \
+setup=$([ -e "$bd/project/setup.sh" ] && echo yes || echo no) \
+keel=$([ -e "$bd/keel" ] && echo yes || echo no)"
+fi
+
+# 38g. The Prompt section of implement-a-batched-task carries the batch bullets and a committing
+# final step, and names none of the harness.
+#
+# parallel-batches.md says to add the fenced bullets to each implementer prompt and does not say
+# where, so the scenario puts them under a marker line of their own above `=== RULES ===`, and this
+# case pins that they are the skill's lines, consecutive, directly after the marker. They are
+# extracted from the skill and checked non-empty first, as case 23 does, so a changed heading cannot
+# turn the comparison into two empty strings. The last `- [ ] **Step` of the task is the commit
+# step, and the text from it to the next marker holds the commit and both paths and not the
+# sentence that forbids committing: the task is what permits the commit in a worktree, and a
+# leftover "Do not commit" would contradict it. The prompt must not name the harness, and an arm
+# that is a subagent is handed no skill framing.
+bb_block="$(awk '/^Add to each implementer prompt:/{f=1; next}
+                 f && $0=="```"{n++; if(n==2) exit; next}
+                 f && n==1{print}' skills/execute-plan/references/parallel-batches.md 2>/dev/null)"
+bb_prompt="$(prompt_of implement-a-batched-task)"
+if [ -z "$bb_block" ] || [ -z "$bb_prompt" ]; then
+    bad "implement-a-batched-task: batch bullets, a committing last step, no harness names" \
+        "extraction found nothing: block=${#bb_block} prompt=${#bb_prompt}"
+else
+    bb_n="$(printf '%s\n' "$bb_block" | wc -l | tr -d ' ')"
+    bb_after="$(printf '%s\n' "$bb_prompt" \
+                | awk -v n="$bb_n" '$0=="=== CONCURRENT BATCH ==="{f=1; next}
+                                    f && c<n{print; c++}')"
+    bb_markers="$(printf '%s\n' "$bb_prompt" | grep -c '^=== CONCURRENT BATCH ===$')"
+    bb_before_rules="$(printf '%s\n' "$bb_prompt" \
+                       | awk '$0=="=== CONCURRENT BATCH ==="{b=NR} $0=="=== RULES ==="{r=NR}
+                              END{print (b>0 && r>b) ? "yes" : "no"}')"
+    bb_laststep="$(printf '%s\n' "$bb_prompt" | grep '^- \[ \] \*\*Step' | tail -n 1)"
+    bb_text="$(printf '%s\n' "$bb_prompt" \
+               | awk '/^- \[ \] \*\*Step 1\.2: Commit\*\*$/{f=1; next} f && /^===/{exit} f{print}')"
+    bb_skill="$(tests/evals/run.sh implement-a-batched-task 2>/dev/null)"
+    bb_ok=1; bb_why=""
+    [ "$bb_after" = "$bb_block" ] || { bb_ok=0; bb_why="$bb_why block-not-consecutive"; }
+    [ "$bb_markers" = "1" ] || { bb_ok=0; bb_why="$bb_why marker-count=$bb_markers"; }
+    [ "$bb_before_rules" = "yes" ] || { bb_ok=0; bb_why="$bb_why marker-not-before-rules"; }
+    [ "$bb_laststep" = '- [ ] **Step 1.2: Commit**' ] \
+        || { bb_ok=0; bb_why="$bb_why last-step='$bb_laststep'"; }
+    case "$bb_text" in *'git commit -m'*) ;; *) bb_ok=0; bb_why="$bb_why no-git-commit-m" ;; esac
+    case "$bb_text" in *'src/format.sh'*) ;; *) bb_ok=0; bb_why="$bb_why no-src-path" ;; esac
+    case "$bb_text" in *'tests/test-format.sh'*) ;; *) bb_ok=0; bb_why="$bb_why no-test" ;; esac
+    case "$bb_text" in *'Do not commit'*) bb_ok=0; bb_why="$bb_why says-do-not-commit" ;; *) ;; esac
+    case "$bb_skill" in *'skill available'*) bb_ok=0; bb_why="$bb_why skill-framing" ;; *) ;; esac
+    if [ "$bb_ok" -eq 1 ]; then
+        ok "implement-a-batched-task: batch bullets, a committing last step, no harness names"
+    else
+        bad "implement-a-batched-task: batch bullets, a committing last step, no harness names" \
+            "$bb_why"
+    fi
+fi
+
 # ---- tests/evals/gate.sh dispatches the gate, and its dry run dispatches nothing ----------------
 #
 # gate.sh replaces a script that lived pasted in the release runbook and had produced two gates from
@@ -1444,6 +1701,45 @@ if [ "$rc" -ne 0 ] && grep -qF 'staged 1 of 2, 1 failed: no-such-scenario.1' <<<
 else
     bad "gate.sh reports a stage failure by name, stages the rest, and exits non-zero" \
         "rc=$rc out=${part_out:0:200}"
+fi
+
+# Behaviour 7 of the lean-task-steps pair: a scenarios file naming the two stages both with --dry-run,
+# each in a staged directory outside the repository, and runs no claude.
+pair="$gate_tmp/pair-scenarios"
+printf 'implement-a-five-step-task\nimplement-a-two-step-task\n' > "$pair"
+pair_dir="$gate_tmp/pair"
+rm -f "$stublog"
+pair_out="$(PATH="$stubbin:$PATH" GATE_STUB_LOG="$stublog" "$GATESH" --dry-run --model sonnet \
+            --scenarios "$pair" "$pair_dir" 2>&1)"; rc=$?
+adopt_dirs "$pair_dir"
+pair_printed="$(grep -c 'claude -p' <<< "$pair_out")"
+if [ "$rc" -eq 0 ] && [ -f "$pair_dir/implement-a-five-step-task.1.dir" ] \
+   && [ -f "$pair_dir/implement-a-two-step-task.1.dir" ] && [ "$pair_printed" -eq 2 ] \
+   && [ ! -e "$stublog" ]; then
+    ok "gate.sh --dry-run over a scenarios file naming the implement pair stages both"
+else
+    bad "gate.sh --dry-run over a scenarios file naming the implement pair stages both" \
+        "rc=$rc printed=$pair_printed out=${pair_out:0:200}"
+fi
+
+# A scenarios file naming implement-a-batched-task stages three arms with --dry-run, which is the
+# form its scenario text asks for (--model sonnet --runs 3), and runs no claude.
+bat="$gate_tmp/batched-scenarios"
+printf 'implement-a-batched-task\n' > "$bat"
+bat_dir="$gate_tmp/batched"
+rm -f "$stublog"
+bat_out="$(PATH="$stubbin:$PATH" GATE_STUB_LOG="$stublog" "$GATESH" --dry-run --model sonnet \
+           --runs 3 --scenarios "$bat" "$bat_dir" 2>&1)"; rc=$?
+adopt_dirs "$bat_dir"
+bat_printed="$(grep -c 'claude -p' <<< "$bat_out")"
+if [ "$rc" -eq 0 ] && [ -f "$bat_dir/implement-a-batched-task.1.dir" ] \
+   && [ -f "$bat_dir/implement-a-batched-task.2.dir" ] \
+   && [ -f "$bat_dir/implement-a-batched-task.3.dir" ] && [ "$bat_printed" -eq 3 ] \
+   && [ ! -e "$stublog" ]; then
+    ok "gate.sh --dry-run --runs 3 over a scenarios file naming the batched scenario stages three"
+else
+    bad "gate.sh --dry-run --runs 3 over a scenarios file naming the batched scenario stages three" \
+        "rc=$rc printed=$bat_printed out=${bat_out:0:200}"
 fi
 
 # Behaviours 1, 2 and 4, against the stub: gate.sh stages and the generated OUT/dispatch.sh

@@ -8,7 +8,7 @@
 # Each case builds a throwaway git repository, stages something, feeds the hook a PreToolUse event
 # on stdin, and asserts on the JSON it writes to stdout.
 
-set -uo pipefail
+set -uo pipefail; . "$(dirname "${BASH_SOURCE[0]}")/grep-quiet.sh"
 
 GUARD="$(cd "$(dirname "$0")/.." && pwd)/hooks/sensitive-guard"
 pass=0

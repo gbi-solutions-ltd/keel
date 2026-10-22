@@ -66,6 +66,17 @@ jobs:
       - name: Run tests
         run: tests/run-tests.sh
 
+      # The same suite again under the bash macOS ships, 3.2, which is what a user's Mac runs.
+      # tests/run-tests.sh starts with `#!/usr/bin/env bash`, and on this runner that may resolve to
+      # a newer bash than /bin/bash, so the step puts a symlink to /bin/bash first on PATH and runs
+      # the suite with /bin/bash itself. It prints the version it runs under, so a log shows whether
+      # the step covered 3.2 or only another bash.
+      - name: Run tests under the bash macOS ships (3.2)
+        run: |
+          mkdir -p "$RUNNER_TEMP/bash32" && ln -s /bin/bash "$RUNNER_TEMP/bash32/bash"
+          PATH="$RUNNER_TEMP/bash32:$PATH" bash --version | sed -n 1p
+          PATH="$RUNNER_TEMP/bash32:$PATH" /bin/bash tests/run-tests.sh
+
   # ruff over the Python in lib/, in CI only, by decision on 2026-09-25: the local lint string stays
   # shellcheck, so a contributor needs nothing new. Installed by hash from ruff-requirements.txt, so
   # a ruff release cannot turn CI red on its own and a replaced file on PyPI cannot run here, and

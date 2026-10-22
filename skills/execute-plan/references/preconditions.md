@@ -14,14 +14,14 @@ project on 2026-08-15 and hitting a gate that could not be cleared by doing anyt
 | The plan has open questions blocking its own tasks | The plan is telling you it is not finished. Ask them as choices rather than reporting them |
 | The PRD is a draft, or the stories are provisional | The requirement may change or vanish, and the work with it |
 | You are on the default branch | Never implement on the default branch without explicit consent. Branch first, which most plans say in their own constraints |
-| A verify command cannot produce a verdict | Steps 2 and 4 of every task then prove nothing. Absent from the profile is one way; present and unable to run is the other, and both are below. **Investigative commands need no profile entry**: `grep`, `git log` and `ls` are not verification |
+| A verify command cannot produce a verdict | The failing and passing runs of every task then prove nothing. Absent from the profile is one way; present and unable to run is the other, and both are below. **Investigative commands need no profile entry**: `grep`, `git log` and `ls` are not verification |
 
 ## What "cannot produce a verdict" means, and how to establish it
 
 Presence in `.keel/profile.json` is not the check. A command can be present and prove nothing: a
 linter with no config, a runner whose dependencies were never installed, a script at a path that no
 longer exists. It passes a JSON read and fails on first contact, mid-run, after a dispatch has been
-spent on it. The waste is the smaller half. Every task's step 2 then watches a red that means
+spent on it. The waste is the smaller half. Every task's failing run then watches a red that means
 nothing and the box gets ticked on it, which is the false witness
 [parallel-batches.md](parallel-batches.md) already names for a different cause.
 
@@ -77,10 +77,10 @@ Refusing such a plan makes it unexecutable by construction: the commands cannot 
 task that creates them runs, and that task cannot run while they are missing.
 
 **So:** where the plan's global constraints name the commands task 1 will create or repair, and
-task 1 does it, start. Task 1's own step 2 legitimately watches its test command fail because the
-toolchain is absent. Every task after it must use the real commands, and if task 1 finishes without
-`keel doctor` passing, stop there. Doctor is right for that one: after task 1 the bar really is
-exit 0, which is all it keeps. Full doctor also runs `verify.security` where `keel init` detected
+task 1 does it, start. Task 1's own failing run legitimately watches its test command fail because
+the toolchain is absent. Every task after it must use the real commands, and if task 1 finishes
+without `keel doctor` passing, stop there. Doctor is right for that one: after task 1 the bar really
+is exit 0, which is all it keeps. Full doctor also runs `verify.security` where `keel init` detected
 one, which needs the network and fails on a high advisory. Name that line when stopping on it: it is
 the dependency tree's state, not task 1's toolchain.
 

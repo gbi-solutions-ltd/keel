@@ -154,7 +154,7 @@ must still obey them.
   `schema_fingerprint_for` in `tests/validate-skills.sh:82-88`, in the same commit.** Never edit an
   existing line: `tests/validate-skills.sh:699` says why, and it is a released version's record.
   A **description** change is not a field-set change: the fingerprint at
-  `tests/validate-skills.sh:670-682` hashes property paths only, so tasks 1 to 5 move nothing.
+  `tests/validate-skills.sh:760-770` hashes property paths only, so tasks 1 to 5 move nothing.
 - `docs/profile-keys.md` is in scope for the unregistered-harness-claim scan
   (`tests/test-harness-claims.sh:139-147` puts depth-1 `docs/*.md` in scope). **A description
   containing `done-guard`, `sensitive-guard`, `context-watch`, `session-start`, `900-word`,
@@ -425,7 +425,7 @@ fails rather than passes.
 `unread:` is what stops this becoming a rubber stamp. A key may be dead, but only with a citation to
 the decision that left it dead, so adding a speculative key means writing down where the intent
 lives. `x-` prefixed members are ignored by JSON Schema validators, and the fingerprint at
-`tests/validate-skills.sh:670-682` walks `properties` only, so this adds no path and moves no
+`tests/validate-skills.sh:760-770` walks `properties` only, so this adds no path and moves no
 version.
 
 - [x] **Step 1: Write the failing test**

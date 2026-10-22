@@ -7,7 +7,7 @@
 # cannot answer. This one has no human to ask, because a denied Stop just runs again, so it warns
 # and allows. A guard that hangs a session is a guard that gets deleted.
 
-set -uo pipefail
+set -uo pipefail; . "$(dirname "${BASH_SOURCE[0]}")/grep-quiet.sh"
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 GUARD="$ROOT_DIR/hooks/done-guard"

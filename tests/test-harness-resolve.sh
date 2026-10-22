@@ -5,7 +5,7 @@
 # warning's scenario cannot arise. `tests/test-keel.sh#shellcheck disable=SC2015` and
 # `test-context-watch.sh#shellcheck disable=SC2015` disable it for the same reason, and
 # `.keel/profile.json#shellcheck at default severity` means an info finding is a red build.
-set -uo pipefail
+set -uo pipefail; . "$(dirname "${BASH_SOURCE[0]}")/grep-quiet.sh"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 pass=0; fail=0
 ok()  { printf '  PASS  %s\n' "$1"; pass=$((pass+1)); return 0; }

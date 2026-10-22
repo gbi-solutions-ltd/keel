@@ -439,14 +439,26 @@ fi
 # The plan template's step ids, **Step <task>.<step>: ...**. keel plan status and keel plan tick
 # find a step by that id and read a plan without ids as unaddressable, so a template trimmed of them
 # writes plans neither command can read. A step left in the old form, **Step 5: ...**, is refused
-# too, because a plan copied from the template would then hold both.
+# too, because a plan copied from the template would then hold both. A step numbered beyond .2 is
+# refused as well, because a task carries two steps. The two refusals also run on
+# concurrent-batches.md, where the nested example commit step lives. The patterns match fenced and
+# indented example steps too, which keel plan does not count, so an example follows the same
+# numbering.
 if [ -f skills/write-plan/references/plan-template.md ]; then
     grep -Eq '^ *- \[ \] \*\*Step [0-9]+[a-z]*\.[0-9]+: ' skills/write-plan/references/plan-template.md \
       || report "skills/write-plan/references/plan-template.md has no step carrying an id, **Step <task>.<step>: ...**. keel plan status and keel plan tick read a plan without them as unaddressable."
-    if grep -Eq '^ *- \[.\] \*\*Step [0-9]+[a-z]*: ' skills/write-plan/references/plan-template.md; then
-        report "skills/write-plan/references/plan-template.md has a step with no id, **Step <n>: ...**. Give it one, **Step <task>.<step>: ...**."
-    fi
 fi
+for step_file in skills/write-plan/references/plan-template.md \
+                 skills/write-plan/references/concurrent-batches.md; do
+    [ -f "$step_file" ] || continue
+    if grep -Eq '^ *- \[.\] \*\*Step [0-9]+[a-z]*: ' "$step_file"; then
+        report "$step_file has a step with no id, **Step <n>: ...**. Give it one, **Step <task>.<step>: ...**."
+    fi
+    # A task carries two steps, build it test first and hand over, so no step id runs past .2.
+    if grep -Eq '^ *- \[.\] \*\*Step [0-9]+[a-z]*\.([3-9]|[1-9][0-9])' "$step_file"; then
+        report "$step_file has a step with an id beyond .2. A task carries two steps, **Step <task>.1** and **Step <task>.2**."
+    fi
+done
 
 # The router's destinations must exist. A route to a deleted skill is a dead end the model
 # follows confidently, and nothing else would catch it.

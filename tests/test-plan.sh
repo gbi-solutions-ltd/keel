@@ -9,7 +9,7 @@
 # shellcheck disable=SC2015
 # Single quotes are deliberate throughout: the fixtures are literal markdown, backticks included.
 # shellcheck disable=SC2016
-set -uo pipefail
+set -uo pipefail; . "$(dirname "${BASH_SOURCE[0]}")/grep-quiet.sh"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 KEEL="$ROOT/bin/keel"
@@ -1713,8 +1713,8 @@ done
 
 nopy="$d/nopy"; mkdir -p "$nopy"
 for b in bash git env dirname basename cat sed awk grep tr sort uname mktemp rm head tail; do
-    t="$(command -v "$b" 2>/dev/null)" && [ -n "$t" ] && ln -s "$t" "$nopy/$b"
-done
+    t="$(type -P "$b" 2>/dev/null)" && [ -n "$t" ] && ln -s "$t" "$nopy/$b"
+done; [ -x "$nopy/grep" ] || bad "fixture no python3" "$nopy/grep is not executable"
 if PATH="$nopy" python3 -c 'pass' >/dev/null 2>&1; then
     bad "fixture no python3" "python3 still runs with PATH=$nopy"
 fi
@@ -1909,7 +1909,7 @@ rk_out="$(cd "$rk3" && PATH="$fakegit:$PATH" "$KEEL" plan risk --staged 2>&1)"; 
   && ok "risk: git failing silently exits 6 with no trailing colon" \
   || bad "risk silent git failure" "rc=$rk_rc, got: [$rk_out]"
 
-# keel's own repository has a profile at the root and twelve tracked fixture profiles below it, and
+# keel's own repository has a profile at the root and tracked fixture profiles below it, and
 # the union must still decide: docs/README.md is light, and the hook's own file is full. Paths are
 # named, so nothing here reads the index or the history.
 if [ "$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null)" = "$(cd "$ROOT" && pwd -P)" ] \
@@ -2961,7 +2961,7 @@ grep -qF 'keel plan batches <plan> [--json]' "$ROOT/docs/03-install-and-distribu
 
 # Plans copy the template's example lines, so the template's example task, and the example it gives
 # of each strict line, are themselves in the strict form: neither gets a strict-form why.
-tpl="$ROOT/skills/write-plan/references/plan-template.md"
+tpl="$ROOT/skills/write-plan/references/plan-template.md"; cb="${tpl%/*}/concurrent-batches.md"
 p="$d/bt-template.md"
 { task 1 none a.md; task 2 none b.md
   awk '/^### Task 3: Reject an empty credential at startup/ { on = 1 } /^- \[ \] \*\*Step 3\.1/ { on = 0 } on' "$tpl"
@@ -2974,7 +2974,7 @@ want="$(printf '%s\n' 'batch: 1 2' 'alone: 3' 'why: task 3 depends on task 2' "$
 p="$d/bt-template-lines.md"
 { task 1 none a.md; task 2 none b.md
   printf '### Task 3: a task\n\n'
-  awk '/^\*\*Depends on:\*\* tasks 1 and 2$/ { on = 1 } on && /^```/ { on = 0 } on' "$tpl"
+  awk '/^\*\*Depends on:\*\* tasks 1 and 2$/ { on = 1 } on && /^```/ { on = 0 } on' "$cb"
   printf '\n'
 } > "$p"
 bt "$p"
@@ -2989,7 +2989,7 @@ p="$d/bt-template-commit.md"
 { printf '%s\n' '# P' '' '### Task 1: a task' '' '**Depends on:** none' '**Files:**' \
     '- Modify: `a.md`' '' '**Done when:** x' '' '- [ ] **Step 1.1: a**' ''
   awk '/^2\. \*\*Write the final step as a commit/ { on = 1 }
-       /^   The named-paths rule above still applies/ { on = 0 } on' "$tpl"
+       /^   The rule under "Named paths only, in every task"/ { on = 0 } on' "$cb"
   printf '%s\n' '- [ ] **Step 1.2: b**' '' '### Task 2: a task' '' '**Depends on:** none' \
     '**Files:**' '- Modify: `b.md`' '' '**Done when:** x' '' '- [ ] **Step 2.1: c**' '' \
     '### Task 3: a task' '' '**Depends on:** none' '**Files:**' '- Modify: `b.md`' '' \

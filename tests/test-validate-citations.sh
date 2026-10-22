@@ -356,7 +356,7 @@ m_checker_own_worked_examples() {
 }
 run "the citation checker's own worked examples are not flagged" 0 m_checker_own_worked_examples
 
-# Case 18. tests/evals/fixtures/ holds eleven stand-in projects that arms are turned loose on, and
+# Case 18. tests/evals/fixtures/ holds stand-in projects that arms are turned loose on, and
 # several are wrong on purpose: done-without-verifying ships a PLAN.md whose boxes are ticked and
 # whose tests fail. A path in one of them names that project's tree, not this one, and being wrong
 # is sometimes the scenario. The scan reaches tests/evals/run.sh and stage.sh and stops there.

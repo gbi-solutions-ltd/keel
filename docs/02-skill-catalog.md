@@ -247,13 +247,14 @@ and any deviation gets its own ADR.
 **Reads:** architecture doc, stories.
 **Writes:** `profile.artifacts.plans` if that is set, otherwise `<docs_root>/plans/`, as `YYYY-MM-DD-<slug>.md`.
 **Does:** superpowers' `writing-plans` with a task shape of keel's own, because it is the best
-version of this that exists. Bite-sized steps of 2 to 5 minutes. Exact file paths. Behaviours
-with examples in the plan, never "add error handling here". Each task carries a `Consumes` and
-`Produces` interface block so a task executed in isolation knows the signatures its neighbours use.
+version of this that exists. Two steps per task: a build step that follows `keel:tdd`, and a
+hand-over step. Exact file paths. Behaviours with examples in the plan, never "add error handling
+here". Each task carries a `Consumes` and `Produces` interface block so a task executed in isolation
+knows the signatures its neighbours use.
 
-Every task follows the TDD five-step shape: write the failing test, run it and watch it fail, write
-minimal code, run it and watch it pass, then run the suite and hand over; only a task in a declared
-concurrent batch commits, in its own worktree. Each task carries a `Depends on:` line, which lets
+Every task has two steps: build it test first, following `keel:tdd`, and hand over, with the
+failing run quoted in the report; only a task in a declared concurrent batch commits, in its own
+worktree. Each task carries a `Depends on:` line, which lets
 `execute-plan` overlap work; the plan declares every batch `keel plan batches` prints, so the
 approver sees the overlap they approve. It also runs a short path for small work.
 

@@ -133,10 +133,10 @@ for l in $linked; do
 done
 
 # A fixture that needs more than files carries a setup.sh, run here with the staged project/ as its
-# working directory. Six scenarios need it: a fixture cannot ship a .git directory, because a
-# nested repository cannot be committed inside this one, so a scenario scored on git state has to
-# build the repository at staging time. Its output goes to stderr, because stdout is the path this
-# script returns.
+# working directory. Every fixture that carries a `setup.sh` needs it: a fixture cannot ship a .git
+# directory, because a nested repository cannot be committed inside this one, so a scenario scored
+# on git state has to build the repository at staging time. Its output goes to stderr, because
+# stdout is the path this script returns.
 #
 # The script is not left in the working directory, for the reason prompt.md is not: it is not one of
 # the files the arm should find lying around in the project it is working on, and a setup script that
@@ -163,10 +163,10 @@ fi
 # follow-up 2). Recording it here makes it part of staging, which every dispatch already does.
 #
 # Only for a scenario whose file mentions head.txt, which is how the two that score against a
-# baseline (review-a-sensitive-change and implement-a-small-change) say so. Six other fixtures are
-# repositories too and are scored on the reply or on tool calls; three files beside their project/
-# are ones those arms would find lying around and never be asked about, and a difference between
-# two arms' staged directories that the scenario does not account for.
+# baseline (review-a-sensitive-change and implement-a-small-change) say so. The other fixtures that
+# build a repository are scored on the reply or on tool calls; three files beside their project/ are
+# ones those arms would find lying around and never be asked about, and a difference between two
+# arms' staged directories that the scenario does not account for.
 #
 # Beside project/ and not in it, for the reason prompt.md is: a file in the project is one the arm
 # finds lying around, and one `git status` would report as an edit. A fixture with no .git gets

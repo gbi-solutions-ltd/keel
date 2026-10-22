@@ -12,7 +12,7 @@
 # shellcheck disable=SC2015
 # Single quoted strings holding backticks and $ are grep patterns for markdown, not expansions.
 # shellcheck disable=SC2016
-set -uo pipefail
+set -uo pipefail; . "$(dirname "${BASH_SOURCE[0]}")/grep-quiet.sh"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 KEEL="$ROOT/bin/keel"
