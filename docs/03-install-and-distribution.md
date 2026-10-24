@@ -381,6 +381,61 @@ history and refuses every unpinned older version. A pin covers that one version 
 itself, a symlink by that name or `.keel/SCAN-ALLOW` on a case-folding disk, is refused outright.
 
 ```bash
+keel scan --leaks <remote> [<object>:<ref>]...
+keel scan --leaks-message <file>
+```
+
+The leak guard: what a push, or a message, carries that must not reach a public repository, checked
+against the internal deny list. `<object>` is a commit or tag id and `<ref>` the remote ref it is
+pushed to; a ref name cannot hold a colon, so the split is unambiguous. Exit 0 with no finding, 1
+with any, and 2 on a usage error, an object that is neither a commit nor a tag, a message file that
+cannot be read, or a history walk that fails.
+
+The deny list is one file of patterns, one extended regular expression per line, with `#` comments
+and blank lines ignored, read from `$KEEL_DENY_FILE` or else `keel/internal-deny-list.txt` under
+`$XDG_CONFIG_HOME`, or `~/.config`. It lives outside every repository, because a list of client
+names is itself the disclosure. `tests/no-internal-leaks.sh` reads it through the same loader,
+`lib/deny-list.sh`. Two generic patterns always run, a developer's home directory path under each of
+the two common prefixes. The first line printed says which mode this was: the list loaded, with its
+path and pattern count, or a warning that no list was found and that client names are not checked on
+this machine.
+
+What is checked, for every commit in range: each line of its message, subject, body and trailers;
+its author and committer names and emails; every path it added, modified or changed in type; and the
+content of those files. The content is checked in every commit that added or changed the file, so a
+file a later commit in the push deletes is still found. A tag object's own message and tagger are
+checked, and each pushed ref name. Binary files are skipped by the supply chain scanner's own test,
+`grep -I`, run once over the candidates, so a pattern inside a binary file, or an empty one, is not
+found. The organisation rules of `tests/no-internal-leaks.sh` are not deny patterns and are not
+applied: the owner's own identity is not a leak.
+
+The range is the walk `keel scan --push` makes: every commit reachable from a pushed commit and from
+no remote-tracking ref of `<remote>`. It trusts those refs, which record what was last fetched and
+not what the remote holds, so after `git remote set-url` they can describe another repository. Two
+rules back that up. A root commit in range is refused, because the public repository has one root,
+already pushed, and a second means an unrelated history, a private one included, is being joined to
+it. A path the repository ignores, by `.gitignore` or `.git/info/exclude` and not by this user's
+global ignore file, is refused when a commit holds it, which is what a force-added audit looks like.
+A line of a commit message whose key is `Claude-Session:`, in any case, is refused whatever made the
+commit: a cherry-pick, a rebase, a clone without the hook, or `--no-verify`.
+
+Nothing matched is ever printed: not the text, not the pattern, not a commit subject. A finding
+names where it was found, a commit, a message line, a path, and which pattern matched, as
+`generic pattern 2` or `deny list line 4`, the line of the deny list file, comments and blank lines
+counted. A path or ref name that matches a pattern is printed as `a changed path` or `a pushed ref
+name`, in every line that would name it. Output that does not name what it found is safe to
+paste into an issue.
+
+The root rule means a first push to an empty repository, or a push to a remote named by URL, which
+has no remote-tracking refs here, needs `git push --no-verify`. Do that once, after reading the
+history by hand.
+
+`keel scan --leaks-message <file>` checks every line of one text file against the same list, up to
+but not including a scissors line, `# ------------------------ >8 ------------------------`. A line
+that starts with `#` counts, because git commits one under some cleanup modes. It works on any text
+file, so it is how a pull request body or release notes are checked before they are posted.
+
+```bash
 keel plan status <plan>
 ```
 

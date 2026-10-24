@@ -66,7 +66,7 @@ HARNESS_FLAG=""
 # Fail loudly on a broken install. Without this the sources below print to stderr and execution
 # continues into undefined functions, which reads as a bug in the project being configured.
 for _need in lib/detect-stack.sh lib/merge-claude-md.sh lib/apex-export.sh \
-             lib/harness/resolve.sh lib/harness/claude.sh VERSION; do
+             lib/harness/resolve.sh lib/harness/claude.sh lib/deny-list.sh VERSION; do
     [ -e "$HERE/$_need" ] || {
         printf 'keel: incomplete install: %s not found under %s\n' "$_need" "$HERE" >&2
         exit 1
@@ -2080,7 +2080,7 @@ RETIRED_SEEN
 SCANNER="$HERE/tests/supply-chain-scan.sh"
 
 cmd_scan() {
-    [ -x "$SCANNER" ] || die "the supply chain scanner is missing from this install ($SCANNER)."
+    case "${1:-}" in --leaks|--leaks-message) leak_scan "$@"; return ;; esac; [ -x "$SCANNER" ] || die "the supply chain scanner is missing from this install ($SCANNER)."
     if [ "${1:-}" = "--push" ]; then
         [ "$#" -eq 3 ] || die "usage: keel scan --push <remote> <commit>"
         scan_push "$2" "$3"
@@ -2210,6 +2210,334 @@ scan_push() {   # scan_push <remote> <commit>
     fi
     ( cd "$tree" && "$SCANNER" --secret-paths < "$work/gone" ) || rc=1
     return "$rc"
+}
+
+# ---- keel scan --leaks and keel scan --leaks-message -----------------------
+#
+# The leak guard: what a push, or a message, carries that must not reach the public repository. It
+# checks against the internal deny list, which the deny list loader reads from outside any
+# repository, and against two rules of its own: a root commit in a push, and a Claude-Session
+# trailer. Its output says WHERE a pattern matched and WHICH deny list line it was, and never what
+# matched, the pattern, a commit subject, or a path or ref name that itself matches: a guard that
+# prints the leak has made a second copy of it, in a terminal and in a CI log.
+#
+# `keel scan --leaks <remote> [<object>:<ref>]...` checks the commits those pushes carry, by the
+# walk scan_push makes: for each, its message, its author and committer, its paths, and the files it
+# added, modified or changed in type. `keel scan --leaks-message <file>` checks one text file, such
+# as a message or a pull request body. Exit 0 with no finding, 1 with any, 2 on a usage error or a
+# history that cannot be read.
+
+# shellcheck source=lib/deny-list.sh
+. "$HERE/lib/deny-list.sh"
+
+LEAK_SCISSORS='# ------------------------ >8 ------------------------'
+
+leak_usage() { err "usage: keel scan --leaks <remote> [<object>:<ref>]...   or   keel scan --leaks-message <file>"; }
+
+# leak_show <text>: the text with control characters shown as ?, since a path or a name from a
+# pushed repository could otherwise write a line of its own into this output.
+leak_show() { printf '%s' "${1//[[:cntrl:]]/?}"; }
+
+# leak_emit <text>: one finding, counted in leak_scan's $found.
+leak_emit() { printf 'leak guard: %s\n' "$1"; found=$((found+1)); }
+
+# leak_split <raw object> <message out>: the headers of a commit or tag into LEAK_AUTHOR,
+# LEAK_COMMITTER and LEAK_TAGGER, and the message after them, as it is, into the second file.
+leak_split() {
+    local line
+    LEAK_AUTHOR=""; LEAK_COMMITTER=""; LEAK_TAGGER=""
+    {
+        while IFS= read -r line; do
+            [ -n "$line" ] || break
+            case "$line" in
+                author\ *)    LEAK_AUTHOR="${line#author }" ;;
+                committer\ *) LEAK_COMMITTER="${line#committer }" ;;
+                tagger\ *)    LEAK_TAGGER="${line#tagger }" ;;
+            esac
+        done
+        cat > "$2"
+    } < "$1"
+}
+
+# leak_ident <header>: LEAK_NAME and LEAK_EMAIL from "Name <email> time zone".
+leak_ident() {
+    local rest="${1% *}"
+    rest="${rest% *}"
+    LEAK_NAME="${rest%%<*}"; LEAK_NAME="${LEAK_NAME% }"
+    LEAK_EMAIL="${rest#*<}"; LEAK_EMAIL="${LEAK_EMAIL%%>*}"
+}
+
+# leak_trailers <message file> <where prefix>: queues a finding in leak_scan's $work/struct for each
+# line of the message whose key is Claude-Session, in any case. Plain bash and not grep, so the
+# greps of a run stay one per pattern.
+leak_trailers() {
+    local line n=0 l
+    while IFS= read -r line || [ -n "$line" ]; do
+        n=$((n+1))
+        l="${line#"${line%%[![:space:]]*}"}"
+        case "$l" in
+            [Cc][Ll][Aa][Uu][Dd][Ee]-[Ss][Ee][Ss][Ss][Ii][Oo][Nn]:*)
+                printf '%smessage line %s: a Claude-Session trailer\n' "$2" "$n" >> "$work/struct" ;;
+        esac
+    done < "$1"
+}
+
+# leak_push <remote> [<object>:<ref>]...: run inside leak_scan, whose variables it fills. Writes
+# every candidate text of the push to $work/c, one file for each kind, and every file a commit in
+# range added to $work/o. Returns 2 where leak_scan is to stop.
+leak_push() {
+    local remote="$1" arg obj ref id type next steps n k u mode oid p cur colons np src pat toplevel
+    local f=() w=() tips=() tagids=()
+    shift
+    git rev-parse --git-dir >/dev/null 2>&1 || { err "this is not a git repository."; return 2; }
+    for arg in "$@"; do
+        case "$arg" in
+            ?*:?*) ;;
+            *) leak_usage; return 2 ;;
+        esac
+        obj="${arg%%:*}"; ref="${arg#*:}"
+        printf '%s\n' "$ref" >> "$work/c/refs"
+        nrefs=$((nrefs+1))
+        id=""; type=""; steps=0
+        case "$obj" in -*) ;; *) id="$(git rev-parse --verify --quiet "$obj^{object}" 2>/dev/null)" ;; esac
+        [ -z "$id" ] || type="$(git cat-file -t "$id" 2>/dev/null)"
+        # A tag is checked and then peeled, and so is a tag of a tag.
+        while [ "$type" = tag ] && [ "$steps" -lt 20 ]; do
+            tagids+=("$id")
+            read -r _ next < <(git cat-file tag "$id" 2>/dev/null)
+            id="$(git rev-parse --verify --quiet "${next:-x}^{object}" 2>/dev/null)"
+            type=""
+            [ -z "$id" ] || type="$(git cat-file -t "$id" 2>/dev/null)"
+            steps=$((steps+1))
+        done
+        if [ "$type" != commit ]; then
+            err "$(leak_show "$obj") is not a commit or tag in this repository."
+            return 2
+        fi
+        tips+=("$id")
+    done
+
+    n=0
+    for id in ${tagids[@]+"${tagids[@]}"}; do
+        git cat-file tag "$id" > "$work/raw" 2>/dev/null || { err "could not read the tag $id."; return 2; }
+        leak_split "$work/raw" "$work/c/tm$n"
+        leak_ident "$LEAK_TAGGER"
+        printf '%s\n%s\n' "$LEAK_NAME" "$LEAK_EMAIL" > "$work/c/tg$n"
+        tag7[n]="$(git rev-parse --short=7 "$id")"
+        n=$((n+1))
+    done
+    ntags=$n
+
+    # The commits: every commit reachable from a pushed commit and from no remote-tracking ref of
+    # <remote>, the walk scan_push makes, with its status checked, since a walk that stops partway
+    # would read as a clean range. --parents is for the root rule.
+    if ! git rev-list --parents "${tips[@]}" --not --remotes="$remote" -- > "$work/walk" 2>/dev/null; then
+        err "could not read the history this push carries, so nothing was checked."
+        return 2
+    fi
+    n=0
+    while IFS=' ' read -r -a w; do
+        [ "${#w[@]}" -gt 0 ] || continue
+        csha[n]="${w[0]}"
+        c7[n]="$(git rev-parse --short=7 "${w[0]}")"
+        printf '%s\n' "${w[0]}" >> "$work/shas"
+        if [ "${#w[@]}" -eq 1 ]; then
+            printf '%s has no parent, so this push carries a history the remote does not have\n' "${c7[$n]}" >> "$work/struct"
+        fi
+        n=$((n+1))
+    done < "$work/walk"
+    ncommits=$n
+    k=0
+    while [ "$k" -lt "$ncommits" ]; do
+        git cat-file commit "${csha[$k]}" > "$work/raw" 2>/dev/null || { err "could not read the commit ${csha[$k]}."; return 2; }
+        leak_split "$work/raw" "$work/c/m$k"
+        leak_ident "$LEAK_AUTHOR"; f=("$LEAK_NAME" "$LEAK_EMAIL")
+        leak_ident "$LEAK_COMMITTER"
+        printf '%s\n%s\n%s\n%s\n' "${f[0]}" "${f[1]}" "$LEAK_NAME" "$LEAK_EMAIL" > "$work/c/id$k"
+        leak_trailers "$work/c/m$k" "${c7[$k]} "
+        k=$((k+1))
+    done
+
+    # Files added, modified or changed in type, the listing scan_push makes, with the commit id kept
+    # so each finding names its commit. The output is NUL-ended tokens: a commit id on its own, and
+    # for each file a record starting with a colon and then its path. A merge's -c record has a colon
+    # for each parent, and its modes and blobs run to one more than that.
+    : > "$work/c/paths"
+    if [ "$ncommits" -gt 0 ]; then
+        if ! git diff-tree --stdin -r -c --root --no-renames --diff-filter=AMT -z < "$work/shas" > "$work/dt" 2>/dev/null; then
+            err "could not read the files this push carries, so nothing was checked."
+            return 2
+        fi
+        cur=-1
+        while IFS= read -r -d '' src; do
+            case "$src" in
+                :*)
+                    IFS= read -r -d '' p || break
+                    [ "$cur" -ge 0 ] || { err "git listed a file before a commit."; return 2; }
+                    read -r -a f <<< "$src"
+                    colons="${f[0]%%[!:]*}"; np=${#colons}
+                    f[0]="${f[0]#"$colons"}"
+                    mode="${f[$np]}"; oid="${f[$((2*np+1))]}"
+                    eci[nentries]="$cur"; epath[nentries]="$p"
+                    printf '%s\n' "${p//$'\n'/ }" >> "$work/c/paths"
+                    # A submodule is a commit, whose content is not in this repository to read.
+                    if [ "$mode" != 160000 ]; then
+                        if [ -f "$work/s/$oid" ]; then
+                            read -r u < "$work/s/$oid"
+                        else
+                            nblobs=$((nblobs+1)); u=$nblobs
+                            git cat-file blob "$oid" > "$work/o/$u" 2>/dev/null || { err "could not read the file $oid of the commit ${csha[$cur]}."; return 2; }
+                            printf '%s\n' "$u" > "$work/s/$oid"
+                        fi
+                        printf '%s\n' "$nentries" >> "$work/m/$u"
+                    fi
+                    nentries=$((nentries+1)) ;;
+                *)
+                    cur=$((cur+1))
+                    while [ "$cur" -lt "$ncommits" ] && [ "${csha[$cur]}" != "$src" ]; do cur=$((cur+1)); done
+                    [ "$cur" -lt "$ncommits" ] || { err "git listed a commit the walk did not."; return 2; } ;;
+            esac
+        done < "$work/dt"
+    fi
+
+    # Ignored means what git check-ignore --no-index says in this working tree, which reads
+    # .gitignore and .git/info/exclude, and with core.excludesFile emptied nothing of this user's
+    # own. A path with a ., .. or empty component is refused by scan_push and is not asked about.
+    toplevel="$(git rev-parse --show-toplevel 2>/dev/null)"
+    n=0
+    if [ -n "$toplevel" ] && [ "$nentries" -gt 0 ]; then
+        k=0
+        while [ "$k" -lt "$nentries" ]; do
+            case "/${epath[$k]}/" in
+                */./*|*/../*|*//*) ;;
+                *) printf '%s\0' "${epath[$k]}" >> "$work/feed"; fed[n]="$k"; n=$((n+1)) ;;
+            esac
+            k=$((k+1))
+        done
+    fi
+    if [ "$n" -gt 0 ]; then
+        ( cd "$toplevel" && git -c core.excludesFile=/dev/null check-ignore --no-index -z -v -n --stdin < "$work/feed" > "$work/ignored" 2>/dev/null )
+        [ $? -le 1 ] || { err "could not read this repository's ignore rules, so nothing was checked."; return 2; }
+        k=0
+        while IFS= read -r -d '' src && IFS= read -r -d '' _ && IFS= read -r -d '' pat && IFS= read -r -d '' _; do
+            if [ -n "$src" ]; then
+                case "$pat" in '!'*) ;; *) ign[${fed[$k]}]=1 ;; esac
+            fi
+            k=$((k+1))
+        done < "$work/ignored"
+    fi
+    return 0
+}
+
+# leak_scan --leaks <remote> [<object>:<ref>]...   or   leak_scan --leaks-message <file>
+leak_scan() {
+    local mode="$1" shown work line hit name rest which l ci k u pi
+    local nrefs=0 ncommits=0 ntags=0 nentries=0 nblobs=0 found=0
+    local csha=() c7=() tag7=() eci=() epath=() fed=() ign=() pm=()
+    shift
+    export GIT_NO_REPLACE_OBJECTS=1
+    deny_load
+    shown="$DENY_FILE"
+    case "$shown" in "${HOME:-/nonexistent}"/*) shown="$(printf '%s/%s' '~' "${shown#"$HOME"/}")" ;; esac
+    if [ -f "$DENY_FILE" ]; then
+        say "leak guard: deny list loaded from $shown ($DENY_LOADED patterns)"
+    else
+        say "leak guard: WARNING no deny list at $shown, so only the 2 generic patterns ran. Client names are not checked on this machine."
+    fi
+    case "$mode" in
+        --leaks)         [ "$#" -ge 1 ] || { leak_usage; return 2; } ;;
+        --leaks-message) [ "$#" -eq 1 ] || { leak_usage; return 2; }
+                         [ -f "$1" ] && [ -r "$1" ] || { err "cannot read '$(leak_show "$1")'."; return 2; } ;;
+    esac
+    if [ "$mode" = --leaks ] && [ "$#" -eq 1 ]; then
+        say "leak guard: nothing pushed, nothing checked"
+        return 0
+    fi
+    work="$(mktemp -d)" || { err "could not create a temporary directory for the leak guard."; return 2; }
+    # Removed however this ends, an interrupted push included, since it holds a copy of what the
+    # push carries. Expanded now, since $work is local and gone by the time the trap runs.
+    # shellcheck disable=SC2064
+    trap "rm -rf '$work'" EXIT
+    mkdir "$work/c" "$work/o" "$work/s" "$work/m" || { err "could not create a temporary directory for the leak guard."; return 2; }
+    : > "$work/struct"; : > "$work/hits"
+    if [ "$mode" = --leaks ]; then
+        leak_push "$@" || return 2
+    else
+        # Every line up to a scissors line, comment lines included, since git commits a # line under
+        # some cleanup modes.
+        while IFS= read -r line || [ -n "$line" ]; do
+            [ "$line" != "$LEAK_SCISSORS" ] || break
+            printf '%s\n' "$line"
+        done < "$1" > "$work/c/mf"
+        leak_trailers "$work/c/mf" ""
+    fi
+
+    # The binary test, once over every file a commit added: the scanner's own, grep -I, which lists
+    # the text files (an empty one is not listed either). Then one grep per pattern over all of
+    # the candidates, as tests/no-internal-leaks.sh does. Names are relative to $work to keep the
+    # argument list short, and the locale is C so that a file the test calls text is searched as
+    # text, whatever bytes it holds.
+    if [ "$nblobs" -gt 0 ]; then
+        ( cd "$work" && LC_ALL=C grep -rIl '' o ) > "$work/text" 2>/dev/null
+    fi
+    ( cd "$work/c" && printf 'c/%s\n' * ) > "$work/cands"
+    if [ -s "$work/text" ]; then cat "$work/text" >> "$work/cands"; fi
+    pi=0
+    while [ "$pi" -lt "${#DENY[@]}" ]; do
+        ( cd "$work" && tr '\n' '\0' < cands | LC_ALL=C xargs -0 grep -anHE -- "${DENY[$pi]}" 2>/dev/null ) \
+          | while IFS= read -r hit; do
+                name="${hit%%:*}"; rest="${hit#*:}"; line="${rest%%:*}"
+                case "$line" in ''|*[!0-9]*) continue ;; esac
+                printf '%s\t%s\t%s\n' "$pi" "$name" "$line"
+            done >> "$work/hits"
+        pi=$((pi+1))
+    done
+
+    # A path that matches a pattern is not named wherever a line would name it.
+    while IFS=$'\t' read -r pi name line; do
+        if [ "$name" = c/paths ]; then pm[line-1]=1; fi
+    done < "$work/hits"
+    while IFS= read -r l; do leak_emit "$l"; done < "$work/struct"
+    k=0
+    while [ "$k" -lt "$nentries" ]; do
+        if [ -n "${ign[$k]:-}" ]; then
+            if [ -n "${pm[$k]:-}" ]; then l="a changed path"; else l="$(leak_show "${epath[$k]}")"; fi
+            leak_emit "${c7[${eci[$k]}]} $l: a path this repository ignores"
+        fi
+        k=$((k+1))
+    done
+    while IFS=$'\t' read -r pi name line; do
+        which="${DENY_WHERE[$pi]}"
+        case "$name" in
+            c/mf)    leak_emit "message line $line: $which" ;;
+            c/m*)    ci="${name#c/m}"; leak_emit "${c7[$ci]} message line $line: $which" ;;
+            c/id*)   ci="${name#c/id}"
+                     case "$line" in 1) l="author name" ;; 2) l="author email" ;; 3) l="committer name" ;; *) l="committer email" ;; esac
+                     leak_emit "${c7[$ci]} $l: $which" ;;
+            c/tm*)   ci="${name#c/tm}"; leak_emit "tag ${tag7[$ci]} message line $line: $which" ;;
+            c/tg*)   ci="${name#c/tg}"
+                     case "$line" in 1) l="tagger name" ;; *) l="tagger email" ;; esac
+                     leak_emit "tag ${tag7[$ci]} $l: $which" ;;
+            c/paths) k=$((line-1)); leak_emit "${c7[${eci[$k]}]} a changed path: $which" ;;
+            c/refs)  leak_emit "a pushed ref name: $which" ;;
+            o/*)     u="${name#o/}"
+                     while IFS= read -r k; do
+                         if [ -n "${pm[$k]:-}" ]; then l="a changed path"; else l="$(leak_show "${epath[$k]}")"; fi
+                         leak_emit "${c7[${eci[$k]}]} $l line $line: $which"
+                     done < "$work/m/$u" ;;
+        esac
+    done < "$work/hits"
+
+    if [ "$found" -gt 0 ]; then
+        say "leak guard: $found finding(s)"
+        return 1
+    fi
+    if [ "$mode" = --leaks ]; then
+        say "leak guard: checked $ncommits commit(s), $ntags tag(s) and $nrefs ref name(s), no findings"
+    else
+        say "leak guard: message checked, no findings"
+    fi
+    return 0
 }
 
 # scan_push_gone <path> <blob>: run inside scan_push, whose $work and $tree it reads. Queues the
@@ -4664,6 +4992,8 @@ case "${1:-}" in
         # to tell a keel that has it from an older one. Keep them, or every hook installed since reads
         # this keel as too old and scans the working tree.
         say "  scan --push <remote> <commit>   the same scan of a commit being pushed, and of its history's key files"
+        say "  scan --leaks <remote> [<object>:<ref>]...   check what a push carries against the deny list"
+        say "  scan --leaks-message <file>   check a message or any text file against the deny list"
         say "  guard install|status|uninstall   pre-push hook: the scan, and no pushes to the default branch, plus a pre-commit hook that stays off until gates.commit_guard turns it on"
         say "  ci-review install|remove|status   opt in to keel's review on pull requests in GitHub Actions: writes one workflow file, off until you run it"
         say "  plan status <plan>   an implementation plan's steps by state, per task, and the next open step's id"
