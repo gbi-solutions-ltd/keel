@@ -210,9 +210,9 @@ Read in order. Each doc is self-contained but they build on each other.
 | [`docs/06-repo-layout.md`](docs/06-repo-layout.md) | Exact file tree of the keel repo |
 | [`docs/07-open-decisions.md`](docs/07-open-decisions.md) | Every call taken and why, decisions: 12 of 12 resolved, two with a named part still open |
 | [`docs/standards.md`](docs/standards.md) | This repo's own conventions, the judgement calls only |
-| [`docs/runbooks/cutting-a-release.md`](docs/runbooks/cutting-a-release.md) | How a release is cut: the eval gate, the three-place version bump, both tags, and the public export. Executed for 0.17.0 |
-| [`docs/runbooks/going-public.md`](docs/runbooks/going-public.md) | What publishing this repository required, executed 2026-08-17, each step annotated with what actually happened |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to add or change a skill, and why the order matters |
+| [`docs/runbooks/cutting-a-release.md`](docs/runbooks/cutting-a-release.md) | How a release is cut: the eval gate, the version-bump pull request, the tag and the GitHub release, in the one public repository |
+| [`docs/runbooks/going-public.md`](docs/runbooks/going-public.md) | What publishing this repository required in 2026-08, each step annotated, and why development moved into it on 2026-10-22 |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to contribute: branches and pull requests, sign-off, review, and why the order of adding a skill matters. Security reports: [`SECURITY.md`](SECURITY.md) |
 | [`SOURCES.md`](SOURCES.md) | Attribution, per skill, for the four MIT projects this is built from |
 
 Templates that ship into every installed project:

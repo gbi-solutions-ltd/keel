@@ -1,0 +1,50 @@
+{
+  "enabledPlugins": {
+    "keel@gbi": true,
+    "security-guidance@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
+    "skill-creator@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
+    "context7@claude-plugins-official": true
+  },
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Read(./**/*.pem)",
+      "Read(./**/id_rsa*)",
+      "Bash(cat *.env*)",
+      "Bash(cat *secrets/*)",
+      "Bash(cat *id_rsa*)",
+      "Bash(head *.env*)",
+      "Bash(tail *.env*)",
+      "Bash(less *.env*)",
+      "Bash(more *.env*)",
+      "Bash(strings *.env*)"
+    ],
+    "ask": [
+      "Bash(git push --force*)",
+      "Bash(git push -f *)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean *)",
+      "Bash(git branch -D *)",
+      "Bash(terraform apply*)",
+      "Bash(terraform destroy*)",
+      "Bash(kubectl delete *)",
+      "Bash(docker system prune*)",
+      "Bash(npm publish*)",
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(nc *)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear",
+        "hooks": [ { "type": "command", "command": "./.claude/keel-nudge", "shell": "bash" } ]
+      }
+    ]
+  }
+}
