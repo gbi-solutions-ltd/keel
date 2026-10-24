@@ -435,5 +435,255 @@ has "16: ... and says a first push needs --no-verify" "$section" 'git push --no-
 expect "17: tests/run-tests.sh runs this file once" \
   "$(grep -c 'test-leak-guard.sh' "$ROOT/tests/run-tests.sh")" "1"
 
+# ==== task 6: keel guard install --leak-guard, the push and commit-message hooks ====================
+# A hook runs as its own process under whatever PATH the owner has, so these cases set PATH
+# explicitly: KP has this checkout's keel on it, and /usr/bin:/bin has none.
+KP="$ROOT/bin:$PATH"
+NOKEEL=/usr/bin:/bin
+ZERO=0000000000000000000000000000000000000000
+mkdir -p "$TMP/oldpush" "$TMP/oldmsg"
+# A keel from before the leak guard: its help names scan --push and not scan --leaks, and it exits 0
+# for anything, as the keel that ran the supply chain scan for a mode it did not know did.
+# shellcheck disable=SC2016
+printf '#!/bin/sh\ncase "$1" in --help) printf "keel <command>\\n  scan --push <remote> <commit>   the scan\\n" ;; esac\nexit 0\n' \
+  > "$TMP/oldpush/keel"
+chmod +x "$TMP/oldpush/keel"
+# A keel that has scan --leaks and not scan --leaks-message.
+# shellcheck disable=SC2016
+printf '#!/bin/sh\ncase "$1" in --help) printf "keel <command>\\n  scan --leaks <remote> [<object>:<ref>]...   push\\n" ;; esac\nexit 0\n' \
+  > "$TMP/oldmsg/keel"
+chmod +x "$TMP/oldmsg/keel"
+
+# ginst <args>: keel guard install in W. GOUT and GRC.
+ginst() {
+    GOUT="$( cd "$W" && HOME="$H" KEEL_DENY_FILE="$DF" "$KEEL" "guard" "$@" 2>&1 )"
+    GRC=$?
+}
+# hook_push <PATH> <branch>: the pre-push hook as git runs it for a push of that branch's tip.
+hook_push() {
+    local sha; sha="$(g rev-parse "$2")"
+    HOUT="$( cd "$W" && printf 'refs/heads/%s %s refs/heads/%s %s\n' "$2" "$sha" "$2" "$ZERO" \
+        | HOME="$H" KEEL_DENY_FILE="$DF" PATH="$1" .git/hooks/pre-push origin "$B" 2>&1 )"
+    HRC=$?
+}
+# cm <PATH> <git commit args...>: a commit as Test Owner, with the hooks installed in W.
+cm() {
+    local p="$1"; shift
+    COUT="$( cd "$W" && HOME="$H" KEEL_DENY_FILE="$DF" PATH="$p" \
+        git -c user.name='Test Owner' -c user.email=owner@example.com commit -q "$@" 2>&1 )"
+    CRC=$?
+}
+line3() { sed -n 3p "$W/.git/hooks/pre-push"; }
+body_of() { ( cd "$W" && git cat-file commit "$1" | sed '1,/^$/d' ); }
+
+# ---- guard 1: opt in per repository ---------------------------------------------------------------
+newfx
+ginst install
+expect "guard 1: a plain install: exit 0" "$GRC" "0"
+expect "guard 1: a plain install writes LEAK_GUARD=0 on line 3" "$(line3)" "LEAK_GUARD=0"
+expect "guard 1: ... after the VERIFY_KEYS line" "$(sed -n 2p "$W/.git/hooks/pre-push" | cut -c1-12)" "VERIFY_KEYS="
+expect "guard 1: ... and writes no commit-msg" "$([ -e "$W/.git/hooks/commit-msg" ] && echo yes || echo no)" "no"
+expect "guard 1: ... and prints the three lines it printed before" "$GOUT" "installed pre-push, pre-commit and prepare-commit-msg in .git/hooks, where no checkout can replace them
+the commit hook stays inert until gates.commit_guard is 'required' or 'warn'
+the hooks are not committed: each clone runs 'keel guard install' for itself"
+
+newfx
+ginst install --leak-guard
+expect "guard 1: install --leak-guard: exit 0" "$GRC" "0"
+expect "guard 1: ... writes LEAK_GUARD=1 on line 3" "$(line3)" "LEAK_GUARD=1"
+expect "guard 1: ... and an executable commit-msg" "$([ -x "$W/.git/hooks/commit-msg" ] && echo yes || echo no)" "yes"
+# shellcheck disable=SC2016
+has "guard 1: ... carrying keel's mark" "$(cat "$W/.git/hooks/commit-msg")" 'installed by `keel guard install`'
+has "guard 1: ... printing the four-hook line" "$GOUT" \
+  "installed pre-push, pre-commit, prepare-commit-msg and commit-msg in .git/hooks, where no checkout can replace them"
+has "guard 1: ... and the leak guard line" "$GOUT" \
+  'the leak guard is on: each push and each commit message is checked against the deny list'
+
+# ---- guard 2: a reinstall keeps the choice -----------------------------------------------------------
+rm -f "$W/.git/hooks/commit-msg"
+ginst install
+expect "guard 2: a plain reinstall keeps LEAK_GUARD=1" "$(line3)" "LEAK_GUARD=1"
+expect "guard 2: ... and rewrites commit-msg" "$([ -x "$W/.git/hooks/commit-msg" ] && echo yes || echo no)" "yes"
+has "guard 2: ... and says the leak guard is on" "$GOUT" 'the leak guard is on: each push'
+ginst install --no-leak-guard
+expect "guard 2: --no-leak-guard: exit 0" "$GRC" "0"
+expect "guard 2: ... writes LEAK_GUARD=0" "$(line3)" "LEAK_GUARD=0"
+expect "guard 2: ... removes keel's commit-msg" "$([ -e "$W/.git/hooks/commit-msg" ] && echo yes || echo no)" "no"
+has "guard 2: ... and says so" "$GOUT" "the leak guard is off; removed keel's commit-msg"
+ginst install
+expect "guard 2: a plain install after it stays off" "$(line3)" "LEAK_GUARD=0"
+ginst install --leak-guard --no-leak-guard
+expect "guard 2: both flags together: exit 1" "$GRC" "1"
+
+# ---- guard 3: another tool's commit-msg --------------------------------------------------------------
+newfx
+printf '#!/bin/sh\nexit 0\n' > "$W/.git/hooks/commit-msg"; chmod +x "$W/.git/hooks/commit-msg"
+ginst install --leak-guard
+expect "guard 3: --leak-guard over another tool's commit-msg: exit 1" "$GRC" "1"
+has "guard 3: ... gives guard_foreign_hook's message" "$GOUT" \
+  ".git/hooks/commit-msg is another tool's hook, and installing would overwrite it. Remove or rename it, then re-run."
+expect "guard 3: ... and writes nothing" "$([ -e "$W/.git/hooks/pre-push" ] && echo yes || echo no)" "no"
+expect "guard 3: ... leaving the other tool's hook as it was" "$(cat "$W/.git/hooks/commit-msg")" "#!/bin/sh
+exit 0"
+ginst install
+expect "guard 3: a plain install ignores it: exit 0" "$GRC" "0"
+expect "guard 3: ... writes LEAK_GUARD=0" "$(line3)" "LEAK_GUARD=0"
+expect "guard 3: ... and leaves it as it was" "$(cat "$W/.git/hooks/commit-msg")" "#!/bin/sh
+exit 0"
+ginst install --no-leak-guard
+expect "guard 3: --no-leak-guard leaves it too" "$(cat "$W/.git/hooks/commit-msg")" "#!/bin/sh
+exit 0"
+
+# ---- guard 4: the pre-push hook with the leak guard on -----------------------------------------------
+newfx
+g checkout -q -b leaky
+commit_file 'fix: Quillbank retry' a.txt 'a\n'
+g checkout -q -b clean origin/main
+commit_file 'feat: clean change' b.txt 'b\n'
+ginst install --leak-guard
+hook_push "$KP" leaky
+expect "guard 4: a branch whose message names the client: exit 1" "$HRC" "1"
+has "guard 4: ... names the deny list line" "$HOUT" 'deny list line 3'
+has "guard 4: ... and the refusal" "$HOUT" 'keel guard: push refused by the leak guard.'
+has "guard 4: ... and the way out" "$HOUT" 'To push anyway, deliberately and on the record:  git push --no-verify'
+has "guard 4: ... and the Claude-Session remedy" "$HOUT" "git rebase <upstream> --exec 'git commit --amend --no-edit'"
+lacks "guard 4: ... and never the client name" "$HOUT" "Quillbank"
+hook_push "$KP" clean
+expect "guard 4: a clean branch: exit 0" "$HRC" "0"
+has "guard 4: ... prints the mode line" "$HOUT" 'leak guard: deny list loaded'
+has "guard 4: ... and the supply chain scan still runs" "$HOUT" 'keel guard: scanning before push'
+HOUT="$( cd "$W" && HOME="$H" KEEL_DENY_FILE="$DF" PATH="$KP" .git/hooks/pre-push </dev/null 2>&1 )"; HRC=$?
+expect "guard 4: run by hand with no arguments: exit 0" "$HRC" "0"
+has "guard 4: ... still prints the mode line" "$HOUT" 'leak guard: deny list loaded'
+
+# ---- guard 5: generic mode lets a clean push through, and says so ------------------------------------
+DF="$H/absent.txt"
+hook_push "$KP" clean
+expect "guard 5: no deny list, a clean push: exit 0" "$HRC" "0"
+has "guard 5: ... says there is no deny list" "$HOUT" 'WARNING no deny list'
+
+# ---- guard 6: fail closed when the leak guard cannot run ---------------------------------------------
+DF="$H/deny.txt"
+hook_push "$NOKEEL" clean
+expect "guard 6: leak guard on, no keel on PATH: exit 1" "$HRC" "1"
+has "guard 6: ... says nothing was checked" "$HOUT" \
+  'keel guard: the leak guard is on and keel is not on PATH, so nothing was checked. Push refused.'
+hook_push "$TMP/oldpush:$NOKEEL" clean
+expect "guard 6: leak guard on, a keel without scan --leaks: exit 1" "$HRC" "1"
+has "guard 6: ... says it is too old" "$HOUT" \
+  'keel guard: the keel on PATH is too old for the leak guard, so nothing was checked. Push refused.'
+ginst install --no-leak-guard
+hook_push "$NOKEEL" clean
+expect "guard 6: leak guard off, no keel on PATH: exit 0 as before" "$HRC" "0"
+has "guard 6: ... allowed, as before" "$HOUT" 'keel is not on PATH, so nothing was scanned. Push allowed.'
+hook_push "$TMP/oldpush:$NOKEEL" clean
+expect "guard 6: leak guard off, a keel without scan --leaks: exit 0 as before" "$HRC" "0"
+lacks "guard 6: ... and no leak guard line" "$HOUT" 'leak guard'
+
+# ---- guard 7: the commit-msg hook ---------------------------------------------------------------------
+newfx
+ginst install --leak-guard
+printf 'feat: x\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_example\n' \
+  > "$TMP/msg1.txt"
+cm "$KP" --allow-empty -F "$TMP/msg1.txt"
+expect "guard 7: a message with the trailer: the commit is made" "$CRC" "0"
+printf 'feat: x\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nSigned-off-by: Test Owner <owner@example.com>\n' \
+  > "$TMP/want1.txt"
+body_of HEAD > "$TMP/got1.txt"
+expect "guard 7: ... the message is exactly the expected one" "$(cmp "$TMP/got1.txt" "$TMP/want1.txt" 2>&1 && echo same)" "same"
+before="$(g rev-parse HEAD)"
+cm "$KP" --amend --no-edit --allow-empty
+body_of HEAD > "$TMP/got1b.txt"
+expect "guard 7: an amend --no-edit leaves the message unchanged" "$(cmp "$TMP/got1b.txt" "$TMP/want1.txt" 2>&1 && echo same)" "same"
+expect "guard 7: ... and the amend succeeded" "$CRC" "0"
+printf 'feat: y\n\nclaude-session: x\nKeep: this line\n' > "$TMP/msg2.txt"
+cm "$KP" --allow-empty -F "$TMP/msg2.txt"
+printf 'feat: y\n\nKeep: this line\nSigned-off-by: Test Owner <owner@example.com>\n' > "$TMP/want2.txt"
+body_of HEAD > "$TMP/got2.txt"
+expect "guard 7: a lower case claude-session line is removed too" "$(cmp "$TMP/got2.txt" "$TMP/want2.txt" 2>&1 && echo same)" "same"
+before="$(g rev-parse HEAD)"
+printf 'feat: z\n\nSee Quillbank notes\n' > "$TMP/msg3.txt"
+cm "$KP" --allow-empty -F "$TMP/msg3.txt"
+expect "guard 7: a message naming the client: the commit fails" "$CRC" "1"
+expect "guard 7: ... and HEAD is unchanged" "$(g rev-parse HEAD)" "$before"
+has "guard 7: ... with the commit-refused line" "$COUT" \
+  'keel guard: commit refused by the leak guard. The message is kept in .git/COMMIT_EDITMSG; edit it and commit again.'
+has "guard 7: ... and the deny list line" "$COUT" 'deny list line 3'
+lacks "guard 7: ... never the client name" "$COUT" "Quillbank"
+printf 'feat: clean\n' > "$TMP/msg4.txt"
+cm "$NOKEEL" --allow-empty -F "$TMP/msg4.txt"
+expect "guard 7: no keel on PATH: the commit fails" "$CRC" "1"
+has "guard 7: ... with the cannot-check line" "$COUT" \
+  'keel guard: the leak guard is on and the keel on PATH cannot check a message, so nothing was checked. Commit refused.'
+expect "guard 7: ... and HEAD is unchanged" "$(g rev-parse HEAD)" "$before"
+cm "$TMP/oldpush:$NOKEEL" --allow-empty -F "$TMP/msg4.txt"
+expect "guard 7: an old keel that exits 0 for anything: the commit fails" "$CRC" "1"
+has "guard 7: ... with the same line" "$COUT" 'cannot check a message, so nothing was checked. Commit refused.'
+cm "$TMP/oldmsg:$NOKEEL" --allow-empty -F "$TMP/msg4.txt"
+expect "guard 7: a keel with scan --leaks and not scan --leaks-message: the commit fails" "$CRC" "1"
+cm "$KP" --allow-empty -F "$TMP/msg4.txt"
+expect "guard 7: a clean message with a usable keel: the commit is made" "$CRC" "0"
+
+# ---- guard 8: keel guard status -----------------------------------------------------------------------
+newfx
+ginst install
+ginst status
+lacks "guard 8: a repository that never opted in: no leak guard line" "$GOUT" 'leak guard:'
+ginst install --leak-guard
+ginst status
+has "guard 8: on, deny list loaded" "$GOUT" 'leak guard: on, deny list loaded (3 patterns)'
+DF="$H/absent.txt"
+ginst status
+has "guard 8: on, no deny list" "$GOUT" 'leak guard: on, WARNING no deny list at ~/absent.txt, generic patterns only'
+DF="$H/deny.txt"
+rm -f "$W/.git/hooks/commit-msg"
+ginst status
+has "guard 8: on, commit-msg missing" "$GOUT" \
+  "leak guard: on, but commit-msg is missing or not keel's. Re-run 'keel guard install --leak-guard'"
+printf '#!/bin/sh\nexit 0\n' > "$W/.git/hooks/commit-msg"; chmod +x "$W/.git/hooks/commit-msg"
+ginst status
+has "guard 8: on, commit-msg not keel's" "$GOUT" "leak guard: on, but commit-msg is missing or not keel's."
+
+# ---- guard 9: uninstall --------------------------------------------------------------------------------
+newfx
+ginst install --leak-guard
+ginst uninstall
+expect "guard 9: uninstall removes keel's commit-msg" "$([ -e "$W/.git/hooks/commit-msg" ] && echo yes || echo no)" "no"
+expect "guard 9: ... and the pre-push" "$([ -e "$W/.git/hooks/pre-push" ] && echo yes || echo no)" "no"
+printf '#!/bin/sh\nexit 0\n' > "$W/.git/hooks/commit-msg"; chmod +x "$W/.git/hooks/commit-msg"
+ginst uninstall
+expect "guard 9: uninstall leaves another tool's commit-msg" "$(cat "$W/.git/hooks/commit-msg")" "#!/bin/sh
+exit 0"
+
+# ---- guard 10: the generated hooks are clean ------------------------------------------------------------
+newfx
+ginst install --leak-guard
+if command -v shellcheck >/dev/null 2>&1; then
+    for hk in pre-push commit-msg; do
+        sc="$(shellcheck -s bash "$W/.git/hooks/$hk" 2>&1)"
+        expect "guard 10: shellcheck -s bash reports nothing on the generated $hk" "$sc" ""
+    done
+else
+    printf '  SKIP  guard 10: shellcheck is not installed\n'
+fi
+if [ -x /bin/bash ] && case "$(/bin/bash --version 2>/dev/null | sed -n 1p)" in *"version 3.2"*) true ;; *) false ;; esac; then
+    for hk in pre-push commit-msg; do
+        bn="$(/bin/bash -n "$W/.git/hooks/$hk" 2>&1)"
+        expect "guard 10: /bin/bash -n parses the generated $hk" "$bn" ""
+    done
+else
+    printf '  SKIP  guard 10: /bin/bash is not bash 3.2 here\n'
+fi
+
+# ---- guard 11: help and the documentation ----------------------------------------------------------------
+has "guard 11: the guard line of help names the flags" "$HELP" \
+  '  guard install [--leak-guard|--no-leak-guard]|status|uninstall   pre-push hook: the scan, and no pushes to the default branch, plus a pre-commit hook that stays off until gates.commit_guard turns it on'
+gsection="$(awk '/^keel guard install /{f=1} /^### keel ci-review/{f=0} f' "$DOC")"
+has "guard 11: the install document describes the flag" "$gsection" '--leak-guard'
+has "guard 11: ... the commit-msg hook" "$gsection" 'commit-msg'
+has "guard 11: ... the reversal of the 2026-09-27 choice" "$gsection" '2026-09-27'
+has "guard 11: ... the main working copy and never a worktree" "$gsection" 'never in a worktree'
+has "guard 11: ... the residual, GitHub-made text" "$gsection" 'release notes'
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

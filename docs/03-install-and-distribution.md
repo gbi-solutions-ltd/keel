@@ -817,7 +817,7 @@ Exit 0 when it printed. Exit 1 is a usage error (no argument, an unknown option,
 missing plan, naming it. Exit 3 is a plan with no `### Task` heading.
 
 ```bash
-keel guard install | status | uninstall
+keel guard install [--leak-guard | --no-leak-guard] | status | uninstall
 ```
 
 Installs three hooks, `pre-push`, `pre-commit` and `prepare-commit-msg`, into git's own hooks
@@ -844,9 +844,10 @@ so a branch cannot weaken the scanner's rules on the push that publishes the cha
 is another matter: it is the pushed commit's own, so an entry a branch adds counts on that push and
 is reviewed with the rest of the branch. Where `keel` on PATH is a symlink into a clone of keel,
 that clone's working tree is the installed keel, so in keel's own repository a branch checked out
-there is scanned by its own copy. With no `keel` on PATH the hook says nothing was scanned and lets
-the push through, and with a `keel` too old for `--push` it says so and scans the working tree
-instead. Run by hand, with no arguments, it scans the working tree;
+there is scanned by its own copy. For this scan, with no `keel` on PATH the hook says nothing was
+scanned and lets the push through (the 2026-09-27 choice), and with a `keel` too old for `--push`
+it says so and scans the working tree instead; the leak guard below reverses the first of these for
+itself. Run by hand, with no arguments, it scans the working tree;
 with nothing to push, it scans nothing. The hook reads git's lines from the right, so a push source
 holding a space, such as `:/fix HEAD`, is still read as the commit it names and the ref it updates.
 `keel guard status` calls a hook written before `--push` stale, since it scans the working tree.
@@ -863,6 +864,55 @@ paths. `git push --no-verify` is the deliberate way past this one too, the same 
 project that genuinely pushes to its default branch sets `conventions.protect_default_branch` to
 `false`. The hooks are written at install time, so running `keel guard install` again picks up a
 newer keel's hooks.
+
+`keel guard install --leak-guard` turns on the leak guard for this repository, which is the only way
+to turn it on: it changes what every push and commit does, so it is never on by default, and the
+presence of the deny list does not turn it on (the list lives in the owner's home, and on by
+presence would refuse his pushes to a client's own repository, which names that client
+legitimately). It writes `LEAK_GUARD=1` as the third line of the `pre-push` hook, after the
+`VERIFY_KEYS` line, and a fourth hook, `commit-msg`, carrying keel's mark. A plain `keel guard
+install` in a repository that never opted in writes `LEAK_GUARD=0` and no `commit-msg`. A reinstall
+keeps the choice the installed `pre-push` holds, so one after an upgrade cannot switch the leak
+guard off silently; `keel guard install --no-leak-guard` writes `LEAK_GUARD=0` and removes
+`commit-msg` when it carries keel's mark. `--leak-guard` refuses, and writes nothing, while a
+`commit-msg` without keel's mark exists; a plain install ignores one. `keel guard uninstall` removes
+keel's `commit-msg` too, and leaves another tool's.
+`keel guard install --leak-guard` belongs in the main working copy and never in a worktree:
+worktrees share `.git/hooks`, so an install there replaces the hooks of every worktree at once.
+
+With the leak guard on, the `pre-push` hook feeds `keel scan --leaks <remote> <sha>:<ref>...` every
+pushed ref that is not a delete, after the default-branch and profile checks and before the supply
+chain scan, and refuses the push on a finding. Each finding names a commit, a field or a file, and
+the deny list line whose pattern matched, never the matched text. Run by hand, it runs
+`keel scan --leaks origin` with no refs, which prints the mode line. With the deny list absent,
+the generic patterns run and a clean push goes through, with a warning saying so.
+
+The `commit-msg` hook rewrites the message through a temporary file, in this order. It removes every
+line whose key is `Claude-Session:` in any case and keeps every other line as it is,
+`Co-Authored-By:` lines included. It adds `Signed-off-by: <name> <email>`, as
+`git var GIT_AUTHOR_IDENT` gives them, once, with
+`git interpret-trailers --if-exists addIfDifferent`. Then it runs `keel scan --leaks-message` on
+the result and refuses the commit on a finding, keeping the message in `.git/COMMIT_EDITMSG`.
+A commit amended with `--no-edit` comes through unchanged.
+
+Both hooks fail closed. A `keel` is usable only when its `--help`, read whole, names `scan --leaks`
+(the push) or `scan --leaks-message` (the commit): an older `keel` answers a mode it does not know
+by running the supply chain scan and exiting 0, so trusting its exit status would pass every
+message.
+With no `keel` on PATH, or an unusable one, the push or the commit is refused and says nothing was
+checked. This reverses, for the leak guard only, the 2026-09-27 choice the paragraph on the pre-push
+hook above states for the supply chain scan, which keeps it: the owner decided on 2026-10-22 that
+the leak guard is opted into, and what it guards against cannot be removed once pushed. With
+`LEAK_GUARD=0` the hook runs only the checks listed above.
+
+`keel guard status` adds one `leak guard:` line after its others when the installed `pre-push` holds
+`LEAK_GUARD=1`: on with the deny list loaded and its pattern count, on with a warning that no deny
+list was found, or on with `commit-msg` missing or not keel's. It adds nothing otherwise.
+
+What the leak guard does not cover. `git push --no-verify` and `git commit --no-verify` skip both
+hooks. And nothing made on GitHub passes through a hook: merge commits, pull request titles and
+bodies, and release notes are written there, so `keel scan --leaks-message <file>` is the way to
+check one by hand.
 
 The pre-commit hook is inert until `gates.commit_guard` says otherwise. `off`, which is what `init`
 writes, and it exits before checking anything: a team adopts the guard for the push protections
