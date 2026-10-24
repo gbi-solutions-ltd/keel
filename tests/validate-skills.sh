@@ -680,7 +680,7 @@ fi
 
 # The reference page is generated, so the only way it goes wrong is by not being regenerated. This
 # compares the page against the schema and nothing else: the set-by column needs a real profile and
-# is checked in tests/test-keel.sh, because this validator runs on every commit and must stay fast.
+# is checked in tests/test-keel-4.sh, because this validator runs on every commit and must stay fast.
 #
 # NO BACKTICK AND NO APOSTROPHE IN THE HEREDOC BELOW. bash 3.2 does not treat a quoted heredoc body
 # as literal inside a $( ), so either character breaks the parse of this whole file, and shellcheck

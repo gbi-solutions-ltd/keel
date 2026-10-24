@@ -40,7 +40,7 @@ section must still obey them.
   `keel init` run.** Anything needing a real profile goes in `tests/test-keel.sh`, which already
   runs `init` 117 times.
 - `hooks/session-start` is not touched by any task.
-- `keel doctor` must still start `python3` at most ten times (`tests/test-keel.sh:405`, measured 8).
+- `keel doctor` must still start `python3` at most ten times (`tests/test-keel.sh#keel doctor starts python3 at most 10 times`, measured 8).
 
 ## Measurements this plan was written against
 
@@ -1039,7 +1039,7 @@ the number it measured. Tasks 6 and 7 put a profile read and more output on doct
 this task does is **run that existing assertion and read the number**, not write a second one.
 
 Writing a second shim was the first draft of this task and it was wrong twice over. It duplicated
-`tests/test-keel.sh:405`, and its shim ended `exec /usr/bin/env python3 "$@"` while `$shimdir` was
+`tests/test-keel.sh#keel doctor starts python3 at most 10 times`, and its shim ended `exec /usr/bin/env python3 "$@"` while `$shimdir` was
 first on `PATH`, so it would have found itself and recursed. The existing shim resolves
 `real_python="$(command -v python3)"` **before** touching `PATH` and execs that absolute path, which
 is the detail that makes it work. Left recorded here because it is the kind of mistake that looks

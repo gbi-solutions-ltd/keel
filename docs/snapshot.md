@@ -95,9 +95,9 @@ dispatch table at `` bin/keel#init)        shift; cmd_init ``.
 |---|---|---|---|
 | Project setup | `` bin/keel#cmd_init() { `` | Detects the stack, writes profile, CLAUDE.md block, settings, and CI if none exists | tests/test-keel.sh |
 | Profile editing | `` bin/keel#profile_set() { `` | Sets one dotted key; refuses unknown paths and init-owned keys | `` tests/test-keel.sh#profile set refuses a path the profile does not have `` |
-| Health check | `` bin/keel#cmd_doctor_text() { `` | Checks profile, gates, guardrails, verify commands; runs them unless `--fast` | tests/test-keel.sh |
-| Generated CI | `` bin/keel#write_ci() { `` | Test step, one step per non-null verify command, dependency audit, key-material check | `` tests/test-keel.sh#write_ci reaches every verify.* command `` |
-| Git guard | `` bin/keel#cmd_guard() { `` | Opt-in pre-push scan and default-branch block, pre-commit gated on `gates.commit_guard` | tests/test-keel.sh |
+| Health check | `` bin/keel#cmd_doctor_text() { `` | Checks profile, gates, guardrails, verify commands; runs them unless `--fast` | tests/test-keel.sh to tests/test-keel-5.sh |
+| Generated CI | `` bin/keel#write_ci() { `` | Test step, one step per non-null verify command, dependency audit, key-material check | `` tests/test-keel-2.sh#write_ci reaches every verify.* command `` |
+| Git guard | `` bin/keel#cmd_guard() { `` | Opt-in pre-push scan and default-branch block, pre-commit gated on `gates.commit_guard` | tests/test-keel-4.sh, tests/test-keel-5.sh |
 | Session context | hooks/session-start | Injects the skill map and profile pointer | tests/test-session-start.sh <!-- keel:claim gate=session-start harness=claude --> |
 | Sensitive paths | hooks/sensitive-guard | Asks before Bash touches a hard-blocked path; fails closed | tests/test-sensitive-guard.sh <!-- keel:claim gate=sensitive-guard harness=claude --> |
 | Done check | hooks/done-guard | Blocks or warns when code was edited and the test command never appeared | tests/test-done-guard.sh <!-- keel:claim gate=done-guard harness=claude --> |
@@ -113,7 +113,7 @@ and `docs/profile-keys.md#gates.security_audit`).
 Prerequisites: bash, git, python3, shellcheck. No package install.
 
 ```bash
-tests/run-tests.sh                 # full suite, about 7 minutes, silent until each file ends
+tests/run-tests.sh                 # full suite, about 6 minutes, silent until each file ends
 tests/test-keel.sh                 # one test file, per verify.test_one
 shellcheck -x bin/keel bin/keel-fleet lib/*.sh lib/harness/*.sh tests/*.sh \
   tests/evals/run.sh tests/evals/stage.sh hooks/session-start hooks/context-watch \

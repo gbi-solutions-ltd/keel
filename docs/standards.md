@@ -269,9 +269,9 @@ everywhere else, and a skip list hides a whole file from every rule at once. A p
 is visible in the diff that introduces it, is printed on every run afterwards, and is counted in the
 summary, so growth is something a reviewer sees rather than discovers.
 
-**Example:** most suppressions sit in `tests/test-keel.sh`, on the lines of tests that must
-contain what they prove the push guard or `keel scan --push` rejects. A suppression with no reason
-is itself a finding.
+**Example:** most suppressions sit in `tests/test-keel-3.sh` and `tests/test-keel-4.sh`, on the
+lines of tests that must contain what they prove the push guard or `keel scan --push` rejects. A
+suppression with no reason is itself a finding.
 
 ## One definition per verify command
 

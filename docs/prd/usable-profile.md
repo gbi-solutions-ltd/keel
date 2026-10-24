@@ -121,7 +121,7 @@ building there.
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
 | NFR-01 | Generating and checking the page must need no network access and no API key. | inferred | `tests/validate-skills.sh:279-280` records that a check which only runs where a key exists is absent exactly where nobody is watching |
-| NFR-02 | `keel doctor` must still start `python3` at most ten times. | confirmed | Asserted at `tests/test-keel.sh:405`. FR-07 to FR-09 add work to doctor's hot path |
+| NFR-02 | `keel doctor` must still start `python3` at most ten times. | confirmed | Asserted at `tests/test-keel.sh#keel doctor starts python3 at most 10 times`. FR-07 to FR-09 add work to doctor's hot path |
 | NFR-03 | This change must add nothing to what `hooks/session-start` injects. | confirmed | It measured 356 estimated tokens against a 400 ceiling on 2026-08-18, and two other ideas are competing for the remainder |
 | NFR-04 | The generated page must be deterministic: generating twice from an unchanged schema must produce identical bytes. | inferred | Otherwise FR-04 fails at random and the rule gets disabled |
 
@@ -156,7 +156,7 @@ measure for this class of internal-tooling change. Re-asking would be theatre.
 | The committed page disagreeing with the schema | The same assertion | Zero |
 | Generating twice produces different bytes | A new assertion | Never |
 | A fixture repo with a pre-existing `.claude/settings.json` where doctor reports no missing plugin | `tests/test-keel.sh` | Zero |
-| `python3` starts in `keel doctor` | Existing assertion at `tests/test-keel.sh:405` | At most 10 |
+| `python3` starts in `keel doctor` | Existing assertion at `tests/test-keel.sh#keel doctor starts python3 at most 10 times` | At most 10 |
 
 ## 10. Milestones
 

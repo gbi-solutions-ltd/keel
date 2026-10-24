@@ -25,6 +25,11 @@ Entries are terse by design; the narrative for each release is in this file's gi
   `gbi-solutions-ltd/keel-internal` was archived read-only on 2026-10-24. The first pull request
   (#3) was merged by its author on 2026-10-24, before `main` was protected, so it went in without
   a review.
+- `tests/test-keel.sh` is split at its section headers into five parts (`tests/test-keel.sh` and
+  `tests/test-keel-2.sh` to `tests/test-keel-5.sh`) sharing `tests/keel-test-lib.sh`, so
+  `tests/run-tests.sh` runs them in parallel. It ran 771 cases serially in 501s and set the suite's
+  wall clock; the suite went from 597s to 349s and 422s over two runs on a 10-core laptop, with the
+  same 771 cases, every case line unchanged.
 
 ## 0.26.0 - 2026-10-22
 
