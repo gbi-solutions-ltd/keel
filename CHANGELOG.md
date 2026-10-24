@@ -35,6 +35,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
   `tests/test-keel.sh` as it does one into the file. A phrase that is one `<placeholder>` is not a
   citation. The newly checked citations held three stale ones, now repaired, and every line-number
   citation into `tests/test-keel.sh` outside a code fence that named the wrong line is now a phrase.
+- `lib/harness/resolve.sh` resolves the manifest path once, when sourced, and no longer forks to
+  read it or rewrites each field to test it for blanks: `keel doctor --fast` 1.08s to 0.95s, best
+  of six. Sourcing it by a relative path and then changing directory no longer turns every gate dark.
 
 ## 0.26.0 - 2026-10-22
 

@@ -17,25 +17,42 @@
 # A field is present only if it holds a non-space character. Same rule as provenance_gaps in
 # tests/test-harness-resolve.sh, deliberately: the validator and the resolver disagreeing about
 # what "absent evidence" means is how a row passes one and is granted by the other.
+# A glob match rather than deleting the spaces and testing what is left: the same rule, and the
+# substitution cost about a millisecond a field under bash 3.2, which is most of what doctor spent in
+# this file, measured 2026-10-25.
 _harness_present() {
-    [ -n "${1//[[:space:]]/}" ]
+    case "$1" in *[![:space:]]*) return 0 ;; esac
+    return 1
 }
 
-harness_capabilities_path() {
+# Resolved once, when this file is sourced. Every resolver call reads the manifest path, and working
+# it out per call cost a subshell and a dirname each time: half of what one `keel doctor` spent here,
+# measured 2026-10-25.
+_HARNESS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# _harness_cap: sets _HARNESS_CAP to the manifest path. The functions below use it rather than
+# `$(harness_capabilities_path)`, because each command substitution is a fork, and a doctor run made
+# about 35 of them.
+_harness_cap() {
     # Set but empty is an error, not a fallback. A caller whose override path came out empty (an
     # unset lookup, a failed mktemp) must not silently resolve against the developer's own manifest
     # and be told every gate is active.
     if [ -n "${KEEL_CAPABILITIES+x}" ]; then
         [ -n "$KEEL_CAPABILITIES" ] || return 1
-        printf '%s' "$KEEL_CAPABILITIES"; return 0
+        _HARNESS_CAP="$KEEL_CAPABILITIES"; return 0
     fi
-    printf '%s' "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/capabilities"
+    _HARNESS_CAP="$_HARNESS_DIR/capabilities"
+}
+
+harness_capabilities_path() {
+    _harness_cap || return 1
+    printf '%s' "$_HARNESS_CAP"
 }
 
 harness_provides() {
     [ $# -eq 2 ] || return 1
     local harness="$1" primitive="$2" cap f1 f2 f3 f4 f5 f6 f7
-    cap="$(harness_capabilities_path)" || return 1
+    _harness_cap || return 1; cap="$_HARNESS_CAP"
     [ -r "$cap" ] || return 1
     while IFS='|' read -r f1 f2 f3 f4 f5 f6 f7 || [ -n "$f1" ]; do
         [ "$f1" = "provides" ] || continue
@@ -53,7 +70,7 @@ harness_provides() {
 harness_known() {
     [ $# -eq 1 ] || return 1
     local harness="$1" cap f1 f2 rest
-    cap="$(harness_capabilities_path)" || return 1
+    _harness_cap || return 1; cap="$_HARNESS_CAP"
     [ -r "$cap" ] || return 1
     while IFS='|' read -r f1 f2 rest || [ -n "$f1" ]; do
         [ "$f1" = "provides" ] && [ "$f2" = "$harness" ] && return 0
@@ -64,7 +81,7 @@ harness_known() {
 harness_gate_active() {
     [ $# -eq 2 ] || return 1
     local harness="$1" gate="$2" cap f1 f2 f3 found=1
-    cap="$(harness_capabilities_path)" || return 1
+    _harness_cap || return 1; cap="$_HARNESS_CAP"
     [ -r "$cap" ] || return 1
     while IFS='|' read -r f1 f2 f3 || [ -n "$f1" ]; do
         [ "$f1" = "requires" ] || continue
@@ -79,7 +96,7 @@ harness_active_gates() {
     [ $# -eq 1 ] || return 1
     local harness="$1" cap f1 f2 rest seen=""
     harness_known "$harness" || return 1
-    cap="$(harness_capabilities_path)" || return 1
+    _harness_cap || return 1; cap="$_HARNESS_CAP"
     while IFS='|' read -r f1 f2 rest || [ -n "$f1" ]; do
         [ "$f1" = "requires" ] || continue
         case " $seen " in *" ${f2} "*) continue ;; esac

@@ -247,8 +247,8 @@ if command -v harness_active_gates >/dev/null 2>&1; then
     [ "$(gate_on 'provides|ghost|p|src| |2026-01-01\nrequires|done-guard|p\n')" = "inactive" ] \
       && ok "a blank version grants nothing" || bad "a blank version grants nothing" "reported active"
 
-    # A tab, not a space. Every fixture above uses a space, which lets `${1//[[:space:]]/}` in
-    # _harness_present be weakened to `${1// /}` with the suite green. resolve.sh states that the
+    # A tab, not a space. Every fixture above uses a space, which lets `*[![:space:]]*` in
+    # _harness_present be weakened to `*[! ]*` with the suite green. resolve.sh states that the
     # resolver and the validator must agree on what absent evidence means, and the validator learned
     # about tabs first, so without this the two drift apart in the direction that grants.
     [ "$(gate_on 'provides|ghost|p|src|\t|2026-01-01\nrequires|done-guard|p\n')" = "inactive" ] \
@@ -346,6 +346,14 @@ if command -v harness_active_gates >/dev/null 2>&1; then
       && ok "resolves with no python3 on PATH" \
       || bad "resolves with no python3 on PATH" "got: $out"
     rm -rf "$stub"
+
+    # Sourced by a relative path, then a cd. The manifest path used to be worked out from
+    # BASH_SOURCE on every call, so after the cd it named a directory that was not there, wrote a
+    # cd: error and resolved every gate dark. It is now resolved once, when the file is sourced.
+    out="$(cd "$ROOT" && /bin/bash -c '. lib/harness/resolve.sh; cd /; harness_active_gates claude' 2>&1 | sort | tr '\n' ' ')"
+    [ "$out" = "context-watch done-guard review-guard sensitive-guard session-start " ] \
+      && ok "resolves after a relative source and a cd" \
+      || bad "resolves after a relative source and a cd" "got: $out"
 else
     bad "resolve.sh defines harness_active_gates" "function not found after sourcing"
 fi
