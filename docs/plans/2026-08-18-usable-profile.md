@@ -486,7 +486,7 @@ no document a user reads."
 - Modify: `tests/test-keel.sh`
 
 **Interfaces:**
-- Consumes: `docs/profile-keys.md` from task 3, and the `fixture` helper at `tests/test-keel.sh:23`
+- Consumes: `docs/profile-keys.md` from task 3, and the `fixture` helper at `tests/keel-test-lib.sh#fixture() {`
 - Produces: nothing
 
 **Done when:** `tests/test-keel.sh` passes and `tests/run-tests.sh` is green.
@@ -817,7 +817,7 @@ silently stopped naming `security-guidance`, `code-review` and `skill-creator`. 
 `keel@gbi` to be named, which that list omitted.
 
 Both of the assertions written for task 6 passed against the broken implementation. What caught it
-was `tests/test-keel.sh:1349`, a years-old assertion about `security-guidance` that has nothing to do
+was `tests/test-keel-2.sh#doctor names a missing recommended plugin`, a years-old assertion about `security-guidance` that has nothing to do
 with this feature. **The fix is better than the plan:** one `expected_plugins()` function that both
 writers read, rather than the two lists the plan implied, which disagreed within a single turn.
 

@@ -52,12 +52,12 @@ must still obey these.
 - **CON-04: no hook.** No task adds one.
 - **CON-05: the `artifacts.*` schema stays `["string","null"]`.** No task opens
   `templates/profile.schema.json`.
-- **doctor's interpreter budget is 10 python3 starts**, asserted at `tests/test-keel.sh:1189`.
+- **doctor's interpreter budget is 10 python3 starts**, asserted at `tests/test-keel.sh#keel doctor starts python3 at most 10 times`.
   Measured on a fresh `node-ts` fixture on 2026-08-30: **doctor currently starts 7**. Task 6 is
   designed to add none, and why it adds none is proved in that task rather than assumed.
 - **`prof_of` prints `None` for a JSON null**, because it is `print(v)` on the Python value, not
-  the empty string. Assert `[ "$got" = "None" ]`, the shape already used at `tests/test-keel.sh:928`
-  and `:1821`. `[ -z "$got" ]` silently passes when `prof_of` fails for an unrelated reason, which
+  the empty string. Assert `[ "$got" = "None" ]`, the shape already used at
+  `tests/test-keel.sh#absent command is null, not guessed` and `tests/test-keel.sh#profile set null clears a value`. `[ -z "$got" ]` silently passes when `prof_of` fails for an unrelated reason, which
   is the bug this note exists to stop.
 - **`docs_root` is `docs/keel` by default**, `bin/keel:55`, not `docs`. This repository's own
   profile says `docs`, which is why the stories read `docs/plans`. **A fresh fixture will be
@@ -613,7 +613,7 @@ Stage exactly those paths and stop. **Do not commit.**
 and `PASS  keel doctor starts python3 at most 10 times` and reports `0 failed`, then
 `tests/run-tests.sh` prints `All test files passed`.
 
-**The interpreter budget is the risk in this task.** `tests/test-keel.sh:1189` caps doctor at 10
+**The interpreter budget is the risk in this task.** `tests/test-keel.sh#keel doctor starts python3 at most 10 times` caps doctor at 10
 python3 starts and it currently uses 7, measured 2026-08-30. The loop below adds none, because
 `json_get` answers a null key from `json_load`'s flat cache. Step 4 re-reads that existing
 assertion's output rather than trusting the reasoning.

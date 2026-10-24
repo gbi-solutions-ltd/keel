@@ -145,7 +145,7 @@ re-litigated: task 0's `Done when` holds, so the task proceeds as done.
 - Consumes: `json_get` (`bin/keel:328`), already used throughout `bin/keel` for reading
   `.keel/profile.json`. Also `deploy.ci` (`bin/keel:562`), which `write_profile` already fills from
   `.gitlab-ci.yml`, `Jenkinsfile`, `azure-pipelines.yml`, `.circleci/config.yml`,
-  `bitbucket-pipelines.yml`, or a non-empty `.github/workflows/` (`tests/test-keel.sh:996-1012`).
+  `bitbucket-pipelines.yml`, or a non-empty `.github/workflows/` (`tests/test-keel.sh#"Jenkinsfile:jenkins"`).
 - Produces: `write_ci` no longer takes a stack argument; it reads `stack.language` from the profile
   itself, so both `cmd_new` (which already writes the profile before calling it) and `cmd_init` (new
   caller) can invoke it identically.
@@ -1894,7 +1894,7 @@ blocked; both are folded in above.
 - **Should fix, fixed:** task 1's `cmd_init` gate tested only for `.github/workflows/ci.yml`, so a
   project holding `.gitlab-ci.yml` or a `Jenkinsfile` would have received a GitHub Actions
   workflow. It now gates on `deploy.ci`, which keel already fills from every platform it knows
-  (`tests/test-keel.sh:996-1012`), with a GitLab test case. The task also now states that the
+  (`tests/test-keel.sh#"Jenkinsfile:jenkins"`), with a GitLab test case. The task also now states that the
   `init` half is plan-added scope beyond the idea document's Recommendation.
 - **Should fix, fixed:** task 5 edited `verify.lint` in the profile and left the two rendered copies
   in `CLAUDE.md` and `AGENTS.md` stale. Both are now in the task's Files and hand-over; a re-render

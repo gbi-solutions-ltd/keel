@@ -630,7 +630,7 @@ task.
    `tests/validate-skills.sh` requires in a body stays in it: the profile-schema markers
    `templates/profile.schema.json` cites (`tests/validate-skills.sh:970-976`), the plugin names
    (`:502-503`) and `repo-snapshot`'s Step 6 (`:627-630`). Example: `git diff` shows no line above
-   the closing `---` of `skills/write-prd/SKILL.md` changing. `tests/test-keel.sh:702` reads the
+   the closing `---` of `skills/write-prd/SKILL.md` changing. `tests/test-keel.sh#wp="$ROOT/skills/write-prd/SKILL.md"` reads the
    from-repo row of the body; that row stays as it is.
 9. If behaviours 3 to 5 together cannot bring the body under 700, the task stops: the body is left
    as it stands, uncommitted in this task's worktree, and the report gives the count, the shortfall

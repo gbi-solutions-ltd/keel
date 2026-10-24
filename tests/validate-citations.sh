@@ -149,12 +149,15 @@ while IFS=$'\t' read -r citing cline cit; do
     fi
 
     # A file that changes often, cited by line, from a document that says what is true now. These
-    # three take insertions in most weeks: 47 lines landed in bin/keel in one commit on 2026-09-09
-    # and moved 32 citations that had been correct. The list is written out rather than derived from
-    # git history, because a rule whose membership changes when somebody commits is one nobody can
-    # predict, and a check people cannot predict is the one they learn to ignore.
+    # take insertions in most weeks: 47 lines landed in bin/keel in one commit on 2026-09-09 and
+    # moved 32 citations that had been correct. tests/test-keel-2.sh to tests/test-keel-5.sh are the
+    # parts tests/test-keel.sh was split into, and take its insertions. The list is written out
+    # rather than derived from git history, because a rule whose membership changes when somebody
+    # commits is one nobody can predict, and a check people cannot predict is the one they learn to
+    # ignore.
     case "$target" in
-        bin/keel|tests/validate-skills.sh|tests/test-keel.sh)
+        bin/keel|tests/validate-skills.sh|tests/test-keel.sh|tests/test-keel-2.sh|tests/test-keel-3.sh|\
+        tests/test-keel-4.sh|tests/test-keel-5.sh)
             case "$citing" in
                 # Records. Each says when it was written, and that date is what tells a reader how
                 # far to trust its line numbers. Repairing a pointer in one is allowed and rewriting
@@ -263,12 +266,19 @@ fi
 # phrase occurring twice still resolves, and rejecting it would be stricter than correct output,
 # which CONTRIBUTING.md calls the unrecoverable failure. The conversion that moved this repository
 # onto the form chose unique phrases by hand; the rule does not demand it.
+#
+# A double-backtick code span, `` path#phrase ``, is the same citation: it is how a phrase holding a
+# backtick has to be written, and docs/snapshot.md writes every citation in its tables that way. Its
+# phrase may hold a single backtick and never two together, which is what ends the span.
 # shellcheck disable=SC2016
-PHRASE_RE='`[A-Za-z0-9._/-]+([.](md|sh|json|yml|yaml|txt|toml))?#[^`]+`'
+PHRASE_RE='`[A-Za-z0-9._/-]+([.](md|sh|json|yml|yaml|txt|toml))?#[^`]+`|`` [A-Za-z0-9._/-]+([.](md|sh|json|yml|yaml|txt|toml))?#([^`]|`[^`])+ ``'
 
 phrase_records=""
 while IFS=$'\t' read -r citing cline cit; do
-    cit="${cit#\`}"; cit="${cit%\`}"
+    case "$cit" in
+        '`` '*) cit="${cit#\`\` }"; cit="${cit% \`\`}" ;;
+        *)      cit="${cit#\`}"; cit="${cit%\`}" ;;
+    esac
     path="${cit%%#*}"
     phrase="${cit#*#}"
     checked=$((checked+1))
@@ -292,6 +302,9 @@ while IFS=$'\t' read -r citing cline cit; do
     fi
 
     case "$phrase" in
+        # A placeholder names the form, not text in the file: plans quote this checker's own advice
+        # as `` bin/keel#<text from the line> ``.
+        "<"*">") continue ;;
         *"|"*)
             report "$citing:$cline cites \`$cit\`, and the phrase contains a pipe. docs/profile-keys.md renders these citations inside a markdown table, where a pipe ends the cell. Choose a phrase without one."
             continue ;;

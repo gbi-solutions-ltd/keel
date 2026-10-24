@@ -30,6 +30,11 @@ Entries are terse by design; the narrative for each release is in this file's gi
   `tests/run-tests.sh` runs them in parallel. It ran 771 cases serially in 501s and set the suite's
   wall clock; the suite went from 597s to 349s and 422s over two runs on a 10-core laptop, with the
   same 771 cases, every case line unchanged.
+- `tests/validate-citations.sh` checks phrase citations written in a double-backtick span
+  (`` path#phrase ``), which it never matched, and treats a line number into the parts of
+  `tests/test-keel.sh` as it does one into the file. A phrase that is one `<placeholder>` is not a
+  citation. The newly checked citations held three stale ones, now repaired, and every line-number
+  citation into `tests/test-keel.sh` outside a code fence that named the wrong line is now a phrase.
 
 ## 0.26.0 - 2026-10-22
 

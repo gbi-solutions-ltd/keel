@@ -622,8 +622,8 @@ Run: `tests/validate-citations.sh`, and repair any citation it reports, then che
 in `bin/keel`, `tests/test-keel.sh` and `docs/03-install-and-distribution.md` as the global
 constraints describe. Expect it to report at least
 `docs/plans/2026-08-17-release-readiness.md` and
-`docs/plans/2026-09-19-make-keel-enforceable-outside-the-agent.md`, which cite
-`` bin/keel#guard_hook_body > "$GUARD_DIR/pre-push" ``, a line this task replaces: repoint each to
+`docs/plans/2026-09-19-make-keel-enforceable-outside-the-agent.md`, which cite the `bin/keel` line
+`` guard_hook_body > "$GUARD_DIR/pre-push" ``, which this task replaces: repoint each to
 `` bin/keel#guard_hook_body > "$d/pre-push" ``, which occurs once.
 Run: `tests/run-tests.sh`
 Expected: PASS, or reds this task did not cause, each named. `tests/supply-chain-scan.sh` still

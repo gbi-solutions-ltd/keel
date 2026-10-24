@@ -91,8 +91,10 @@ you are covered for.
   prose a model may follow and nothing asserts it, `human` where a person is the reader,
   `unread:<path>` naming the record that decided nothing reads it, `observed:<path>` naming the
   record that measured a model reading it unprompted. The path is followed by
-  `:<line>`, or by `#<phrase>` where the phrase is matched literally anywhere in the file.
-  **Prefer the phrase for `bin/keel`, `tests/validate-skills.sh` and `tests/test-keel.sh`**, which
+  `:<line>`, or by `#<phrase>` where the phrase is matched literally anywhere in the file. A phrase
+  holding a backtick goes in a double-backtick span, `` path#phrase ``, and is checked the same way.
+  **Prefer the phrase for `bin/keel`, `tests/validate-skills.sh`, `tests/test-keel.sh` and its parts
+  `tests/test-keel-2.sh` to `tests/test-keel-5.sh`**, which
   take insertions in most weeks: 47 lines landed in `bin/keel` in one commit on 2026-09-09 and moved
   32 citations that had been correct, with every check green. A phrase carries no backtick and no
   pipe, because `docs/profile-keys.md` renders these citations inside a markdown table. **The check does not tie the line to the key**, deliberately: the

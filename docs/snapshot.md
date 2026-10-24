@@ -234,7 +234,7 @@ Correction: as of 2026-09-26, CI's `Python lint` job runs ruff over `lib/` with 
 `E4,E7,E9,F` (817e509, task 10). The local lint command still covers shell only.
 
 - **CI runs on Linux only** (.github/workflows/ci.yml:16). Stock macOS has no `timeout`, so
-  `doctor` runs verify commands unbounded there (`` bin/keel#macOS ships neither ``); the Windows
+  `doctor` runs verify commands unbounded there (`` bin/keel#ships neither `timeout` nor `gtimeout` ``); the Windows
   fixes in `9c68003` have no CI coverage.
 
 Correction: as of 2026-09-26, CI also has an advisory `Tests on macOS` job (e242a88, task 9),

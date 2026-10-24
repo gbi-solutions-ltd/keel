@@ -546,7 +546,7 @@ rather than a ceiling."
 - Test: `tests/test-keel.sh`
 
 **Interfaces:**
-- Consumes: `merge_profile` (`bin/keel:277-305`), `fixture` (`tests/test-keel.sh:23`)
+- Consumes: `merge_profile` (`bin/keel:277-305`), `fixture` (`tests/keel-test-lib.sh#fixture() {`)
 - Produces: nothing. `verify` story
 
 **Done when:** `tests/test-keel.sh` passes and `tests/run-tests.sh` is green.

@@ -1108,8 +1108,8 @@ fi
 rm -rf "$we"
 ```
 
-`fixture` is at `tests/test-keel.sh:28` and `node-ts` is one of its stacks. `ok`, `bad` and `$KEEL`
-are at `:19`, `:20` and `:15`.
+`fixture` is at `tests/keel-test-lib.sh#fixture() {` and `node-ts` is one of its stacks. `ok`, `bad` and
+`$KEEL` are at `:25`, `:26` and `:21`.
 
 - [x] **Step 2: Run it and watch it fail**
 
