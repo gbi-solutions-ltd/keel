@@ -1802,12 +1802,12 @@ The owner runs this task in his own terminal, in the new working copy, on `publi
 behaviour 2 shows `<N>` patterns, behaviour 3 prints `0` and `OK`, behaviour 4 shows no finding, and
 `gh pr create` prints the pull request's URL.
 
-- [ ] **Step 13.1: There is no test for this**
+- [x] **Step 13.1: There is no test for this** Note: owner task; owner's terminal. Witnessed: the address is in SECURITY.md, services@gbi-solutions.com, edit read on the owner's copy. The planned rebase in behaviour 3 was aborted (it runs the working tree's keel, which predates the leak guard at the first commit) and skipped: messages were already signed off with no Claude-Session trailer. Dry run output pasted by the owner: 25 patterns, 11 commits checked, no findings. Pull request created in the browser (gh login lacked access to the repository): PR #3, 11 commits; bash 3.2 cases ran on macOS CI
 
 This task is the owner's: run behaviours 1 to 5 in order, stopping at the first output that differs
 from the one given.
 
-- [ ] **Step 13.2: Hand over**
+- [x] **Step 13.2: Hand over** Note: owner reported; PR #3 head 6163ed9; witnessed on GitHub: all five CI jobs passed on that head
 
 Report each behaviour's output and the pull request's number.
 
@@ -1843,11 +1843,11 @@ rest.
 **Done when:** there is no command in the profile for this. Behaviour 1's output, with the head SHA
 matching.
 
-- [ ] **Step 14.1: There is no test for this**
+- [x] **Step 14.1: There is no test for this** Note: witnessed in the browser pane: the CI run on 6163ed9, Validate skills and templates, Tests on macOS, Python lint, Supply chain and DCO sign-off all successful; the macOS step 'Run tests under the bash macOS ships (3.2)' succeeded; the log line printing the bash version was not read
 
 This task is the owner's: run behaviour 1, or record behaviour 2's message.
 
-- [ ] **Step 14.2: Hand over**
+- [x] **Step 14.2: Hand over** Note: run 40088350682, headSha 6163ed9, no billing block
 
 Report the checks' output and the run's `headSha`.
 
@@ -1950,11 +1950,11 @@ The owner runs this task. Changing a repository setting and merging are his alon
 **Done when:** there is no command in the profile for this. Behaviour 0's permission, behaviour
 1's read-back and behaviour 2's `MERGED` line and help lines; behaviour 3's outputs when it ran.
 
-- [ ] **Step 15.1: There is no test for this**
+- [x] **Step 15.1: There is no test for this** Note: owner reported: reviewer gfsekamanya has admin; protection read back [true,1,[Validate skills and templates,Supply chain,Python lint,DCO sign-off]]. Deviation: PR #3 was merged by its author before main was protected (merge commit 2591577), so the first pull request had no review; the owner also deleted the remote branch. Recorded in CHANGELOG.md in PR #4
 
 This task is the owner's: run behaviours 0, 1 and 2 in order, and behaviour 3 only if needed.
 
-- [ ] **Step 15.2: Hand over**
+- [x] **Step 15.2: Hand over** Note: owner reported; stable checkout (origin gbi-solutions-ltd/keel) fast-forwarded a21b3eb..2591577 and keel --help shows both scan --leaks lines
 
 Report the protection read-back and the merge commit.
 
@@ -2006,11 +2006,11 @@ The owner runs this task. Archiving changes a repository setting; nothing is del
 **Done when:** there is no command in the profile for this. Behaviour 2 prints `true`, and
 behaviour 3's dry run fails as stated.
 
-- [ ] **Step 16.1: There is no test for this**
+- [x] **Step 16.1: There is no test for this** Note: owner reported: old checkout clean but for the untracked early draft of this plan (abandoned), nothing ahead of v0.26.0 or origin/main; keel-internal archived 2026-10-24, witnessed in the browser: archived by the owner, read-only
 
 This task is the owner's: run behaviours 1 to 3.
 
-- [ ] **Step 16.2: Hand over**
+- [x] **Step 16.2: Hand over** Note: owner reported: push URL archived-do-not-push, dry run failed as expected; keel guard status shows push guard active and leak guard on with 25 patterns
 
 Report the outputs, and the date of the archive for task 17.
 
@@ -2078,11 +2078,11 @@ The owner runs this task. It proves the flow end to end, and that the guard refu
 **Done when:** there is no command in the profile for this. Behaviour 1's output as given,
 behaviour 2's `git log` showing a sign-off and no `Claude-Session`, and the second `MERGED` line.
 
-- [ ] **Step 17.1: There is no test for this**
+- [x] **Step 17.1: There is no test for this** Note: owner reported, screenshot read: probe push dry run exit 1, finding on deny list line 2, push refused by the leak guard, grep count 0, detached commit so nothing sent; PR #4 witnessed: commit e960b99 has Signed-off-by and no Claude-Session line, DCO and other checks passed, merging blocked until review, then approved and merged by gfsekamanya as 8f6448d
 
 This task is the owner's: run behaviours 1 and 2.
 
-- [ ] **Step 17.2: Hand over**
+- [x] **Step 17.2: Hand over** Note: move complete; rounds: 0; routing: owner; loop: n/a
 
 Report the outputs. The move is complete.
 
