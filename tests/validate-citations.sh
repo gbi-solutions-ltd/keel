@@ -304,7 +304,8 @@ while IFS=$'\t' read -r citing cline cit; do
 
     # A placeholder names the form, not text in the file: plans quote this checker's own advice as
     # `` bin/keel#<text from the line> ``. It is words in angle brackets; anything else in them, such
-    # as `<!-- keel:begin -->`, is real text and is checked.
+    # as `<!-- keel:begin -->`, is real text and is checked. A one-word tag such as `<details>` reads
+    # as a placeholder too, and is not checked.
     case "$phrase" in
         "<"*">")
             inner="${phrase#<}"; inner="${inner%>}"

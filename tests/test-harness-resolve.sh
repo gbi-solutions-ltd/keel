@@ -199,6 +199,20 @@ if command -v harness_active_gates >/dev/null 2>&1; then
       && bad "an empty KEEL_CAPABILITIES is refused" "returned zero" \
       || ok "an empty KEEL_CAPABILITIES is refused"
 
+    # And by each function that reads the manifest, after a call that resolved it. The path is held
+    # in _HARNESS_CAP between calls, so a function that ignored _harness_cap's refusal would read the
+    # last good manifest and report gates active on no evidence. Each is called directly: through
+    # harness_active_gates alone, its own harness_known call would hide the other three.
+    harness_known claude >/dev/null
+    for call in "harness_provides claude pretooluse_ask" "harness_known claude" \
+                "harness_gate_active claude done-guard" "harness_active_gates claude"; do
+        # shellcheck disable=SC2086
+        # Word splitting is the point: each entry is a function and its arguments.
+        KEEL_CAPABILITIES="" $call >/dev/null \
+          && bad "an empty KEEL_CAPABILITIES is refused by ${call%% *}" "returned zero" \
+          || ok "an empty KEEL_CAPABILITIES is refused by ${call%% *}"
+    done
+
     # One fixture per way a provides row can be absent evidence while looking populated. Each of
     # these granted its primitive in the first version of resolve.sh, and none is visible in a diff.
     # The positive control is first on purpose: without it every negative below also passes against
@@ -248,7 +262,7 @@ if command -v harness_active_gates >/dev/null 2>&1; then
       && ok "a blank version grants nothing" || bad "a blank version grants nothing" "reported active"
 
     # A tab, not a space. Every fixture above uses a space, which lets `*[![:space:]]*` in
-    # _harness_present be weakened to `*[! ]*` with the suite green. resolve.sh states that the
+    # _harness_present be weakened to `*[!\ ]*` with the suite green. resolve.sh states that the
     # resolver and the validator must agree on what absent evidence means, and the validator learned
     # about tabs first, so without this the two drift apart in the direction that grants.
     [ "$(gate_on 'provides|ghost|p|src|\t|2026-01-01\nrequires|done-guard|p\n')" = "inactive" ] \

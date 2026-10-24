@@ -921,9 +921,9 @@ rm -rf "$FIXTURE_CACHE"
 #
 # R-01. The refactor may not change one byte of what a Claude Code user gets.
 #
-# The baseline is GENERATED from the pre-refactor commit, not committed as a fixture. Lines 1 to 3
-# of this file state the policy the suite runs on: fixtures are generated per case rather than
-# committed, so they cannot go stale against the code they exercise. A committed baseline of init
+# The baseline is GENERATED from the pre-refactor commit, not committed as a fixture. The header of
+# tests/keel-test-lib.sh states the policy the suite runs on: fixtures are generated per case rather
+# than committed, so they cannot go stale against the code they exercise. A committed baseline of init
 # output is exactly the fixture that policy forbids.
 #
 # KEEL_BASELINE_REF names the commit to compare against. Unset, it defaults to HEAD, which makes

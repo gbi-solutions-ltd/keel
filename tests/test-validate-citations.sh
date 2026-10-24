@@ -260,10 +260,12 @@ run "a phrase citation into bin/keel from a live document is accepted" 0 m_hot_p
 # one of them goes stale as fast.
 m_hot_line_in_keel_part() {
     mkdir -p "$1/tests"
-    printf '#!/usr/bin/env bash\n# A comment.\necho hi\n' > "$1/tests/test-keel-3.sh"
-    printf 'The case is at `tests/test-keel-3.sh:2`.\n' >> "$1/README.md"
+    printf '#!/usr/bin/env bash\n# A comment.\necho hi\n' > "$1/tests/test-keel-$hot_part.sh"
+    printf 'The case is at `tests/test-keel-%s.sh:2`.\n' "$hot_part" >> "$1/README.md"
 }
-run "a line-number citation into a part of tests/test-keel.sh from a live document is rejected" 1 m_hot_line_in_keel_part
+for hot_part in 2 3 4 5; do
+    run "a line-number citation into tests/test-keel-$hot_part.sh from a live document is rejected" 1 m_hot_line_in_keel_part
+done
 
 # Case 6j. The phrase form in a double-backtick code span, which is how a phrase holding a backtick
 # has to be written, and how docs/snapshot.md writes every citation in its tables. The single

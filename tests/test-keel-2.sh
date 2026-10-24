@@ -343,7 +343,7 @@ rm -rf "$crd" "$crlfdir"
 # FAIL line reached stdout for the JSON reshaper even though problems was incremented and the
 # real exit code was nonzero: a --json consumer could see problems: 0 and an empty findings entry
 # for this check while the process exited nonzero. Reuses the "gitignored docs root" setup used
-# against `keel init` above, against `keel doctor --json` instead.
+# against `keel init` in tests/test-keel.sh, against `keel doctor --json` instead.
 ddi="$(fixture bare)"
 ( cd "$ddi" && "$KEEL" init -y >/dev/null 2>&1 )
 printf 'docs/\n' >> "$ddi/.gitignore"

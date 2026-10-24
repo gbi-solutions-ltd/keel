@@ -122,7 +122,7 @@ Expected: FAIL, `explain_level: init did not write technical`. The validator als
 second half of this task and is expected until step 3 finishes.
 
 **Deviation, found during execution on 2026-08-18 and settled by the requester.**
-`tests/test-keel-3.sh#context_window is schema-declared, so writing it needed no bump` asserted `schema_version == 1` on a freshly initialised profile,
+`tests/test-keel-3.sh#the literal 1 was unsatisfiable` asserted `schema_version == 1` on a freshly initialised profile,
 under the name `writing context_window did not move schema_version`. The name describes a real
 non-behaviour; the implementation pinned a version literal, so it was unsatisfiable by any
 legitimate bump and it blocked `FR-11`. Proved both halves before changing anything: with
