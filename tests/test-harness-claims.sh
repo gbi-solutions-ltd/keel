@@ -339,40 +339,40 @@ if [ -f "$M" ]; then
     dupes="$(git ls-files 'skills/*/SKILL.md' | sed 's#.*/\([^/]*\)/SKILL.md#\1#' | sort | uniq -d)"
     [ -z "$dupes" ] && ok "no skill appears twice in the tree" || bad "no skill appears twice" "$dupes"
 
-    # ...and both manifests actually ship. tests/export-public.sh is what produces the public tree,
-    # and it had no test of its own: its exclusion list is a privacy guard with nothing pinning it,
-    # and a manifest that is untracked or newly excluded exports as silently as it imports. The task
-    # that added this file asked for a one-off manual confirmation, which is a measurement nobody
-    # repeats.
-    xd="$(mktemp -d)"; rm -rf "$xd"
-    if tests/export-public.sh "$xd" >/dev/null 2>&1; then
-        miss=""
-        for f in .claude-plugin/plugin.json .codex-plugin/plugin.json \
-                 hooks/hooks.json hooks/hooks.codex.json skills/keel/SKILL.md; do
-            [ -f "$xd/$f" ] || miss="$miss $f"
-        done
-        [ -z "$miss" ] && ok "the public export ships both plugin manifests and both hook manifests" \
-          || bad "the public export ships both plugin manifests and both hook manifests" "absent:$miss"
+    # ...and both manifests actually ship. The export that once produced the public tree is gone
+    # because the public repository is the tree: what ships is what git tracks. A machine holding
+    # the private clone also holds docs/audits, so the validators run on a copy of the tracked
+    # files, which is how that machine sees what a fresh clone sees. That is public CI's condition.
+    # shellcheck source=tests/withheld.sh
+    . tests/withheld.sh
+    miss=""
+    for f in .claude-plugin/plugin.json .codex-plugin/plugin.json \
+             hooks/hooks.json hooks/hooks.codex.json skills/keel/SKILL.md; do
+        git ls-files --error-unmatch "$f" >/dev/null 2>&1 || miss="$miss $f"
+    done
+    [ -z "$miss" ] && ok "both plugin manifests and both hook manifests are tracked, so they ship" \
+      || bad "both plugin manifests and both hook manifests are tracked, so they ship" "untracked:$miss"
 
-        leaked=""
-        [ -d "$xd/.claude" ] && leaked="$leaked .claude/"
-        [ -d "$xd/docs/audits" ] && leaked="$leaked docs/audits/"
-        [ -f "$xd/.keel/handoff.md" ] && leaked="$leaked .keel/handoff.md"
-        [ -z "$leaked" ] && ok "the public export still excludes what it is meant to" \
-          || bad "the public export still excludes what it is meant to" "exported:$leaked"
-
-        # A file that ships can cite one that does not. On 2026-10-13 a plan cited
-        # `docs/audits/<file>.md:125`, the export dropped docs/audits, and the export's own suite
-        # went red at release time, after the internal tag. Running the checker inside the export
-        # catches that here, against the exclusion list export-public.sh actually applies.
-        if xc="$(cd "$xd" && tests/validate-citations.sh 2>&1)"; then
-            ok "every citation in the public export resolves inside it"
-        else
-            bad "every citation in the public export resolves inside it" \
-                "$(printf '%s\n' "$xc" | grep '^FAIL' | head -3)"
-        fi
+    xd="$(mktemp -d)"
+    while IFS= read -r f; do
+        mkdir -p "$xd/$(dirname "$f")"
+        cp -p "$f" "$xd/$f" 2>/dev/null
+    done < <(git ls-files)
+    held=""
+    for w in $(withheld_list); do
+        [ -e "$xd/$w" ] && held="$held $w"
+    done
+    [ -z "$held" ] && ok "a fresh clone holds no withheld path" \
+      || bad "a fresh clone holds no withheld path" "present:$held"
+    if xc="$(cd "$xd" && tests/validate-citations.sh 2>&1)"; then
+        ok "every citation resolves in a fresh clone"
     else
-        bad "tests/export-public.sh runs" "non-zero exit"
+        bad "every citation resolves in a fresh clone" "$(printf '%s\n' "$xc" | grep '^FAIL' | head -3)"
+    fi
+    if xc="$(cd "$xd" && tests/validate-skills.sh 2>&1)"; then
+        ok "every relative link resolves in a fresh clone"
+    else
+        bad "every relative link resolves in a fresh clone" "$(printf '%s\n' "$xc" | grep '^FAIL' | head -3)"
     fi
     rm -rf "$xd"
 else
@@ -417,8 +417,8 @@ done
 # it, which is a footgun for the second profile rather than a help for the first. Checked against
 # code.claude.com/docs/en/plugins-reference on 2026-09-06.
 #
-# What does need checking is that the file is TRACKED. tests/export-public.sh publishes `git
-# ls-files` and nothing else, deliberately, so an untracked agent definition is one that exists on
+# What does need checking is that the file is TRACKED. The public repository is the tracked tree,
+# so an untracked agent definition is one that exists on
 # the author's machine and ships to nobody. That failure is invisible from inside this repository,
 # where the profile resolves perfectly.
 for prof in $profiles; do

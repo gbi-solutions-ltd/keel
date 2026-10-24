@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-09-04, from the 0.18.0 release. Carried out of `.keel/handoff.md` before it was discarded |
-| Status | **recorded, not planned.** The release step that catches this class already exists and worked; this is about catching it earlier |
-| Recommendation | Do nothing yet. One occurrence in the repository's life, caught by the gate built for it. Revisit on the second |
-| Next | nothing |
+| Status | **solved 2026-10-22** by tests/withheld.sh, which both validators read |
+| Recommendation | Nothing is left to do |
+| Next | Nothing is left to do |
 
 ## The problem
 
@@ -17,7 +17,8 @@ filesystem it is run on:
 ```
 
 That is the right check for this repository and the wrong one for the repository people read.
-`tests/export-public.sh:42-47` drops three paths on the way out:
+The `case` in `excluded()` of `tests/export-public.sh`, which was removed on 2026-10-22, dropped
+three paths on the way out:
 
 ```sh
 case "$1" in
@@ -68,3 +69,18 @@ exclusion added later inherits the rule for free only if the list is genuinely s
 
 Links **out of** an excluded file need no rule. `docs/audits/` does not ship, so where its links
 point is not a public reader's problem.
+
+## Outcome
+
+The third option of the table above was taken: a shared file both validators read. It is
+`tests/withheld.sh`, which holds the one list of withheld paths and three functions that answer
+questions about it. The export it was written for is gone, because the public repository is the
+tracked tree.
+
+The drift problem is gone for two reasons. There is one list, so there is no second copy to fall
+out of step, and a test ties that list to `.gitignore`, so a path added to one and not the other
+fails.
+
+A citation into a withheld path is now skipped while the path is absent, rather than reported. It
+is checked in full once the path is present, so the owner's machine, which holds `docs/audits/`,
+still sees it resolve or fail.
