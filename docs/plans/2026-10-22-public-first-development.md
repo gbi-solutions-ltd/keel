@@ -1711,11 +1711,11 @@ The coordinator runs this task itself.
 **Done when:** there is no command in the profile for this. The evidence is the report: each
 behaviour's output, and any failure named with its file and cause and the task added for it.
 
-- [ ] **Step 12.1: There is no test for this**
+- [x] **Step 12.1: There is no test for this** Note: behaviours 1 to 3, 5, 6 run: fresh clone suite All test files passed with the injected git settings cleared (they redden tests/test-ci-review.sh otherwise); lint OK on shellcheck 0.9.0; docs/audits present on the owner's copy: four checks pass; rehearsal and DCO ok (9 signed off, 0 Claude-Session); behaviour 4 bash 3.2 NOT run, owner's terminal
 
 Run behaviours 1 to 6 and note each result with its output.
 
-- [ ] **Step 12.2: Hand over**
+- [x] **Step 12.2: Hand over** Note: ticks committed alone as the plan says; rounds: 0; routing: coordinator; loop: n/a
 
 Behaviour 7 is the only commit: the plan's ticks. Hand the results to the owner with task 13.
 
@@ -2182,3 +2182,15 @@ tree disagreed.
    `docs/runbooks/going-public.md` still says the release runbook carries that section's export
    and sync steps. Section 7a is marked obsolete for this repository, and the file is an executed
    record, so it was not rewritten.
+6. **Task 12, behaviour 5 expected `no findings` against a deny file holding the invented names,
+   which cannot hold.** The new tests and this plan use those names as fixtures on purpose, so
+   the guard correctly finds them (127 findings, all on the three invented lines). The generic
+   patterns alone (no deny file) check 9 commits and find nothing, which is what the rehearsal
+   was meant to prove. The owner's real deny list is the run that matters, in task 13.
+7. **Task 12, behaviour 1 ran without the bundle from the owner.** The coordinator already held
+   the branch's history, so the fresh clone was made from the cloud copy, and the commits were
+   carried to the owner's working copy by a bundle fetched there (fast-forward, clean tree). The
+   untracked `.claude/` and an older plan file that stood in the way were first copied to
+   `.git/pre-ff/` in that working copy.
+8. **Task 12, behaviour 4 (bash 3.2) was not run.** The device shell is a Linux VM with bash 5.1;
+   only the owner's terminal has `/bin/bash` 3.2. It is handed to task 13.
