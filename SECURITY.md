@@ -1,6 +1,6 @@
 # Security policy
 
-Report a vulnerability in keel privately, by email to `security@<owner to fill>`. Never report one
+Report a vulnerability in keel privately, by email to `services@gbi-solutions.com`. Never report one
 in an issue, a pull request or a discussion: this repository is public, and so is everything
 posted to it.
 
