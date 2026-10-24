@@ -22,6 +22,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
   `Claude-Session:` trailers and adds a sign-off. Pull requests are checked for a
   DCO `Signed-off-by` line by `tests/check-dco.sh`. `.claude/` is published. See
   `CONTRIBUTING.md` and `SECURITY.md`.
+  `gbi-solutions-ltd/keel-internal` was archived read-only on 2026-10-24. The first pull request
+  (#3) was merged by its author on 2026-10-24, before `main` was protected, so it went in without
+  a review.
 
 ## 0.26.0 - 2026-10-22
 
