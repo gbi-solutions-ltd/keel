@@ -269,9 +269,10 @@ fi
 #
 # A double-backtick code span, `` path#phrase ``, is the same citation: it is how a phrase holding a
 # backtick has to be written, and docs/snapshot.md writes every citation in its tables that way. Its
-# phrase may hold a single backtick and never two together, which is what ends the span.
+# phrase may hold a single backtick and never two together, which is what ends the span, and may
+# end in one, which is why markdown pads the span with spaces.
 # shellcheck disable=SC2016
-PHRASE_RE='`[A-Za-z0-9._/-]+([.](md|sh|json|yml|yaml|txt|toml))?#[^`]+`|`` [A-Za-z0-9._/-]+([.](md|sh|json|yml|yaml|txt|toml))?#([^`]|`[^`])+ ``'
+PHRASE_RE='`[A-Za-z0-9._/-]+([.](md|sh|json|yml|yaml|txt|toml))?#[^`]+`|`` [A-Za-z0-9._/-]+([.](md|sh|json|yml|yaml|txt|toml))?#([^`]|`[^`])+`? ``'
 
 phrase_records=""
 while IFS=$'\t' read -r citing cline cit; do
@@ -301,10 +302,16 @@ while IFS=$'\t' read -r citing cline cit; do
         continue
     fi
 
+    # A placeholder names the form, not text in the file: plans quote this checker's own advice as
+    # `` bin/keel#<text from the line> ``. It is words in angle brackets; anything else in them, such
+    # as `<!-- keel:begin -->`, is real text and is checked.
     case "$phrase" in
-        # A placeholder names the form, not text in the file: plans quote this checker's own advice
-        # as `` bin/keel#<text from the line> ``.
-        "<"*">") continue ;;
+        "<"*">")
+            inner="${phrase#<}"; inner="${inner%>}"
+            case "$inner" in *[!A-Za-z0-9\ _-]*) ;; *) continue ;; esac ;;
+    esac
+
+    case "$phrase" in
         *"|"*)
             report "$citing:$cline cites \`$cit\`, and the phrase contains a pipe. docs/profile-keys.md renders these citations inside a markdown table, where a pipe ends the cell. Choose a phrase without one."
             continue ;;

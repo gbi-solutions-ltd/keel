@@ -300,6 +300,20 @@ m_placeholder_phrase() {
 }
 run "a phrase that is one placeholder in angle brackets is ignored" 0 m_placeholder_phrase
 
+# Markdown pads a span whose content ends in a backtick, so `` path#Run `keel` `` is the shape such
+# a phrase takes, and the closing backtick of `keel` must not be read as the start of the span's end.
+m_double_phrase_ends_tick_gone() {
+    printf 'By phrase: `` tests/evals/results.md#Run `keel` ``.\n' >> "$1/docs/ideas/example.md"
+}
+run "a double-backtick phrase ending in a backtick is rejected when the text is gone" 1 m_double_phrase_ends_tick_gone
+
+# A placeholder is words. Angle brackets around anything else are real text, such as the markers
+# keel writes into CLAUDE.md, and a citation of one goes stale like any other.
+m_marker_phrase_gone() {
+    printf 'The block starts at `tests/evals/results.md#<!-- keel:begin -->`.\n' >> "$1/docs/ideas/example.md"
+}
+run "a phrase in angle brackets that is not a placeholder is still checked" 1 m_marker_phrase_gone
+
 # Case 7. skills/repo-snapshot/references/section-templates.md carries
 # `.github/workflows/deploy.yml:34` inside a fenced block, as an example of what a filled-in
 # snapshot looks like for somebody else's repository. It is the only citation in the whole tree that
