@@ -10,7 +10,7 @@
 # 13 ask rules have no counterpart.
 #
 # NOTHING HERE FAKES THE MISSING 13. A rule that looks like a prompt and is not one is the failure
-# this whole design exists to prevent, and tests/test-keel.sh fails the build on a `Bash(`, an
+# this whole design exists to prevent, and tests/test-keel-4.sh fails the build on a `Bash(`, an
 # `"ask"` or a `prompt` appearing in what this writes.
 
 # `deny|<path glob>` and `ask|<rule>`, the same shape claude.sh prints, because cmd_init counts both

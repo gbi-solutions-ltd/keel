@@ -19,9 +19,9 @@
 # it as a no-op.
 #
 # THE BODIES BELOW WERE MOVED, NOT REWRITTEN. Every byte of what `keel init` writes on Claude Code
-# is asserted against the pre-refactor commit by tests/test-keel.sh, which builds the baseline from
-# a worktree at KEEL_BASELINE_REF rather than from a committed fixture. A tidy-up inside a moved
-# function is how that assertion gets broken by accident, so there were none.
+# is asserted against the pre-refactor commit by tests/test-keel-4.sh, which builds the baseline
+# from a worktree at KEEL_BASELINE_REF rather than from a committed fixture. A tidy-up inside a
+# moved function is how that assertion gets broken by accident, so there were none.
 
 # Both reports below read the same settings files, so they are one interpreter start and one parse
 # rather than two of each. Filled on the first lookup and never again in this process.
@@ -591,7 +591,7 @@ _claude_doctor_editor() {
 # string below carries its own Python indentation, and re-indenting the shell around it silently
 # de-indented `sys.exit(1)` out of its `if`. Python then failed, `age` came back empty, and doctor
 # reported the marketplace as not registered on a machine where it is. Caught by the doctor baseline
-# comparison in tests/test-keel.sh, which is the only thing that would have.
+# comparison in tests/test-keel-4.sh, which is the only thing that would have.
 _claude_doctor_marketplace() {
     local found="" cfg age="" stale_days=7
     for cfg in "${CLAUDE_CONFIG_DIR:-}" "$HOME/.claude"; do
