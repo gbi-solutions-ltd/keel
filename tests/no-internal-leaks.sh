@@ -10,7 +10,8 @@
 # `payments-api`, "a partner bank", `PROD-042-requirements.md`.
 #
 # Usage: tests/no-internal-leaks.sh   (from the repository root)
-# Exits 0 when clean, 1 on any match.
+# Exits 0 when clean, 1 on any match, and 1 before scanning when a deny list pattern is not a
+# valid regular expression.
 #
 # NOTE, BEFORE THIS REPOSITORY IS EVER MADE PUBLIC: the deny list below is itself the disclosure.
 # It is the one file that enumerates who we work with, and it necessarily contains the names in
@@ -83,6 +84,16 @@ fi
 # and still prints OK is worse than one that fails, and nothing else would tell the reader. Printed
 # after --list-patterns so that stays machine readable.
 printf 'mode  %s\n' "$deny_mode"
+
+# A pattern grep cannot compile matches nothing and says nothing, so the scan below would call a
+# tree clean while that name went unchecked. Refuse instead, naming the deny list line, never the
+# pattern.
+if [ "${#DENY_INVALID[@]}" -gt 0 ]; then
+    for invalid_where in "${DENY_INVALID[@]}"; do
+        printf 'FAIL  %s: not a valid pattern\n' "$invalid_where"
+    done
+    exit 1
+fi
 
 # Files this scanner should not read: itself and its tests, which must contain the patterns in
 # order to test for them.

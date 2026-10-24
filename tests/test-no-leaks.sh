@@ -354,5 +354,154 @@ zephyr-ledger
   && ok "tests/no-internal-leaks.sh --list-patterns prints the five patterns, generic first" \
   || bad "--list-patterns through the loader" "got: $(printf '%s' "$got" | tr '\n' ' ')"
 
+# ---- the loader validates what it reads: DENY_INVALID -------------------------------------------
+#
+# The broken list: line 1 a comment, line 2 Quillbank, line 3 an unclosed parenthesis, line 4
+# \bQBK\b, line 5 an unclosed bracket. grep exits 2 on lines 3 and 5, and every caller discards
+# grep's errors, so before the loader tried each pattern they matched nothing and said nothing.
+write_broken_list() {
+    printf '%s\n' '# invented identifiers, two of them not valid' 'Quillbank' 'Quill(bank' \
+      '\bQBK\b' 'zephyr[ledger' > "$DENY_DIR/broken.txt"
+}
+write_broken_list
+
+# probe_inv <file>: what deny_load leaves in the five names, joined, under set -u as the scanners
+# source it.
+probe_inv() {
+    KEEL_DENY_FILE="$1" bash -c '
+        set -u
+        . "$0" 2>/dev/null || { printf "no loader\n"; exit 0; }
+        deny_load
+        printf "rc=%s\n" "$?"
+        IFS="|"
+        printf "pat=%s|\n" "${DENY[*]}"
+        printf "where=%s|\n" "${DENY_WHERE[*]}"
+        printf "loaded=%s\n" "$DENY_LOADED"
+        printf "invalid=%s|\n" "${DENY_INVALID[*]-}"
+    ' "$LOADER" 2>&1
+}
+
+got="$(probe_inv "$DENY_DIR/broken.txt")"
+want='rc=0
+pat=/Users/[a-z]|/home/[a-z]|Quillbank|\bQBK\b|
+where=generic pattern 1|generic pattern 2|deny list line 2|deny list line 4|
+loaded=2
+invalid=deny list line 3|deny list line 5|'
+[ "$got" = "$want" ] \
+  && ok "the loader leaves out a pattern that does not compile and lists its line in DENY_INVALID" \
+  || bad "the loader over the broken list" "got: $(printf '%s' "$got" | tr '\n' ' ')"
+
+# An empty DENY_INVALID is safe to count under set -u, for a list with nothing wrong and for no
+# list.
+for f in loader.txt definitely-absent.txt; do
+    got="$( KEEL_DENY_FILE="$DENY_DIR/$f" bash -c \
+              'set -u; . "$0" 2>/dev/null && deny_load && printf "%s" "${#DENY_INVALID[@]}"' "$LOADER" 2>&1 )"
+    [ "$got" = "0" ] \
+      && ok "DENY_INVALID is empty under set -u for $f" \
+      || bad "DENY_INVALID under set -u for $f" "got: $got"
+done
+
+# Reset on every call: the broken list and then the five-pattern list, in one shell.
+got="$( KEEL_DENY_FILE="$DENY_DIR/broken.txt" bash -c '
+    set -u
+    . "$0" 2>/dev/null || exit 0
+    deny_load
+    first="${#DENY_INVALID[@]}"
+    KEEL_DENY_FILE="$1"
+    deny_load
+    printf "%s then %s" "$first" "${#DENY_INVALID[@]}"
+' "$LOADER" "$DENY_DIR/loader.txt" 2>&1 )"
+[ "$got" = "2 then 0" ] \
+  && ok "deny_load resets DENY_INVALID on every call" \
+  || bad "deny_load resets DENY_INVALID" "got: $got"
+
+# Locale. A pattern compiles in one locale and not in another, keel scan greps under C and the
+# scanner in the caller's locale, so the loader tries both. Each case runs the loader in a child
+# shell with LC_ALL set. A locale that is not installed is skipped, and C always is.
+printf '%s\n' 'caf[[=é=]]' '[ä-é]' > "$DENY_DIR/locale.txt"
+
+# find_locale <name>: the name as `locale -a` prints it, matched case-insensitively with hyphens
+# dropped, or nothing.
+find_locale() {
+    local want l
+    want="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -d '-')"
+    while IFS= read -r l; do
+        if [ "$(printf '%s' "$l" | tr '[:upper:]' '[:lower:]' | tr -d '-')" = "$want" ]; then
+            printf '%s' "$l"
+            return 0
+        fi
+    done < <(locale -a 2>/dev/null)
+    return 0
+}
+
+# invalid_under <locale name>: DENY_INVALID of the locale list, joined, loaded under that locale.
+invalid_under() {
+    KEEL_DENY_FILE="$DENY_DIR/locale.txt" LC_ALL="$1" bash -c '
+        . "$0" 2>/dev/null || { printf "no loader"; exit 0; }
+        deny_load
+        IFS="|"
+        printf "%s|" "${DENY_INVALID[*]-}"
+    ' "$LOADER" 2>&1
+}
+
+for want_loc in C en_US.UTF-8 C.utf8; do
+    loc="$(find_locale "$want_loc")"
+    if [ -z "$loc" ]; then
+        printf '  SKIP  caf[[=é=]] under LC_ALL=%s: locale %s is not installed\n' "$want_loc" "$want_loc"
+        printf '  SKIP  [ä-é] under LC_ALL=%s: locale %s is not installed\n' "$want_loc" "$want_loc"
+        continue
+    fi
+    got="$(invalid_under "$loc")"
+    case "$got" in
+        "deny list line 1|"*|*"|deny list line 1|"*) ok "caf[[=é=]] is in DENY_INVALID under LC_ALL=$loc" ;;
+        *) bad "caf[[=é=]] under LC_ALL=$loc" "got: $got" ;;
+    esac
+    # The expectation comes from grep: invalid exactly when it exits 2 under this locale or under C.
+    LC_ALL="$loc" grep -E -q -- '[ä-é]' < /dev/null 2>/dev/null; r_here=$?
+    LC_ALL=C grep -E -q -- '[ä-é]' < /dev/null 2>/dev/null; r_c=$?
+    if [ "$r_here" -eq 2 ] || [ "$r_c" -eq 2 ]; then
+        case "$got" in
+            *"deny list line 2|"*) ok "[ä-é] is in DENY_INVALID under LC_ALL=$loc, as grep says" ;;
+            *) bad "[ä-é] under LC_ALL=$loc" "grep exits $r_here here and $r_c under C, got: $got" ;;
+        esac
+    else
+        case "$got" in
+            *"deny list line 2|"*) bad "[ä-é] under LC_ALL=$loc" "grep compiles it, got: $got" ;;
+            *) ok "[ä-é] is loaded under LC_ALL=$loc, as grep says" ;;
+        esac
+    fi
+done
+
+# The scanner refuses before it scans: the mode line, one FAIL per invalid pattern, exit 1, and
+# nothing else, not even the finding for Quillbank that the fixture holds.
+root="$(fixture)"
+printf '\nWe integrate with Quillbank rails.\n' >> "$root/skills/example/SKILL.md"
+got="$( cd "$root" && KEEL_DENY_FILE="$DENY_DIR/broken.txt" "$SCANNER" 2>&1 )"
+rc=$?
+want="mode  internal deny list loaded from $DENY_DIR/broken.txt (2 patterns)
+FAIL  deny list line 3: not a valid pattern
+FAIL  deny list line 5: not a valid pattern"
+[ "$got" = "$want" ] \
+  && ok "the scanner prints the mode line and one FAIL per invalid pattern, and nothing else" \
+  || bad "the scanner over the broken list" "got: $(printf '%s' "$got" | tr '\n' '|')"
+[ "$rc" -eq 1 ] && ok "... and exits 1" || bad "the scanner over the broken list exit" "got $rc"
+case "$got" in
+    *"project-specific identifier"*|*"Quill("*|*"zephyr["*)
+        bad "the scanner prints no finding and no pattern" "got: $(printf '%s' "$got" | tr '\n' '|')" ;;
+    *) ok "... prints no finding and no pattern" ;;
+esac
+rm -rf "$root"
+
+# --list-patterns still prints what is loaded: the four valid patterns, generic first.
+got="$( cd "$(dirname "$SCANNER")/.." && KEEL_DENY_FILE="$DENY_DIR/broken.txt" "$SCANNER" --list-patterns )"
+rc=$?
+want='/Users/[a-z]
+/home/[a-z]
+Quillbank
+\bQBK\b'
+[ "$got" = "$want" ] && [ "$rc" -eq 0 ] \
+  && ok "--list-patterns over the broken list prints the four valid patterns, generic first, exit 0" \
+  || bad "--list-patterns over the broken list" "rc=$rc got: $(printf '%s' "$got" | tr '\n' ' ')"
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

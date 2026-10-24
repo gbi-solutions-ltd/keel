@@ -2224,8 +2224,8 @@ scan_push() {   # scan_push <remote> <commit>
 # `keel scan --leaks <remote> [<object>:<ref>]...` checks the commits those pushes carry, by the
 # walk scan_push makes: for each, its message, its author and committer, its paths, and the files it
 # added, modified or changed in type. `keel scan --leaks-message <file>` checks one text file, such
-# as a message or a pull request body. Exit 0 with no finding, 1 with any, 2 on a usage error or a
-# history that cannot be read.
+# as a message or a pull request body. Exit 0 with no finding, 1 with any, 2 on a usage error, a
+# history that cannot be read, or a deny list holding a pattern that is not valid.
 
 # shellcheck source=lib/deny-list.sh
 . "$HERE/lib/deny-list.sh"
@@ -2431,7 +2431,7 @@ leak_push() {
 
 # leak_scan --leaks <remote> [<object>:<ref>]...   or   leak_scan --leaks-message <file>
 leak_scan() {
-    local mode="$1" shown work line hit name rest which l ci k u pi
+    local mode="$1" shown work line hit name rest which l ci k u pi where
     local nrefs=0 ncommits=0 ntags=0 nentries=0 nblobs=0 found=0
     local csha=() c7=() tag7=() eci=() epath=() fed=() ign=() pm=()
     shift
@@ -2443,6 +2443,15 @@ leak_scan() {
         say "leak guard: deny list loaded from $shown ($DENY_LOADED patterns)"
     else
         say "leak guard: WARNING no deny list at $shown, so only the 2 generic patterns ran. Client names are not checked on this machine."
+    fi
+    # A pattern grep cannot compile matches nothing and says nothing, so scanning on would report a
+    # clean push with that name unchecked. Name each deny list line, never its pattern, and refuse.
+    if [ "${#DENY_INVALID[@]}" -gt 0 ]; then
+        for where in "${DENY_INVALID[@]}"; do
+            say "leak guard: $where: not a valid pattern, so it checked nothing"
+        done
+        say "leak guard: refusing to scan: fix the deny list at $shown"
+        return 2
     fi
     case "$mode" in
         --leaks)         [ "$#" -ge 1 ] || { leak_usage; return 2; } ;;
@@ -3362,6 +3371,8 @@ cmd_guard() {
                     lshown="$(leak_deny_shown)"
                     if [ ! -x "$d/commit-msg" ] || ! grep -qF "$GUARD_MARK" "$d/commit-msg"; then
                         say "leak guard: on, but commit-msg is missing or not keel's. Re-run 'keel guard install --leak-guard'"
+                    elif [ "${#DENY_INVALID[@]}" -gt 0 ]; then
+                        say "leak guard: on, but ${#DENY_INVALID[@]} deny list pattern(s) are not valid, so scans refuse. See 'keel scan --leaks-message <file>'"
                     elif [ -f "$DENY_FILE" ]; then
                         say "leak guard: on, deny list loaded ($DENY_LOADED patterns)"
                     else

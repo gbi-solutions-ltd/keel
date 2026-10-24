@@ -389,7 +389,8 @@ The leak guard: what a push, or a message, carries that must not reach a public 
 against the internal deny list. `<object>` is a commit or tag id and `<ref>` the remote ref it is
 pushed to; a ref name cannot hold a colon, so the split is unambiguous. Exit 0 with no finding, 1
 with any, and 2 on a usage error, an object that is neither a commit nor a tag, a message file that
-cannot be read, or a history walk that fails.
+cannot be read, a history walk that fails, or a deny list holding a pattern that is not a valid
+regular expression.
 
 The deny list is one file of patterns, one extended regular expression per line, with `#` comments
 and blank lines ignored, read from `$KEEL_DENY_FILE` or else `keel/internal-deny-list.txt` under
@@ -399,6 +400,18 @@ names is itself the disclosure. `tests/no-internal-leaks.sh` reads it through th
 the two common prefixes. The first line printed says which mode this was: the list loaded, with its
 path and pattern count, or a warning that no list was found and that client names are not checked on
 this machine.
+
+A pattern that is not a valid extended regular expression, such as one with a parenthesis left open,
+is refused rather than skipped. grep cannot compile it, so it would match nothing, and the scan
+would print its mode line and no findings while that name went unchecked. The loader tries each
+pattern from the file with `grep -E` over empty input as it reads it, once in the caller's locale
+and once in the C locale `keel scan` greps in, since what compiles can differ between them, and
+leaves out each one that does not compile in either; the count in the mode line is of the valid
+patterns. After the mode line the scan prints `leak guard: deny list line <n>: not a valid pattern,
+so it checked nothing` for each, then `leak guard: refusing to scan: fix the deny list at <path>`,
+and exits 2 having checked nothing. The pattern itself is never printed: open the file at line
+`<n>`. `tests/no-internal-leaks.sh` prints `FAIL  deny list line <n>: not a valid pattern` for each,
+after its mode line, and exits 1 before it scans.
 
 What is checked, for every commit in range: each line of its message, subject, body and trailers;
 its author and committer names and emails; every path it added, modified or changed in type; and the
@@ -905,9 +918,15 @@ hook above states for the supply chain scan, which keeps it: the owner decided o
 the leak guard is opted into, and what it guards against cannot be removed once pushed. With
 `LEAK_GUARD=0` the hook runs only the checks listed above.
 
+A deny list holding a pattern that is not valid fails closed as well: `keel scan` exits 2 after
+naming the deny list line to fix, and the `pre-push` hook refuses with `keel guard: push refused by
+the leak guard.`, a push that only deletes a branch included, while the `commit-msg` hook refuses
+with its `nothing was checked. Commit refused.` line.
+
 `keel guard status` adds one `leak guard:` line after its others when the installed `pre-push` holds
 `LEAK_GUARD=1`: on with the deny list loaded and its pattern count, on with a warning that no deny
-list was found, or on with `commit-msg` missing or not keel's. It adds nothing otherwise.
+list was found, on with `commit-msg` missing or not keel's, or on with the number of deny list
+patterns that are not valid, so that every scan refuses. It adds nothing otherwise.
 
 What the leak guard does not cover. `git push --no-verify` and `git commit --no-verify` skip both
 hooks. And nothing made on GitHub passes through a hook: merge commits, pull request titles and
