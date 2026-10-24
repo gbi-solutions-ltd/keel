@@ -146,10 +146,40 @@ Fix the check, then pin the case in the relevant test file as a must-not-reject.
 asymmetric: too loose misses a defect, too strict teaches people to ignore checks, and the second is
 unrecoverable.
 
+## Branches, pull requests and sign-off
+
+The repository is public, and so is every branch pushed to it. Work happens on a short-lived branch
+from `main` and reaches `main` through a pull request. `main` is always releasable.
+
+Every commit carries `Signed-off-by:` for its author under the Developer Certificate of Origin
+(`git commit -s`). The `DCO sign-off` job (`tests/check-dco.sh`) checks it on every pull request,
+with merge commits and bot commits exempt. Fix a missing sign-off with `git rebase --signoff main`.
+Where the leak guard is installed, its `commit-msg` hook adds the sign-off for the configured
+identity, so a maintainer's commits carry it without `-s`. There is no CLA.
+
+Report a vulnerability by email as `SECURITY.md` says, never in an issue.
+
+Maintainers holding the deny list run `keel guard install --leak-guard` in their main working copy.
+
+An audit a skill writes to `docs/audits/` is committed in that clone, never in this repository:
+
+```
+git -C docs/audits add <file>
+git -C docs/audits commit -s -m "audits: <file>"
+git -C docs/audits push
+```
+
+`git status` in this repository shows nothing for it, because the directory is ignored.
+
+Commit SHAs cited in `CHANGELOG.md`, `tests/evals/results.md`, `docs/plans/` and `docs/ideas/` for
+work before v0.26.0 name commits in the private repository keel was developed in until then, which
+is archived, so they do not resolve in this one.
+
 ## Commits and review
 
 - Conventional commits: `type(scope): summary`.
-- **No attribution footers.** No `Co-Authored-By`, no robot emoji, no generated-with line.
+- **Trailers.** `Signed-off-by` on every commit. `Co-Authored-By` may stay. No `Claude-Session`
+  line: the leak guard's `commit-msg` hook removes it. No robot emoji and no generated-with line.
 - No em or en dashes, in the message as well as the code.
 - Say *why*, not just what. If a test or a real repository changed your mind, that belongs in the
   message; it is the most valuable thing in the history.
@@ -158,9 +188,11 @@ unrecoverable.
   because tasks that run side by side and each write the same record would conflict at the merge. A
   status line claiming 3 of 19 when 5 exist makes every other claim suspect.
 
-**Review:** either Bernard Tebandeke or `gfsekamanya`, and never the change's own author. Both are
-not required; requiring both would stall the tool whenever one is busy, which is how internal
-tooling dies.
+**Review:** either Bernard Tebandeke or `gfsekamanya` reviews, and either suffices. Neither
+reviews a change they wrote: **no change is merged by its own author unreviewed**. Both are not
+required; requiring both would stall the tool whenever one is busy, which is how internal tooling
+dies. An outside contributor cannot merge their own change, because merging needs write access and
+`main` requires an approving review.
 
 ## Releases
 

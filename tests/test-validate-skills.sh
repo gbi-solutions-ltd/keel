@@ -1306,5 +1306,52 @@ m_agent_healthy() {
 check_reports "a healthy agents directory does not trip the floor" no \
   "read no agent file" m_agent_healthy
 
+# Withheld paths (tests/withheld.sh). docs/audits is a clone of a private repository, absent on a
+# contributor's machine. A link into it is skipped while the directory is absent and checked while
+# it is present, and a document inside it is never one of the documents these checks read.
+m_wh_runbook() {
+    mkdir -p "$1/docs/runbooks"
+    printf '# R\n\nSee [the audit](../audits/2026-01-01-security.md).\n' > "$1/docs/runbooks/r.md"
+}
+m_wh_runbook_empty_dir() { m_wh_runbook "$1"; mkdir -p "$1/docs/audits"; }
+m_wh_runbook_file() {
+    m_wh_runbook "$1"
+    mkdir -p "$1/docs/audits"
+    printf '# Audit\n' > "$1/docs/audits/2026-01-01-security.md"
+}
+run "a docs link into an absent withheld directory is skipped" 0 m_wh_runbook
+run "a docs link into a present, empty withheld directory is checked" 1 m_wh_runbook_empty_dir
+run "a docs link to a present withheld file passes" 0 m_wh_runbook_file
+check_reports "a present withheld directory still reports the broken docs link" yes \
+  "broken link" m_wh_runbook_empty_dir
+
+m_wh_skill_links() {
+    printf '\nSee [the audit](../../docs/audits/x.md).\n' >> "$1/skills/example/SKILL.md"
+    printf '# Thing\n\nSee [the audit](../../../docs/audits/x.md).\n' \
+        > "$1/skills/example/references/thing.md"
+}
+m_wh_skill_links_dir() { m_wh_skill_links "$1"; mkdir -p "$1/docs/audits"; }
+check_reports "a skill and a reference linking into an absent withheld directory are skipped" no \
+  "broken link" m_wh_skill_links
+check_reports "a skill link into a present withheld directory is checked" yes \
+  "skills/example/SKILL.md: broken link to ../../docs/audits/x.md" m_wh_skill_links_dir
+check_reports "a reference link into a present withheld directory is checked" yes \
+  "skills/example/references/thing.md: broken link to ../../../docs/audits/x.md" m_wh_skill_links_dir
+
+# A withheld document is never a document of the dash and link checks, present or not.
+wh_stale_text() {
+    printf '# Audit\n\nA dash %s here, and [a link](missing.md).\n' "$(printf '\xe2\x80\x94')"
+}
+m_wh_audit_document() {
+    mkdir -p "$1/docs/audits"
+    wh_stale_text > "$1/docs/audits/a.md"
+}
+m_wh_plan_document() {
+    mkdir -p "$1/docs/plans"
+    wh_stale_text > "$1/docs/plans/p.md"
+}
+run "a withheld document with a dash and a broken link is not checked" 0 m_wh_audit_document
+run "the same text in a plan is checked" 1 m_wh_plan_document
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

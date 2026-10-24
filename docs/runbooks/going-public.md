@@ -1,8 +1,8 @@
 # Runbook: making this repository public
 
-**EXECUTED 2026-08-17.** This repository is `gbi-solutions-ltd/keel-internal` and remains private.
-The public repository is `gbi-solutions-ltd/keel`, a fresh tree of 158 files at two commits, MIT
-licensed, CI green. Executed as `docs/plans/2026-08-17-go-public.md`.
+**EXECUTED 2026-08-17; superseded for this repository on 2026-10-22,** when development moved
+into the public repository `gbi-solutions-ltd/keel`; `gbi-solutions-ltd/keel-internal` was archived
+read-only at v0.26.0. The steps below remain the record, and the route for the next one published.
 
 The three decisions taken first, by Bernard:
 
@@ -253,6 +253,9 @@ tests/no-internal-leaks.sh            # clean, and printing that it ran in fallb
 Then change visibility.
 
 ## 7a. Publishing an update, after the first release
+
+This section is obsolete for this repository since 2026-10-22: there is no export, and a change
+that is not a release lands through a pull request like any other.
 
 **For a release, use [`cutting-a-release.md`](cutting-a-release.md) instead.** It carries this
 section's export and sync steps plus the eval gate, the version bump, the tags and the release

@@ -378,5 +378,86 @@ m_fixture_path_in_eval_log() {
 }
 run "a citation into a staged fixture tree in the eval log is not flagged" 0 m_fixture_path_in_eval_log
 
+# Withheld paths (tests/withheld.sh). docs/audits is a clone of a private repository, absent on a
+# contributor's machine. A citation into it is skipped while the directory is absent and checked
+# while it is present, and a document inside it is never one of the documents these checks read.
+check_says() {   # check_says <name> <yes|no> <needle> <mutate-fn>
+    local name="$1" want="$2" needle="$3" mutate="$4"
+    local root; root="$(mktemp -d)"
+    fixture_valid "$root"
+    "$mutate" "$root"
+    local out; out="$( cd "$root" && "$CHECKER" 2>&1 )"
+    rm -rf "$root"
+    local saw=no
+    case "$out" in *"$needle"*) saw=yes ;; esac
+    if [ "$saw" = "$want" ]; then
+        printf '  PASS  %s\n' "$name"; pass=$((pass+1))
+    else
+        printf '  FAIL  %s (wanted saw=%s, got saw=%s)\n' "$name" "$want" "$saw"; fail=$((fail+1))
+    fi
+}
+
+# wh_plan <root> <citing line>: docs/plans/p.md holding that line outside any fence.
+wh_plan() {
+    mkdir -p "$1/docs/plans"
+    printf '# Plan\n\n%s\n' "$2" > "$1/docs/plans/p.md"
+}
+# wh_audit <root> <lines>: docs/audits/a.md of that many non-blank lines.
+wh_audit() {
+    local i
+    mkdir -p "$1/docs/audits"
+    : > "$1/docs/audits/a.md"
+    for i in $(seq 1 "$2"); do printf 'line %s\n' "$i" >> "$1/docs/audits/a.md"; done
+}
+
+m_wh_root_absent()  { wh_plan "$1" 'See `docs/audits/a.md:3`.'; }
+m_wh_rel_absent()   { wh_plan "$1" 'See `../audits/a.md:3`.'; }
+m_wh_root_nofile()  { m_wh_root_absent "$1"; mkdir -p "$1/docs/audits"; }
+m_wh_rel_nofile()   { m_wh_rel_absent "$1"; mkdir -p "$1/docs/audits"; }
+m_wh_root_five()    { m_wh_root_absent "$1"; wh_audit "$1" 5; }
+m_wh_rel_five()     { m_wh_rel_absent "$1"; wh_audit "$1" 5; }
+m_wh_root_two()     { m_wh_root_absent "$1"; wh_audit "$1" 2; }
+m_wh_rel_two()      { m_wh_rel_absent "$1"; wh_audit "$1" 2; }
+run "a citation of a withheld file, root form, is skipped while the directory is absent" 0 m_wh_root_absent
+run "a citation of a withheld file, relative form, is skipped while the directory is absent" 0 m_wh_rel_absent
+run "a root-form citation of a missing file in a present withheld directory fails" 1 m_wh_root_nofile
+run "a relative citation of a missing file in a present withheld directory fails" 1 m_wh_rel_nofile
+check_says "the root-form failure names a file that does not exist" yes "does not exist" m_wh_root_nofile
+check_says "the relative failure names a file that does not exist" yes "does not exist" m_wh_rel_nofile
+run "a root-form citation of line 3 of a five line withheld file passes" 0 m_wh_root_five
+run "a relative citation of line 3 of a five line withheld file passes" 0 m_wh_rel_five
+run "a root-form citation past the end of a two line withheld file fails" 1 m_wh_root_two
+run "a relative citation past the end of a two line withheld file fails" 1 m_wh_rel_two
+check_says "the root-form failure names the length" yes "is 2 lines long" m_wh_root_two
+check_says "the relative failure names the length" yes "is 2 lines long" m_wh_rel_two
+
+# A missing file outside the withheld path still fails with no withheld directory present.
+m_wh_other_missing() { wh_plan "$1" 'See `docs/plans/missing.md:3`.'; }
+run "a citation of a missing file that is not withheld still fails" 1 m_wh_other_missing
+
+# The phrase form has its own missing-file branch and gets the same two checks.
+m_wh_phrase_absent() { wh_plan "$1" 'See `docs/audits/a.md#some text`.'; }
+m_wh_phrase_nofile() { m_wh_phrase_absent "$1"; mkdir -p "$1/docs/audits"; }
+run "a phrase citation of a withheld file is skipped while the directory is absent" 0 m_wh_phrase_absent
+run "a phrase citation of a missing file in a present withheld directory fails" 1 m_wh_phrase_nofile
+check_says "the phrase failure names a file that does not exist" yes "does not exist" m_wh_phrase_nofile
+
+# A withheld document is never a citing document, present or not.
+wh_stale_text() {
+    printf '# Audit\n\nSee `docs/b.md:99999`, and a dash %s here.\n' "$(printf '\xe2\x80\x94')"
+}
+m_wh_audit_citing() {
+    mkdir -p "$1/docs/audits"
+    printf '# B\n\nTwo lines.\n' > "$1/docs/b.md"
+    wh_stale_text > "$1/docs/audits/a.md"
+}
+m_wh_plan_citing() {
+    mkdir -p "$1/docs/plans"
+    printf '# B\n\nTwo lines.\n' > "$1/docs/b.md"
+    wh_stale_text > "$1/docs/plans/p.md"
+}
+run "a withheld document's stale citation is not checked" 0 m_wh_audit_citing
+run "the same text in a plan is checked" 1 m_wh_plan_citing
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

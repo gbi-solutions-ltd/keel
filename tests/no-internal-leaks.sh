@@ -23,40 +23,17 @@
 # here, because every reporting helper returns 0 explicitly: see the `return 0` on each below. That
 # makes the invariant shellcheck cannot see a stated fact in the code rather than an assumption.
 # shellcheck disable=SC2015
-set -uo pipefail
+set -uo pipefail; . "$(dirname "${BASH_SOURCE[0]}")/../lib/deny-list.sh"
 
 errors=0
 report() { printf 'FAIL  %s\n' "$1"; errors=$((errors+1)); return 0; }
 
-# Generic patterns. These stay in the tree because they disclose nothing: a developer's absolute path
-# helps nobody else and dates the moment they change laptop.
-DENY=( '/Users/[a-z]' '/home/[a-z]' )
-
-# Client and partner identifiers are loaded from a file outside this tree, because the list is itself
-# the disclosure. It was the one file that enumerated who we work with, and it must contain the names
-# in order to search for them, so the guard against disclosure had become the disclosure. Decision 2
-# in docs/07-open-decisions.md required this before any public release, and 2026-08-17 is that release.
-#
-# One pattern per line, ERE, `#` comments and blank lines ignored. Absent is a legitimate state: a CI
-# runner on a fork has no list, exactly as it has no marketplace registered. When it is absent the
-# generic patterns above still run, so the scan degrades rather than going quiet, and either way the
-# mode is printed before any finding.
-#
-# What is not covered, and the format that would fix it. tests/test-no-leaks.sh proves the mechanism
-# with invented names; it can no longer prove that every pattern in the real list still matches
-# something, because it no longer has the real list. Giving this file a `pattern<TAB>sample` format
-# would restore that check whenever it is present, and it is the better end state. It was not built
-# here because the mechanism came first.
-DENY_FILE="${KEEL_DENY_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/keel/internal-deny-list.txt}"
+# The generic patterns and the deny list file, and why the list lives outside this tree, are in
+# lib/deny-list.sh, which loads them for this script and for `keel scan --leaks`.
+deny_load
 deny_mode="generic patterns only, no internal deny list at $DENY_FILE"
 if [ -f "$DENY_FILE" ]; then
-    loaded=0
-    while IFS= read -r line || [ -n "$line" ]; do
-        case "$line" in ''|\#*) continue ;; esac
-        DENY+=( "$line" )
-        loaded=$((loaded+1))
-    done < "$DENY_FILE"
-    deny_mode="internal deny list loaded from $DENY_FILE ($loaded patterns)"
+    deny_mode="internal deny list loaded from $DENY_FILE ($DENY_LOADED patterns)"
 fi
 
 # Decision 2 in docs/07-open-decisions.md keeps GBi-specific content inside named reference files,

@@ -171,6 +171,7 @@ keel/
 │   ├── apex_render.py
 │   ├── context_watch.py
 │   ├── detect-stack.sh
+│   ├── deny-list.sh
 │   ├── merge-claude-md.sh
 │   └── subagent_statusline.py
 │
@@ -185,7 +186,7 @@ keel/
 │   └── keel-terse.md
 │
 ├── tests/
-│   ├── export-public.sh
+│   ├── check-dco.sh
 │   ├── generate-profile-keys.sh
 │   ├── grep-quiet.sh
 │   ├── no-internal-leaks.sh
@@ -194,6 +195,7 @@ keel/
 │   ├── test-agents.sh
 │   ├── test-apex-export.sh
 │   ├── test-cache-install.sh
+│   ├── test-check-dco.sh
 │   ├── test-ci-review.sh
 │   ├── test-context-watch.sh
 │   ├── test-doc-claims.sh
@@ -201,6 +203,7 @@ keel/
 │   ├── test-eval-harness.sh
 │   ├── test-grep-quiet.sh
 │   ├── test-keel.sh
+│   ├── test-leak-guard.sh
 │   ├── test-no-leaks.sh
 │   ├── test-profile-keys.sh
 │   ├── test-review-guard.sh
@@ -210,8 +213,10 @@ keel/
 │   ├── test-supply-chain.sh
 │   ├── test-validate-citations.sh
 │   ├── test-validate-skills.sh
+│   ├── test-withheld.sh
 │   ├── validate-citations.sh
 │   ├── validate-skills.sh
+│   ├── withheld.sh
 │   ├── fixtures/                       # per-stack detection fixtures, and an APEX capture
 │   ├── evals/                          # 21 scenarios, 21 fixtures, results.md
 │   └── plugin-evals/                   # 2 pilot cases for `claude plugin eval`, run by hand
@@ -232,7 +237,7 @@ keel/
 │   ├── profile-keys.md
 │   ├── prompting.md
 │   ├── standards.md
-│   ├── audits/
+│   ├── audits/                      # private: a clone of a separate repository, ignored by .gitignore
 │   ├── decisions/
 │   ├── ideas/
 │   ├── plans/
@@ -256,6 +261,7 @@ keel/
 ├── LICENSE
 ├── NOTICE
 ├── README.md
+├── SECURITY.md
 ├── SOURCES.md
 ├── THIRD-PARTY-LICENSES.md
 ├── VERSION

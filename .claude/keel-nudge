@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# SessionStart hook, committed to this repository by `keel init`.
+#
+# A project hook cannot see which plugins a session loaded, so this states the condition and leaves
+# the check to the reader. It prints in every session and sits in that session's context, which is
+# why it is short.
+set -eu
+
+read -r -d '' MSG <<'TXT' || true
+If you have no skills named `keel:*`, the keel plugin is not loaded in this session and the rest of
+this note applies. If you do have them, ignore it.
+
+This project expects the plugin. Without it its gates on tests, security, and review do not apply,
+and .keel/profile.json is what is left: read it before running any test, lint, or build command
+rather than assuming the stack's usual one.
+
+Install it:
+  /plugin marketplace add gbi-solutions-ltd/keel
+  /plugin install keel@gbi
+
+Continuing without it is fine for a small change.
+TXT
+
+escape() { local s="$1"; s="${s//\\/\\\\}"; s="${s//\"/\\\"}"; s="${s//$'\n'/\\n}"; printf '%s' "$s"; }
+printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$(escape "$MSG")"

@@ -52,7 +52,7 @@
 # Usage: tests/validate-citations.sh   (from the repository root)
 # Exits 0 when clean, 1 when any citation is stale.
 
-set -uo pipefail
+set -uo pipefail; . "$(dirname "${BASH_SOURCE[0]}")/withheld.sh"
 
 errors=0
 checked=0
@@ -63,7 +63,7 @@ report() { printf 'FAIL  %s\n' "$1"; errors=$((errors+1)); return 0; }
 # is 400 off.
 files=()
 while IFS= read -r f; do
-    [ -n "$f" ] && files+=("$f")
+    [ -n "$f" ] && ! withheld_under "$f" && files+=("$f")
 done < <({ find docs skills -name '*.md' 2>/dev/null
            find . -maxdepth 1 -name '*.md' 2>/dev/null | sed 's|^\./||'; })
 
@@ -142,7 +142,7 @@ while IFS=$'\t' read -r citing cline cit; do
         # CONTRIBUTING.md calls unrecoverable, and it would arrive on six citations at once.
         seg="${path%%/*}"
         case "${path##*/}" in *.*) has_ext=1 ;; *) has_ext=0 ;; esac
-        if [ "$has_ext" -eq 1 ] && [ "$seg" != "$path" ] && [ -d "$seg" ]; then
+        if [ "$has_ext" -eq 1 ] && [ "$seg" != "$path" ] && [ -d "$seg" ] && ! withheld_skip "$path" && ! withheld_skip "$dir/$path"; then
             report "$citing:$cline cites \`$cit\`, and $path does not exist. The file was renamed or deleted and the citation was left behind."
         fi
         continue
@@ -285,7 +285,7 @@ while IFS=$'\t' read -r citing cline cit; do
         # tree. Anything else is an anchor in a markdown link or another repository's path, and is
         # not this check's business.
         seg="${path%%/*}"
-        if [ "$seg" != "$path" ] && [ -d "$seg" ]; then
+        if [ "$seg" != "$path" ] && [ -d "$seg" ] && ! withheld_skip "$path" && ! withheld_skip "$dir/$path"; then
             report "$citing:$cline cites \`$cit\`, and $path does not exist. The file was renamed or deleted and the citation was left behind."
         fi
         continue

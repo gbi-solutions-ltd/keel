@@ -151,7 +151,9 @@ run "a co-tenant schema is rejected" 1 m_cotenant
 # Generic patterns, which stay in the tree because they disclose nothing. These must fire whether or
 # not a list is loaded, and the second case is the one that matters: an absent list must degrade the
 # scan, not silence it.
-m_abs_path() { printf '\nSee /Users/someone/Projects/thing for an example.\n' >> "$1/skills/example/SKILL.md"; }
+# The home-path prefixes are built from pieces, so this file holds no literal developer path: the
+# push scan of `keel scan --leaks` reads every changed file and has no skip list.
+m_abs_path() { printf '\nSee %s/Projects/thing for an example.\n' "/Us""ers/someone" >> "$1/skills/example/SKILL.md"; }
 run "an absolute home path is rejected" 1 m_abs_path
 run_no_list "an absent list still catches a developer path" 1 m_abs_path
 
@@ -204,7 +206,7 @@ The clinicDao writes a clinicaccount row; also clinicAccount, cliniccode, clinic
 Callers: registerclinic and settleclinic.
 Parsing schema WXYZ, lowercase wxyz, hosted at exampleapex.net.
 Co-tenants FIRSTCO and SECONDCO share the instance.
-Paths like /Users/someone/Projects and /home/someone/src date instantly.
+Paths like '"/Us""ers/someone"'/Projects and '"/ho""me/someone"'/src date instantly.
 ' > "$cov_root/docs/every-identifier.md"
 fired="$( ( cd "$cov_root" && KEEL_DENY_FILE="$DENY_DIR/deny.txt" "$SCANNER" 2>&1 ) | sed -n "s/.*matching '\(.*\)' ->.*/\1/p" | sort -u )"
 declared="$( KEEL_DENY_FILE="$DENY_DIR/deny.txt" "$SCANNER" --list-patterns | sort -u )"
@@ -250,10 +252,107 @@ run "GBi in a shipped output style is rejected" 1 m_gbi_in_style
 # a larger pipe buffer, and costs about a megabyte in a temp directory.
 m_many_hits() {
     mkdir -p "$1/skills/example/references"
-    awk 'BEGIN{for(i=0;i<20000;i++) print "See /Users/someone/Projects/thing line " i}' \
+    awk -v p="/Us""ers/someone" 'BEGIN{for(i=0;i<20000;i++) print "See " p "/Projects/thing line " i}' \
       > "$1/skills/example/references/big.md"
 }
 run "a leak repeated past a pipe buffer is still rejected" 1 m_many_hits
+
+# ---- the loader: lib/deny-list.sh --------------------------------------------------------------
+#
+# One loader reads the deny list for this scanner and for `keel scan --leaks`, so the two cannot
+# disagree about which file, which patterns or which line a pattern came from. Each case sources it
+# in a subshell, so nothing it sets reaches the cases above or below.
+LOADER="$(cd "$(dirname "$0")/.." && pwd)/lib/deny-list.sh"
+
+# The loader's own list, written outside any fixture tree like the one above.
+write_loader_list() {
+    printf '%s\n' '# invented identifiers for the leak guard'"'"'s tests' '' 'Quillbank' 'zephyr-ledger' \
+      '\bQBK\b' > "$DENY_DIR/loader.txt"
+}
+write_loader_list
+
+# probe <file>: what deny_load leaves behind, one line per name, and its status. The loader is
+# sourced in a child shell of its own, so nothing it sets reaches the cases above or below.
+probe() {
+    KEEL_DENY_FILE="$1" bash -c '
+        . "$0" 2>/dev/null || { printf "no loader\n"; exit 0; }
+        deny_load
+        printf "rc=%s\n" "$?"
+        printf "n=%s\n" "${#DENY[@]}"
+        printf "where=%s\n" "$(printf "%s|" "${DENY_WHERE[@]}")"
+        printf "loaded=%s\n" "$DENY_LOADED"
+        printf "file=%s\n" "$DENY_FILE"
+        printf "pat=%s\n" "$(printf "%s|" "${DENY[@]}")"
+    ' "$LOADER"
+}
+
+got="$(probe "$DENY_DIR/loader.txt")"
+want="rc=0
+n=5
+where=generic pattern 1|generic pattern 2|deny list line 3|deny list line 4|deny list line 5|
+loaded=3
+file=$DENY_DIR/loader.txt
+pat=/Users/[a-z]|/home/[a-z]|Quillbank|zephyr-ledger|\\bQBK\\b|"
+if [ "$got" = "$want" ]; then
+    ok "the loader reads five patterns and names each by its line in the file"
+else
+    bad "the loader reads five patterns" "got: $(printf '%s' "$got" | tr '\n' ' ')"
+fi
+
+got="$(probe "$DENY_DIR/definitely-absent.txt")"
+case "$got" in
+    "rc=0
+n=2
+where=generic pattern 1|generic pattern 2|
+loaded=0
+"*) ok "an absent list leaves the two generic patterns and a count of 0" ;;
+    *) bad "an absent list leaves two patterns" "got: $(printf '%s' "$got" | tr '\n' ' ')" ;;
+esac
+
+# A last line with no newline is still a pattern: `read` returns non-zero on it.
+printf 'Quillbank\nzephyr-ledger' > "$DENY_DIR/no-newline.txt"
+got="$(probe "$DENY_DIR/no-newline.txt")"
+case "$got" in
+    *"where=generic pattern 1|generic pattern 2|deny list line 1|deny list line 2|"*"loaded=2"*)
+        ok "a last line with no newline is still read" ;;
+    *) bad "a last line with no newline is still read" "got: $(printf '%s' "$got" | tr '\n' ' ')" ;;
+esac
+
+# The default location, with KEEL_DENY_FILE unset: XDG_CONFIG_HOME, then HOME/.config.
+got="$( env -u KEEL_DENY_FILE XDG_CONFIG_HOME="$DENY_DIR/xdg" bash -c \
+          '. "$0" 2>/dev/null && deny_load && printf "%s" "$DENY_FILE"' "$LOADER" )"
+[ "$got" = "$DENY_DIR/xdg/keel/internal-deny-list.txt" ] \
+  && ok "the default file is under XDG_CONFIG_HOME when KEEL_DENY_FILE is unset" \
+  || bad "the default file" "got: $got"
+
+# Every name the loader sets starts with DENY or deny_, because it is sourced into scripts that
+# have names of their own. The names a fresh shell holds are listed before and after.
+stray="$( KEEL_DENY_FILE="$DENY_DIR/loader.txt" bash -c '
+    names() { compgen -A variable; compgen -A function; }
+    : | :   # bash creates PIPESTATUS at its first pipeline, and that is not a name of the loader
+    names | sort -u > "$1/before"
+    . "$0" 2>/dev/null || exit 0
+    deny_load
+    names | sort -u > "$1/after"
+    comm -13 "$1/before" "$1/after"
+' "$LOADER" "$DENY_DIR" )"
+if [ -f "$LOADER" ] && [ -z "$(printf '%s\n' "$stray" | sed '/^DENY/d;/^deny_/d;/^names$/d;/^$/d')" ] \
+   && [ -f "$DENY_DIR/after" ]; then
+    ok "every name the loader sets starts with DENY or deny_"
+else
+    bad "the loader's names" "stray: $(printf '%s' "$stray" | tr '\n' ' ')"
+fi
+
+# The scanner loads through it and behaves as before: five patterns, the generic ones first.
+got="$( cd "$(dirname "$SCANNER")/.." && KEEL_DENY_FILE="$DENY_DIR/loader.txt" "$SCANNER" --list-patterns )"
+want='/Users/[a-z]
+/home/[a-z]
+Quillbank
+zephyr-ledger
+\bQBK\b'
+[ "$got" = "$want" ] \
+  && ok "tests/no-internal-leaks.sh --list-patterns prints the five patterns, generic first" \
+  || bad "--list-patterns through the loader" "got: $(printf '%s' "$got" | tr '\n' ' ')"
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

@@ -2,10 +2,10 @@ name: CI
 
 on:
   push:
-    # sandbox is built as well as main, because on 2026-10-17 the release commit 5f09164 reached
-    # sandbox and was first built on macOS only once a pull request existed, where
-    # `keel plan batches` failed (5b50a83). A build on the push finds that before the release.
-    branches: [main, sandbox]
+    # main only. Work reaches main through pull requests, which the pull_request trigger below
+    # builds on every push to their branch, so a branch needs no push build of its own, and a
+    # branch pushed with no pull request open is checked by the local guard alone.
+    branches: [main]
   pull_request:
 
 # Stated here because otherwise the token's scope is a repository setting nobody can see from this
@@ -115,3 +115,22 @@ jobs:
       # gating on.
       - name: Prove the scan still catches what it claims
         run: tests/test-supply-chain.sh
+
+  # On pull requests only. Every commit in the pull request carries a Signed-off-by line for its
+  # author, the Developer Certificate of Origin, checked by a script in this repository rather
+  # than a third-party app. Merge commits and bot-authored commits are exempt, for the reasons in
+  # tests/check-dco.sh. A separate job so that it can be a required check on its own.
+  dco:
+    name: DCO sign-off
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - name: Every commit is signed off by its author
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: tests/check-dco.sh "$BASE_SHA" "$HEAD_SHA"

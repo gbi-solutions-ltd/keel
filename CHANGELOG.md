@@ -7,6 +7,22 @@ versions as each skill is tested against real repositories.
 
 Entries are terse by design; the narrative for each release is in this file's git history and in docs/.
 
+## Unreleased
+
+- Development moved into the public repository. Work lands through short-lived branches and
+  pull requests into `main`, and a release is a version-bump pull request followed by an annotated
+  tag and a GitHub release in the same repository (`docs/runbooks/cutting-a-release.md`).
+  `tests/export-public.sh` is gone. The 27 audits under `docs/audits/` live in a private companion
+  repository cloned at that path and ignored by `.gitignore`; `tests/withheld.sh` holds the one
+  list of withheld paths, and the validators skip a path in it only while it is absent.
+  `keel guard install --leak-guard` adds a local leak guard: `keel scan --leaks` checks every
+  commit a push carries (files, paths, messages, author and committer, tag messages and ref names)
+  against the deny list and never prints what matched, refuses a pushed `Claude-Session:` trailer,
+  and fails closed when it cannot run; a `commit-msg` hook checks each message, removes
+  `Claude-Session:` trailers and adds a sign-off. Pull requests are checked for a
+  DCO `Signed-off-by` line by `tests/check-dco.sh`. `.claude/` is published. See
+  `CONTRIBUTING.md` and `SECURITY.md`.
+
 ## 0.26.0 - 2026-10-22
 
 - Release gate 2026-10-22 against `9d35bf3`: **seven treatment arms, all seven pass**, $2.41 in one
