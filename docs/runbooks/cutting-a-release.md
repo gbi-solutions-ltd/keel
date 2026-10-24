@@ -1,30 +1,23 @@
 # Runbook: cutting a keel release
 
-**Covers:** everything between "a release is due" and a published GitHub release on the public
-repository, including the eval gate, the three-place version bump, the merge, both tags, and the
-public export.
+**Covers:** everything between "a release is due" and a published GitHub release, all in
+`gbi-solutions-ltd/keel`: the eval gate, the version-bump pull request, the merge, the annotated
+tag on the merged commit and the GitHub release.
 
 **Does not cover:** deciding that a release is due, or which number it gets. That is the owner's
 call, and it is the first section below because getting it wrong is the one thing here that cannot
-be undone. Publishing a non-release change to the public tree is
-[`going-public.md`](going-public.md) section 7a, not this document. First publication of a
-repository is that document too.
+be undone. A change that is not a release lands through a pull request like any other. First
+publication of a repository is [`going-public.md`](going-public.md).
 
-**Executed end to end for 0.17.0 on 2026-09-01**, internal `e35df65`, public `8b3e4f2`. Every
-command below was run on that release and its output is what is quoted. The symptoms table is wider
-than one release: rows marked *recorded* come from the 2026-08-17 and 2026-08-19 runs and were not
-reproduced on this one.
+The commands of sections 0 and 1 and the version-bump steps of section 2 were run end to end for
+0.17.0 on 2026-09-01 and their output is what is quoted. The branch step in section 2 and all of
+sections 3 and 4 have not yet been run on a release. The symptoms table is wider than one release:
+rows marked *recorded* come from the 2026-08-17 and 2026-08-19 runs and were not reproduced on that
+one.
 
-Two repositories are involved and confusing them is the expensive mistake:
-
-| Name | Path | What it is |
-|---|---|---|
-| internal | `gbi-solutions-ltd/keel-internal` | This repository, private, full history, `origin` here |
-| public | `gbi-solutions-ltd/keel` | A fresh tree with no shared history, **one commit per release** |
-
-The history is not publishable: every deny pattern is reachable in it, and six files and two
-commit messages carry client identifiers. That is why the public tree is an export rather than a mirror,
-and why nothing here ever pushes this repository's history anywhere.
+There is one repository, `gbi-solutions-ltd/keel`, and it is public. Every branch pushed to it is
+public the moment it lands, so nothing goes onto a branch that is not fit to read, and the leak
+guard in section 3 runs on every push.
 
 ## 0. Before anything: three decisions
 
@@ -100,6 +93,12 @@ recorded in the CHANGELOG either way.
 
 ## 2. The version bump
 
+Do the bump on a branch `release/X.Y.Z` from `main`, never on `main` itself:
+
+```bash
+git fetch origin && git switch -c release/0.17.0 origin/main
+```
+
 **Four places, one commit, because `tests/test-keel.sh` pins them to each other:**
 
 1. `VERSION`, which drives the CLI and every project's profile
@@ -140,7 +139,7 @@ only difference, are expected; anything else is not. The second was first seen a
 ```bash
 tests/run-tests.sh          # expect the two failures above
 git add VERSION .claude-plugin/plugin.json .codex-plugin/plugin.json CHANGELOG.md
-git commit                  # "release: 0.17.0"
+git commit -s -m "release: 0.17.0"
 tests/run-tests.sh          # expect: All test files passed
 ```
 
@@ -149,36 +148,45 @@ step, printing `OK    shellcheck clean`. On a machine without it, `run-tests.sh`
 only CI runs it. Section 3's wait is not optional either way, because CI is what proves the release
 commit itself.
 
-## 3. Land it internally
+## 3. Land it
 
-All work is on `sandbox` and reaches `main` through a PR. Never commit a release on `main`.
+The release commit reaches `main` through a pull request from `release/X.Y.Z`, reviewed by someone
+other than its author.
 
-1. Push and wait for CI **on the release commit specifically**:
+1. Write the gate result into the pull request body, with any accepted failure named, and check
+   that file before anything is published, since a pull request body is public too:
    ```bash
-   git push origin sandbox
+   keel scan --leaks-message <body-file>
+   ```
+2. Push the release branch from your own terminal, and read the leak guard's mode line first:
+   ```bash
+   git push origin release/0.17.0
+   ```
+   ```
+   leak guard: deny list loaded from ~/.config/keel/internal-deny-list.txt (25 patterns)
+   ```
+   The line must say the deny list is loaded and give the owner's full count. A `WARNING no deny
+   list` line means only the 2 generic patterns ran: see Symptoms. The push is public the moment it
+   lands, so the guard is the only check between this machine and the world.
+3. Open the pull request, which is what starts CI:
+   ```bash
+   gh pr create --base main --head release/0.17.0 --title "release: 0.17.0" --body-file <body-file>
+   ```
+4. Wait for CI on the pull request, the `DCO sign-off` job included, **on the release commit
+   specifically**. CI builds on pull requests and on pushes to `main` only, so there is nothing to
+   wait for before this step:
+   ```bash
    gh run view <run-id> --json headSha,conclusion -q '.headSha + " " + .conclusion'
    ```
    A green run against the previous head is not a green release. Read the SHA.
-2. Put the gate result in the PR body, with any accepted failure named.
-3. Merge, and read the result rather than chaining on it:
+5. Review by the reviewer who is not the author.
+6. Merge, and read the result rather than chaining on it:
    ```bash
    gh pr merge <n> --merge
    gh pr view <n> --json state,mergeCommit -q '.state + " " + .mergeCommit.oid'
    ```
-4. **Tag the merge commit, annotated, without checking out `main`.** The tag message is the release
-   summary; `git tag -l -n30 v0.16.1` shows the house shape.
-   ```bash
-   git fetch origin --tags
-   git tag -a v0.17.0 <merge-sha> -F <message-file>
-   git push origin v0.17.0
-   ```
-   Both pushes need a Touch ID approval, because the signing key is in Secretive.
-5. Bring `sandbox` level with `main` so the next session starts clean:
-   ```bash
-   git merge --ff-only origin/main && git push origin sandbox
-   ```
 
-## 4. Publish
+## 4. Sweep, tag and release
 
 **First Tier B release only: the CHANGELOG entry must carry the CCA warning in plain words.** Not a
 link to the design, and not a sentence about capability manifests. The text to paste is in
@@ -187,47 +195,16 @@ three gates stop blocking if an upstream change lands, that nothing in keel will
 does, and what to check. A person reading only the CHANGELOG has to learn this; it is the one risk
 in Tier B that a keel user cannot detect for themselves.
 
-Nothing in this section is reversible. Making a repository private again does not recall clones or
-forks, and a fork network keeps objects reachable after the parent is locked down.
+Nothing in this section is reversible. A tag and a release are public the moment they are pushed,
+and making a repository private again does not recall clones or forks.
 
-**1. Export.** Tracked files only, via `git ls-files`, so nothing untracked or ignored can be
-carried out by accident. Confirm the working tree matches what was merged first:
-
-```bash
-git rev-parse <merge-sha>^{tree}    # must equal
-git rev-parse HEAD^{tree}           # this
-tests/export-public.sh /tmp/keel-export
-```
-
-```
-exported 280 files to /tmp/keel-export, skipped 14
-excluded: docs/audits, .claude, .keel/handoff.md
-```
-
-**Note both numbers.** The exclusions are the exposure, not a tidy-up: `docs/audits/` holds the
-security posture of real services, named. If this release added an audit, the thing to verify is
-that the exclusion fired, not to edit anything.
-
-**2. Commit inside the export, then run its suite.** In that order.
+**1. Fetch, and sweep the merge commit.** The release-time sweep runs over the tracked tree of the
+commit that was merged, on a detached checkout of it:
 
 ```bash
-cd /tmp/keel-export && git init -q && git add -A \
-    && git -c user.name=export -c user.email=export@local commit -qm export \
-    && tests/run-tests.sh          # All test files passed
-```
-
-Committing first because `tests/test-cache-install.sh` archives `HEAD` and a staged index with no
-commit has none, which fails for a reason that has nothing to do with the export. Committing
-afterwards is worse: a suite run leaves `lib/__pycache__/*.pyc` behind and `rsync` does not read
-`.gitignore`.
-
-This step is what caught the manifest defect in the first publication. A subset that fails its own
-validator is not a release.
-
-**3. Sweep the export, from inside it.**
-
-```bash
-cd /tmp/keel-export && ./tests/no-internal-leaks.sh
+git fetch origin --tags
+git switch --detach <merge-sha>
+tests/no-internal-leaks.sh
 ```
 
 ```
@@ -236,65 +213,72 @@ OK    no project-specific identifiers
 ```
 
 **Read the mode line, not just the OK.** The scanner takes no directory argument: passing one is
-silently ignored and it sweeps `git ls-files` of wherever it is run, so running it from this
-repository's root prints the same `OK` having swept the wrong tree. `git ls-files` is also why a
+silently ignored and it sweeps `git ls-files` of wherever it is run, which is why the sweep runs on
+the detached checkout and not on whatever branch happens to be out. `git ls-files` is also why a
 new file has to be `git add`ed before the suite means anything: an untracked file is invisible to
-this scanner, and to the supply chain scan beside it. The real mode line names the home directory
-it loaded from, which is why it is elided above: this repository's own sweep rejects a developer's
-absolute path in a tracked file. And the deny list lives outside
-the tree at `~/.config/keel/internal-deny-list.txt`, so on a machine without it the scan degrades to
-two generic patterns and still prints `OK`. Two things must both be true: **25 patterns**, and
-`OK`.
+this scanner, and to the supply chain scan beside it. That is also why the untracked `docs/audits/`
+on the owner's machine is not swept: it is not in `git ls-files`. The real mode line names the home
+directory it loaded from, which is why it is elided above: this repository's own sweep rejects a
+developer's absolute path in a tracked file. And the deny list lives outside the tree at
+`~/.config/keel/internal-deny-list.txt`, so on a machine without it the scan degrades to two
+generic patterns and still prints `OK`. Two things must both be true: **the full pattern count**,
+and `OK`.
 
-**4. Sync into a clone of the public repository and check the count.**
+**2. Check the tag message and the release notes.** Both are public text:
 
 ```bash
-git clone git@github-personal:gbi-solutions-ltd/keel.git /tmp/keel-public
-rsync -a --delete --exclude '.git/' /tmp/keel-export/ /tmp/keel-public/
-cd /tmp/keel-public && git add -A && git ls-files | wc -l    # must equal the export's number
-git status --short | awk '{print $1}' | sort | uniq -c
+keel scan --leaks-message <message-file>
+keel scan --leaks-message <notes-file>
 ```
 
-The count must equal what `export-public.sh` printed: 280 for 0.17.0. A disagreement of three is how
-the `.pyc` files above were caught.
-
-**5. Commit, push, tag, release.** One commit per release, titled `keel <version>`.
+**3. Tag the merge commit, annotated.** The tag message is the release summary;
+`git tag -l -n30 v0.16.1` shows the house shape. The leak guard checks the tag's message on push.
 
 ```bash
-git commit -F <message-file>
-git push origin main
-git tag -a v0.17.0 -m "keel 0.17.0" && git push origin v0.17.0
+git tag -a v0.17.0 <merge-sha> -F <message-file>
+git push origin v0.17.0
+```
+
+Each push needs a Touch ID approval, because the signing key is in Secretive.
+
+**4. Release.**
+
+```bash
 gh release create v0.17.0 --repo gbi-solutions-ltd/keel \
-    --title "keel 0.17.0" --notes-file <notes> --latest
+    --title "keel 0.17.0" --notes-file <notes-file> --latest
 ```
 
-Release notes are written for someone who has never read this repository: no internal commit SHAs,
-no PR numbers, no paths that only exist here. `gh release view v0.16.1 --repo gbi-solutions-ltd/keel
---json body` is the house shape.
+Release notes are written for someone who has never read this repository: no commit SHAs, no PR
+numbers, no path that exists only in the private clone. `gh release view v0.16.1 --repo
+gbi-solutions-ltd/keel --json body` is the house shape.
 
-**6. Verify what shipped, through the API rather than from your clone.**
+**5. Verify what shipped, through the API rather than from your clone.**
 
 ```bash
-gh api "repos/gbi-solutions-ltd/keel/contents/VERSION?ref=v0.17.0" -q .content | base64 -d
-gh api "repos/gbi-solutions-ltd/keel/contents/docs/audits?ref=main"     # expect 404
-gh api "repos/gbi-solutions-ltd/keel/contents/.claude?ref=main"         # expect 404
+gh api "repos/gbi-solutions-ltd/keel/contents/VERSION?ref=v0.17.0" -q .content | base64 -d   # 0.17.0
+gh api "repos/gbi-solutions-ltd/keel/contents/docs/audits?ref=v0.17.0"                       # expect 404
 ```
 
-A local clone shows what you built. The API shows what people can read.
+`VERSION` at the tag must read the number just released, and `docs/audits` at the tag must be a 404:
+the directory is the security posture of real services, named, and it lives only in the private
+clone. `.claude/` is published, so there is no 404 check for it. A local clone shows what you
+built. The API shows what people can read.
 
 ## Symptoms
 
 | Symptom | Likely cause | Action |
 |---|---|---|
 | `FAIL version, from a tracked-files-only copy (got: <old>)` and `FAIL doctor output unchanged against HEAD`, differing only in the version, and nothing else | The bump is edited but not committed | Expected. Commit, re-run, require green |
-| The export's suite fails `validate-citations.sh` on a file under an excluded path | A shipped document cites an excluded one by line. Happened at 0.23.0, after the internal tag | Fix the citation in its own PR. `tests/test-harness-claims.sh` now runs the checker inside a real export, so the next one goes red before release |
 | Any other test red at bump time | Not the bump | Stop. Fix it in its own change |
 | `gh pr checks` green but the release commit was never built | The check ran against the previous head | Read `headSha` on the run, not the PR |
-| The export's file count and the clone's disagree | A suite run left `.pyc` files that `rsync` copied | Re-export from a clean tree, commit inside it before running the suite. *Recorded* |
+| The push prints `leak guard: WARNING no deny list` | The deny list is absent on this machine, so only the 2 generic patterns ran | Do not push. Restore `~/.config/keel/internal-deny-list.txt` and push again |
+| The push is refused with `keel is not on PATH` | The leak guard cannot find `keel` | Put this working copy's `bin/keel` on PATH and push again |
+| The `DCO sign-off` check fails on the pull request | A commit on the branch has no `Signed-off-by` line | `git rebase --signoff main`, then push the branch again |
+| A validator reports a broken citation into `docs/audits/` on the owner's machine | The private clone is behind, or missing a file | Pull it |
 | The sweep prints `OK` with "generic patterns only" | The deny list is absent on this machine | Do not push. Restore `~/.config/keel/internal-deny-list.txt` and re-sweep |
-| Push protection rejects the public push | A test fixture shaped like a credential | Fix at the cause, not the unblock link. Sweep per provider: the first sweep missed a Stripe key by searching the OpenAI shape. *Recorded* |
+| Push protection rejects a push | A test fixture shaped like a credential | Fix at the cause, not the unblock link. Sweep per provider: the first sweep missed a Stripe key by searching the OpenAI shape. *Recorded* |
 | A skill fix reaches nobody after a release | a `plugin.json` disagrees with `VERSION` | The cache is keyed on `plugin.json`, and there are two of them since Tier B. Bump all four. *Recorded* |
-| A `main...sandbox` range gives obviously wrong counts | Local `main` is behind `origin/main` | `git fetch` first. It has produced a wrong artifact before |
+| A `main...release/X.Y.Z` range gives obviously wrong counts | Local `main` is behind `origin/main` | `git fetch` first. It has produced a wrong artifact before |
 | The release commit passes CI on the PR and fails the same checks on `main` | A `producer \| grep -q` under `pipefail`, not the tree. grep leaves at the first match and the producer's 141 fails the pipeline | Read the failures for a common shape before re-running. Fix the pipeline, not the thing it accused |
 
 ## Do not
@@ -302,17 +286,17 @@ A local clone shows what you built. The API shows what people can read.
 - **Do not bump `VERSION` as part of an ordinary ship.** A release is a decision about a set of
   changes. Ship with `## Unreleased` entries and leave the number alone; offer the bump, do not take
   it.
-- **Do not stay on `main` after merging.** Work happens on `sandbox`, and the rule breaks by
-  sitting on `main` afterwards.
+- **Start every change on its own branch from `main`.** A release is committed on `release/X.Y.Z`,
+  and the rule breaks by committing on `main` or by sitting there afterwards.
 - **Do not re-dispatch an eval arm whose staged directory still exists.** It is the same arm at
   full price, and scoring is reading.
 - **Do not quietly turn a documentation change into a release to get it published.** Plugin
-  installs are keyed by version, so an untagged commit on public `main` reaches no installed user,
-  which is a reason to publish an update rather than a reason to cut a release. Section 7a of
-  [`going-public.md`](going-public.md) is the route for that.
-- **Do not push the public tree from this repository, or add it as a remote here.** The export is
-  built in a scratch directory and pushed from a clone of the public repository, so there is no
-  configuration in which one wrong `git push` publishes this repository's history.
+  installs are keyed by version, so a commit on `main` with no tag reaches no installed user, which
+  is a reason to land the change through a pull request and release when one is due, not a reason to
+  cut a release for it.
+- **Do not add `keel-internal` as a remote of this working copy, and never push its history: it is
+  archived, and every deny pattern is reachable in it.** One wrong `git push` of that history would
+  publish all of them.
 - **Do not fix a red check as part of releasing.** A gate that repairs its own failures is not a
   gate, and the fix belongs in its own reviewed change.
 
@@ -322,7 +306,7 @@ A local clone shows what you built. The API shows what people can read.
 |---|---|
 | Whether a release is due, and its number | Bernard |
 | Accepting a failed eval arm and releasing anyway | Bernard, named in the CHANGELOG |
-| Whether an export exclusion is right | Bernard. `docs/audits/` is the standing answer |
+| What is withheld (`tests/withheld.sh`) | Bernard. `docs/audits/` is the standing answer |
 | Everything else here | Whoever is running the release |
 
 ## Still open
