@@ -50,3 +50,6 @@ scratchpad/
 
 # claude plugin eval writes its reports here
 tests/plugin-evals/results/
+
+# docs/audits is a clone of a private repository holding the audits. It is never part of this tree.
+docs/audits/

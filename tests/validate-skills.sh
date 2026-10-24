@@ -12,7 +12,7 @@
 # here, because every reporting helper returns 0 explicitly: see the `return 0` on each below. That
 # makes the invariant shellcheck cannot see a stated fact in the code rather than an assumption.
 # shellcheck disable=SC2015
-set -uo pipefail
+set -uo pipefail; . "$(dirname "${BASH_SOURCE[0]}")/withheld.sh"
 
 # NOTHING IN THIS FILE PIPES INTO `grep -q`. Use a here-string, which is a redirect and not a
 # pipeline, so the status is grep's alone. `producer | grep -q needle` under `set -o pipefail` is a
@@ -169,7 +169,7 @@ for skill in skills/*/SKILL.md; do
     while IFS= read -r target; do
         target="${target%%#*}"
         [ -n "$target" ] || continue
-        [ -e "$dir/$target" ] || report "$name: broken link to $target"
+        [ -e "$dir/$target" ] || withheld_skip "$dir/$target" || report "$name: broken link to $target"
     done < <(sed 's/``[^`]*``//g; s/`[^`]*`//g' "$skill" \
         | grep -o '](\([^)]*\))' | sed 's/](\(.*\))/\1/' | grep -Ev '^(https?:|#)')
 done
@@ -201,7 +201,7 @@ while IFS= read -r f; do
     while IFS= read -r target; do
         target="${target%%#*}"
         [ -n "$target" ] || continue
-        [ -e "$fdir/$target" ] || report "$f: broken link to $target"
+        [ -e "$fdir/$target" ] || withheld_skip "$fdir/$target" || report "$f: broken link to $target"
     done < <(sed 's/``[^`]*``//g; s/`[^`]*`//g' "$f" \
         | grep -o '](\([^)]*\))' | sed 's/](\(.*\))/\1/' | grep -Ev '^(https?:|#)')
 done < <(find skills agents templates output-styles -name '*.md' 2>/dev/null)
@@ -276,7 +276,7 @@ done < <(find skills agents templates output-styles -name '*.md' 2>/dev/null)
 #     docs/05-token-and-memory-design.md, which is the document that defines the layout and has to
 #     name it. A skill must write <docs_root>; prose about the default is prose.
 while IFS= read -r f; do
-    [ -f "$f" ] || continue
+    { [ -f "$f" ] && ! withheld_under "$f"; } || continue
     LC_ALL=C grep -q "$(printf '\xe2\x80\x94')" "$f" && report "$f: contains an em dash"
     LC_ALL=C grep -q "$(printf '\xe2\x80\x93')" "$f" && report "$f: contains an en dash"
 
@@ -285,7 +285,7 @@ while IFS= read -r f; do
     while IFS= read -r target; do
         target="${target%%#*}"
         [ -n "$target" ] || continue
-        [ -e "$ddir/$target" ] || report "$f: broken link to $target"
+        [ -e "$ddir/$target" ] || withheld_skip "$ddir/$target" || report "$f: broken link to $target"
     done < <(awk '/^ *```/{fence=!fence; next} !fence' "$f" \
         | sed 's/``[^`]*``//g; s/`[^`]*`//g' \
         | grep -o '](\([^)]*\))' | sed 's/](\(.*\))/\1/' | grep -Ev '^(https?:|#)')
