@@ -18,9 +18,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
   `keel guard install --leak-guard` adds a local leak guard: `keel scan --leaks` checks every
   commit a push carries (files, paths, messages, author and committer, tag messages and ref names)
   against the deny list and never prints what matched, refuses a pushed `Claude-Session:` trailer,
-  and fails closed when it cannot run; a `commit-msg` hook checks each message, removes
-  `Claude-Session:` trailers and adds a sign-off. Pull requests are checked for a
-  DCO `Signed-off-by` line by `tests/check-dco.sh`. `.claude/` is published. See
+  and fails closed when it cannot run, or a deny list pattern is not valid; a `commit-msg` hook
+  checks each message, removes `Claude-Session:` trailers and adds a sign-off. Pull requests are
+  checked for a DCO `Signed-off-by` line by `tests/check-dco.sh`. `.claude/` is published. See
   `CONTRIBUTING.md` and `SECURITY.md`.
   `gbi-solutions-ltd/keel-internal` was archived read-only on 2026-10-24. The first pull request
   (#3) was merged by its author on 2026-10-24, before `main` was protected, so it went in without

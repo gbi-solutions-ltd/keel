@@ -414,8 +414,8 @@ OUT="$( cd "$W" && PATH="$TMP/wrap:$PATH" HOME="$H" KEEL_DENY_FILE="$DF" "$KEEL"
 RC=$?
 expect "15: 30 commits of 30 files: exit 0" "$RC" "0"
 has "15: ... all of them checked" "$OUT" 'leak guard: checked 30 commit(s), 0 tag(s) and 1 ref name(s), no findings'
-expect "15: one binary test and one grep per pattern, 6 calls, not one per file" \
-  "$(wc -l < "$TMP/grep.log" | tr -d ' ')" "6"
+expect "15: two validity checks per loaded pattern, one binary test and one grep per pattern, 12 calls, not one per file" \
+  "$(wc -l < "$TMP/grep.log" | tr -d ' ')" "12"
 
 # ---- behaviour 16: help and the documentation ------------------------------------------------------------------
 HELP="$( HOME="$TMP" "$KEEL" --help 2>&1 )"
@@ -684,6 +684,82 @@ has "guard 11: ... the commit-msg hook" "$gsection" 'commit-msg'
 has "guard 11: ... the reversal of the 2026-09-27 choice" "$gsection" '2026-09-27'
 has "guard 11: ... the main working copy and never a worktree" "$gsection" 'never in a worktree'
 has "guard 11: ... the residual, GitHub-made text" "$gsection" 'release notes'
+
+# ==== a deny list holding a pattern that is not valid: every scan refuses ===========================
+# The broken list, line 1 a comment, line 2 Quillbank, line 3 an unclosed parenthesis, line 4
+# \bQBK\b, line 5 an unclosed bracket. grep exits 2 on lines 3 and 5, and the guard used to discard
+# that.
+write_broken() {
+    printf '%s\n' '# invented identifiers, two of them not valid' 'Quillbank' 'Quill(bank' \
+      '\bQBK\b' 'zephyr[ledger' > "$1"
+}
+BROKEN_OUT='leak guard: deny list loaded from ~/broken.txt (2 patterns)
+leak guard: deny list line 3: not a valid pattern, so it checked nothing
+leak guard: deny list line 5: not a valid pattern, so it checked nothing
+leak guard: refusing to scan: fix the deny list at ~/broken.txt'
+REFUSE='leak guard: refusing to scan: fix the deny list at ~/broken.txt'
+
+# ---- invalid 1: keel scan --leaks and --leaks-message refuse ---------------------------------------
+newfx
+BL="$H/broken.txt"; write_broken "$BL"; DF="$BL"
+leaks origin
+expect "invalid 1: scan --leaks origin: exit 2" "$RC" "2"
+expect "invalid 1: ... prints the mode line, a line per invalid pattern and the refusal" "$OUT" "$BROKEN_OUT"
+
+g checkout -q -b topic
+commit_file 'fix: Quillbank retry' a.txt 'a\n'
+leaks origin "$(g rev-parse HEAD)":refs/heads/topic
+expect "invalid 1: a push whose message names the client: exit 2" "$RC" "2"
+expect "invalid 1: ... the same four lines, no finding and no checked line" "$OUT" "$BROKEN_OUT"
+lacks "invalid 1: ... and none of the pattern text" "$OUT" 'Quill('
+lacks "invalid 1: ... nor the other pattern" "$OUT" 'zephyr['
+
+printf 'chore: tidy\n\nQBK follow-up\n' > "$TMP/inv-m1.txt"
+lmsg "$TMP/inv-m1.txt"
+expect "invalid 1: scan --leaks-message: exit 2" "$RC" "2"
+expect "invalid 1: ... the same four lines" "$OUT" "$BROKEN_OUT"
+lacks "invalid 1: ... and none of the pattern text" "$OUT" 'Quill('
+
+# ---- invalid 2: the hooks fail closed, their handling unchanged ------------------------------------
+newfx
+g checkout -q -b clean origin/main
+commit_file 'feat: clean change' b.txt 'b\n'
+ginst install --leak-guard
+BL="$H/broken.txt"; write_broken "$BL"; DF="$BL"
+hook_push "$KP" clean
+expect "invalid 2: pre-push over a clean branch: exit 1" "$HRC" "1"
+has "invalid 2: ... names the deny list to fix" "$HOUT" "$REFUSE"
+has "invalid 2: ... and the push refusal" "$HOUT" 'keel guard: push refused by the leak guard.'
+lacks "invalid 2: ... and the supply chain scan never ran" "$HOUT" 'keel guard: scanning before push'
+HOUT="$( cd "$W" && HOME="$H" KEEL_DENY_FILE="$DF" PATH="$KP" .git/hooks/pre-push </dev/null 2>&1 )"; HRC=$?
+expect "invalid 2: run by hand with no arguments, as a delete-only push is: exit 1" "$HRC" "1"
+has "invalid 2: ... with the refusing line" "$HOUT" "$REFUSE"
+before="$(g rev-parse HEAD)"
+printf 'feat: clean\n' > "$TMP/inv-m2.txt"
+cm "$KP" --allow-empty -F "$TMP/inv-m2.txt"
+expect "invalid 2: commit-msg over a clean message: the commit fails" "$CRC" "1"
+expect "invalid 2: ... and HEAD is unchanged" "$(g rev-parse HEAD)" "$before"
+has "invalid 2: ... with the refusing line" "$COUT" "$REFUSE"
+has "invalid 2: ... and the nothing-was-checked line" "$COUT" \
+  'keel guard: the leak guard is on and the keel on PATH cannot check a message, so nothing was checked. Commit refused.'
+
+# ---- invalid 3: keel guard status says the scans refuse --------------------------------------------
+ginst status
+has "invalid 3: on, two invalid patterns" "$GOUT" \
+  "leak guard: on, but 2 deny list pattern(s) are not valid, so scans refuse. See 'keel scan --leaks-message <file>'"
+rm -f "$W/.git/hooks/commit-msg"
+ginst status
+has "invalid 3: ... with commit-msg missing, the commit-msg line" "$GOUT" \
+  "leak guard: on, but commit-msg is missing or not keel's."
+lacks "invalid 3: ... and not the invalid pattern line" "$GOUT" 'are not valid'
+ginst install --leak-guard
+DF="$H/deny.txt"
+ginst status
+has "invalid 3: the three-pattern list still reads loaded" "$GOUT" 'leak guard: on, deny list loaded (3 patterns)'
+
+# ---- invalid 4: the document says so -------------------------------------------------------------------
+section="$(awk '/^keel scan --leaks </{f=1} /^keel plan status/{f=0} f' "$DOC")"
+has "invalid 4: the install document describes the refusal" "$section" 'not a valid pattern'
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
