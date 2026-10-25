@@ -2134,7 +2134,11 @@ fi
 # each injected SKILL.md into the prompt as plain text rather than relying on a plugin install, and
 # stage.sh dispatches nothing. The only harness-specific thing in the harness is the guidance a
 # human copies, so that guidance is the only thing that changes.
-out="$("$REPO/tests/evals/stage.sh" --harness codex tdd-under-deadline 2>&1 >/dev/null)"
+# The guidance is on stderr and the staged directory on stdout, kept for the cleanup trap: thrown
+# away to /dev/null, every run left the directory behind.
+errf="$(mktemp "${TMPDIR:-/tmp}/keel-stage-err-XXXXXX")"; selftest_paths+=("$errf")
+d="$("$REPO/tests/evals/stage.sh" --harness codex tdd-under-deadline 2>"$errf")"; staged+=("$d")
+out="$(cat "$errf")"
 if printf '%s' "$out" | grep -q 'codex exec'; then
     ok "codex guidance names codex exec"
 else
@@ -2149,7 +2153,8 @@ else
     bad "codex guidance carries --skip-git-repo-check" "the staged fixture is not a git repo and Codex refuses to run outside one"
 fi
 
-out="$("$REPO/tests/evals/stage.sh" tdd-under-deadline 2>&1 >/dev/null)"
+d="$("$REPO/tests/evals/stage.sh" tdd-under-deadline 2>"$errf")"; staged+=("$d")
+out="$(cat "$errf")"
 if printf '%s' "$out" | grep -q 'claude -p'; then
     ok "the default guidance is unchanged"
 else
