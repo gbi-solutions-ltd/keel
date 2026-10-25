@@ -27,8 +27,19 @@ _harness_present() {
 
 # Resolved once, when this file is sourced. Every resolver call reads the manifest path, and working
 # it out per call cost a subshell and a dirname each time: half of what one `keel doctor` spent here,
-# measured 2026-10-25.
-_HARNESS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# measured 2026-10-25. Through symlinks the way bin/keel resolves itself, because the manifest sits
+# beside the file a link names and not beside the link, and with CDPATH emptied for the cd, because
+# one that finds its directory through CDPATH prints it and the capture would hold two lines.
+_harness_src="${BASH_SOURCE[0]}"
+while [ -L "$_harness_src" ]; do
+    _harness_link="$(readlink "$_harness_src")"
+    case "$_harness_link" in
+        /*) _harness_src="$_harness_link" ;;
+        *)  _harness_src="$(dirname "$_harness_src")/$_harness_link" ;;
+    esac
+done
+_HARNESS_DIR="$(CDPATH='' cd "$(dirname "$_harness_src")" && pwd)"
+unset _harness_src _harness_link
 
 # _harness_cap: sets _HARNESS_CAP to the manifest path. The functions below use it rather than
 # `$(harness_capabilities_path)`, because each command substitution is a fork, and a doctor run made

@@ -368,6 +368,30 @@ if command -v harness_active_gates >/dev/null 2>&1; then
     [ "$out" = "context-watch done-guard review-guard sensitive-guard session-start " ] \
       && ok "resolves after a relative source and a cd" \
       || bad "resolves after a relative source and a cd" "got: $out"
+
+    # With CDPATH set, a cd that finds its directory through it prints that directory, and a cd
+    # inside $(...) then captures two lines instead of one path.
+    out="$(cd "$ROOT" && CDPATH="$ROOT" /bin/bash -c '. lib/harness/resolve.sh; harness_active_gates claude' 2>&1 | sort | tr '\n' ' ')"
+    [ "$out" = "context-watch done-guard review-guard sensitive-guard session-start " ] \
+      && ok "resolves with CDPATH set" \
+      || bad "resolves with CDPATH set" "got: $out"
+
+    # Sourced through a symlink, the manifest is the one beside the file the link names, not one
+    # beside the link.
+    lnk="$(mktemp -d)"
+    ln -s "$ROOT/lib/harness/resolve.sh" "$lnk/resolve.sh"
+    out="$(/bin/bash -c ". '$lnk/resolve.sh'; harness_active_gates claude" 2>&1 | sort | tr '\n' ' ')"
+    [ "$out" = "context-watch done-guard review-guard sensitive-guard session-start " ] \
+      && ok "resolves when sourced through a symlink" \
+      || bad "resolves when sourced through a symlink" "got: $out"
+    # And through a relative link to that one, which is read against the link's own directory.
+    mkdir -p "$lnk/rel"
+    ln -s ../resolve.sh "$lnk/rel/resolve.sh"
+    out="$(/bin/bash -c ". '$lnk/rel/resolve.sh'; harness_active_gates claude" 2>&1 | sort | tr '\n' ' ')"
+    [ "$out" = "context-watch done-guard review-guard sensitive-guard session-start " ] \
+      && ok "resolves when sourced through a relative symlink" \
+      || bad "resolves when sourced through a relative symlink" "got: $out"
+    rm -rf "$lnk"
 else
     bad "resolve.sh defines harness_active_gates" "function not found after sourcing"
 fi

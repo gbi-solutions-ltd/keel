@@ -540,6 +540,13 @@ out="$("$broken/bin/keel" version 2>&1)"; rc=$?
   || bad "symlink" "an incomplete install exited 0"
 rm -rf "$parent"
 
+# Run by a relative path with CDPATH set, the cd that finds keel's own directory goes through CDPATH
+# and prints it, so a HERE captured from that cd held two lines and every source under it failed.
+real_version="$(cat "$ROOT/VERSION")"
+[ "$( cd "$ROOT" && CDPATH="$ROOT" bin/keel version 2>&1 )" = "$real_version" ] \
+  && ok "run by a relative path with CDPATH set, keel finds its own VERSION" \
+  || bad "CDPATH" "version with CDPATH set was not $real_version"
+
 # ---- keel scan --push -------------------------------------------------------
 #
 # What the pre-push hook runs once per pushed ref. It scans the commit, never the working tree, so
