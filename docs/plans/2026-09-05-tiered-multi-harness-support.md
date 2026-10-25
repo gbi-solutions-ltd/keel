@@ -2811,12 +2811,13 @@ exactly the silent-inert behaviour this task removes.
 - [x] **Step 3: Write the minimal implementation**
 
 **Placement is the whole of this task, and getting it wrong inverts the gate.** Insert the block
-**after** the `hard_block_paths` cheap gate at `hooks/sensitive-guard#*'"hard_block_paths"'*) ;;` and before the stdin
-read at `:61`. Not after `ask()`, and not before the profile walk: the guard exits 0 at `:59` for
-every repository that declares no `hard_block_paths`, which is almost all of them, and a self-check
-placed above that line would exit 2 on **every Bash tool call in every repository on Codex**. The
-hook's own header states the invariant it would break, at `:16-17`, "SILENT UNLESS THE REPOSITORY
-ASKS FOR IT".
+**after** the `hard_block_paths` cheap gate at `hooks/sensitive-guard#*'"hard_block_paths"'*) ;;`
+and before the stdin read at `hooks/sensitive-guard#event="$(</dev/stdin)"`. Not after `ask()`, and
+not before the profile walk: the guard exits 0 in that gate's `*) exit 0 ;;` arm for every
+repository that declares no `hard_block_paths`, which is almost all of them, and a self-check placed
+above that line would exit 2 on **every Bash tool call in every repository on Codex**. The hook's
+own header states the invariant it would break, at `:16-17`, "SILENT UNLESS THE REPOSITORY ASKS FOR
+IT".
 
 So the order is: profile found, `hard_block_paths` declared, **then** ask whether this harness can
 honour it.
@@ -3965,7 +3966,7 @@ correct.** Fixed in place:
 |---|---|---|
 | `ok`/`bad` do not exist in `test-sensitive-guard.sh` or `test-done-guard.sh`; both count `pass`/`fail` directly | `grep -c '^ok()'` returns 0 in both | tasks 12, 13 |
 | Both hooks read their event from **stdin**, not an environment variable | `hooks/sensitive-guard#event="$(</dev/stdin)"`, `hooks/done-guard:69` | tasks 12, 13 |
-| The self-check placed before the `hard_block_paths` gate would exit 2 on **every Bash call in every repository** on Codex | `hooks/sensitive-guard:16-17,55-61` | task 12 |
+| The self-check placed before the `hard_block_paths` gate would exit 2 on **every Bash call in every repository** on Codex | `hooks/sensitive-guard:16-17`, `hooks/sensitive-guard#*'"hard_block_paths"'*) ;;` | task 12 |
 | `case` globs are not path-aware, so `docs/*.md` swept `docs/prd/` and `docs/stories/` | reproduced; 60 extra lines | task 5 |
 | Seven skills pin `model sonnet`, not five | `grep -rln` lists `shape-idea` and `write-docs` too | task 15 |
 | `json_get` on a list returns Python `str()`, `['claude', 'codex']` | `bin/keel:105-121` | task 8 |

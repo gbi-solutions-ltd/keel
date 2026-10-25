@@ -82,6 +82,16 @@ else
 fi
 rm -rf "$r"
 
+# And the trap is on EXIT, not ERR. An ERR trap would miss a `set -u` exit, and would fire on a read
+# the hook expects to fail: with the profile unreadable every Bash call would ask, which the header's
+# cheap filters exist to prevent. An unreadable profile and a command that is not a commit stay
+# silent. As root the profile is readable anyway and the case passes for the plain reason.
+r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
+chmod 000 "$r/.keel/profile.json"
+check "an unreadable profile on a command that is not a commit asks nothing" "" "$r" "ls"
+chmod 644 "$r/.keel/profile.json"
+rm -rf "$r"
+
 # The same commit with the hook run by a relative path, CDPATH set and no CLAUDE_PLUGIN_ROOT. A cd
 # that finds its directory through CDPATH prints it, so a ROOT captured from one held two lines, the
 # resolver could not be read, and the hook asked on a commit it should have let through. kp is a
