@@ -21,6 +21,10 @@ add() { names+=("$1"); cmds+=("$2"); }
 # The validator checks the repo; its own tests check the validator.
 add "tests/test-validate-skills.sh" "tests/test-validate-skills.sh"
 add "tests/test-keel.sh"            "tests/test-keel.sh"
+add "tests/test-keel-2.sh"          "tests/test-keel-2.sh"
+add "tests/test-keel-3.sh"          "tests/test-keel-3.sh"
+add "tests/test-keel-4.sh"          "tests/test-keel-4.sh"
+add "tests/test-keel-5.sh"          "tests/test-keel-5.sh"
 add "tests/test-no-leaks.sh"        "tests/test-no-leaks.sh"
 add "tests/test-apex-export.sh"     "tests/test-apex-export.sh"
 add "tests/test-supply-chain.sh"    "tests/test-supply-chain.sh"
@@ -83,7 +87,7 @@ MAX_JOBS=4
 # user.useConfigOnly turns git's identity auto-detection off, so a fixture that means to commit has
 # to configure its own identity, and the next setup copied from one of these fails on the machine
 # that wrote it instead of in CI. The file is real and writable, not /dev/null, because
-# tests/test-keel.sh asserts `keel guard install` leaves the global config alone and that assertion
+# tests/test-keel-4.sh asserts `keel guard install` leaves the global config alone and that assertion
 # has to be able to see a global write.
 GIT_CONFIG_SYSTEM=/dev/null
 GIT_CONFIG_GLOBAL="$LOG_DIR/gitconfig"

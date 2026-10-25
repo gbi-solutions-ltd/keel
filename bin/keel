@@ -27,6 +27,8 @@ while [ -L "$SELF" ]; do
         *)  SELF="$(dirname "$SELF")/$_link" ;;
     esac
 done
+# CDPATH unset for every cd from here on: one that finds its directory through CDPATH prints it.
+unset CDPATH
 HERE="$(cd "$(dirname "$SELF")/.." && pwd)"
 
 # The profile schema's own version, deliberately separate from VERSION. `keel_version` answers
@@ -119,7 +121,8 @@ harness_flag_set() {
 # Every harness the capability manifest knows, one per line. Read from the manifest rather than
 # listed here, so a harness added there cannot be missing from an error message that names them.
 harness_ids() {
-    awk -F'|' '$1=="provides" {print $2}' "$(harness_capabilities_path)" | awk '!seen[$0]++'
+    _harness_cap || return 1
+    awk -F'|' '$1=="provides" && !seen[$2]++ {print $2}' "$_HARNESS_CAP"
 }
 
 # Every gate the capability manifest knows, one per line. Read from the manifest for the same
@@ -128,7 +131,8 @@ harness_ids() {
 # whole design exists to prevent. tests/test-harness-claims.sh already fails the build when the
 # requires rows and the files under hooks/ disagree, so either is the same list.
 harness_gates() {
-    awk -F'|' '$1=="requires" {print $2}' "$(harness_capabilities_path)" | awk '!seen[$0]++'
+    _harness_cap || return 1
+    awk -F'|' '$1=="requires" && !seen[$2]++ {print $2}' "$_HARNESS_CAP"
 }
 
 # Which harness is running this process.

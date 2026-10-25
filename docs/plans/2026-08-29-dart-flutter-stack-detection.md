@@ -71,10 +71,10 @@ alone: that file runs under `#!/usr/bin/env bash`, where `grep` resolves to the 
   Check `pmset -g log | /usr/bin/grep -i 'sleep\|wake'` before suspecting the suite.
 - **`prof_of` prints one value per line, not a space-separated row.** Reading several fields in one
   call therefore uses the `{ read -r a; read -r b; } <<EOF ... EOF` idiom, which is what
-  `tests/test-keel.sh:1877-1879` already does. A plain `[ "$(prof_of "$d" a b)" = "x y" ]` never
+  `tests/test-keel.sh#{ read -r p_test; read -r p_lint; read -r p_build; } <<EOF` already does. A plain `[ "$(prof_of "$d" a b)" = "x y" ]` never
   matches, which is how an earlier draft of this plan was wrong.
 - **Never append to a template under `$FIXTURE_CACHE`.** `fixture()` hands out a copy
-  (`tests/test-keel.sh:28-35`); writing to the template instead poisons every later case silently.
+  (`tests/keel-test-lib.sh#fixture() {`); writing to the template instead poisons every later case silently.
   Task 4's third case appends to `$d`, the copy, which is why it is safe.
 
 **Concurrent batches:** tasks 1 and 2 both say `Depends on: none` and name no file in common, so they
@@ -321,7 +321,7 @@ P
 ```
 
 Then add the assertions, **immediately after the per-language detection loop that ends at
-`tests/test-keel.sh:191`**.
+`tests/test-keel.sh#ok "detects $stack as $want"`**.
 
 **Every assertion here reads `detect_languages`, never `detect_stack`, and that is load-bearing.**
 `detect_stack` is `lang_profile "$(detect_languages | head -n 1)"`, and `lang_profile` has no `dart`
@@ -427,7 +427,7 @@ file and the same function chain this task edits. Change `the thirteen` to `the 
 line, and nothing else in that comment.
 
 Second, two of the six new assertions test with a substring where this file tests with equality
-everywhere else. `tests/test-keel.sh:975` is the precedent: `[ "$got" = "typescript python" ]`. The
+everywhere else. `tests/test-keel.sh#[ "$got" = "typescript python" ]` is the precedent: `[ "$got" = "typescript python" ]`. The
 fixtures are deterministic and the exact answer is known, so `*dart*` also passes on `dart javascript`
 and the `also` check passes on a duplicated entry. Replace:
 
@@ -661,7 +661,7 @@ got="$(detect_in "$d" 'detect_stack')"
 
 **(b) The end-to-end assertion omits the one field its own comment defends.** `lang_profile`'s new
 arm argues specifically for runtime `dart` over `flutter`, and the profile check does not read
-`stack.runtime`. The PL/SQL end-to-end at `tests/test-keel.sh:838-845` pins both. Replace the three
+`stack.runtime`. The PL/SQL end-to-end at `tests/test-keel.sh#keel init writes plsql and oracle into the profile` pins both. Replace the three
 `read`s with four:
 
 ```bash
@@ -1126,7 +1126,7 @@ class, but the record said less than the truth and now says it.
 
 - [x] **Step 1: Write the failing test**
 
-Add to the `---- has_ui ----` block that begins at `tests/test-keel.sh:910`, after the existing
+Add to the `---- has_ui ----` block that begins at `tests/test-keel.sh#---- has_ui ---`, after the existing
 cases:
 
 ```bash
@@ -1248,7 +1248,7 @@ is here and why task 9 exists.
 
 - [x] **Step 1: Write the failing test**
 
-Add to the `---- datastores ----` block that begins at `tests/test-keel.sh:955`, using the
+Add to the `---- datastores ----` block that begins at `tests/test-keel.sh#---- datastores ---`, using the
 `stores_of` helper defined there rather than a fresh inline reader:
 
 ```bash

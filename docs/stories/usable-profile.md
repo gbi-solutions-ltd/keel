@@ -478,7 +478,7 @@ Scenario: the budget holds after the plugin work
   Then it starts python3 at most ten times
 ```
 
-**Notes:** the assertion already exists at `tests/test-keel.sh:405` and measured 8 on 2026-08-18.
+**Notes:** the assertion already exists at `tests/test-keel.sh#keel doctor starts python3 at most 10 times` and measured 8 on 2026-08-18.
 This story is a guard, not new work: `FR-07` adds a profile read and `FR-09` adds output, both on
 doctor's hot path. The context window work hit this same budget and solved it by reading a constant
 with `sed` rather than an interpreter, which is the precedent if this goes over.

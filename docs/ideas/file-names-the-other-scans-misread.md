@@ -18,7 +18,7 @@ walk also runs `` LC_ALL=C grep -qI . "$f" ``, so a file named `-` reads grep's 
 walk's own input, the false pass task 1c fixed in the supply chain scanner.
 
 **The key-material step `write_ci` generates.** Every generated workflow refuses committed key
-material with `` bin/keel#if git ls-files | grep -qE ``. A committed `docs/café.pem` is listed as
+material with `` bin/keel#if git ls-files ``. A committed `docs/café.pem` is listed as
 `"docs/caf\303\251.pem"`, the regex anchored at `$` never matches the closing quote, and the key
 passes the CI check. The review confirmed it in a scratch repository. Every repository keel has
 generated a workflow for carries this step.

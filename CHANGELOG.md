@@ -25,6 +25,24 @@ Entries are terse by design; the narrative for each release is in this file's gi
   `gbi-solutions-ltd/keel-internal` was archived read-only on 2026-10-24. The first pull request
   (#3) was merged by its author on 2026-10-24, before `main` was protected, so it went in without
   a review.
+- `tests/test-keel.sh` is split at its section headers into five parts (`tests/test-keel.sh` and
+  `tests/test-keel-2.sh` to `tests/test-keel-5.sh`) sharing `tests/keel-test-lib.sh`, so
+  `tests/run-tests.sh` runs them in parallel. It ran 771 cases serially in 501s and set the suite's
+  wall clock; the suite went from 597s to 349s and 422s over two runs on a 10-core laptop, with the
+  same 771 cases, every case line unchanged.
+- `tests/validate-citations.sh` checks phrase citations written in a double-backtick span
+  (`` path#phrase ``), which it never matched, and treats a line number into the parts of
+  `tests/test-keel.sh` as it does one into the file. A phrase that is one `<placeholder>` is not a
+  citation. The newly checked citations held three stale ones, now repaired, and every line-number
+  citation into `tests/test-keel.sh` outside a code fence that named the wrong line is now a phrase.
+- `lib/harness/resolve.sh` resolves the manifest path once, when sourced, and no longer forks to
+  read it or rewrites each field to test it for blanks: `keel doctor --fast` 1.08s to 0.95s, best
+  of six. Sourcing it by a relative path and then changing directory, sourcing it through a symlink,
+  or sourcing it with `CDPATH` set no longer turns every gate dark. `bin/keel`, `bin/keel-fleet` and
+  the session-start, context-watch and sensitive-guard hooks unset `CDPATH`, so run by a relative
+  path with it set they no longer report an incomplete install, fall back to another `keel`, go
+  silent or ask on a commit they should let through. The eval scripts under `tests/evals/` and the
+  `dispatch.sh` that `gate.sh` writes unset it too.
 
 ## 0.26.0 - 2026-10-22
 

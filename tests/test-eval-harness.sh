@@ -1033,15 +1033,17 @@ fi
 # The root is resolved with pwd -P because the script reports physical paths: on macOS mktemp
 # returns /var/..., which is /private/var/....
 ISO="$REPO/tests/evals/isolation-check.sh"
+# Sets iso_r rather than printing it: called inside $(...), the selftest_paths append ran in the
+# subshell and was lost, so every root outlived the suite's cleanup trap.
 iso_root() {
     local r
     r="$(mktemp -d "${TMPDIR:-/tmp}/keel-iso-root-XXXXXX")" || return 1
     selftest_paths+=("$r")
-    ( cd "$r" && pwd -P )
+    iso_r="$(cd "$r" && pwd -P)"
 }
 
 # 42. A skill tree is reported as the directory that holds skills/, and the exit is 1.
-iso="$(iso_root)"
+iso_root && iso="$iso_r"
 mkdir -p "$iso/x/skills/review-code" && : > "$iso/x/skills/review-code/SKILL.md"
 iso_out="$(KEEL_ISOLATION_ROOT="$iso" "$ISO" 2>/dev/null)"; rc=$?
 if [ "$rc" -eq 1 ] && printf '%s\n' "$iso_out" | grep -qFx "$iso/x"; then
@@ -1052,7 +1054,7 @@ else
 fi
 
 # 43. A scenario's file is reported when --names lists it.
-iso="$(iso_root)"
+iso_root && iso="$iso_r"
 mkdir -p "$iso/y" && : > "$iso/y/add-ci-that-gates.md"
 printf 'add-ci-that-gates\n' > "$iso/names.txt"
 iso_out="$(KEEL_ISOLATION_ROOT="$iso" "$ISO" --names "$iso/names.txt" 2>/dev/null)"; rc=$?
@@ -1064,7 +1066,7 @@ else
 fi
 
 # 44. A leftover staged directory is reported by its keel-eval- name.
-iso="$(iso_root)"
+iso_root && iso="$iso_r"
 mkdir -p "$iso/z/keel-eval-AbC123"
 iso_out="$(KEEL_ISOLATION_ROOT="$iso" "$ISO" 2>/dev/null)"; rc=$?
 if [ "$rc" -eq 1 ] && printf '%s\n' "$iso_out" | grep -qFx "$iso/z/keel-eval-AbC123"; then
@@ -1076,7 +1078,7 @@ fi
 # 45. A skill the check does not name is not reported. A guard: it passes before the script exists
 # and must still pass after, because a check that flagged every skills/ directory would be
 # unusable on a machine that has any other plugin.
-iso="$(iso_root)"
+iso_root && iso="$iso_r"
 mkdir -p "$iso/w/skills/docx/references" && : > "$iso/w/skills/docx/SKILL.md" \
     && : > "$iso/w/skills/docx/references/a.md"
 iso_out="$(KEEL_ISOLATION_ROOT="$iso" "$ISO" 2>/dev/null)"; rc=$?
@@ -1089,7 +1091,7 @@ fi
 # 46. A tree passed as a staged dir is not reported, a root holding only case 45's tree exits 0, and
 # a sibling whose name merely begins with the staged dir's is still reported: "under" is a path
 # boundary, not a string prefix.
-iso="$(iso_root)"
+iso_root && iso="$iso_r"
 mkdir -p "$iso/w/skills/docx/references" && : > "$iso/w/skills/docx/SKILL.md"
 out_only="$(KEEL_ISOLATION_ROOT="$iso" "$ISO" 2>/dev/null)"; rc_only=$?
 mkdir -p "$iso/v/skills/review-code/references" "$iso/v/keel-eval-Q1" \
@@ -1115,7 +1117,7 @@ fi
 # the word: one whose author is named keel (q), and the same on a single line (q1). The last two
 # are the false positives the old pattern, which matched a "name": "keel" anywhere in the file,
 # reported.
-iso="$(iso_root)"
+iso_root && iso="$iso_r"
 mkdir -p "$iso/r/skills/write-plan/references" "$iso/s/tests/evals/scenarios" \
     "$iso/p/.claude-plugin" "$iso/q/.claude-plugin" "$iso/q1/.claude-plugin"
 printf '{\n  "name": "keel",\n  "version": "1"\n}\n' > "$iso/p/.claude-plugin/plugin.json"
@@ -1136,8 +1138,8 @@ fi
 # 48. With no --names the scenario names come from scenarios/*.md beside the script. The script is
 # copied into a temp tree that has tests/evals/scenarios/x.md beside it, so the real scenarios are
 # not what is being read, and a file named x.md in the root is the hit.
-iso="$(iso_root)"
-tree="$(iso_root)"
+iso_root && iso="$iso_r"
+iso_root && tree="$iso_r"
 mkdir -p "$tree/tests/evals/scenarios" "$iso/y"
 cp "$ISO" "$tree/tests/evals/isolation-check.sh"
 : > "$tree/tests/evals/scenarios/x.md"; : > "$iso/y/x.md"
@@ -1151,8 +1153,8 @@ fi
 
 # 49. With neither source the <scenario>.md rule is skipped, and stderr says so. A copy run from
 # outside the repository with no --names would otherwise check less than it appears to, silently.
-iso="$(iso_root)"
-tree="$(iso_root)"
+iso_root && iso="$iso_r"
+iso_root && tree="$iso_r"
 mkdir -p "$tree/tests/evals" "$iso/y"
 cp "$ISO" "$tree/tests/evals/isolation-check.sh"
 : > "$iso/y/x.md"
@@ -1171,7 +1173,7 @@ fi
 # 50. The macOS data volume is pruned. From 10.15 on, `find /` walks the data volume a second time
 # under /System/Volumes/Data, so a hit would be reported twice and a staged dir under its second
 # name. The planted tree is under the pruned path and must not be reported.
-iso="$(iso_root)"
+iso_root && iso="$iso_r"
 mkdir -p "$iso/System/Volumes/Data/h/skills/review-code" "$iso/System/Volumes/Data/keel-eval-Dup1"
 : > "$iso/System/Volumes/Data/h/skills/review-code/SKILL.md"
 iso_out="$(KEEL_ISOLATION_ROOT="$iso" "$ISO" 2>/dev/null)"; rc=$?
@@ -1185,7 +1187,7 @@ fi
 # not cover it, and the check says so with exit 2 and no OK line. The first is a staged dir under
 # the pruned data volume; the second is an empty directory the walk cannot match by name. Real
 # staged directories always match, by their keel-eval- name.
-iso="$(iso_root)"
+iso_root && iso="$iso_r"
 mkdir -p "$iso/System/Volumes/Data/keel-eval-Zz9" "$iso/n"
 iso_out="$(KEEL_ISOLATION_ROOT="$iso" "$ISO" "$iso/System/Volumes/Data/keel-eval-Zz9" 2>&1)"; rc1=$?
 iso_out2="$(KEEL_ISOLATION_ROOT="$iso" "$ISO" "$iso/n" 2>&1)"; rc2=$?
@@ -1200,9 +1202,9 @@ fi
 # 52. A staged dir named keel-eval- is covered by its own name, so the fail-closed rule does not
 # trip on a real one, and a clean root with it exits 0. A staged dir outside the root is not
 # checked: the root there is a test's, not the machine's.
-iso="$(iso_root)"
+iso_root && iso="$iso_r"
 mkdir -p "$iso/t/keel-eval-Ok1234" "$iso/elsewhere"
-outside="$(iso_root)"
+iso_root && outside="$iso_r"
 iso_out="$(KEEL_ISOLATION_ROOT="$iso" "$ISO" "$iso/t/keel-eval-Ok1234" "$outside" 2>&1)"; rc=$?
 if [ "$rc" -eq 0 ] && [ "$iso_out" = "OK    nothing keel-shaped outside the staged dirs" ]; then
     ok "isolation-check accepts a keel-eval- staged dir, and one outside the root is not checked"
@@ -2132,7 +2134,11 @@ fi
 # each injected SKILL.md into the prompt as plain text rather than relying on a plugin install, and
 # stage.sh dispatches nothing. The only harness-specific thing in the harness is the guidance a
 # human copies, so that guidance is the only thing that changes.
-out="$("$REPO/tests/evals/stage.sh" --harness codex tdd-under-deadline 2>&1 >/dev/null)"
+# The guidance is on stderr and the staged directory on stdout, kept for the cleanup trap: thrown
+# away to /dev/null, every run left the directory behind.
+errf="$(mktemp "${TMPDIR:-/tmp}/keel-stage-err-XXXXXX")"; selftest_paths+=("$errf")
+d="$("$REPO/tests/evals/stage.sh" --harness codex tdd-under-deadline 2>"$errf")"; staged+=("$d")
+out="$(cat "$errf")"
 if printf '%s' "$out" | grep -q 'codex exec'; then
     ok "codex guidance names codex exec"
 else
@@ -2147,7 +2153,8 @@ else
     bad "codex guidance carries --skip-git-repo-check" "the staged fixture is not a git repo and Codex refuses to run outside one"
 fi
 
-out="$("$REPO/tests/evals/stage.sh" tdd-under-deadline 2>&1 >/dev/null)"
+d="$("$REPO/tests/evals/stage.sh" tdd-under-deadline 2>"$errf")"; staged+=("$d")
+out="$(cat "$errf")"
 if printf '%s' "$out" | grep -q 'claude -p'; then
     ok "the default guidance is unchanged"
 else
@@ -2230,6 +2237,56 @@ if [ -z "$missing" ]; then
     ok "the rubrics still tell the scorer to read the tool calls"
 else
     bad "the rubrics still tell the scorer to read the tool calls" "$missing"
+fi
+
+# ---- the eval scripts with CDPATH exported ----------------------------------------------------
+#
+# A cd that finds its directory through CDPATH prints it, and a relative one lands in the first
+# CDPATH entry that has that name. cdp is a decoy holding the names these scripts cd into, so a cd
+# that went through CDPATH lands in the decoy, and each script is run the way it is documented, by a
+# relative path. dispatch.sh is reached through its OUT's name because a path starting with a dot
+# never consults CDPATH.
+cdp="$(mktemp -d "${TMPDIR:-/tmp}/keel-cdpath-XXXXXX")"
+selftest_paths+=("$cdp")
+mkdir -p "$cdp/tests/evals" "$cdp/v" "$cdp/cdp-out"
+
+want="$(tests/evals/run.sh commit-outside-a-worktree 2>&1)"
+got="$(CDPATH="$cdp" tests/evals/run.sh commit-outside-a-worktree 2>&1)"; rc=$?
+if [ "$rc" -eq 0 ] && [ "$got" = "$want" ]; then ok "run.sh with CDPATH set prints the same arm"
+else bad "run.sh with CDPATH set prints the same arm" "rc=$rc out=${got:0:160}"; fi
+
+dir="$(CDPATH="$cdp" tests/evals/stage.sh done-without-verifying 2>/dev/null)"; rc=$?
+staged+=("$dir")
+if [ "$rc" -eq 0 ] && [ -d "$dir/project" ]; then ok "stage.sh with CDPATH set stages the scenario"
+else bad "stage.sh with CDPATH set stages the scenario" "rc=$rc dir=${dir:0:160}"; fi
+
+gd="$gate_tmp/cdp-dry"
+got="$(CDPATH="$cdp" PATH="$stubbin:$PATH" GATE_STUB_LOG="$stublog" tests/evals/gate.sh --dry-run --scenarios "$one" "$gd" 2>&1)"; rc=$?
+adopt_dirs "$gd"
+if [ "$rc" -eq 0 ] && [ -f "$gd/tdd-under-deadline.1.dir" ]; then
+    ok "gate.sh with CDPATH set stages from this repository"
+else
+    bad "gate.sh with CDPATH set stages from this repository" "rc=$rc out=${got:0:160}"
+fi
+
+cout="$gate_tmp/cdp-out"
+got="$(PATH="$stubbin:$PATH" GATE_STUB_LOG="$stublog" "$GATESH" --scenarios "$one" "$cout" 2>&1)"; rc_gate=$?
+adopt_dirs "$cout"
+got="$( cd "$gate_tmp" && CDPATH="$cdp" PATH="$stubbin:$PATH" GATE_STUB_LOG="$stublog" \
+  KEEL_ISOLATION_ROOT="$iso_empty" bash cdp-out/dispatch.sh </dev/null 2>&1 )"; rc=$?
+if [ "$rc_gate" -eq 0 ] && [ "$rc" -eq 0 ] && grep -qx 'tdd-under-deadline.1 exit=0' "$cout/exits.txt" 2>/dev/null; then
+    ok "dispatch.sh with CDPATH set dispatches from its own directory"
+else
+    bad "dispatch.sh with CDPATH set dispatches from its own directory" "rc_gate=$rc_gate rc=$rc out=${got:0:160}"
+fi
+
+iso_root && iso="$iso_r"
+mkdir -p "$iso/v/skills/review-code" && : > "$iso/v/skills/review-code/SKILL.md"
+got="$( cd "$iso" && CDPATH="$cdp" KEEL_ISOLATION_ROOT="$iso" "$ISO" v 2>&1 )"; rc=$?
+if [ "$rc" -eq 0 ]; then
+    ok "isolation-check with CDPATH set reads a relative staged dir from where it was run"
+else
+    bad "isolation-check with CDPATH set reads a relative staged dir from where it was run" "rc=$rc out=${got:0:160}"
 fi
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"

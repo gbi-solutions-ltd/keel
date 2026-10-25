@@ -543,7 +543,7 @@ true, which is the class this repository keeps rediscovering the hard way.
 1. `tests/validate-skills.sh:409` explains that reading `lang_profile`'s case labels would "yield
    `nest` as a fourteenth language". `detect_languages` now yields fifteen, so `nest` would be the
    sixteenth. The rule itself is correct; its explanation is off by two.
-2. The `psycopg` regression guard at `tests/test-keel.sh:791` matches `*postgres*`, so it would not
+2. The `psycopg` regression guard at `tests/test-keel.sh#a psycopg project gave` matches `*postgres*`, so it would not
    notice an extra store appearing beside postgres. Task 3 widens the postgres pair with
    `supabase`, which makes an exact assertion worth more than it was.
 

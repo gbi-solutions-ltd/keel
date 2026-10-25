@@ -854,7 +854,7 @@ In `docs/03-install-and-distribution.md`, make three edits, each wrapped at 100 
 
    The test behind that paragraph counts FAIL lines only, so it stays green while the paragraph
    goes stale. It is the case
-   `` tests/test-keel.sh#and that is the only FAIL a fresh project has ``.
+   `` tests/test-keel-2.sh#and that is the only FAIL a fresh project has ``.
 
 Run the lint command. Expected: exit 0.
 

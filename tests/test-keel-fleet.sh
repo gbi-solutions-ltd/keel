@@ -121,6 +121,16 @@ problems_col="$(printf '%s' "$row" | awk -F'\t' '{ print $6 }')"
   || bad "keel-fleet" "expected nonzero exit for a repo with real problems, got 0"
 rm -rf "$c"
 
+# Run by a relative path with CDPATH set, the cd that finds keel-fleet's own directory went through
+# CDPATH and printed it, so KEEL_BIN held two lines, was not executable, and the script fell back to
+# whatever keel was on PATH. With none on PATH, every row failed, so PATH here drops every
+# directory holding a keel, or a developer's own install would hide the failure.
+nokeel="$(printf '%s' "$PATH" | tr ':' '\n' | while IFS= read -r p; do [ -x "$p/keel" ] || printf '%s:' "$p"; done)"
+out="$( cd "$ROOT" && CDPATH="$ROOT" PATH="${nokeel%:}" bin/keel-fleet "$repo_a" 2>&1 )"
+got="$(printf '%s\n' "$out" | awk -F'\t' -v r="$repo_a" '$1 == r { print $2 }')"
+[ "$got" = "$(cat "$ROOT/VERSION")" ] && ok "run by a relative path with CDPATH set, fleet still finds its own keel" \
+  || bad "keel-fleet" "with CDPATH set the row was: $out"
+
 rm -rf "$a" "$b"
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

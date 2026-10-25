@@ -962,7 +962,7 @@ and `:20`, `docs/ideas/leon-van-zyl-skill-collection.md:177`,
 `docs/plans/2026-09-19-make-keel-enforceable-outside-the-agent.md:490,922,996`,
 `docs/ideas/profile-loosening-goes-unnoticed.md:30`, `docs/ideas/context-window-at-init.md:100,129`,
 `docs/ideas/snapshot-records-its-own-path.md:36,86`, `docs/ideas/snapshot-citation-accuracy.md:46`,
-`docs/stories/context-window-at-init.md:339`'s `bin/keel:1602` citation,
+`docs/stories/context-window-at-init.md:339`'s citation of line 1602 of `bin/keel`,
 the `docs/audits/2026-09-20-security.md` line 81 citation (second occurrence, now
 `bin/keel#eval "$cmd"`), the `docs/audits/2026-08-19-delegation-rules-baselines.md` lines 318 and
 322 citations, and `docs/plans/2026-09-07-declared-profile-keys-take-effect.md`'s `artifacts.*` and

@@ -66,7 +66,7 @@ Variants of building it:
 | Finding | Evidence | What it means for the idea |
 |---|---|---|
 | Re-running init already merges new keys in, non-destructively | `bin/keel:207` `merge_profile`, and its comment on why existing values win | The asked-for capability exists. The question is the signal, not the mechanism |
-| `keel_version` is tool-owned, so it always reflects the last init | `bin/keel:226` | "Has this project been re-initialised since the upgrade?" is answerable. "Did the upgrade change anything?" is not |
+| `keel_version` is tool-owned, so it always reflects the last init | `bin/keel#merged["keel_version"] = fresh["keel_version"]` | "Has this project been re-initialised since the upgrade?" is answerable. "Did the upgrade change anything?" is not |
 | The doctor warning fires on any version difference | `[ "$pv" != "$iv" ]` in doctor | It cannot distinguish a schema change from a typo fix, so it will cry wolf on most releases |
 | The profile schema is a separate, versionless file | `templates/profile.schema.json` | There is nowhere to record that a release changed the schema, which is why the comparison has to fall back on the release version |
 | A field's absence has already caused a design decision once | Decision 3, `docs/07-open-decisions.md`: `hard_block_paths` at the top level, not under `gates`, and the prose was wrong for weeks | Absent and misplaced fields are a real failure mode here, not a hypothetical one |

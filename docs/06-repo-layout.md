@@ -189,6 +189,7 @@ keel/
 │   ├── check-dco.sh
 │   ├── generate-profile-keys.sh
 │   ├── grep-quiet.sh
+│   ├── keel-test-lib.sh
 │   ├── no-internal-leaks.sh
 │   ├── run-tests.sh
 │   ├── supply-chain-scan.sh
@@ -203,6 +204,10 @@ keel/
 │   ├── test-eval-harness.sh
 │   ├── test-grep-quiet.sh
 │   ├── test-keel.sh
+│   ├── test-keel-2.sh
+│   ├── test-keel-3.sh
+│   ├── test-keel-4.sh
+│   ├── test-keel-5.sh
 │   ├── test-leak-guard.sh
 │   ├── test-no-leaks.sh
 │   ├── test-profile-keys.sh
@@ -286,7 +291,7 @@ symlinked or synchronised, so drift between the two harnesses' skills is not pre
 there is nothing to drift from. What differs is `hooks`: Claude Code gets `hooks/hooks.json` by
 convention and Codex is pointed at `hooks/hooks.codex.json`, which is generated without the gates
 the capability manifest withholds from it. Both versions are pinned to `VERSION` by
-`tests/test-keel.sh`, which globs `.*-plugin/plugin.json` rather than naming them.
+`tests/test-keel-4.sh`, which globs `.*-plugin/plugin.json` rather than naming them.
 
 Facts worth recording, each verified against the plugin documentation:
 

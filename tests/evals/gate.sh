@@ -62,7 +62,7 @@
 # and no expansion of a possibly empty array under `set -u`, which bash 3.2 treats as unbound. The
 # script it writes is held to the same.
 
-set -uo pipefail
+set -uo pipefail; unset CDPATH  # a cd that finds its directory through CDPATH prints it
 
 caller="$PWD"
 cd "$(dirname "$0")/../.." || exit 1
@@ -280,7 +280,7 @@ HEADER
     printf ' )\n'
     cat <<'BODY'
 
-set -uo pipefail
+set -uo pipefail; unset CDPATH  # a cd that finds its directory through CDPATH prints it
 
 here="$(cd "$(dirname "$0")" && pwd -P)" || exit 2
 

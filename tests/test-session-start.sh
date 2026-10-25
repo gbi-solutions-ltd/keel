@@ -166,6 +166,15 @@ check_version "a plugin root's VERSION reaches the session context" "$vroot/ok" 
 # measuring something other than what a session sees.
 check_version "with CLAUDE_PLUGIN_ROOT unset the fallback finds this repository" "" "keel $(cat "$(dirname "$HOOK")/../VERSION")"
 
+# 12b. The same fallback run by a relative path with CDPATH set. A cd that finds its directory through
+# CDPATH prints it, so the ROOT it captured held two lines and the version went missing. kp is a link
+# to this repository, because CDPATH is never consulted for a path starting with a dot.
+ln -s "$(cd "$(dirname "$HOOK")/.." && pwd)" "$tmp/kp"
+got="$( cd "$tmp" && unset CLAUDE_PLUGIN_ROOT && CDPATH="$tmp" kp/hooks/session-start 2>/dev/null | grep -o 'keel [0-9][0-9.]*' | head -1 )"
+if [ "$got" = "keel $(cat "$(dirname "$HOOK")/../VERSION")" ]; then ok "run by a relative path with CDPATH set, the fallback still finds this repository"
+else bad "version" "with CDPATH set: expected [keel $(cat "$(dirname "$HOOK")/../VERSION")], got [$got]"; fi
+rm -f "$tmp/kp"
+
 # 13. No VERSION at all, which is what a partial or hand-assembled install looks like.
 mkdir -p "$vroot/none"
 check_version "an absent VERSION drops the line and keeps the router" "$vroot/none" NONE

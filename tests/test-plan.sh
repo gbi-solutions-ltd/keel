@@ -720,7 +720,7 @@ case "$kept" in /*) rm -f "$kept" ;; esac
 
 # ---- report: lead time and rework from git ------------------------------------------------------
 
-# rrepo <dir>: an empty repository, as tests/test-keel.sh builds them.
+# rrepo <dir>: an empty repository, as tests/keel-test-lib.sh builds them.
 rrepo() {
     mkdir -p "$1"
     ( cd "$1" && git init -q -b main . && git config user.email t@t.t && git config user.name t ) \

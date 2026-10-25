@@ -199,6 +199,20 @@ if command -v harness_active_gates >/dev/null 2>&1; then
       && bad "an empty KEEL_CAPABILITIES is refused" "returned zero" \
       || ok "an empty KEEL_CAPABILITIES is refused"
 
+    # And by each function that reads the manifest, after a call that resolved it. The path is held
+    # in _HARNESS_CAP between calls, so a function that ignored _harness_cap's refusal would read the
+    # last good manifest and report gates active on no evidence. Each is called directly: through
+    # harness_active_gates alone, its own harness_known call would hide the other three.
+    harness_known claude >/dev/null
+    for call in "harness_provides claude pretooluse_ask" "harness_known claude" \
+                "harness_gate_active claude done-guard" "harness_active_gates claude"; do
+        # shellcheck disable=SC2086
+        # Word splitting is the point: each entry is a function and its arguments.
+        KEEL_CAPABILITIES="" $call >/dev/null \
+          && bad "an empty KEEL_CAPABILITIES is refused by ${call%% *}" "returned zero" \
+          || ok "an empty KEEL_CAPABILITIES is refused by ${call%% *}"
+    done
+
     # One fixture per way a provides row can be absent evidence while looking populated. Each of
     # these granted its primitive in the first version of resolve.sh, and none is visible in a diff.
     # The positive control is first on purpose: without it every negative below also passes against
@@ -247,8 +261,8 @@ if command -v harness_active_gates >/dev/null 2>&1; then
     [ "$(gate_on 'provides|ghost|p|src| |2026-01-01\nrequires|done-guard|p\n')" = "inactive" ] \
       && ok "a blank version grants nothing" || bad "a blank version grants nothing" "reported active"
 
-    # A tab, not a space. Every fixture above uses a space, which lets `${1//[[:space:]]/}` in
-    # _harness_present be weakened to `${1// /}` with the suite green. resolve.sh states that the
+    # A tab, not a space. Every fixture above uses a space, which lets `*[![:space:]]*` in
+    # _harness_present be weakened to `*[!\ ]*` with the suite green. resolve.sh states that the
     # resolver and the validator must agree on what absent evidence means, and the validator learned
     # about tabs first, so without this the two drift apart in the direction that grants.
     [ "$(gate_on 'provides|ghost|p|src|\t|2026-01-01\nrequires|done-guard|p\n')" = "inactive" ] \
@@ -346,6 +360,38 @@ if command -v harness_active_gates >/dev/null 2>&1; then
       && ok "resolves with no python3 on PATH" \
       || bad "resolves with no python3 on PATH" "got: $out"
     rm -rf "$stub"
+
+    # Sourced by a relative path, then a cd. The manifest path used to be worked out from
+    # BASH_SOURCE on every call, so after the cd it named a directory that was not there, wrote a
+    # cd: error and resolved every gate dark. It is now resolved once, when the file is sourced.
+    out="$(cd "$ROOT" && /bin/bash -c '. lib/harness/resolve.sh; cd /; harness_active_gates claude' 2>&1 | sort | tr '\n' ' ')"
+    [ "$out" = "context-watch done-guard review-guard sensitive-guard session-start " ] \
+      && ok "resolves after a relative source and a cd" \
+      || bad "resolves after a relative source and a cd" "got: $out"
+
+    # With CDPATH set, a cd that finds its directory through it prints that directory, and a cd
+    # inside $(...) then captures two lines instead of one path.
+    out="$(cd "$ROOT" && CDPATH="$ROOT" /bin/bash -c '. lib/harness/resolve.sh; harness_active_gates claude' 2>&1 | sort | tr '\n' ' ')"
+    [ "$out" = "context-watch done-guard review-guard sensitive-guard session-start " ] \
+      && ok "resolves with CDPATH set" \
+      || bad "resolves with CDPATH set" "got: $out"
+
+    # Sourced through a symlink, the manifest is the one beside the file the link names, not one
+    # beside the link.
+    lnk="$(mktemp -d)"
+    ln -s "$ROOT/lib/harness/resolve.sh" "$lnk/resolve.sh"
+    out="$(/bin/bash -c ". '$lnk/resolve.sh'; harness_active_gates claude" 2>&1 | sort | tr '\n' ' ')"
+    [ "$out" = "context-watch done-guard review-guard sensitive-guard session-start " ] \
+      && ok "resolves when sourced through a symlink" \
+      || bad "resolves when sourced through a symlink" "got: $out"
+    # And through a relative link to that one, which is read against the link's own directory.
+    mkdir -p "$lnk/rel"
+    ln -s ../resolve.sh "$lnk/rel/resolve.sh"
+    out="$(/bin/bash -c ". '$lnk/rel/resolve.sh'; harness_active_gates claude" 2>&1 | sort | tr '\n' ' ')"
+    [ "$out" = "context-watch done-guard review-guard sensitive-guard session-start " ] \
+      && ok "resolves when sourced through a relative symlink" \
+      || bad "resolves when sourced through a relative symlink" "got: $out"
+    rm -rf "$lnk"
 else
     bad "resolve.sh defines harness_active_gates" "function not found after sourcing"
 fi

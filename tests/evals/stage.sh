@@ -33,7 +33,7 @@
 # here rather than in a second script is what keeps the two arms of a comparison honest: same tree,
 # same prompt, one documented difference.
 
-set -uo pipefail
+set -uo pipefail; unset CDPATH  # a cd that finds its directory through CDPATH prints it
 cd "$(dirname "$0")/../.." || exit 1
 repo="$PWD"
 

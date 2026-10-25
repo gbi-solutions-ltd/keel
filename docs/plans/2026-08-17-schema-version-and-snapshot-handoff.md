@@ -203,7 +203,7 @@ established, and this whole change exists to stop conflating those two.
 
 The substring `configured by keel` moves from the warning to the informational line and keeps its
 wording, so the existing assertion at
-`tests/test-keel.sh#doctor reports which keel configured the project` still matches. Retitle that
+`tests/test-keel-3.sh#doctor reports which keel configured the project` still matches. Retitle that
 case: it no longer tests staleness, it tests that doctor reports which keel configured the project.
 
 - [x] **Step 1: Write the failing test**

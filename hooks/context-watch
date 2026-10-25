@@ -28,7 +28,7 @@
 #
 # Turn it off with KEEL_CONTEXT_WATCH=off, or gates.context_watch=false in .keel/profile.json.
 
-set -uo pipefail
+set -uo pipefail; unset CDPATH  # a cd that finds its directory through CDPATH prints it
 
 command -v python3 >/dev/null 2>&1 || exit 0
 

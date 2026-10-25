@@ -31,7 +31,7 @@
 # permission deny rules in `lib/harness/claude.sh#harness_permission_rules() {` already warn. This raises the cost of a careless commit; it
 # is not a boundary against a determined one. The boundary is review.
 
-set -uo pipefail
+set -uo pipefail; unset CDPATH  # a cd that finds its directory through CDPATH prints it
 
 ask() {
     printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"keel: %s"}}' "$1"

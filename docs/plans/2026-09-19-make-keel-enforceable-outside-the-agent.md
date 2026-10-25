@@ -142,10 +142,10 @@ re-litigated: task 0's `Done when` holds, so the task proceeds as done.
 - Test: `tests/test-keel.sh`
 
 **Interfaces:**
-- Consumes: `json_get` (`bin/keel:328`), already used throughout `bin/keel` for reading
+- Consumes: `json_get` (`bin/keel#json_get() {`), already used throughout `bin/keel` for reading
   `.keel/profile.json`. Also `deploy.ci` (`bin/keel:562`), which `write_profile` already fills from
   `.gitlab-ci.yml`, `Jenkinsfile`, `azure-pipelines.yml`, `.circleci/config.yml`,
-  `bitbucket-pipelines.yml`, or a non-empty `.github/workflows/` (`tests/test-keel.sh:996-1012`).
+  `bitbucket-pipelines.yml`, or a non-empty `.github/workflows/` (`tests/test-keel.sh#"Jenkinsfile:jenkins"`).
 - Produces: `write_ci` no longer takes a stack argument; it reads `stack.language` from the profile
   itself, so both `cmd_new` (which already writes the profile before calling it) and `cmd_init` (new
   caller) can invoke it identically.
@@ -172,7 +172,7 @@ against the diff as it stood (spec-compliance: COMPLIES; code-quality: no blocki
 should-fix, one consider, see below), plus this session's own run of `tests/test-keel.sh`.
 
 Add near the existing `keel new` CI coverage (around
-`tests/test-keel.sh#ok "new writes a CI workflow"`, which checks that `.github/workflows/ci.yml` is
+`tests/test-keel-2.sh#ok "new writes a CI workflow"`, which checks that `.github/workflows/ci.yml` is
 written), a fixture-based check that the generator reaches every non-null `verify.*` command, and a
 second check that `keel init` on an existing project without a CI file writes one:
 
@@ -402,7 +402,7 @@ task can make.
 
 - [x] **Step 1: Write the failing test**
 
-Add beside the existing guard tests (near `tests/test-keel.sh#---- the push guard ---`, which
+Add beside the existing guard tests (near `tests/test-keel-4.sh#---- the push guard ---`, which
 already builds a `$g` fixture and runs `"$KEEL" guard install`):
 
 ```bash
@@ -627,7 +627,7 @@ session is the check that would falsify this conclusion if wrong.
 
 - [x] **Step 1: Write the failing test**
 
-Add beside the existing pre-push tests (near `tests/test-keel.sh#push_to() {`, which already fakes a
+Add beside the existing pre-push tests (near `tests/test-keel-4.sh#push_to() {`, which already fakes a
 push by piping ref lines into the hook):
 
 ```bash
@@ -840,7 +840,7 @@ one too, the same as the other two."
 
 - [x] **Step 6: Run the suite at the unit boundary, then hand over**
 
-The existing shellcheck assertion at `tests/test-keel.sh#pre-push hook is shellcheck clean` already
+The existing shellcheck assertion at `tests/test-keel-4.sh#pre-push hook is shellcheck clean` already
 lints `"$g/.githooks/pre-push"`, the file `guard_hook_body` generates; because it reads the
 generated file rather than a hardcoded copy, it automatically covers this task's change with no new
 test code. Confirm it still passes when the full suite runs in step 4 above.
@@ -946,7 +946,7 @@ flattens scalars only and returns a Python repr for a list, so the field is read
 
 - [x] **Step 1: Write the failing test**
 
-Add beside the existing doctor tests (near `tests/test-keel.sh#bad "doctor no profile"`, which
+Add beside the existing doctor tests (near `tests/test-keel-2.sh#bad "doctor no profile"`, which
 already runs `"$KEEL" doctor` against a fixture):
 
 ```bash
@@ -1894,7 +1894,7 @@ blocked; both are folded in above.
 - **Should fix, fixed:** task 1's `cmd_init` gate tested only for `.github/workflows/ci.yml`, so a
   project holding `.gitlab-ci.yml` or a `Jenkinsfile` would have received a GitHub Actions
   workflow. It now gates on `deploy.ci`, which keel already fills from every platform it knows
-  (`tests/test-keel.sh:996-1012`), with a GitLab test case. The task also now states that the
+  (`tests/test-keel.sh#"Jenkinsfile:jenkins"`), with a GitLab test case. The task also now states that the
   `init` half is plan-added scope beyond the idea document's Recommendation.
 - **Should fix, fixed:** task 5 edited `verify.lint` in the profile and left the two rendered copies
   in `CLAUDE.md` and `AGENTS.md` stale. Both are now in the task's Files and hand-over; a re-render

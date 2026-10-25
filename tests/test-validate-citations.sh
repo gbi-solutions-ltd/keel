@@ -256,6 +256,66 @@ m_hot_phrase_in_live_doc() {
 }
 run "a phrase citation into bin/keel from a live document is accepted" 0 m_hot_phrase_in_live_doc
 
+# The parts tests/test-keel.sh was split into take the insertions it used to, so a line number into
+# one of them goes stale as fast.
+m_hot_line_in_keel_part() {
+    mkdir -p "$1/tests"
+    printf '#!/usr/bin/env bash\n# A comment.\necho hi\n' > "$1/tests/test-keel-$hot_part.sh"
+    printf 'The case is at `tests/test-keel-%s.sh:2`.\n' "$hot_part" >> "$1/README.md"
+}
+for hot_part in 2 3 4 5; do
+    run "a line-number citation into tests/test-keel-$hot_part.sh from a live document is rejected" 1 m_hot_line_in_keel_part
+done
+
+# Case 6j. The phrase form in a double-backtick code span, which is how a phrase holding a backtick
+# has to be written, and how docs/snapshot.md writes every citation in its tables. The single
+# backtick pattern never matched it, so a citation of this shape went stale with nothing reporting
+# it: two in this tree named text that had moved to another file.
+m_double_phrase_gone() {
+    printf 'By phrase: `` tests/evals/results.md#A sentence nobody wrote ``.\n' >> "$1/docs/ideas/example.md"
+}
+run "a double-backtick phrase citation whose text is not in the cited file is rejected" 1 m_double_phrase_gone
+
+m_double_phrase_there() {
+    printf 'By phrase: `` tests/evals/results.md#Checked the exception list explicitly ``.\n' \
+      >> "$1/docs/ideas/example.md"
+}
+run "a double-backtick phrase citation whose text is there is accepted" 0 m_double_phrase_there
+
+m_double_phrase_tick_there() {
+    printf 'Run `keel doctor` first.\n' >> "$1/tests/evals/results.md"
+    printf 'By phrase: `` tests/evals/results.md#Run `keel doctor` first ``.\n' >> "$1/docs/ideas/example.md"
+}
+run "a double-backtick phrase holding a backtick is accepted when the text is there" 0 m_double_phrase_tick_there
+
+m_double_phrase_tick_gone() {
+    printf 'By phrase: `` tests/evals/results.md#Run `keel doctor` last ``.\n' >> "$1/docs/ideas/example.md"
+}
+run "a double-backtick phrase holding a backtick is rejected when the text is gone" 1 m_double_phrase_tick_gone
+
+# The must-not-reject half. Four plans in this tree describe the form itself as
+# `` bin/keel#<text from the line> ``, quoting the advice this checker prints. A phrase that is one
+# placeholder in angle brackets names a shape, not text, and reporting it would fail the checker's
+# own documentation.
+m_placeholder_phrase() {
+    printf 'Cite it in the form `` tests/evals/results.md#<text from the line> ``.\n' >> "$1/docs/ideas/example.md"
+}
+run "a phrase that is one placeholder in angle brackets is ignored" 0 m_placeholder_phrase
+
+# Markdown pads a span whose content ends in a backtick, so `` path#Run `keel` `` is the shape such
+# a phrase takes, and the closing backtick of `keel` must not be read as the start of the span's end.
+m_double_phrase_ends_tick_gone() {
+    printf 'By phrase: `` tests/evals/results.md#Run `keel` ``.\n' >> "$1/docs/ideas/example.md"
+}
+run "a double-backtick phrase ending in a backtick is rejected when the text is gone" 1 m_double_phrase_ends_tick_gone
+
+# A placeholder is words. Angle brackets around anything else are real text, such as the markers
+# keel writes into CLAUDE.md, and a citation of one goes stale like any other.
+m_marker_phrase_gone() {
+    printf 'The block starts at `tests/evals/results.md#<!-- keel:begin -->`.\n' >> "$1/docs/ideas/example.md"
+}
+run "a phrase in angle brackets that is not a placeholder is still checked" 1 m_marker_phrase_gone
+
 # Case 7. skills/repo-snapshot/references/section-templates.md carries
 # `.github/workflows/deploy.yml:34` inside a fenced block, as an example of what a filled-in
 # snapshot looks like for somebody else's repository. It is the only citation in the whole tree that

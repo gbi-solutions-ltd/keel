@@ -3978,7 +3978,7 @@ correct.** Fixed in place:
 | Task 8's regeneration of `docs/profile-keys.md` would wipe task 6's tags | generator output | tasks 6, 8 |
 | Task 4 step 2 mutated a tracked file while `MAX_JOBS=4` jobs read it | `tests/run-tests.sh#capped at 4 concurrent` | task 4 |
 | A one-line tag lookback fails any claim that wraps | the support page's own paragraph | task 5 |
-| Task 7's committed baseline contradicts the suite's stated policy | `tests/test-keel.sh:1-3` | task 7 |
+| Task 7's committed baseline contradicts the suite's stated policy | `tests/keel-test-lib.sh#Fixtures are generated per` | task 7 |
 | `cmd_doctor` would call functions that exist for one harness only | `bin/keel:1323` | task 7, sixth contract function |
 
 ### Not fixed, with reasons
