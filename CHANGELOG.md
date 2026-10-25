@@ -41,7 +41,8 @@ Entries are terse by design; the narrative for each release is in this file's gi
   or sourcing it with `CDPATH` set no longer turns every gate dark. `bin/keel`, `bin/keel-fleet` and
   the session-start, context-watch and sensitive-guard hooks unset `CDPATH`, so run by a relative
   path with it set they no longer report an incomplete install, fall back to another `keel`, go
-  silent or ask on a commit they should let through.
+  silent or ask on a commit they should let through. The eval scripts under `tests/evals/` and the
+  `dispatch.sh` that `gate.sh` writes unset it too.
 
 ## 0.26.0 - 2026-10-22
 
