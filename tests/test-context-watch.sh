@@ -235,6 +235,16 @@ case "$out" in *"75%"*) ok "the warn still fires at 75 percent of a genuine 2000
   *) bad "e2e" "the floor silenced a warning that should have fired: $out" ;; esac
 printf '{"docs_root":"docs/keel"}\n' > "$work/.keel/profile.json"
 
+# Run by a relative path with CDPATH set and no CLAUDE_PLUGIN_ROOT, a ROOT captured from a cd that
+# went through CDPATH held two lines, the library was not found, and the hook went silent. kp is a
+# link to this repository, because CDPATH is never consulted for a path starting with a dot.
+ln -s "$ROOT" "$work/kp"
+out="$(printf '{"hook_event_name":"UserPromptSubmit","transcript_path":"%s","cwd":"%s","session_id":"s-cdpath","tool_name":"Bash"}' \
+  "$work/warn.jsonl" "$work" | ( cd "$work" && unset CLAUDE_PLUGIN_ROOT && CDPATH="$work" kp/hooks/context-watch ) 2>/dev/null)"
+case "$out" in *"75%"*) ok "run by a relative path with CDPATH set, the warn still fires" ;;
+  *) bad "CDPATH" "the hook went silent with CDPATH set: $out" ;; esac
+rm -f "$work/kp"
+
 # The watchdog does nothing at all without python3, rather than printing an apology on every
 # prompt. doctor is what reports the silence; the hook must not.
 #

@@ -43,7 +43,7 @@
 #
 # Budget: under 250 tokens, 400 hard, enforced by tests/validate-skills.sh.
 
-set -euo pipefail
+set -euo pipefail; unset CDPATH  # a cd that finds its directory through CDPATH prints it
 
 read -r -d '' CONTEXT <<'TXT' || true
 This project uses keel. Before starting substantive work, pick a skill.

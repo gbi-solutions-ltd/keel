@@ -2,7 +2,7 @@
 # Fans out `keel doctor --json --fast` across repositories and prints one row per repository.
 # Usage: keel-fleet <repo-path>...
 #        keel-fleet --file <path-list-file>   (one repository path per line)
-set -uo pipefail
+set -uo pipefail; unset CDPATH  # a cd that finds its directory through CDPATH prints it
 
 # The sibling bin/keel first: the documented login-shell install symlinks that one file alone, and
 # a fleet script is what a login shell runs. Falling back to PATH covers a plugin install. Made

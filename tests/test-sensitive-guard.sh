@@ -67,6 +67,21 @@ r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
 check "a commit staging nothing sensitive is not blocked" "" "$r" "git commit -m x"
 rm -rf "$r"
 
+# The same commit with the hook run by a relative path, CDPATH set and no CLAUDE_PLUGIN_ROOT. A cd
+# that finds its directory through CDPATH prints it, so a ROOT captured from one held two lines, the
+# resolver could not be read, and the hook asked on a commit it should have let through. kp is a
+# link to this repository, because CDPATH is never consulted for a path starting with a dot.
+r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
+: > "$r/src/ui/button.tsx"; git -C "$r" add -A
+ln -s "$(cd "$(dirname "$GUARD")/.." && pwd)" "$r/kp"
+out="$(event "git commit -m x" "$r" | ( cd "$r" && unset CLAUDE_PLUGIN_ROOT && CDPATH="$r" kp/hooks/sensitive-guard ) 2>/dev/null)"
+if [ -z "$out" ]; then
+    printf '  PASS  run by a relative path with CDPATH set, it still lets a safe commit through\n'; pass=$((pass+1))
+else
+    printf '  FAIL  run by a relative path with CDPATH set, it still lets a safe commit through (got: %s)\n' "${out:0:90}"; fail=$((fail+1))
+fi
+rm -rf "$r"
+
 # A repository that declares no sensitive paths must be untouched, which is almost every repository.
 r="$(mktemp -d)"; fixture "$r" ''
 : > "$r/src/auth/token.go"; git -C "$r" add -A

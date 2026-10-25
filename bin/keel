@@ -27,9 +27,9 @@ while [ -L "$SELF" ]; do
         *)  SELF="$(dirname "$SELF")/$_link" ;;
     esac
 done
-# CDPATH emptied for the cd: one that finds its directory through CDPATH prints it, and HERE would
-# capture that line as well as pwd's.
-HERE="$(CDPATH='' cd "$(dirname "$SELF")/.." && pwd)"
+# CDPATH unset for every cd from here on: one that finds its directory through CDPATH prints it.
+unset CDPATH
+HERE="$(cd "$(dirname "$SELF")/.." && pwd)"
 
 # The profile schema's own version, deliberately separate from VERSION. `keel_version` answers
 # "which keel wrote this file". This answers "does this file have the fields the installed keel

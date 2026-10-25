@@ -38,8 +38,10 @@ Entries are terse by design; the narrative for each release is in this file's gi
 - `lib/harness/resolve.sh` resolves the manifest path once, when sourced, and no longer forks to
   read it or rewrites each field to test it for blanks: `keel doctor --fast` 1.08s to 0.95s, best
   of six. Sourcing it by a relative path and then changing directory, sourcing it through a symlink,
-  or sourcing it with `CDPATH` set no longer turns every gate dark, and `bin/keel` run by a relative
-  path with `CDPATH` set no longer reports an incomplete install.
+  or sourcing it with `CDPATH` set no longer turns every gate dark. `bin/keel`, `bin/keel-fleet` and
+  the session-start, context-watch and sensitive-guard hooks unset `CDPATH`, so run by a relative
+  path with it set they no longer report an incomplete install, fall back to another `keel`, go
+  silent or ask on a commit they should let through.
 
 ## 0.26.0 - 2026-10-22
 
