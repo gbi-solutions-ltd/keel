@@ -9,7 +9,7 @@
 #
 # Usage: tests/evals/run.sh <scenario-name>
 
-set -uo pipefail
+set -uo pipefail; unset CDPATH  # a cd that finds its directory through CDPATH prints it
 cd "$(dirname "$0")/../.." || exit 1
 
 name="${1:-}"

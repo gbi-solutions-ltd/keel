@@ -58,7 +58,7 @@
 #
 # Portable to the bash 3.2 and BSD userland a Mac ships: no mapfile, no realpath, no GNU flags.
 
-set -u
+set -u; unset CDPATH  # a cd that finds its directory through CDPATH prints it
 
 usage() {
     printf 'usage: tests/evals/isolation-check.sh [--names <file>] <staged dir>...\n' >&2

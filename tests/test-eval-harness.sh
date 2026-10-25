@@ -2232,5 +2232,55 @@ else
     bad "the rubrics still tell the scorer to read the tool calls" "$missing"
 fi
 
+# ---- the eval scripts with CDPATH exported ----------------------------------------------------
+#
+# A cd that finds its directory through CDPATH prints it, and a relative one lands in the first
+# CDPATH entry that has that name. cdp is a decoy holding the names these scripts cd into, so a cd
+# that went through CDPATH lands in the decoy, and each script is run the way it is documented, by a
+# relative path. dispatch.sh is reached through its OUT's name because a path starting with a dot
+# never consults CDPATH.
+cdp="$(mktemp -d "${TMPDIR:-/tmp}/keel-cdpath-XXXXXX")"
+selftest_paths+=("$cdp")
+mkdir -p "$cdp/tests/evals" "$cdp/v" "$cdp/cdp-out"
+
+want="$(tests/evals/run.sh commit-outside-a-worktree 2>&1)"
+got="$(CDPATH="$cdp" tests/evals/run.sh commit-outside-a-worktree 2>&1)"; rc=$?
+if [ "$rc" -eq 0 ] && [ "$got" = "$want" ]; then ok "run.sh with CDPATH set prints the same arm"
+else bad "run.sh with CDPATH set prints the same arm" "rc=$rc out=${got:0:160}"; fi
+
+dir="$(CDPATH="$cdp" tests/evals/stage.sh done-without-verifying 2>/dev/null)"; rc=$?
+staged+=("$dir")
+if [ "$rc" -eq 0 ] && [ -d "$dir/project" ]; then ok "stage.sh with CDPATH set stages the scenario"
+else bad "stage.sh with CDPATH set stages the scenario" "rc=$rc dir=${dir:0:160}"; fi
+
+gd="$gate_tmp/cdp-dry"
+got="$(CDPATH="$cdp" PATH="$stubbin:$PATH" GATE_STUB_LOG="$stublog" tests/evals/gate.sh --dry-run --scenarios "$one" "$gd" 2>&1)"; rc=$?
+adopt_dirs "$gd"
+if [ "$rc" -eq 0 ] && [ -f "$gd/tdd-under-deadline.1.dir" ]; then
+    ok "gate.sh with CDPATH set stages from this repository"
+else
+    bad "gate.sh with CDPATH set stages from this repository" "rc=$rc out=${got:0:160}"
+fi
+
+cout="$gate_tmp/cdp-out"
+got="$(PATH="$stubbin:$PATH" GATE_STUB_LOG="$stublog" "$GATESH" --scenarios "$one" "$cout" 2>&1)"; rc_gate=$?
+adopt_dirs "$cout"
+got="$( cd "$gate_tmp" && CDPATH="$cdp" PATH="$stubbin:$PATH" GATE_STUB_LOG="$stublog" \
+  KEEL_ISOLATION_ROOT="$iso_empty" bash cdp-out/dispatch.sh </dev/null 2>&1 )"; rc=$?
+if [ "$rc_gate" -eq 0 ] && [ "$rc" -eq 0 ] && grep -qx 'tdd-under-deadline.1 exit=0' "$cout/exits.txt" 2>/dev/null; then
+    ok "dispatch.sh with CDPATH set dispatches from its own directory"
+else
+    bad "dispatch.sh with CDPATH set dispatches from its own directory" "rc_gate=$rc_gate rc=$rc out=${got:0:160}"
+fi
+
+iso="$(iso_root)"
+mkdir -p "$iso/v/skills/review-code" && : > "$iso/v/skills/review-code/SKILL.md"
+got="$( cd "$iso" && CDPATH="$cdp" KEEL_ISOLATION_ROOT="$iso" "$ISO" v 2>&1 )"; rc=$?
+if [ "$rc" -eq 0 ]; then
+    ok "isolation-check with CDPATH set reads a relative staged dir from where it was run"
+else
+    bad "isolation-check with CDPATH set reads a relative staged dir from where it was run" "rc=$rc out=${got:0:160}"
+fi
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
