@@ -67,6 +67,21 @@ r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
 check "a commit staging nothing sensitive is not blocked" "" "$r" "git commit -m x"
 rm -rf "$r"
 
+# A crash is not an answer. Claude Code lets the tool call proceed on any exit but 0 and 2, so a
+# hook that died here waved the commit through. A tool_input that is a string rather than an object
+# makes the embedded Python raise, which is the crash this case can reach from outside; a `set -u`
+# slip ends the same way.
+r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
+: > "$r/src/auth/token.go"; git -C "$r" add -A
+out="$(printf '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":"git commit -m x","cwd":"%s"}' "$r" \
+  | ( cd "$r" && "$GUARD" ) 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q '"permissionDecision": *"ask"'; then
+    printf '  PASS  a guard that fails unexpectedly asks rather than letting the commit through\n'; pass=$((pass+1))
+else
+    printf '  FAIL  a guard that fails unexpectedly asks rather than letting the commit through (rc=%s, got: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1))
+fi
+rm -rf "$r"
+
 # The same commit with the hook run by a relative path, CDPATH set and no CLAUDE_PLUGIN_ROOT. A cd
 # that finds its directory through CDPATH prints it, so a ROOT captured from one held two lines, the
 # resolver could not be read, and the hook asked on a commit it should have let through. kp is a
