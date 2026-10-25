@@ -336,10 +336,10 @@ Scenario: no documented site still claims a configured value simply wins
   Then each describes the floor, the environment override, and the one million bound
 ```
 
-**Notes:** the four sites are `templates/profile.schema.json:290`, `bin/keel:1602`, `bin/keel:1307`
-and `lib/context_watch.py:130-140`. All four currently state that an explicit setting wins outright,
-which is why this is `fix`. The second scenario is not redundant: `bin/keel:1307` remains reachable
-for every profile written before S-05.
+**Notes:** the four sites are `templates/profile.schema.json:290`, lines 1602 and 1307 of `bin/keel`
+as they stood, and `lib/context_watch.py:130-140`. All four currently state that an explicit setting
+wins outright, which is why this is `fix`. The second scenario is not redundant: line 1307 of
+`bin/keel` remains reachable for every profile written before S-05.
 
 ### S-08 Doctor names both values when it bounds a window
 

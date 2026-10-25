@@ -804,7 +804,7 @@ say so rather than adding a sentence back to the schema by hand.
 | `unread:this plan's verdict row 7` | `conventions.working_branch` |
 | `unread:this plan's verdict row 9` | `observability.log_shipping` |
 | `unread:docs/ideas/standards-that-bind.md#in the skills that can afford one` | `gates.coding_standards` |
-| `code:bin/keel:1346` | `artifacts.snapshot`, `artifacts.prd`, `artifacts.stories`, `artifacts.architecture`, `artifacts.decisions`, `artifacts.plans` |
+| `code:bin/keel#d=json.load(open('.keel/profile.json')).get('artifacts',{})` | `artifacts.snapshot`, `artifacts.prd`, `artifacts.stories`, `artifacts.architecture`, `artifacts.decisions`, `artifacts.plans` |
 | `code:bin/keel#local cg; cg="$(json_get .keel/profile.json gates.commit_guard 2>/dev/null` | `gates.commit_guard` |
 | `code:hooks/done-guard:114` | `gates.done_verified` |
 | `code:lib/context_watch.py:570` | `gates.context_watch` |

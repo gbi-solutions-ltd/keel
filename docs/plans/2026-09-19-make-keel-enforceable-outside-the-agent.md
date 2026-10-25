@@ -142,7 +142,7 @@ re-litigated: task 0's `Done when` holds, so the task proceeds as done.
 - Test: `tests/test-keel.sh`
 
 **Interfaces:**
-- Consumes: `json_get` (`bin/keel:328`), already used throughout `bin/keel` for reading
+- Consumes: `json_get` (`bin/keel#json_get() {`), already used throughout `bin/keel` for reading
   `.keel/profile.json`. Also `deploy.ci` (`bin/keel:562`), which `write_profile` already fills from
   `.gitlab-ci.yml`, `Jenkinsfile`, `azure-pipelines.yml`, `.circleci/config.yml`,
   `bitbucket-pipelines.yml`, or a non-empty `.github/workflows/` (`tests/test-keel.sh#"Jenkinsfile:jenkins"`).
