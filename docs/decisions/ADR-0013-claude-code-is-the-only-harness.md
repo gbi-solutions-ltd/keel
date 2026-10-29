@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| Status | proposed |
+| Status | accepted |
 | Date | 2026-10-29 |
-| Deciders | The maintainer of keel. Bernard chose this shape on 2026-10-29 in the design conversation; acceptance is a separate act |
+| Deciders | Bernard Tebandeke, accepted 2026-10-29 |
 | Requirements | None written. Driver is the request recorded in [`docs/architecture/claude-code-only.md`](../architecture/claude-code-only.md) |
-| Supersedes | ADR-0004, ADR-0005 |
+| Supersedes | [ADR-0004](ADR-0004-a-guarantee-belongs-to-a-repository-and-harness-pair.md), [ADR-0005](ADR-0005-one-skill-body-per-skill-across-harnesses.md) |
 
 ## Context
 

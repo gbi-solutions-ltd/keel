@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| Status | proposed |
+| Status | accepted |
 | Date | 2026-10-29 |
-| Deciders | The maintainer of keel. Bernard chose this shape on 2026-10-29 in the design conversation; acceptance is a separate act |
+| Deciders | Bernard Tebandeke, accepted 2026-10-29 |
 | Requirements | None written. Driver is [`docs/architecture/claude-code-only.md`](../architecture/claude-code-only.md) |
-| Supersedes | ADR-0003 |
+| Supersedes | [ADR-0003](ADR-0003-gate-availability-from-a-capability-manifest.md) |
 
 ## Context
 

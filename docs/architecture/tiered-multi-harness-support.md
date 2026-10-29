@@ -2,14 +2,14 @@
 
 | | |
 |---|---|
-| Status | accepted 2026-09-05 |
+| Status | accepted 2026-09-05, superseded 2026-10-29 |
 | Mode | existing |
 | Date | 2026-09-05 |
 | Requirements | No PRD. Driver is [`docs/ideas/keel-on-codex.md`](../ideas/keel-on-codex.md), amended 2026-09-05 |
 | Stories | None yet |
 | Extends | [`docs/01-architecture.md`](../01-architecture.md) |
 | ADRs | ADR-0003, ADR-0004, ADR-0005, all accepted 2026-09-05 |
-| Extended by | [`claude-code-only.md`](claude-code-only.md), ADR-0013 and ADR-0014, proposed 2026-10-29. If accepted, they remove Codex support and supersede this design's three ADRs |
+| Superseded by | [`claude-code-only.md`](claude-code-only.md), ADR-0013 and ADR-0014, accepted 2026-10-29. Codex support leaves this repository and this design's three ADRs are superseded |
 
 ## 1. Summary
 

@@ -2,13 +2,13 @@
 
 | | |
 |---|---|
-| Status | draft |
+| Status | accepted 2026-10-29 |
 | Mode | existing |
 | Date | 2026-10-29 |
-| Requirements | No PRD. Driver is Bernard's request of 2026-10-29: an independent keel Codex plugin is planned, as one exists for Cursor, and Codex support leaves this repository so Claude Code features can be used without limitation. The idea record `docs/ideas/claude-code-features-assessed-2026-10-29.md` (PR #7) waits on this design |
+| Requirements | No PRD. Driver is Bernard's request of 2026-10-29: an independent keel Codex plugin is planned, as one exists for Cursor, and Codex support leaves this repository so Claude Code features can be used without limitation. The idea record [`docs/ideas/claude-code-features-assessed-2026-10-29.md`](../ideas/claude-code-features-assessed-2026-10-29.md) waits on this design |
 | Stories | None |
 | Extends | [`docs/architecture/tiered-multi-harness-support.md`](tiered-multi-harness-support.md), which it reverses, and [`docs/01-architecture.md`](../01-architecture.md) |
-| ADRs | ADR-0013 (supersedes ADR-0004 and ADR-0005), ADR-0014 (supersedes ADR-0003), both proposed |
+| ADRs | ADR-0013 (supersedes ADR-0004 and ADR-0005), ADR-0014 (supersedes ADR-0003), both accepted 2026-10-29 |
 
 ## 1. Summary
 
@@ -244,11 +244,10 @@ Still open, none blocking `write-plan`:
 
 ## On acceptance
 
-When ADR-0013 and ADR-0014 are accepted, ADR-0003, ADR-0004 and ADR-0005 get `superseded by`
-status rows, and the 2026-09-05 design's header gains a `Superseded by` row pointing here. They are
-not edited before then, because a proposed decision has not changed anything yet.
+Accepted 2026-10-29. ADR-0003, ADR-0004 and ADR-0005 carry `superseded by` status rows, and the
+2026-09-05 design's header carries a `Superseded by` row pointing here.
 
 ## Next
 
-`write-plan`, once the ADRs are accepted. It should land after PR #7 and before the plan for the
-idea record's items, which this design changes.
+`write-plan` for the removal. It lands before the plan for the idea record's items, which this
+design changes.
