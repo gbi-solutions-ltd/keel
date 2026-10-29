@@ -94,7 +94,7 @@ flowchart TB
 | Component | Responsibility after this change | Satisfies | Depends on |
 |---|---|---|---|
 | `lib/harness/capabilities` | The Claude Code feature ledger: which primitive each gate needs, the version that provides it, and the evidence. The highest version a shipped gate needs is keel's minimum | G2 | Nothing |
-| `lib/harness/resolve.sh` | Answers "is this gate active" from the ledger. Kept because `hooks/sensitive-guard` and `keel doctor` consult it and the evidence rule lives in it | G2 | The ledger |
+| `lib/harness/resolve.sh` | Answers "is this gate active" and "what minimum version" from the ledger. Kept because `keel doctor` and the generator consult it and the evidence rule lives in it. `hooks/sensitive-guard` stops sourcing it: on Claude Code `ask` is always honoured, so the guard has nothing left to ask the ledger | G2 | The ledger |
 | `lib/harness/claude.sh` | Claude Code's writers for `keel init`. No longer one side of a two-file contract, so it may fold into `bin/keel` or stay; the plan decides | G1 | `bin/keel` |
 | `bin/keel` | `init`, `doctor`, `plan`, `scan`. Loses `--harness`, `HARNESS_SET`, `harness_each`, `harness_set_for_repo`, the Codex trust parser and the `AGENTS.md` writes. `doctor` gains the minimum version check | G1, G2, G3 | The ledger, the resolver |
 | `hooks/*` | Unchanged in purpose. Lose the Codex branches: the `CODEX_VERSION` and exit 2 block in `sensitive-guard`, the rollout reader in `done-guard` | G1 | python3 |
@@ -113,7 +113,7 @@ superseded rather than deleted, because they explain why the current answer look
 | Data | Change | Who writes | Who reads |
 |---|---|---|---|
 | `lib/harness/capabilities` | The nine `provides|codex|...` rows and the Codex commentary go. `provides|claude|...` and `requires|...` rows stay, each with source, version and date | Contributors | `resolve.sh`, the generator, `keel doctor` |
-| `.keel/profile.json` `harnesses` | Removed. `SCHEMA_VERSION` 6 to 7. A profile written before 7 keeps loading: the key is ignored and `keel profile sync` drops it | `keel init`, `keel profile sync` | Nothing after this change |
+| `.keel/profile.json` `harnesses` | Retired in schema 7 (`SCHEMA_VERSION` 6 to 7), through the existing `retired_keys` list. A profile written before 7 keeps loading, the key does nothing, and `keel doctor` warns that it is retired, as it does for every retired key; removing it is a hand edit | `keel init` before this change | `keel doctor`'s retired-key warning only |
 | `.keel/profile.json` gate keys | Unchanged | | |
 | `.codex/config.toml`, `.codex/agents/*.toml` in user repositories | No longer written or read. Left in place where they exist | `keel init` before this change | `keel-codex`, once it exists |
 | `AGENTS.md` in user repositories | No longer written or checked. An existing managed block is left as it is | `keel init` before this change | Other harnesses and their ports |
@@ -178,7 +178,7 @@ cannot translate is that port's decision.
 |---|---|---|---|
 | Claude Code older than keel's minimum | `keel doctor` version check | A field newer than the client is ignored or the plugin refuses to load; doctor warns. Fails **open** for gates the client cannot run, which is why the warning names them | Update Claude Code |
 | `claude --version` unavailable or unparseable | Doctor | Reports "cannot tell", never "ok". Fails **closed** in what it claims | None needed |
-| A profile from schema 6 still lists `harnesses` with `codex` | `keel doctor` | Loads; doctor says once that this plugin no longer serves Codex and names `keel-codex` and the v0.26.0 tag | `keel profile sync` drops the key |
+| A profile from schema 6 still lists `harnesses` | `keel doctor`'s retired-key warning | Loads; the warning names schema 7, says this plugin no longer serves Codex, and names the v0.26.0 tag | Delete the key by hand |
 | A repository still holds keel-written `.codex/` files | `keel doctor` | Left alone, reported as not managed by this plugin | Delete them, or let `keel-codex` take them over |
 | A stale `AGENTS.md` managed block | Not detected by this plugin | Left alone. Its readers are other harnesses | Their port's `init` rewrites it |
 | A port silently ships Claude-only text it could not translate | Not detectable here | Cursor or Codex users read instructions naming features they lack | The port adds a frontmatter allowlist and fails on unmatched rules |
