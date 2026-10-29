@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| Extended by | [`architecture/tiered-multi-harness-support.md`](architecture/tiered-multi-harness-support.md), ADR-0003, ADR-0004, ADR-0005 |
+| Extended by | [`architecture/tiered-multi-harness-support.md`](architecture/tiered-multi-harness-support.md), ADR-0003, ADR-0004, ADR-0005; [`architecture/claude-code-only.md`](architecture/claude-code-only.md), ADR-0013, ADR-0014, proposed 2026-10-29, which reverses the multi-harness design |
 
 **Layer 1 below describes Claude Code.** Which gates a harness actually delivers is stated in one
 generated place, `docs/harness-support.md`, and nowhere else. Do not add a sentence
