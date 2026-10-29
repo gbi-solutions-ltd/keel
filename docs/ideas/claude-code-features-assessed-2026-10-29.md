@@ -15,7 +15,7 @@ the one promise `hard_block_paths` makes, on any commit where the guard does not
 
 **Evidence.**
 
-- **2026-10-25, the guard failed open on a crash.** `c1b8caf` records that an event whose
+- **2026-10-25, the guard failed open on a crash.** `1580dae` records that an event whose
   `tool_input` is a string made the embedded Python in `hooks/sensitive-guard` raise, the hook
   exited 1, and the commit went through without asking. The fix, an `EXIT` trap that answers
   `ask`, sat on no branch until 2026-10-29 and is the first commit of
