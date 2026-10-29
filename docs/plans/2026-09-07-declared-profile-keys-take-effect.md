@@ -811,7 +811,7 @@ say so rather than adding a sentence back to the schema by hand.
 | `code:lib/context_watch.py:591` | `gates.context_window` |
 | `code:lib/context_watch.py:507` | `gates.context_warn_pct` |
 | `code:lib/context_watch.py:508` | `gates.context_stop_pct` |
-| `code:hooks/sensitive-guard:162` | `hard_block_paths` |
+| `code:hooks/sensitive-guard#get("hard_block_paths") or []` | `hard_block_paths` |
 | `advisory:skills/ship/SKILL.md#profile.conventions.commit_style` | `conventions.commit_style` |
 | `code:bin/keel:1640` | `conventions.default_branch` |
 | `code:bin/keel:1817` | `conventions.protect_default_branch` |

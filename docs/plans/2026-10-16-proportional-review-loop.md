@@ -52,7 +52,7 @@ Copied from `.keel/profile.json` and `docs/standards.md`. Every task inherits th
   no longer than it, and anything else goes in its references. `review-code` and `ship` edits stay
   inside 900. A body edit to a skill over 700 words owes an ADR-0001 eval arm; the task says how.
 - **Line citations.** Some documents cite line ranges in others (`templates/profile.schema.json`
-  cites `hooks/sensitive-guard:162`). Do not change `hooks/sensitive-guard`; where an edit shifts a
+  cites `hooks/sensitive-guard#get("hard_block_paths") or []`). Do not change `hooks/sensitive-guard`; where an edit shifts a
   cited line elsewhere, `tests/validate-citations.sh` says so, and the fix is placement.
 - Bash 3.2 compatible.
 

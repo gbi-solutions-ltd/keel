@@ -38,6 +38,11 @@ ask() {
     exit 0
 }
 
+# A crash is not an answer. Claude Code lets the tool call proceed on any exit but 0 and 2, so a
+# `set -u` slip or a Python exception below would wave the commit through. 2 is the deliberate block
+# further down; any other unexpected exit asks.
+trap 'case $? in 0|2) ;; *) ask "the guard failed unexpectedly, so it cannot tell whether this commit touches a sensitive path. Approving is a human decision." ;; esac' EXIT
+
 # Walk up for the profile, the way git looks for .git. A session started in a subdirectory is
 # ordinary, and looking only in the current directory meant the guard silently did not exist there.
 PROFILE=""

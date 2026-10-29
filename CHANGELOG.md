@@ -43,6 +43,11 @@ Entries are terse by design; the narrative for each release is in this file's gi
   path with it set they no longer report an incomplete install, fall back to another `keel`, go
   silent or ask on a commit they should let through. The eval scripts under `tests/evals/` and the
   `dispatch.sh` that `gate.sh` writes unset it too.
+- `hooks/sensitive-guard` asks when it fails unexpectedly. Claude Code lets a tool call proceed on
+  any hook exit but 0 and 2, so a crash in the guard, such as the embedded Python raising on an
+  event whose `tool_input` is a string rather than an object, let a commit touching
+  `hard_block_paths` through without asking. An `EXIT` trap now answers `ask` on any exit but 0
+  and 2. An event that is not JSON at all still exits 0 without asking.
 
 ## 0.26.0 - 2026-10-22
 

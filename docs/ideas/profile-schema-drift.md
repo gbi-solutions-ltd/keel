@@ -81,7 +81,7 @@ Variants of building it:
    `skills/setup-deployment/SKILL.md` line 30 at `bda1acc`, `skills/coding-standards/SKILL.md:64`,
    `skills/write-plan/SKILL.md#On a greenfield project`,
    `skills/execute-plan/references/preconditions.md:17`). The only field read by code rather than by
-   a model is `hard_block_paths`, and `hooks/sensitive-guard:57` exits 0 in silence when the profile
+   a model is `hard_block_paths`, and `hooks/sensitive-guard#*'"hard_block_paths"'*) ;;` exits 0 in silence when the profile
    does not contain the string at all, which its header at line 16 states is deliberate.
 
    **But that same line is the sharpest argument for this idea.** Absent and opted-out are
