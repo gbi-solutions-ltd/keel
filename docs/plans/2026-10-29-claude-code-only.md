@@ -309,7 +309,7 @@ Codex 0.153.4 binary has no such variable.
 **Done when:** `tests/test-sensitive-guard.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 2c.1: Build it test first**
+- [x] **Step 2c.1: Build it test first** Note: built by the implementer; red quoted (33 passed, 3 failed) and reproduced by the spec reviewer against HEAD's hook
 
 Follow `keel:tdd` for each behaviour: write its test from the example, run it, and watch it fail
 for the reason the behaviour names, then write the minimal implementation and watch it pass.
@@ -322,7 +322,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 A red in either validator is this task's. This is the one boundary run the task schedules.
 
-- [ ] **Step 2c.2: Hand over**
+- [x] **Step 2c.2: Hand over** Note: rounds: 1; routing: inherit; loop: full; spec COMPLIES; quality: no blocking, the CDPATH text check is stricter than correct output and the gate's limit is unstated, both in the follow-ups
 
 ```bash
 git add hooks/sensitive-guard tests/test-sensitive-guard.sh docs/architecture/claude-code-only.md
@@ -944,6 +944,10 @@ into your report; if it lists anything this task did not touch, say so and leave
 9. `docs/snapshot.md`'s citation of `hooks/done-guard:114, 364-367` (today line 173) points at the
    block it describes, `251-254` after task 3. (Added by the coordinator on 2026-10-30 from task 3's
    quality review: `tests/validate-citations.sh` does not check the second number of that form.)
+10. The design's probe record no longer says `sensitive-guard` "refuses on either" without the
+    condition task 2c added: it refuses only when `CLAUDE_PROJECT_DIR` is empty. The changelog's
+    Unreleased entry no longer says the hook unsets `CDPATH`, which task 2b removed. (Added by the
+    coordinator on 2026-10-30 from task 2c's reviews.)
 
 **Done when:** `tests/test-doc-claims.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
@@ -1022,5 +1026,14 @@ touch, say so and leave it unstaged.
   `~/.codex/auth.json` in a throwaway home. Codex rotated its refresh token there, and the rotated
   token was deleted with the throwaway home, so the user's real login was left with a revoked token
   (`refresh_token_reused`) and needs `codex login`. No later task runs Codex.
+- **Follow-ups for the hooks, found during this run and not in it.** `sensitive-guard`: `git -c
+  key=val commit` is not recognised as a commit; an unreadable profile on a commit exits 0 silently;
+  the profile walk calls the external `dirname`; the walk starts from `$PWD`, which a cloud
+  session's remote hook may set to the home directory; the CDPATH case task 2c added reads the
+  hook's text and is stricter than correct output, so it should run the hook under a decoy
+  `CDPATH` instead; the comment should state that a Codex process that inherited
+  `CLAUDE_PROJECT_DIR` turns the refusal off. `done-guard`: a transcript whose rows parse but match
+  no Claude Code shape reads as a clean turn instead of warning. `lib/context_watch.py`: on a
+  non-Claude transcript `transcript_kind` reads the whole file on every call.
 - **Not in this plan.** `keel-cursor`'s generator reads the archived `keel-internal` checkout; that
   is the port's to fix. The idea record's items are the next plan.
