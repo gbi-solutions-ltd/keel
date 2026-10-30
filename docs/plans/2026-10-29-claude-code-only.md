@@ -479,7 +479,7 @@ so and leave it unstaged.
 and so do `tests/test-keel.sh`, `tests/test-keel-3.sh`, `tests/test-keel-5.sh` and
 `tests/test-doc-claims.sh`; `tests/validate-citations.sh` and `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 4.1: Build it test first**
+- [x] **Step 4.1: Build it test first** Note: built by the implementer; red reproduced by the spec reviewer against HEAD's bin/keel (test-keel-4 90 passed, 22 failed); report's red came from an earlier test-file state
 
 Follow `keel:tdd` for each behaviour: write its test from the example, run it, and watch it fail
 for the reason the behaviour names, then write the minimal implementation and watch it pass. The
@@ -495,7 +495,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 A red in either validator is this task's. This is the one boundary run the task schedules.
 
-- [ ] **Step 4.2: Hand over**
+- [x] **Step 4.2: Hand over** Note: rounds: 1; routing: inherit; loop: full; spec COMPLIES; quality: no blocking, parser blindness moved to task 4b, doc lines and citation drift sweep to task 10
 
 ```bash
 git add bin/keel bin/keel-fleet lib/harness/claude.sh templates/profile.schema.json \
@@ -511,6 +511,68 @@ the delegation profiles through it. **Do not commit.** The coordinator commits a
 passes, with `git commit -s -m "refactor(keel): serve one harness, and retire profile.harnesses in schema 7"`.
 Paste the `git status --porcelain` output into your report; if it lists anything this task did not
 touch, say so and leave it unstaged.
+
+### Task 4b: the retired-key checks read the register by running it
+
+Added by the coordinator on 2026-10-30 from task 4's quality review: task 4 wrote the `harnesses`
+row of `retired_keys` as a `printf` so it could carry a comment, and `tests/test-doc-claims.sh`
+still parses the register's text, so its "this repository's own profile sets no retired key" case
+reads the key as `printf '%s\n' 'harnesses` and cannot see it.
+
+**Story:** G1, ADR-0013
+**Files:**
+- Modify: `tests/test-doc-claims.sh`
+- Modify: `tests/validate-skills.sh`
+- Modify: `lib/harness/claude.sh` (its header comment only)
+- Test: `tests/test-validate-skills.sh`
+
+**Interfaces:**
+- Consumes: `retired_keys` in `bin/keel`, which prints one `path|version|message` row per line
+- Produces: nothing new
+
+**Depends on:** task 4
+
+**Behaviours:**
+
+1. Both checks read the register by running `retired_keys` from `bin/keel`, not by parsing its
+   source. Example: with a copy of `.keel/profile.json` that gains `"harnesses": []`, the
+   test-doc-claims case for this repository's own profile fails naming `harnesses`; without it, the
+   case passes. `tests/validate-skills.sh` still reports `harnesses` as declared.
+2. A row spelled another way is still read. Example: in a fixture `bin/keel` whose `retired_keys`
+   emits one row with `echo "foo.bar|7|gone"`, both checks read the key `foo.bar`; a
+   test-validate-skills case pins it.
+3. `lib/harness/claude.sh`'s header lists every function `bin/keel` calls from it. Example: the list
+   names `harness_context_file` and `harness_config_dirs`, and says `cmd_doctor` calls
+   `harness_context_file` as well as `harness_doctor_findings`.
+
+**Done when:** `tests/test-doc-claims.sh` and `tests/test-validate-skills.sh` pass, and
+`tests/validate-citations.sh` and `tests/validate-skills.sh` report OK.
+
+- [ ] **Step 4b.1: Build it test first**
+
+Follow `keel:tdd` for each behaviour: write its test from the example, run it, and watch it fail
+for the reason the behaviour names, then write the minimal implementation and watch it pass.
+Run: `tests/test-doc-claims.sh` and `tests/test-validate-skills.sh`
+Expected before the implementation: FAIL, the case for behaviour 1 passes on a profile that sets
+`harnesses`, so its negative variant fails; the case for behaviour 2 fails because an `echo` row is
+not parsed. Expected after: PASS. Quote the failing output in your report.
+
+Run: `tests/run-tests.sh`.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+A red in either validator is this task's. This is the one boundary run the task schedules.
+
+- [ ] **Step 4b.2: Hand over**
+
+```bash
+git add tests/test-doc-claims.sh tests/validate-skills.sh lib/harness/claude.sh tests/test-validate-skills.sh
+git status --porcelain
+```
+
+Stage those paths, and each file whose broken citation this task repaired, by name, and stop.
+**Do not commit.** The coordinator commits after both review passes, with
+`git commit -s -m "test: read the retired-key register by running it"`. Paste the
+`git status --porcelain` output into your report; if it lists anything this task did not touch, say
+so and leave it unstaged.
 
 ### Task 5: `keel init` stops writing `AGENTS.md`
 
@@ -595,7 +657,7 @@ touch, say so and leave it unstaged.
   a harness
 - Produces: a ledger with `provides|claude|...` and `requires|...` rows only
 
-**Depends on:** tasks 2, 2b, 2c, 3 and 4
+**Depends on:** tasks 2, 2b, 2c, 3, 4 and 4b
 
 **Behaviours:**
 
@@ -948,6 +1010,18 @@ into your report; if it lists anything this task did not touch, say so and leave
     condition task 2c added: it refuses only when `CLAUDE_PROJECT_DIR` is empty. The changelog's
     Unreleased entry no longer says the hook unsets `CDPATH`, which task 2b removed. (Added by the
     coordinator on 2026-10-30 from task 2c's reviews.)
+11. Two lines a Codex grep cannot find no longer describe the harness set:
+    `docs/03-install-and-distribution.md`'s list of `keel-fleet` columns (today around line 1039)
+    and `docs/07-open-decisions.md`'s "names the harness it is running under" (around line 196).
+    The changelog notes that `keel doctor` reports one fewer warning outside Claude Code, since
+    "cannot determine which harness is running" is gone. (From task 4's quality review.)
+12. Citations that the line removals of this plan moved onto other content are repaired. Method:
+    for each `path:line` citation into `bin/keel`, `lib/`, `hooks/` or `tests/validate-skills.sh`,
+    in any document, read the cited lines at `main` and now; where they differ, find the cited
+    content now and repoint. Example: `docs/prd/profile-sync.md`'s `bin/keel:941-950`, which held
+    `profile_set` at `main`, points at `profile_set` again. A citation already wrong at `main` is
+    left alone and listed in the report. (From task 4's quality review: `tests/validate-citations.sh`
+    checks only that a cited line exists and is not blank.)
 
 **Done when:** `tests/test-doc-claims.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
