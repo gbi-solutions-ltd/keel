@@ -1082,7 +1082,7 @@ its own sleep: against the old TERM-then-wait code both passed after 62 seconds.
 
 **Done when:** `tests/test-keel-4.sh` passes.
 
-- [ ] **Step 7c.1: Build it test first**
+- [x] **Step 7c.1: Build it test first** Note: built by the implementer; red on a scratch copy with plain kill (124 passed, 1 failed) reproduced by the spec reviewer
 
 Follow `keel:tdd`. For behaviours 1 and 2, write the marker cases, run them against a scratch copy of
 `bin/keel` with the plain `kill` and `wait` put back, and watch them fail because `ended` exists;
@@ -1096,7 +1096,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 7c.2: Hand over**
+- [x] **Step 7c.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES
 
 ```bash
 git add tests/test-keel-4.sh
