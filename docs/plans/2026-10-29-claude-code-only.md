@@ -839,7 +839,7 @@ unstaged.
 `tests/test-supply-chain.sh` pass, and `tests/validate-citations.sh` and `tests/validate-skills.sh`
 report OK.
 
-- [ ] **Step 6.1: Build it test first**
+- [x] **Step 6.1: Build it test first** Note: built by the implementer; reds reproduced by the spec reviewer against HEAD (58/6, 22/5)
 
 Follow `keel:tdd` for each behaviour: write its test from the example, run it, and watch it fail
 for the reason the behaviour names, then write the minimal implementation and watch it pass.
@@ -852,7 +852,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 A red in either validator is this task's. This is the one boundary run the task schedules.
 
-- [ ] **Step 6.2: Hand over**
+- [x] **Step 6.2: Hand over** Note: rounds: 1; routing: inherit; loop: full; spec COMPLIES; quality: no blocking, four should-fix routed to tasks 7, 8 and 10
 
 ```bash
 git add lib/harness/capabilities tests/generate-harness-artifacts.sh docs/harness-support.md \
@@ -880,6 +880,7 @@ say so and leave it unstaged.
 - Modify: `bin/keel`
 - Modify: `README.md` (the minimum version line only)
 - Modify: `tests/keel-test-lib.sh`
+- Modify: `lib/harness/capabilities` (its header comments only)
 - Test: `tests/test-harness-resolve.sh`, `tests/test-harness-claims.sh`, `tests/test-keel-4.sh`
 - Plus each file whose citation into `bin/keel` or `lib/harness/resolve.sh` this task's edits break,
   and each test file that runs doctor without `tests/keel-test-lib.sh`
@@ -934,6 +935,16 @@ say so and leave it unstaged.
    without it, and the baseline diff at `tests/test-keel-4.sh` (around 983 to 994) and the warning
    count in `tests/test-keel-2.sh` are unchanged. Test files that run doctor without the library set
    the same variable.
+8. The claim registry is proved to check the harness, not only the name. Example: a fixture in
+   `tests/test-harness-claims.sh` tagging a known gate under an unknown harness,
+   `<!-- keel:claim gate=session-start harness=ghost -->`, is reported as `ghost/session-start`; the
+   fixture file named `ceiling.md` is renamed for what it now tests. (From task 6's quality review:
+   its fixtures used only names the ledger never had, which fail whatever the harness.)
+9. Comments state one harness. Example: `lib/harness/capabilities`' header no longer says "What each
+   harness provides" or "on every harness lacking", and `tests/test-harness-resolve.sh`'s wire-format
+   comment and its "every harness" / "some harness" wording use the ledger header's words; the "no
+   Codex artifact remains" loop moves out of the `if [ -x "$GEN" ]` block it does not belong to.
+   (From task 6's quality review.)
 
 **Done when:** `tests/test-harness-resolve.sh`, `tests/test-harness-claims.sh` and
 `tests/test-keel-4.sh` pass, and `tests/validate-citations.sh` and `tests/validate-skills.sh` report
@@ -956,8 +967,8 @@ A red in either validator is this task's. This is the one boundary run the task 
 
 ```bash
 git add lib/harness/resolve.sh tests/generate-harness-artifacts.sh docs/harness-support.md bin/keel \
-        README.md tests/keel-test-lib.sh tests/test-harness-resolve.sh tests/test-harness-claims.sh \
-        tests/test-keel-4.sh
+        README.md tests/keel-test-lib.sh lib/harness/capabilities tests/test-harness-resolve.sh \
+        tests/test-harness-claims.sh tests/test-keel-4.sh
 git status --porcelain
 ```
 
@@ -1008,7 +1019,11 @@ touch, say so and leave it unstaged.
 4. The model-pin rule in `tests/validate-skills.sh` (around lines 322 to 348) keeps its check and
    gets a reason that does not rest on Codex. Example: its comment says a dispatch names its model or
    a delegation profile because `docs/ideas/model-routing.md` measured which model the reading should
-   run on, and the comment no longer cites `lib/harness/codex.sh`.
+   run on, and the comment no longer cites `lib/harness/codex.sh`. The same goes for the comment
+   around line 326 ("written for Codex at .codex/agents/keel-fanout.toml") and for
+   `tests/test-validate-skills.sh` around line 178: each states today's reason, that `agents/*.md`
+   is where Claude Code turns a delegation profile into a model, and none says what a deleted file
+   relied on. (Widened by the coordinator on 2026-10-30 from task 6's quality review.)
 5. `skills/context-budget/SKILL.md` no longer says keel writes `AGENTS.md`. Example: its line 23
    area names `CLAUDE.md` as the file the keel block lives in. (From task 5's report.)
 6. The skills still validate under their budgets. Example: `tests/validate-skills.sh` reports
@@ -1180,6 +1195,11 @@ into your report; if it lists anything this task did not touch, say so and leave
     1148), `docs/snapshot.md` (around 38), `docs/06-repo-layout.md`'s "Five files" sentence,
     `templates/project-claude-md-block.md` (line 3) and the comment in `lib/merge-claude-md.sh`
     (line 2). (From task 5's report.)
+15. `templates/profile.schema.json` no longer says a key "applies on both harnesses" (around line
+    308), and `docs/profile-keys.md` is regenerated; if `schema_fingerprint_for` moves with a
+    description edit, it is updated in the same commit. `docs/ideas/concise-responses.md`'s citation of
+    `docs/05-token-and-memory-design.md:278` for "634 against 450" points at the figure or loses its
+    line number. (From task 6's quality review.)
 
 **Done when:** `tests/test-doc-claims.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
@@ -1207,7 +1227,8 @@ git add README.md CHANGELOG.md docs/01-architecture.md docs/02-skill-catalog.md 
         docs/snapshot.md docs/standards.md docs/runbooks/cutting-a-release.md \
         docs/ideas/keel-on-codex.md docs/stories/tiered-multi-harness-support.md \
         docs/ideas/claude-code-features-assessed-2026-10-29.md docs/architecture/claude-code-only.md \
-        templates/project-claude-md-block.md lib/merge-claude-md.sh
+        templates/project-claude-md-block.md lib/merge-claude-md.sh templates/profile.schema.json \
+        docs/profile-keys.md docs/ideas/concise-responses.md tests/validate-skills.sh
 git status --porcelain
 ```
 
@@ -1270,5 +1291,10 @@ touch, say so and leave it unstaged.
   non-Claude transcript `transcript_kind` reads the whole file on every call.
   The retired-key checks treat a register that prints some rows and then fails as a shorter
   register; both should read the subshell's exit status (task 4c's quality review).
+  From task 6's quality review: the `harness=codex` grep in `tests/test-harness-claims.sh` has no
+  test that it fires; the `cf_blank` resolver case repeats the `ghost` one; a stray
+  `hooks/hooks.*.json` is now reported as an orphan hook and nothing pins that; the support page
+  generator still loops over harnesses; the ledger and `resolve.sh` cite ADR-0003 for the evidence
+  rule where ADR-0014 supersedes it.
 - **Not in this plan.** `keel-cursor`'s generator reads the archived `keel-internal` checkout; that
   is the port's to fix. The idea record's items are the next plan.
