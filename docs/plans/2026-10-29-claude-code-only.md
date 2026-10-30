@@ -743,7 +743,7 @@ the referenced-docs scan, so a link in it to an uncommitted document still gets 
 **Done when:** `tests/test-keel.sh` and `tests/test-keel-2.sh` pass, and `tests/validate-citations.sh`
 and `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 5b.1: Build it test first**
+- [x] **Step 5b.1: Build it test first** Note: built by the implementer; red reproduced by the spec reviewer against HEAD (310 passed, 1 failed); behaviour 2 held on arrival and was proven able to fail
 
 Follow `keel:tdd` for each behaviour: write its test from the example, run it, and watch it fail
 for the reason the behaviour names, then write the minimal implementation and watch it pass.
@@ -757,7 +757,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 A red in either validator is this task's. This is the one boundary run the task schedules.
 
-- [ ] **Step 5b.2: Hand over**
+- [x] **Step 5b.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES
 
 ```bash
 git add bin/keel tests/test-keel.sh tests/test-keel-2.sh
@@ -1172,14 +1172,14 @@ into your report; if it lists anything this task did not touch, say so and leave
     `profile_set` at `main`, points at `profile_set` again. A citation already wrong at `main` is
     left alone and listed in the report. (From task 4's quality review: `tests/validate-citations.sh`
     checks only that a cited line exists and is not blank.)
+13. `docs/06-repo-layout.md`'s `lib/` tree names `lib/retired-keys.sh` (task 4c), and
+    `docs/ideas/stack-plugins-on-existing-repos.md`'s "written at init, `bin/keel:444`" points at
+    the `plugins.recommended` write. (From task 4c's quality review.)
 14. No current document or template says keel writes `AGENTS.md`: `README.md` (around line 22),
     `docs/02-skill-catalog.md` (around 565), `docs/03-install-and-distribution.md` (around 1140 and
     1148), `docs/snapshot.md` (around 38), `docs/06-repo-layout.md`'s "Five files" sentence,
     `templates/project-claude-md-block.md` (line 3) and the comment in `lib/merge-claude-md.sh`
     (line 2). (From task 5's report.)
-13. `docs/06-repo-layout.md`'s `lib/` tree names `lib/retired-keys.sh` (task 4c), and
-    `docs/ideas/stack-plugins-on-existing-repos.md`'s "written at init, `bin/keel:444`" points at
-    the `plugins.recommended` write. (From task 4c's quality review.)
 
 **Done when:** `tests/test-doc-claims.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
