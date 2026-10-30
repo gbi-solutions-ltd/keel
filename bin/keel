@@ -579,7 +579,7 @@ stage_for_team() {
     # hold a space and this file uses no arrays; `$1` is already read into `root` above.
     local p
     set --
-    for p in .keel $(harness_context_file) AGENTS.md $(harness_config_dirs) "$root" .gitignore; do
+    for p in .keel $(harness_context_file) $(harness_config_dirs) "$root" .gitignore; do
         [ -e "$p" ] && set -- "$@" "$p"
     done
     if [ "$#" -gt 0 ] && git add -- "$@" >/dev/null 2>&1; then
@@ -610,7 +610,7 @@ cmd_init() {
     local root; root="$(docs_root)"
     check_docs_ignored "$root" || exit 1
 
-    for f in $(harness_context_file) AGENTS.md; do
+    for f in $(harness_context_file); do
         check_markers "$f"; local rc=$?
         [ $rc -eq 2 ] && die "$f has duplicate keel markers. Remove the extra block by hand; keel will not guess which to keep."
         [ $rc -eq 3 ] && die "$f has an unbalanced keel marker. Fix it by hand."
@@ -624,7 +624,6 @@ cmd_init() {
     local block; block="$(mktemp)"
     render_block "$block" "$root"
     for _ctx in $(harness_context_file); do merge_block "$_ctx" "$block"; done
-    merge_block AGENTS.md "$block"
     rm -f "$block"
     scaffold_docs "$root"
     harness_write_config "$root"
@@ -648,7 +647,7 @@ cmd_init() {
     say "keel: configured $(basename "$PWD")"
     [ "$FORCE" -eq 1 ] && say "  (--force: detected values overwrote the existing profile)"
     say "  profile   .keel/profile.json"
-    say "  block     $(harness_context_file | sed 's/$/,/' | tr '\n' ' ')AGENTS.md"
+    say "  block     $(harness_context_file)"
     say "  docs      $root/"
     say "  plugins   $(harness_config_paths | sed -n 's/^committed|//p' | paste -sd' ' -)"
     say "  guards    $(harness_config_paths | sed -n 's/^committed|//p' | head -1) permissions: $(harness_permission_rules | grep -c "^deny|") deny, $(harness_permission_rules | grep -c "^ask|") ask"
@@ -1082,7 +1081,6 @@ cmd_new() {
     local block; block="$(mktemp)"
     render_block "$block" "$root"
     for _ctx in $(harness_context_file); do merge_block "$_ctx" "$block"; done
-    merge_block AGENTS.md "$block"
     rm -f "$block"
     scaffold_docs "$root"
     harness_write_config "$root"
@@ -1304,7 +1302,7 @@ PY
     done < <(referenced_docs_findings "$root")
     [ "$refs" -eq 0 ] && good "every referenced document is in HEAD" || true
 
-    for f in $(harness_context_file) AGENTS.md; do
+    for f in $(harness_context_file); do
         check_markers "$f"; local rc=$?
         case $rc in
           0) [ -f "$f" ] && good "$f markers intact" || warn "$f is absent" ;;

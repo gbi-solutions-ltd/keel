@@ -939,8 +939,13 @@ if git -C "$ROOT" worktree add -q --detach "$base/repo" "$BASELINE_REF" 2>/dev/n
     # the only line that legitimately differs between two runs in two temp directories. Without it
     # the summary block is uncovered, and the refactor changed "CLAUDE.md, AGENTS.md" to
     # "CLAUDE.md AGENTS.md" with nothing noticing. Found in review of this task's own work.
-    sed -E 's/configured .*/configured FIXTURE/' "$base/init.txt" > "$base/init.norm"
-    sed -E 's/configured .*/configured FIXTURE/' "$after/init.txt" > "$after/init.norm"
+    #
+    # The `block` line is dropped from both sides. It changed on purpose when init stopped writing
+    # AGENTS.md, so every baseline from before that change differs on it. Its exact text has its
+    # own assertion in tests/test-keel.sh: "init writes CLAUDE.md only: the summary names CLAUDE.md
+    # alone".
+    sed -E 's/configured .*/configured FIXTURE/; /^  block /d' "$base/init.txt" > "$base/init.norm"
+    sed -E 's/configured .*/configured FIXTURE/; /^  block /d' "$after/init.txt" > "$after/init.norm"
     if diff -q "$base/init.norm" "$after/init.norm" >/dev/null 2>&1; then
         ok "init output unchanged against $BASELINE_REF: what it prints"
     else
@@ -948,7 +953,9 @@ if git -C "$ROOT" worktree add -q --detach "$base/repo" "$BASELINE_REF" 2>/dev/n
           "$(diff "$base/init.norm" "$after/init.norm" 2>&1 | head -4 | tr '\n' ' ')"
     fi
 
-    for f in .claude/settings.json .claude/settings.local.json CLAUDE.md AGENTS.md; do
+    # AGENTS.md is not compared: init no longer writes it. tests/test-keel.sh asserts that it is not
+    # created, and that one already there is left byte-identical.
+    for f in .claude/settings.json .claude/settings.local.json CLAUDE.md; do
         if diff -q "$base/$f" "$after/$f" >/dev/null 2>&1; then
             ok "init output unchanged against $BASELINE_REF: $f"
         else
@@ -968,13 +975,14 @@ if git -C "$ROOT" worktree add -q --detach "$base/repo" "$BASELINE_REF" 2>/dev/n
     # within a week. The line's wording and its level are still compared, and the number itself has
     # its own assertion further down, where a bump is the thing being tested rather than noise.
     #
-    # The harness section is dropped from BOTH sides, and only that section. It is output the
-    # refactor did not move: it did not exist until the doctor task added it, so a comparison that
-    # included it would be red for the whole of that task and green again the moment it was
-    # committed, which is a comparison that reports when somebody last committed rather than what
-    # changed. Every line the filter drops carries its own assertion in this file. The alternatives
-    # are anchored and name one line each, because a pattern loose enough to swallow a neighbouring
-    # check would silence exactly what this comparison exists to catch.
+    # The harness section is dropped from BOTH sides, and besides it only the AGENTS.md line named
+    # below. It is output the refactor did not move: it did not exist until the doctor task added
+    # it, so a comparison that included it would be red for the whole of that task and green again
+    # the moment it was committed, which is a comparison that reports when somebody last committed
+    # rather than what changed. Every line the filter drops carries its own assertion, in this file
+    # or where named below. The alternatives are anchored and name one line each, because a pattern
+    # loose enough to swallow a neighbouring check would silence exactly what this comparison exists
+    # to catch.
     #
     # The closing tally goes with it, for the same reason and no other: it is the sum of the lines
     # above, so filtering a section out of the comparison and leaving its contribution in the total
@@ -984,7 +992,11 @@ if git -C "$ROOT" worktree add -q --detach "$base/repo" "$BASELINE_REF" 2>/dev/n
     # The first three alternatives name lines this doctor no longer prints and a baseline from
     # before schema 7 still does, so they stay while such a baseline can be compared against. Each
     # has its assertion below: "doctor names no running harness".
-    HSECTION='^(ok    running under |WARN  cannot determine which harness is running|WARN  codex is installed on this machine|ok    claude gates active:|WARN  claude does not get |WARN  this repository declares hard_block_paths|keel doctor: )'
+    #
+    # The AGENTS.md marker line is the same kind: doctor stopped checking AGENTS.md, and a baseline
+    # from before that change still prints it. Its absence is asserted in tests/test-keel.sh:
+    # "doctor no longer checks AGENTS.md: no line names it".
+    HSECTION='^(ok    running under |WARN  cannot determine which harness is running|WARN  codex is installed on this machine|ok    claude gates active:|WARN  claude does not get |WARN  this repository declares hard_block_paths|ok    AGENTS\.md markers intact$|keel doctor: )'
     ( cd "$base" && "$base/repo/bin/keel" doctor 2>&1 \
         | sed -E 's/schema version [0-9]+/schema version N/g' | grep -vE "$HSECTION" > "$base/doctor.txt" )
     ( cd "$after" && "$ROOT/bin/keel" doctor 2>&1 \

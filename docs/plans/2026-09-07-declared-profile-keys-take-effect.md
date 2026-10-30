@@ -41,7 +41,7 @@ Twenty-two keys, one verdict each. `harnesses` is stated for every `gates.*` key
 | 4 | `gates.observability` | **retire** | n/a | n/a | No mechanism is proposed anywhere in the tree, and the census found no reader, no named reader and no idea record |
 | 5 | `gates.docs_updated` | **retire** | n/a | n/a | Same as `gates.review`. `skills/ship/SKILL.md` step 6 is unconditional |
 | 6 | `plugins.excluded` | **wire** | `plugin_report` in `lib/harness/claude.sh` | **claude only** | `plugins.recommended` is read at `lib/harness/claude.sh:63` and there is no Codex counterpart of that report. ADR-0004: the description must say so, and task 4 writes it |
-| 7 | `conventions.working_branch` | **retire** | n/a | n/a | The brief's proposed home does not work: the push guard at `bin/keel:2485-2489` protects `default_branch` and already permits a push to any other branch, so reading `working_branch` there would change nothing |
+| 7 | `conventions.working_branch` | **retire** | n/a | n/a | The brief's proposed home does not work: the push guard at `bin/keel:2483-2487` protects `default_branch` and already permits a push to any other branch, so reading `working_branch` there would change nothing |
 | 8 | `deploy.target` | **human-read** | n/a | n/a | See the deploy set, below |
 | 9 | `observability.log_shipping` | **retire** | n/a | n/a | `observability.backend` already makes the distinction: `none` in the table at `skills/coding-standards/references/observability.md:19-24` is "Structured logs to stdout only". The key appears only inside that file's JSON example at `:11-17` and nothing branches on it |
 | 10 | `notes` | **human-read** | n/a | n/a | It was written for a skill to read and no skill can afford to: `hooks/session-start` has 4 characters of headroom against the 1,285 limit at `tests/validate-skills.sh:522`. The corrected description says plainly that no skill reads it |
@@ -399,7 +399,7 @@ hard problem. The rule was prototyped against the tree on 2026-09-07 and does no
 direction. It flags 25 of 61 leaves, and 7 of the 25 are genuinely read: `artifacts.stories`,
 `.architecture`, `.decisions` and `.plans` through the map iteration at
 `bin/keel#.get('artifacts',{})`, `gates.context_warn_pct` and `.context_stop_pct` through
-`lib/context_watch.py:367-378`, and `conventions.default_branch` through the sed at `bin/keel:2485`.
+`lib/context_watch.py:367-378`, and `conventions.default_branch` through the sed at `bin/keel:2483`.
 That is 28% false positives, against `docs/standards.md:79` calling the too-strict failure the
 unrecoverable one and `tests/validate-citations.sh:20-25` recording a rule thrown away at 70%. It
 also under-reports: `gates.done_verified`'s real read is
@@ -778,7 +778,7 @@ say so rather than adding a sentence back to the schema by hand.
 
 | Value | Keys |
 |---|---|
-| `code:bin/keel:1709` | `harnesses` |
+| `code:bin/keel:1707` | `harnesses` |
 | `code:bin/keel:1522` | `schema_version` |
 | `code:bin/keel:1536` | `keel_version` |
 | `code:bin/keel#echo service` | `project.kind` |
@@ -813,7 +813,7 @@ say so rather than adding a sentence back to the schema by hand.
 | `code:lib/context_watch.py:378` | `gates.context_stop_pct` |
 | `code:hooks/sensitive-guard#get("hard_block_paths") or []` | `hard_block_paths` |
 | `advisory:skills/ship/SKILL.md#profile.conventions.commit_style` | `conventions.commit_style` |
-| `code:bin/keel:2485` | `conventions.default_branch` |
+| `code:bin/keel:2483` | `conventions.default_branch` |
 | `code:bin/keel:1817` | `conventions.protect_default_branch` |
 | `code:hooks/session-start:111` | `conventions.response_style` |
 | `code:hooks/session-start:116` | `conventions.explain_level` |

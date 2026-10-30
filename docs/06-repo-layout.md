@@ -259,7 +259,6 @@ keel/
 │
 ├── .gitignore
 ├── .shellcheckrc                       # shellcheck -x resolves a source from the script's directory
-├── AGENTS.md
 ├── CHANGELOG.md
 ├── CLAUDE.md
 ├── CONTRIBUTING.md
@@ -328,7 +327,6 @@ project/
 ├── .claude/
 │   └── settings.json               # marketplace ref, enabled plugins, optional guard hook
 ├── CLAUDE.md                       # with the keel:start/keel:end managed block
-├── AGENTS.md                       # same block, for non-Claude agents
 └── docs/keel/
     ├── README.md                   # what this directory is, for humans
     ├── prompting.md                # the cheatsheet

@@ -137,7 +137,7 @@ re-litigated: task 0's `Done when` holds, so the task proceeds as done.
 **Idea:** `docs/ideas/write-ci-does-not-match-ship.md`
 
 **Files:**
-- Modify: `bin/keel` (`write_ci` at `bin/keel:988-1047`; its call site in `cmd_new` at
+- Modify: `bin/keel` (`write_ci` at `bin/keel:987-1046`; its call site in `cmd_new` at
   `bin/keel:1206`; a new call site in `cmd_init` after `bin/keel:842`)
 - Test: `tests/test-keel.sh`
 
@@ -222,7 +222,7 @@ writes the file at all; they exist to stay green once step 3 lands.
 
 - [x] **Step 3: Write the minimal implementation** (not witnessed this session; see provenance note above)
 
-Replace `write_ci` (`bin/keel:988-1047`):
+Replace `write_ci` (`bin/keel:987-1046`):
 
 ```bash
 write_ci() {
@@ -272,7 +272,7 @@ Add a new call in `cmd_init`, immediately after `ignore_local_state` (`bin/keel:
     [ -n "$(json_get .keel/profile.json deploy.ci || true)" ] || write_ci
 ```
 
-`write_profile` ran earlier in `cmd_init` (`bin/keel:828`, the same ordering `cmd_new` has at
+`write_profile` ran earlier in `cmd_init` (`bin/keel:619`, the same ordering `cmd_new` has at
 `bin/keel:1213`), so `deploy.ci` reflects the tree as it was before this call: a workflow this call
 writes is not what it reads. On a later `keel init` in the same project, `deploy.ci` then detects
 `github-actions` from the file keel wrote, which is true and keeps the file from being rewritten.
@@ -617,7 +617,7 @@ session is the check that would falsify this conclusion if wrong.
 
 **Interfaces:**
 - Consumes: nothing new. `guard_hook_body` already receives old-sha/new-sha pairs on stdin per ref
-  and previously discarded both (`bin/keel:1729`, `_lsha`, `_rsha`).
+  and previously discarded both (`bin/keel:2510-2513`, `_lsha`, `_rsha`).
 - Produces: a second refusal path in the generated `.githooks/pre-push`, alongside the existing
   default-branch refusal, sharing the same single stdin read.
 

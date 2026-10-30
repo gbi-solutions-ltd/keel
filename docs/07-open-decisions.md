@@ -641,7 +641,7 @@ sources, and that `keel init` announces what it did:
   mode      .claude/settings.local.json: bypassPermissions, not committed
 ```
 
-**The comment's framing is corrected in the same change.** `bin/keel:705-707` said the mode "is a
+**The comment's framing is corrected in the same change.** `lib/harness/claude.sh:381-383` said the mode "is a
 decision each engineer makes about their own machine, not one a repository makes on their behalf".
 The second half is true and is the whole point of the file split: the mode never propagates to
 anyone else's clone. The first half was not, because keel picks the default and the engineer only

@@ -22,7 +22,7 @@ downstream check that gates on `have_python()` believes python3 works.
 
 - `bin/keel:253-254`, the central `HAVE_PYTHON` flag `merge_permissions_into_settings` and others
   read
-- `bin/keel:1262-1269`, doctor's profile-parse check, which folds "didn't run" and "invalid JSON"
+- `bin/keel:1260-1267`, doctor's profile-parse check, which folds "didn't run" and "invalid JSON"
   into one failure message
 - `bin/keel#&& have_py=1`, the pre-push loosening check, `have_py=1`, does not go through
   `HAVE_PYTHON`

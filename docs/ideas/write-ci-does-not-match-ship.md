@@ -10,13 +10,13 @@
 ## The problem
 
 `skills/ship/SKILL.md` states eight gate items a change must clear before it ships. All eight are
-agent-run, prose-enforced checks inside the ship skill's own turn. `write_ci` (`bin/keel:988-1047`)
+agent-run, prose-enforced checks inside the ship skill's own turn. `write_ci` (`bin/keel:987-1046`)
 generates the only CI pipeline keel produces for a new project, and it reads exactly one profile
 key: `verify.test`. A human pushing directly, a session that compacted before running `ship`, or a
 tool other than the one that wrote the skill bypasses all eight items silently, and the generated
 pipeline notices none of it.
 
-**Evidence.** `write_ci()` at `bin/keel:988-1047` (called once, from `cmd_new`, when `keel new`
+**Evidence.** `write_ci()` at `bin/keel:987-1046` (called once, from `cmd_new`, when `keel new`
 scaffolds a project) writes `.github/workflows/ci.yml` with one job, `verify`: checkout, a
 stack-conditional language setup, one `Test` step running the literal value of `verify.test`
 (falling back to an `echo` if null), and one hardcoded "refuse committed key material" grep, not
@@ -33,7 +33,7 @@ thinner than even the pipeline the project that ships it actually relies on.
 
 | Ship requirement (`skills/ship/SKILL.md:20-40`) | CI (`write_ci`) enforces? | Evidence |
 |---|---|---|
-| 1. Tests pass | Partial. Generated CI runs `verify.test`, but only protects a merge if branch protection requires the check | `bin/keel:1146,1156` |
+| 1. Tests pass | Partial. Generated CI runs `verify.test`, but only protects a merge if branch protection requires the check | `bin/keel:994,1025` |
 | 2. New code has new tests | No | No such step exists |
 | 3. Lint/format/typecheck pass | No. Never read | `docs/profile-keys.md` cites only `doctor`/commit-guard as readers, never CI |
 | 4. `security-audit --diff` clean, `hard_block_paths` not overridable | No. `gates.security_audit` is advisory skill prose; `hard_block_paths` is enforced only by `hooks/sensitive-guard`, a Claude Code hook, not CI | `docs/profile-keys.md` |
