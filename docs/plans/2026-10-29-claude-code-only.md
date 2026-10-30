@@ -205,22 +205,27 @@ goes through with its `ask` discarded.
 
 **Interfaces:**
 - Consumes: task 2's refusal block
-- Produces: a probe line in section 7 reading exactly `Codex hook environment has CODEX_VERSION:
-  yes` or `... : no`, and `Codex hook payload has turn_id: yes` or `... : no`
+- Produces: two lines in section 7's probe record: `Codex hook environment has CODEX_VERSION: no`
+  and `Codex hook payload has turn_id: not measured`, each followed by its evidence
 
 **Depends on:** task 2
 
 **Behaviours:**
 
-1. The signal is measured, not assumed. Example: a probe under a throwaway `CODEX_HOME`, as task 1
-   ran it (the commands are in section 7), adds a `PreToolUse` hook with matcher `Bash` that writes
-   its environment and its stdin to files, runs one `codex exec` of a harmless shell command, and
-   records both lines; `~/.codex/config.toml` is byte-identical afterwards.
-2. The refusal fires on whichever signal the probe found. Examples: if the payload has `turn_id`,
-   an event containing `"turn_id":"t1"` with no `CODEX_VERSION`, a profile listing `src/auth` and
-   `git commit -m x` exits 2 with stderr naming keel v0.26.0; if the environment has `CODEX_VERSION`,
-   the existing case keeps passing; a Claude Code event with neither still gets `ask` and exit 0.
-   The match is a builtin `case` on the raw event, in the style of the commit filter.
+1. The record says what was and was not measured. Example: section 7 gains the two Interfaces lines.
+   The evidence for the first is the 2026-10-30 run: Codex's `SessionStart` hook ran with no
+   `CODEX_VERSION` in its environment, and its payload keys were `cwd`, `hook_event_name`, `model`,
+   `permission_mode`, `session_id`, `source` and `transcript_path`. The second says `PreToolUse`
+   never fired because the run's `codex exec` failed authentication, so `turn_id` was not observed,
+   and that Bernard chose on 2026-10-30 to detect both signals rather than probe again. No further
+   probe is run.
+   (Revised by the coordinator on 2026-10-30: the first probe cost the user's Codex login, see the
+   notes.)
+2. The refusal fires on either signal. Examples: an event containing `"turn_id":"t1"` with no
+   `CODEX_VERSION`, a profile listing `src/auth` and `git commit -m x` exits 2 with stderr naming
+   keel v0.26.0; the same with `CODEX_VERSION=0.153.4` set and no `turn_id` also exits 2; a Claude
+   Code event with neither still gets `ask` and exit 0. The `turn_id` match is a builtin `case` on
+   the raw event for the JSON key `"turn_id"`, in the style of the commit filter.
 3. The refusal names keel's release once, unambiguously. Example: its stderr reads that keel v0.26.0
    is the last keel release that supports Codex and gives the install line from section 7's probe
    record; it does not say "stay on v0.26.0" next to the word Codex alone.
@@ -231,20 +236,20 @@ goes through with its `ask` discarded.
 **Done when:** `tests/test-sensitive-guard.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 2b.1: Build it test first**
+- [x] **Step 2b.1: Build it test first** Note: built by the implementer after a revision mid-task (detect both signals); reds quoted for behaviours 2 to 4; the first probe run failed auth and was not repeated
 
-Run the probe for behaviour 1 first and record it; then follow `keel:tdd` for behaviours 2 to 4:
-write each test from its example, watch it fail for the reason it names, then implement.
+Write behaviour 1's record first; then follow `keel:tdd` for behaviours 2 to 4: write each test
+from its example, watch it fail for the reason it names, then implement.
 Run: `tests/test-sensitive-guard.sh`
 Expected before the implementation: FAIL, the case for behaviour 3 fails because the message says
-"stay on v0.26.0", and, if the probe found `turn_id` only, the case for behaviour 2 fails because
-the hook asks instead of exiting 2. Expected after: PASS. Quote the failing output in your report.
+"stay on v0.26.0", and the case for behaviour 2 fails because the hook asks instead of exiting 2 on
+a `turn_id` event. Expected after: PASS. Quote the failing output in your report.
 
 Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 A red in either validator is this task's. This is the one boundary run the task schedules.
 
-- [ ] **Step 2b.2: Hand over**
+- [x] **Step 2b.2: Hand over** Note: rounds: 1; routing: inherit; loop: full; spec COMPLIES; quality: no blocking, five should-fix or consider carried into task 2c and task 10
 
 ```bash
 git add hooks/sensitive-guard tests/test-sensitive-guard.sh docs/architecture/claude-code-only.md
@@ -858,8 +863,9 @@ into your report; if it lists anything this task did not touch, say so and leave
 8. The design's failure table matches task 1's probe. Example: the row for a Codex user installing
    from `main` no longer says "nothing loads"; it says Codex loads the Claude Code hook set from
    `hooks/hooks.json` and that `sensitive-guard` refuses a sensitive commit there, as tasks 2 and 2b
-   left it. Section 4's `hooks/*` row and section 8's first bullet no longer say the Codex block is
-   removed. (Added by the coordinator on 2026-10-30 from the reports of tasks 1 and 2.)
+   left it. No line of the design says `sensitive-guard` loses its Codex arm or exit 2 block, or that
+   its only decisions are `ask` and silence; task 2b's quality review found four (today around lines
+   100, 186, 259 and 306). (Added by the coordinator on 2026-10-30 from the reports of tasks 1 and 2.)
 
 **Done when:** `tests/test-doc-claims.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
@@ -934,5 +940,9 @@ touch, say so and leave it unstaged.
   check: in each batch, every Done when names only its task's own test, and each last step commits
   ```
 
+- **Codex login, 2026-10-30.** Tasks 1 and 2b ran `codex exec` with a copy of the user's
+  `~/.codex/auth.json` in a throwaway home. Codex rotated its refresh token there, and the rotated
+  token was deleted with the throwaway home, so the user's real login was left with a revoked token
+  (`refresh_token_reused`) and needs `codex login`. No later task runs Codex.
 - **Not in this plan.** `keel-cursor`'s generator reads the archived `keel-internal` checkout; that
   is the port's to fix. The idea record's items are the next plan.
