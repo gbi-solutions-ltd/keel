@@ -1236,18 +1236,21 @@ cv_fx="$(fixture node-ts)"
 ( cd "$cv_fx" && "$KEEL" init -y >/dev/null 2>&1 )
 cv_min="$(bash -c ". '$ROOT/lib/harness/resolve.sh'; harness_min_version")"
 cv_stub="$(mktemp -d)"
-# A stub that hangs writes its pid first, and exec keeps that pid for the sleep, so the sleep can
-# be found and killed if doctor left it running. ps names the command, so a pid reused since is not
-# killed. The trap repeats tests/keel-test-lib.sh's own, which a second trap on EXIT replaces.
+# A stub that hangs leaves its background sleep running after doctor kills the stub, and writes
+# that sleep's pid to `orphans` so cleanup can kill it. ps names the command, so a pid reused since
+# is not killed. A second trap on EXIT replaces the first, so this one reads back the trap
+# tests/keel-test-lib.sh set and runs it last, and removes the directories these cases create.
 cv_reap() {
     local p
-    [ -f "$cv_stub/pids" ] || return 0
+    [ -f "$cv_stub/orphans" ] || return 0
     while read -r p; do
         case "$(ps -p "$p" -o comm= 2>/dev/null)" in *sleep) kill -9 "$p" 2>/dev/null ;; esac
-    done < "$cv_stub/pids"
+    done < "$cv_stub/orphans"
     return 0
 }
-trap 'cv_reap; rm -rf "$FIXTURE_CACHE" "$(dirname "$KEEL_CLAUDE")"' EXIT
+cv_chain() { eval "set -- $(trap -p EXIT)"; cv_lib_exit="${3-}"; }
+cv_chain
+trap 'cv_reap; rm -rf "$cv_fx" "$cv_stub"; eval "$cv_lib_exit"' EXIT
 cv_doctor() {   # cv_doctor <stub body>; doctor --fast's output with KEEL_CLAUDE running that body
     printf '#!/bin/sh\n%s\n' "$1" > "$cv_stub/claude"
     chmod +x "$cv_stub/claude"
@@ -1265,11 +1268,13 @@ case "$line" in
 esac
 
 # Common version spellings parse: a leading v, a pre-release suffix, and a warning line printed
-# before the version.
+# before the version. Each case asserts the parsed version in either the good line or the "older
+# than" line, so a ledger row raising the minimum past one of them does not turn it red.
 spelling() {   # spelling <case name> <stub body> <version doctor must name>
     local line; line="$(cv_line "$(cv_doctor "$2")")"
     case "$line" in
-      "ok    Claude Code $3 meets"*"$cv_min") ok "$1" ;;
+      "ok    Claude Code $3 meets keel's minimum, $cv_min") ok "$1" ;;
+      "WARN  Claude Code $3 is older than keel's minimum, $cv_min. "*) ok "$1" ;;
       *) bad "$1" "line: ${line:-<none>}" ;;
     esac
 }
@@ -1334,31 +1339,37 @@ out="$(cv_doctor "echo garbage")"
 cannot_tell "the warning names its cause: output with no version named no version" "$out" "its output named no version"
 
 # A claude that hangs, on a login or an update prompt, must not hang doctor, and neither must one
-# that ignores SIGTERM. Each stub sleeps 60 seconds and doctor must end inside 30, so a loaded
-# machine slowing doctor down does not turn the case red. The floor of 5 is the kill's own delay.
-hung() {   # hung <stub body>; doctor's output into $cv_stub/out, its seconds into cv_secs
-    local TIMEFORMAT=%R
-    cv_secs="$( { time cv_doctor "echo \$\$ >> '$cv_stub/pids'; $1" > "$cv_stub/out"; } 2>&1 )"
+# that ignores SIGTERM. Each stub is a shell that writes its pid, starts `sleep 60` in the
+# background, waits for it, and only then writes `ended`. Killed, it never writes `ended`, and that
+# marker is the proof: no clock is asserted, because a loaded machine slows doctor down, and a time
+# bound or a vanished stub cannot tell a kill from a stub that finished its own sleep.
+# Each case starts with no pid, no orphan and no marker, so a pid the case before wrote, and reaped
+# since, is never checked again.
+hung() {   # hung <stub body before the sleep>; doctor's output into $cv_stub/out
+    : > "$cv_stub/pids"; : > "$cv_stub/orphans"; rm -f "$cv_stub/ended"
+    cv_doctor "$1 echo \$\$ >> '$cv_stub/pids'; sleep 60 & echo \$! >> '$cv_stub/orphans'; wait; : > '$cv_stub/ended'" > "$cv_stub/out"
 }
-gone() {   # gone; 0 when no pid a stub wrote is still a running process
+gone() {   # gone; 0 when the stub wrote its pid and that pid is no longer a running process
     local p
+    [ -s "$cv_stub/pids" ] || return 1
     while read -r p; do kill -0 "$p" 2>/dev/null && return 1; done < "$cv_stub/pids"
     return 0
 }
-hung "exec sleep 60"
-cannot_tell "the warning names its cause: one that hangs was stopped after 5 seconds" "$(cat "$cv_stub/out")" "stopped after 5 seconds"
-[ "${cv_secs%.*}" -ge 5 ] 2>/dev/null && [ "${cv_secs%.*}" -lt 30 ] \
-  && ok "the hang test does not depend on doctor's speed: one that hangs is killed after 5 seconds, and doctor ends inside 30 ($cv_secs)" \
-  || bad "the hang test does not depend on doctor's speed: one that hangs is killed after 5 seconds, and doctor ends inside 30" "took ${cv_secs:-?} seconds"
+killed() {   # killed <case name>; the timed-out warning, no `ended`, and the stub's shell gone
+    if [ -e "$cv_stub/ended" ]; then
+        bad "$1" "the stub ran to its end and wrote ended, so doctor waited for it rather than killing it"
+    elif ! gone; then
+        bad "$1" "the stub's shell is still running, or wrote no pid: $(tr '\n' ' ' < "$cv_stub/pids")"
+    else
+        cannot_tell "$1" "$(cat "$cv_stub/out")" "stopped after 5 seconds"
+    fi
+}
+hung ""
+killed "a claude that hangs is killed: the timed-out warning, no ended marker, and its shell gone"
 cv_reap
 
-hung "trap '' TERM; exec sleep 60"
-cannot_tell "a claude that ignores SIGTERM is still stopped: the timed-out warning" "$(cat "$cv_stub/out")" "stopped after 5 seconds"
-[ "${cv_secs%.*}" -lt 30 ] 2>/dev/null \
-  && ok "a claude that ignores SIGTERM is still stopped: doctor ends inside 30 seconds ($cv_secs)" \
-  || bad "a claude that ignores SIGTERM is still stopped: doctor ends inside 30 seconds" "took ${cv_secs:-?} seconds"
-gone && ok "a claude that ignores SIGTERM is still stopped: no stub process is left running" \
-  || bad "a claude that ignores SIGTERM is still stopped: no stub process is left running" "pids: $(tr '\n' ' ' < "$cv_stub/pids")"
+hung "trap '' TERM;"
+killed "a claude that ignores SIGTERM is killed: the timed-out warning, no ended marker, and its shell gone"
 cv_reap
 
 # The suite's own doctor runs: tests/keel-test-lib.sh exports a KEEL_CLAUDE that prints the
