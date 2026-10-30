@@ -941,6 +941,9 @@ into your report; if it lists anything this task did not touch, say so and leave
    left it. No line of the design says `sensitive-guard` loses its Codex arm or exit 2 block, or that
    its only decisions are `ask` and silence; task 2b's quality review found four (today around lines
    100, 186, 259 and 306). (Added by the coordinator on 2026-10-30 from the reports of tasks 1 and 2.)
+9. `docs/snapshot.md`'s citation of `hooks/done-guard:114, 364-367` (today line 173) points at the
+   block it describes, `251-254` after task 3. (Added by the coordinator on 2026-10-30 from task 3's
+   quality review: `tests/validate-citations.sh` does not check the second number of that form.)
 
 **Done when:** `tests/test-doc-claims.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
