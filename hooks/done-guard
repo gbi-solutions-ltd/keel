@@ -73,7 +73,7 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 KEEL_EVENT="$event" KEEL_PROFILE_TEXT="$profile_text" python3 - <<'PY'
-import json, os, re, sys
+import json, os, sys
 
 def emit(obj):
     print(json.dumps(obj))
@@ -199,9 +199,6 @@ def turn_tool_calls(path, own_transcript):
     if not rows:
         return None           # empty or wholly unparseable is not the same as a clean turn
 
-    if is_codex_rollout(rows):
-        return codex_turn_tool_calls(rows)
-
     start = 0
     for i, r in enumerate(rows):
         if is_real_user(r):
@@ -217,116 +214,6 @@ def turn_tool_calls(path, own_transcript):
             if isinstance(b, dict) and b.get("type") == "tool_use":
                 calls.append(b)
     return calls
-
-# WHAT A CODEX TURN LOOKS LIKE, AND WHY IT NEEDS ITS OWN READER.
-#
-# Codex hands its hooks a rollout file, not a Claude Code transcript. Every line is
-# {"timestamp", "ordinal", "type", "payload"}, and nothing in it carries a `message` key or the row
-# types below. Feeding it to the Claude reader returns an empty list, which this hook cannot tell
-# from a turn that ran no tools, so the guard would pass every Codex turn in silence. That is the
-# fail-open direction and it is the one this whole design exists to close, so the shape is sniffed
-# and parsed rather than assumed. Verified 2026-09-06 against codex-cli 0.153.4;
-# tests/fixtures/transcripts/codex.jsonl is a trimmed capture.
-#
-# THE TURN BOUNDARY IS STATED, NOT INFERRED. Every record of a turn carries that turn's id, on
-# payload.turn_id or under payload.internal_chat_message_metadata_passthrough. So where the Claude
-# reader has to guess which user row started the turn, and is_real_user above is the scar tissue of
-# that guess, here the boundary is read. Records with no turn id at all are pre-turn setup and are
-# not this turn's work.
-#
-# THE SUBAGENT QUESTION, SETTLED. The Claude reader skips isSidechain rows because Claude Code
-# interleaves a subagent's rows into the main transcript. Codex does not: a subagent is its own
-# thread with its own rollout, handed over as agent_transcript_path on SubagentStop, and the
-# parent's file holds only the parent's records. So `own_transcript` has nothing to do on this path,
-# and its absence here is the answer rather than an omission. The attribution Codex gives is
-# strictly finer than a per-row boolean: thread_id and turn_id on the records themselves.
-
-_APPLY_PATCH = re.compile(r"\*\*\* (?:Add|Update|Delete) File: (.+?)(?:\\n|\n|\"|$)")
-_PATCH_BODY = re.compile(r"\*\*\* Begin Patch.*?(?:\*\*\* End Patch|$)", re.S)
-
-
-def is_codex_rollout(rows):
-    """True when these rows are a Codex rollout rather than a Claude Code transcript.
-
-    Sniffed on the record envelope, which every rollout line carries and no Claude Code row has.
-    Sniffing the file rather than asking which harness is running is deliberate: a format change
-    WITHIN one harness is the case that bites, and a harness-keyed switch cannot see it.
-    """
-    for r in rows:
-        if isinstance(r.get("payload"), dict) and isinstance(r.get("ordinal"), int):
-            return True
-    return False
-
-
-def _codex_turn_id(row):
-    payload = row.get("payload")
-    if not isinstance(payload, dict):
-        return None
-    tid = payload.get("turn_id")
-    if tid:
-        return tid
-    meta = payload.get("internal_chat_message_metadata_passthrough")
-    return meta.get("turn_id") if isinstance(meta, dict) else None
-
-
-def codex_turn_tool_calls(rows):
-    """The turn's tool calls, in the same shape the caller reads for Claude Code.
-
-    The names below are keel's, not Codex's. Codex exposes one `exec` tool that runs a snippet, so
-    there is no Edit or Bash to report; what the caller needs to know is which paths this turn wrote
-    and whether it ran the test command, and both are in the call's own input. Normalising here
-    keeps that judgement in one place instead of teaching the decision below about two harnesses.
-
-    Edits are read from apply_patch's headers, which Codex's own instructions make the only
-    sanctioned way to change a file: `*** Add File:`, `*** Update File:`, `*** Delete File:`. Those
-    are protocol markers, not prose, so this is not the kind of English matching docs/standards.md
-    refuses. The input arrives JSON-escaped inside the snippet, hence the two newline forms.
-
-    ITS LIMIT, AND IT IS THE SAME LIMIT THE HEADER ALREADY DECLARES. A file written with a shell
-    redirect instead of apply_patch is not seen, exactly as a test suite run through a wrapper
-    script is not seen. This raises the cost of claiming done without checking; it is not a proof.
-    """
-    turn = None
-    for r in rows:
-        tid = _codex_turn_id(r)
-        if tid:
-            turn = tid
-    # NO TURN ID ANYWHERE MEANS NOTHING IS THIS TURN'S WORK, which is the header's rule applied to
-    # the case it did not spell out. The filter below ran only while a boundary had been found, so a
-    # rollout carrying no turn id at all skipped it and every custom_tool_call in the file counted:
-    # a turn that answered a question was blocked in `required` mode for an apply_patch twenty turns
-    # earlier. The alternative, attributing the whole file, is the over-blocking that makes a gate
-    # the thing people delete, and it is the direction the header already rules out. The cost is
-    # stated rather than hidden: a Codex shape that stops carrying turn ids takes this guard quiet
-    # on that harness, and the canary case below is what turns that from a silence into a red build.
-    if turn is None:
-        return []
-
-    calls = []
-    for r in rows:
-        payload = r.get("payload")
-        # DECLARED EQUIVALENT MUTANT: relaxing this to `isinstance(payload, dict)` alone leaves the
-        # suite green, because no other record in the rollout vocabulary carries a string `input`
-        # and the isinstance below already drops them. It is kept as the selector rather than
-        # deleted: it says what a tool call IS, and without it a record type Codex adds later that
-        # happens to carry a string `input` would be read as one.
-        if not isinstance(payload, dict) or payload.get("type") != "custom_tool_call":
-            continue
-        if _codex_turn_id(r) != turn:
-            continue
-        src = payload.get("input")
-        if not isinstance(src, str):
-            continue
-        for path in _APPLY_PATCH.findall(src):
-            calls.append({"name": "Edit", "input": {"file_path": path.strip()}})
-        # The patch BODY is content, not a command, and the decision below asks whether the turn ran
-        # the test command by looking for it in this string. Left in, a turn that patched any file
-        # mentioning that command would be read as having run it, and the guard would go quiet on
-        # exactly the edit it exists to catch. This repository is full of such files. Stripping the
-        # patch rather than skipping the whole call keeps a real `apply_patch ... && <test>` visible.
-        calls.append({"name": "Bash", "input": {"command": _PATCH_BODY.sub("", src)}})
-    return calls
-
 
 # SubagentStop gets the subagent's own transcript; transcript_path there is the main session's.
 own = ev.get("agent_transcript_path") if ev.get("hook_event_name") == "SubagentStop" else None

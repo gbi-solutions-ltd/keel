@@ -399,7 +399,7 @@ hard problem. The rule was prototyped against the tree on 2026-09-07 and does no
 direction. It flags 25 of 61 leaves, and 7 of the 25 are genuinely read: `artifacts.stories`,
 `.architecture`, `.decisions` and `.plans` through the map iteration at
 `bin/keel#.get('artifacts',{})`, `gates.context_warn_pct` and `.context_stop_pct` through
-`lib/context_watch.py:497-508`, and `conventions.default_branch` through the sed at `bin/keel:1640`.
+`lib/context_watch.py:367-378`, and `conventions.default_branch` through the sed at `bin/keel:1640`.
 That is 28% false positives, against `docs/standards.md:79` calling the too-strict failure the
 unrecoverable one and `tests/validate-citations.sh:20-25` recording a rule thrown away at 70%. It
 also under-reports: `gates.done_verified`'s real read is
@@ -591,7 +591,7 @@ to `:716` is that summary and the two `exit` lines.
 # tree before this rule was chosen. It flagged 25 of 61 keys and 7 of the 25 are genuinely read:
 # artifacts.stories, .architecture, .decisions and .plans through the map iteration at
 # bin/keel:1341-1350, gates.context_warn_pct and .context_stop_pct through
-# lib/context_watch.py:497-508, and conventions.default_branch through the sed at bin/keel:1640.
+# lib/context_watch.py:367-378, and conventions.default_branch through the sed at bin/keel:1640.
 # 28% false positives, against docs/standards.md's rule that a check is never stricter than correct
 # output. It under-reports too: gates.done_verified is read as (prof.get("gates") or
 # {}).get("done_verified") at hooks/done-guard:114 and the dotted string appears in that file only
@@ -807,10 +807,10 @@ say so rather than adding a sentence back to the schema by hand.
 | `code:bin/keel#d=json.load(open('.keel/profile.json')).get('artifacts',{})` | `artifacts.snapshot`, `artifacts.prd`, `artifacts.stories`, `artifacts.architecture`, `artifacts.decisions`, `artifacts.plans` |
 | `code:bin/keel#local cg; cg="$(json_get .keel/profile.json gates.commit_guard 2>/dev/null` | `gates.commit_guard` |
 | `code:hooks/done-guard:114` | `gates.done_verified` |
-| `code:lib/context_watch.py:570` | `gates.context_watch` |
-| `code:lib/context_watch.py:591` | `gates.context_window` |
-| `code:lib/context_watch.py:507` | `gates.context_warn_pct` |
-| `code:lib/context_watch.py:508` | `gates.context_stop_pct` |
+| `code:lib/context_watch.py:440` | `gates.context_watch` |
+| `code:lib/context_watch.py:461` | `gates.context_window` |
+| `code:lib/context_watch.py:377` | `gates.context_warn_pct` |
+| `code:lib/context_watch.py:378` | `gates.context_stop_pct` |
 | `code:hooks/sensitive-guard#get("hard_block_paths") or []` | `hard_block_paths` |
 | `advisory:skills/ship/SKILL.md#profile.conventions.commit_style` | `conventions.commit_style` |
 | `code:bin/keel:1640` | `conventions.default_branch` |

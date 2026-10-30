@@ -63,7 +63,7 @@
 # file exists to prevent, dressed as evidence. ADR-0003 is the standing rule, absent evidence fails.
 #
 # `subagent_transcript_path` is PROVIDED and required by nothing, deliberately. done-guard reads it
-# only on SubagentStop and falls back to transcript_path when it is absent (hooks/done-guard:316-317),
+# only on SubagentStop and falls back to transcript_path when it is absent (hooks/done-guard:219-220),
 # so requiring it would disable the whole gate on a harness whose Stop path works. Under-requiring
 # resolved done-guard active on Codex; over-requiring would resolve it inactive where it works. The
 # rule is that a gate requires what it cannot function without, not everything it can use.

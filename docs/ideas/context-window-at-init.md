@@ -119,7 +119,7 @@ costed together or the second one to land fails the build.
 | init never writes `gates.context_window` | `bin/keel:364` | The gap is real and the fix is one field |
 | The schema already declares it | `templates/profile.schema.json:287` | No schema version bump, no drift report on existing profiles |
 | doctor exists to nag about it | `bin/keel:1307` | The nudge is a workaround for the missing write and could be simplified afterwards |
-| The handoff is already written automatically before compaction | `lib/context_watch.py:369-372`, on `PreCompact` | Half of "automatic handoff" already ships. Only the resume side is manual |
+| The handoff is already written automatically before compaction | `lib/context_watch.py:465-471`, on `PreCompact` | Half of "automatic handoff" already ships. Only the resume side is manual |
 | SessionStart already fires on `clear` | `hooks/hooks.json`, matcher `startup|clear|compact` | The hook that would carry the pointer already runs at exactly the right moment |
 | `hooks/session-start` never reads the handoff | No `handoff` match anywhere in the file | This is the actual gap, and it is small |
 | The hook forbids reading volatile files, with one bounded exception | `hooks/session-start:4-14` | A pointer is permissible under the stated bound; the contents are not |

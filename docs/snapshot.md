@@ -69,7 +69,7 @@ requires an ask primitive (lib/harness/capabilities:118) that no Codex row provi
 transcript, finds edits to non-documentation files, and looks for `verify.test` as a substring of
 <!-- keel:claim gate=done-guard harness=claude -->
 any Bash command in the turn (hooks/done-guard:32-36). With `gates.done_verified` at `required` it
-blocks the stop (hooks/done-guard:364-366); otherwise it warns.
+blocks the stop (hooks/done-guard:251-253); otherwise it warns.
 
 ## 3. Repository structure
 

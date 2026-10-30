@@ -340,27 +340,27 @@
         "context_watch": {
           "type": "boolean",
           "description": "false turns the session context watchdog off for this project. Declared here rather than left to additionalProperties because it is not a required/warn/off gate.",
-          "x-keel-read-by": "code:lib/context_watch.py:570"
+          "x-keel-read-by": "code:lib/context_watch.py:440"
         },
         "context_window": {
           "type": "integer",
           "minimum": 1,
           "description": "Context window in tokens for sessions in this project, written by keel init as 200000. It is a floor and not a ceiling: the watchdog raises it once a session is observed exceeding it, since the API would have refused the request otherwise, so a value that understates the window costs nothing beyond an early first estimate. It is never raised above 1000000, the largest window any current model offers, so a mistyped extra zero cannot silence the watchdog. A floor only ever raises, so setting a value at or below the window the session already has does nothing. That baseline is 200000 on a harness whose transcript does not state its own window, which is what Claude Code does; where the transcript states one, as a Codex rollout does with model_context_window, the stated number is the baseline instead. KEEL_CONTEXT_WINDOW is how a smaller window is forced deliberately, and it is used as set except that it too is capped at 1000000.",
-          "x-keel-read-by": "code:lib/context_watch.py:591"
+          "x-keel-read-by": "code:lib/context_watch.py:461"
         },
         "context_warn_pct": {
           "type": "integer",
           "minimum": 1,
           "maximum": 99,
           "description": "Percentage of the window at which the watchdog starts warning. Default 70.",
-          "x-keel-read-by": "code:lib/context_watch.py:507"
+          "x-keel-read-by": "code:lib/context_watch.py:377"
         },
         "context_stop_pct": {
           "type": "integer",
           "minimum": 1,
           "maximum": 100,
           "description": "Percentage of the window at which the watchdog blocks tool calls until a handoff is written. Default 85.",
-          "x-keel-read-by": "code:lib/context_watch.py:508"
+          "x-keel-read-by": "code:lib/context_watch.py:378"
         },
         "suite_warn_seconds": {
           "type": "integer",

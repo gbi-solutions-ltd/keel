@@ -882,7 +882,7 @@ fi
 # tree before this rule was chosen. It flagged 25 of 61 keys and 7 of the 25 are genuinely read:
 # artifacts.stories, .architecture, .decisions and .plans through the `get('artifacts',{})` map
 # iteration in cmd_doctor, gates.context_warn_pct and .context_stop_pct through
-# lib/context_watch.py:497-508, and conventions.default_branch through the sed in the pre-push hook
+# lib/context_watch.py:367-378, and conventions.default_branch through the sed in the pre-push hook
 # body that `keel guard install` writes.
 # 28% false positives, against docs/standards.md's rule that a check is never stricter than correct
 # output. It under-reports too: gates.done_verified is read as (prof.get("gates") or

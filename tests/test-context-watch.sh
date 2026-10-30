@@ -428,19 +428,14 @@ out="$(fire UserPromptSubmit "$work/stop.jsonl" /nonexistent-project-dir)"; rc=$
 [ "$rc" -eq 0 ] && ok "a cwd with no profile is not an error" \
   || bad "failure" "rc=$rc"
 
-# ---- two transcript shapes, and a third that is neither --------------------
+# ---- a recorded transcript, and a shape that is not one -------------------
 #
-# These are the only cases in this file driven by a recording rather than by a shape this file
-# believes in. The header above says the suite generates its fixtures; these two are the exception,
-# and they are the exception on purpose. What read_usage claims is that it can parse what a harness
-# actually writes, and a synthetic file can only prove it parses what we think a harness writes.
-# tests/fixtures/transcripts/codex.jsonl is a trimmed capture from codex-cli 0.153.4 and
-# claude-stop-edited-no-test.jsonl is one captured from a real Claude Code turn. They are the canary
-# section 10.3 of docs/architecture/tiered-multi-harness-support.md requires: when either harness
-# changes its transcript shape, these go red rather than the watchdog going quiet.
-#
-# They are also the evidence behind the two codex rows in lib/harness/capabilities. Delete them and
-# those rows assert a parser nothing checks.
+# The case below is driven by a recording rather than by a shape this file believes in. The header
+# above says the suite generates its fixtures; this is the exception, on purpose. What read_usage
+# claims is that it can parse what Claude Code actually writes, and a synthetic file can only prove
+# it parses what we think it writes. claude-stop-edited-no-test.jsonl is captured from a real Claude
+# Code turn, so when the transcript shape changes this goes red rather than the watchdog going
+# quiet.
 
 FIX="$ROOT/tests/fixtures/transcripts"
 usage() {   # usage <fixture> <index 0=tokens 1=kind>
@@ -448,73 +443,14 @@ usage() {   # usage <fixture> <index 0=tokens 1=kind>
       "$1" "$2"
 }
 
-got="$(usage "$FIX/codex.jsonl" 1)"
-[ "$got" = codex ] && ok "a Codex transcript is recognised" || bad "a Codex transcript is recognised" "got $got"
-
 got="$(usage "$FIX/claude-stop-edited-no-test.jsonl" 1)"
 [ "$got" = claude ] && ok "a Claude Code transcript is recognised" \
   || bad "a Claude Code transcript is recognised" "got $got"
 
-n="$(usage "$FIX/codex.jsonl" 0)"
-[ "$n" -gt 0 ] && ok "a Codex transcript yields a token total" || bad "a Codex transcript yields a token total" "got $n"
-
-# The exact number, not merely a positive one, and it pins two separate things that both look
-# right while being wrong.
-#
-# ONE: Codex reports cached_input_tokens INSIDE input_tokens and states the answer as total_tokens,
-# where Claude Code reports four disjoint counts that have to be added. The fixture's second record
-# is 14018 input, of which 13056 cached, plus 5 output, stating 14023. Summing the fields the Claude
-# way gives 27079, so the session would be reported at roughly twice its real occupancy and would
-# hard-stop at half the intended threshold.
-#
-# TWO: one token_usage_record is written per model RESPONSE, not per turn, and this fixture holds
-# the two that one turn wrote: 13993 then 14023. Occupancy is the size of the most recent request,
-# so the last one wins. Adding them gives 28016, more than the whole window is occupied by, which is
-# the same class of error as summing the fields. A fixture holding one usage record cannot tell the
-# two apart and leaves both changes green, which is why the second one is in it.
-[ "$n" = 14023 ] && ok "the Codex total is the last response's total_tokens, not a sum" \
-  || bad "the Codex total" "expected 14023, got $n"
-
-# The window is read, not assumed. The Codex fixture states model_context_window 258400. Assuming
-# the 200,000 default would report this session at 129% of a window it is at 5% of, and hard-stop
-# every Codex session at 66% of the room it actually has.
-w="$(python3 -c 'import sys;sys.path.insert(0,"lib");import context_watch as c;print(c.declared_window(sys.argv[1]))' "$FIX/codex.jsonl")"
-[ "$w" = 258400 ] && ok "a Codex transcript states its own context window" \
-  || bad "declared window" "expected 258400, got $w"
-
-# Claude Code states none, so the inference in window_for is still what answers for it.
-w="$(python3 -c 'import sys;sys.path.insert(0,"lib");import context_watch as c;print(c.declared_window(sys.argv[1]))' "$FIX/claude-stop-edited-no-test.jsonl")"
-[ "$w" = 0 ] && ok "a Claude Code transcript states no window, so nothing is invented" \
-  || bad "declared window" "expected 0, got $w"
-
-# R-01: a stated window must not change what Claude Code sees. Nothing states one there, so this
-# pins that the new parameter defaults to the old behaviour rather than to a window of its own.
+# Claude Code states no window, so the inference in window_for is what answers for it.
 w="$(python3 -c 'import sys;sys.path.insert(0,"lib");import context_watch as c;print(c.window_for("claude-opus-5"))')"
 [ "$w" = 200000 ] && ok "an unstated window leaves the Claude Code answer unchanged" \
   || bad "window_for default" "expected 200000, got $w"
-
-# ...and window_for uses it. Reading the number and then ignoring it leaves every case above green
-# while the watchdog still measures Codex against the 200,000 default.
-w="$(python3 -c 'import sys;sys.path.insert(0,"lib");import context_watch as c;print(c.window_for("", declared=258400))')"
-[ "$w" = 258400 ] && ok "a stated window is what the session is measured against" \
-  || bad "stated window" "expected 258400, got $w"
-
-# A stated window is a starting point, not a ceiling: observation still raises it. Otherwise a
-# harness that understated its own window would cap the watchdog below the real one permanently.
-w="$(python3 -c 'import sys;sys.path.insert(0,"lib");import context_watch as c;print(c.window_for("", observed=300000, declared=258400))')"
-[ "$w" = 1000000 ] && ok "observation still raises a stated window" || bad "stated window" "expected 1000000, got $w"
-
-# END TO END, and this is the assertion the codex transcript_turn_usage row in
-# lib/harness/capabilities actually rests on. Everything above tests read_usage, which only sniffs.
-# What context-watch runs is measure and window_for, and until 2026-09-06 those understood Claude
-# Code rows alone: a Codex session measured 0 tokens, hook() returned at `if not tokens`, and the
-# watchdog was silent on every turn. A gate the manifest calls active and which never fires is the
-# failure this whole design exists to prevent, so it is pinned here as one line: occupancy, window,
-# percentage and model, all four read from the rollout rather than assumed.
-got="$(python3 "$LIB" measure "$FIX/codex.jsonl")"
-[ "$got" = "14023 258400 5 gpt-5.6-terra" ] \
-  && ok "context-watch measures a real Codex session end to end" \
-  || bad "codex end to end" "expected '14023 258400 5 gpt-5.6-terra', got '$got'"
 
 # A transcript with no assistant turn YET is not an unrecognised one. That is the state of every
 # session at its first prompt, and calling it unsupported made the watchdog announce itself inactive
@@ -529,14 +465,6 @@ err="$(printf '{"hook_event_name":"UserPromptSubmit","transcript_path":"%s","cwd
   "$fresh" "$work" | python3 "$LIB" hook 2>&1 >/dev/null)"
 [ -z "$err" ] && ok "and the hook says nothing about it" \
   || bad "and the hook says nothing about it" "stderr was: $err"
-rm -f "$fresh"
-
-# A Codex rollout with no usage record yet, the same case on the other harness.
-fresh="$(mktemp)"
-printf '{"timestamp":"2026-09-06T07:16:38Z","ordinal":0,"type":"session_meta","payload":{"session_id":"x"}}\n' > "$fresh"
-got="$(usage "$fresh" 1)"
-[ "$got" = codex ] && ok "a Codex rollout with no usage record yet is recognised" \
-  || bad "a Codex rollout with no usage record yet is recognised" "got $got"
 rm -f "$fresh"
 
 u="$(mktemp)"; printf 'not a transcript\n' > "$u"
@@ -569,9 +497,8 @@ printf '%s' "$err" | grep -q 'watchdog inactive' \
 #
 # _tail_entries exists because parsing a multi-megabyte transcript on every prompt would make the
 # watchdog the slowest thing in the session, which its own docstring calls "a good way to have it
-# turned off". _measure_parts returned early only when it had BOTH a token count and a declared
-# window, and a Claude Code transcript never states a window, so the second condition was never met
-# and the whole file was parsed on every cache miss, on every Claude Code session.
+# turned off". A Claude Code turn in the tail settles the measurement, so the whole file is read only
+# when the tail carries none.
 #
 # Asserted by making the whole-file read impossible rather than by timing it: a timing test on a
 # 600KB file is a test that fails on a slow CI box and gets deleted.
@@ -624,29 +551,6 @@ PY
 )"
 [ "$got" = 77001 ] && ok "a tail with no usable turn still falls through to the whole file" \
   || bad "a tail with no usable turn still falls through to the whole file" "got: $got"
-
-# A Codex rollout DOES state a window, so the fallthrough for the window is kept there: a tail
-# carrying a usage record and no token_count must still read the whole file rather than put the
-# session back on the 200000 default.
-cx="$work/cxbig.jsonl"
-{
-  printf '{"ordinal":0,"type":"event_msg","payload":{"type":"token_count","info":{"model_context_window":258400}}}\n'
-  i=0; while [ "$i" -lt 4000 ]; do
-    printf '{"ordinal":1,"type":"response_item","payload":{"type":"message","note":"%s"}}\n' "$pad"
-    i=$((i+1))
-  done
-  printf '{"ordinal":2,"type":"token_usage_record","payload":{"usage":{"input_tokens":91000,"cached_input_tokens":0,"output_tokens":0,"total_tokens":91000}}}\n'
-} > "$cx"
-got="$(KEEL_LIB="$LIB" python3 - "$cx" <<'PY' 2>&1
-import importlib.util, os, sys
-spec = importlib.util.spec_from_file_location("cw", os.environ["KEEL_LIB"])
-cw = importlib.util.module_from_spec(spec); spec.loader.exec_module(cw)
-t, m, w = cw._measure_parts(sys.argv[1])
-print("%s %s" % (t, w))
-PY
-)"
-[ "$got" = "91000 258400" ] && ok "a Codex tail with no stated window still finds it in the whole file" \
-  || bad "a Codex tail with no stated window still finds it in the whole file" "got: $got"
 
 rm -rf "$work"
 printf '\n%s passed, %s failed\n' "$pass" "$fail"

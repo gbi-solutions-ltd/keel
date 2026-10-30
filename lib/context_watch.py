@@ -85,62 +85,25 @@ def _tail_entries(path):
 
 
 def measure(path):
-    """Return (tokens, model) for the most recent main-thread assistant turn, or (0, "").
-
-    Two transcript shapes are understood, and which one a file is is decided by sniffing the file
-    rather than by asking which harness is running. A format change WITHIN one harness is the case
-    that actually bites, and a harness-keyed switch cannot see it.
-    """
-    tail = _tail_entries(path)
-    if tail is not None:
-        tokens, model = _measure_over(tail)
-        if tokens:
-            return tokens, model
-        # No usable turn in the tail. Fall through to the whole file rather than report zero, which
-        # would read as an empty context and silence the watchdog exactly when it is needed.
-    return _measure_over(_entries(path))
+    """Return (tokens, model) for the most recent main-thread assistant turn, or (0, "")."""
+    return _measure_parts(path)
 
 
 def _measure_parts(path):
-    """(tokens, model, declared window) in ONE pass over the tail where the tail settles it.
+    """(tokens, model), from the tail where the tail settles it.
 
-    measure and declared_window are kept as separate public functions because the tests and the
-    harness manifest reason about them separately, but the two callers that need both would
-    otherwise parse the same file twice on every cache miss.
-
-    THE TAIL IS ASKED SHAPE FIRST, and that is the whole of this function. Requiring both a token
-    count and a declared window before trusting the tail reads as conservative and is not: a Claude
-    Code transcript never states a window, anywhere, so the second condition was never met and the
-    WHOLE FILE was parsed on every cache miss of every Claude Code session, on UserPromptSubmit and
-    on PreToolUse both. That is precisely the cost _tail_entries exists to avoid, and its own
+    A Claude Code turn in the tail settles the measurement, so the whole file is read only when the
+    tail carries none. Reporting zero there instead would read as an empty context and silence the
+    watchdog exactly when it is needed. Parsing the whole file on every cache miss, on
+    UserPromptSubmit and on PreToolUse both, is the cost _tail_entries exists to avoid, and its own
     docstring calls paying it "a good way to have it turned off".
-
-    So a Claude turn in the tail settles both parts, because the missing one is a number that
-    harness never writes and no amount of further reading will produce. A Codex rollout keeps the
-    fallthrough it needs: a tail carrying a usage record and no token_count still reads the whole
-    file, rather than putting the session back on the 200,000 default, which is the failure
-    declared_window exists to prevent.
     """
     tail = _tail_entries(path)
     if tail is not None:
         tokens, model = _measure_claude(tail)
         if tokens:
-            return tokens, model, 0
-        tokens, model = _measure_codex(tail)
-        window = _window_over(tail)
-        if tokens and window:
-            return tokens, model, window
-    whole = list(_entries(path))
-    tokens, model = _measure_over(whole)
-    return tokens, model, _window_over(whole)
-
-
-def _measure_over(entries):
-    entries = list(entries)
-    tokens, model = _measure_claude(entries)
-    if tokens:
-        return tokens, model
-    return _measure_codex(entries)
+            return tokens, model
+    return _measure_claude(_entries(path))
 
 
 def _measure_claude(entries):
@@ -164,88 +127,11 @@ def _measure_claude(entries):
     return tokens, model
 
 
-def _measure_codex(entries):
-    """(tokens, model) from a Codex rollout, the file its hooks are handed as transcript_path.
-
-    Every line is {"timestamp", "ordinal", "type", "payload"}. Verified 2026-09-06 against
-    codex-cli 0.153.4; tests/fixtures/transcripts/codex.jsonl is a trimmed capture.
-
-    THE FIELDS ARE NOT CLAUDE CODE'S AND DO NOT SUM THE SAME WAY. Claude Code reports four disjoint
-    counts that have to be added. Codex reports `input_tokens` with `cached_input_tokens` already
-    inside it, and states the answer as `total_tokens`. The fixture's last record is 14018 input of
-    which 13056 cached, plus 5 output, stating 14023, which is input plus output. Adding the four
-    the way the Claude branch does gives 27079, so a session at 5% of its window would be reported
-    at 10% and would hard-stop at roughly half of the occupancy that should trigger it. Both numbers
-    are the ones tests/test-context-watch.sh pins, so this paragraph cannot drift from the code
-    without the suite going red.
-
-    One token_usage_record is written per model RESPONSE, not per turn, so a turn that reasons and
-    then answers writes two. The last one wins, matching the Claude branch: occupancy is the size of
-    the most recent request, not a running total, and summing responses would report a multiple of
-    the window. `payload.turn_token_usage` is the per-turn roll-up and is deliberately not what this
-    reads, for the same reason.
-    """
-    tokens, model = 0, ""
-    for d in entries:
-        payload = d.get("payload")
-        if not isinstance(payload, dict):
-            continue
-        if d.get("type") == "turn_context":
-            model = payload.get("model") or model
-            continue
-        if d.get("type") != "token_usage_record":
-            continue
-        usage = payload.get("usage")
-        if not isinstance(usage, dict):
-            continue
-        total = usage.get("total_tokens")
-        if not isinstance(total, int):
-            total = (usage.get("input_tokens") or 0) + (usage.get("output_tokens") or 0)
-        tokens = total
-    return tokens, model
-
-
-def declared_window(path):
-    """The context window the transcript states, or 0 when it states none.
-
-    Claude Code states none, which is why window_for has to infer one. A Codex rollout carries
-    `model_context_window` on its event_msg/token_count records, so on that harness the window is
-    read rather than assumed. Without this, a Codex session is measured against the 200,000 default
-    and hard-stops at 66% of a window that is actually 258,400, on every session.
-
-    Falls through from the tail to the whole file, the same way measure does, and for the same
-    reason turned the other way up: a rollout over TAIL_BYTES whose tail happens to carry no
-    token_count record would otherwise return 0 and put the session back on the 200,000 default,
-    silently reintroducing the exact failure this function exists to prevent.
-    """
-    tail = _tail_entries(path)
-    if tail is not None:
-        window = _window_over(tail)
-        if window:
-            return window
-    return _window_over(_entries(path))
-
-
-def _window_over(entries):
-    window = 0
-    for d in entries:
-        payload = d.get("payload")
-        if not isinstance(payload, dict) or payload.get("type") != "token_count":
-            continue
-        info = payload.get("info")
-        if not isinstance(info, dict):
-            continue
-        w = _positive_int(info.get("model_context_window"))
-        if w is not None:
-            window = w
-    return window
-
-
 UNSUPPORTED = -1
 
 
 def transcript_kind(path):
-    """"claude", "codex" or "unsupported", from the SHAPE of the first row that settles it.
+    """"claude" or "unsupported", from the SHAPE of the first row that settles it.
 
     Shape and not a token count, and that distinction is the whole of this function. Deciding by
     "which parser returned a number" calls a perfectly good transcript unsupported whenever it has
@@ -253,9 +139,8 @@ def transcript_kind(path):
     would then announce itself inactive once per session, on a file it understands perfectly well,
     and the message would mean nothing by the second week.
 
-    Sniffing the file rather than asking which harness is running is deliberate: a format change
-    WITHIN one harness is the case that actually bites, and a harness-keyed switch cannot see it.
-    Codex says outright that the transcript is not a stable interface for hooks.
+    Sniffing the file is deliberate: a format change is the case that actually bites, and the
+    transcript is not a stable interface for hooks.
 
     STOPS AT THE FIRST ROW THAT ANSWERS. This runs on every prompt, ahead of the measurement cache,
     so it must not be a parse of the whole file: _tail_entries' own docstring says doing that on
@@ -265,14 +150,11 @@ def transcript_kind(path):
         # Claude Code: type-tagged rows carrying a message object.
         if isinstance(d.get("message"), dict) or d.get("type") in ("user", "assistant", "summary"):
             return "claude"
-        # Codex: a rollout envelope, {"timestamp", "ordinal", "type", "payload"}.
-        if isinstance(d.get("payload"), dict) and isinstance(d.get("ordinal"), int):
-            return "codex"
     return "unsupported"
 
 
 def read_usage(path):
-    """Return (tokens, kind). kind is "claude", "codex" or "unsupported".
+    """Return (tokens, kind). kind is "claude" or "unsupported".
 
     Never returns 0 for a file whose format it does not recognise. A watchdog that has stopped
     working looks exactly like a session using no context, and that is the silent-gate failure in
@@ -282,9 +164,7 @@ def read_usage(path):
     kind = transcript_kind(path)
     if kind == "unsupported":
         return (UNSUPPORTED, "unsupported")
-    entries = list(_entries(path))
-    tokens = _measure_claude(entries)[0] if kind == "claude" else _measure_codex(entries)[0]
-    return (tokens, kind)
+    return (_measure_claude(_entries(path))[0], kind)
 
 
 def _positive_int(value):
@@ -303,7 +183,7 @@ def _positive_int(value):
     return None
 
 
-def window_for(model, observed=0, configured=None, declared=0):
+def window_for(model, observed=0, configured=None):
     """The context window this session is working against.
 
     On Claude Code there is no reliable way to read this. A real 1M session records its model as
@@ -313,17 +193,11 @@ def window_for(model, observed=0, configured=None, declared=0):
     hard-stops the session immediately and never lifts, on exactly the sessions with the most room
     left.
 
-    A Codex rollout does carry it, as `model_context_window`, and `declared` is that number when the
-    transcript stated one. See declared_window.
-
     So, in order:
 
     1. `KEEL_CONTEXT_WINDOW` wins over everything below, and is used as set apart from the bound in
        step 5. It is the deliberate override: the test suite uses it to force a small window, and a
        session that knows better can do the same. Nothing raises it, and only the bound lowers it.
-    1a. A window the transcript states beats the model-string guess in step 4, because it is read
-       rather than assumed. Steps 2 and 3 still raise it and step 5 still bounds it, so a stated
-       window behaves exactly like a better starting point and not like a ceiling.
     2. Observation beats assumption. Occupancy above a tier is proof the window is larger, since the
        API would have refused the request otherwise. This can only correct upward, so it never
        invents room that is not there.
@@ -347,11 +221,7 @@ def window_for(model, observed=0, configured=None, declared=0):
     if env is not None:
         return min(env, LONG_WINDOW)
 
-    stated = _positive_int(declared)
-    if stated is not None:
-        window = stated
-    else:
-        window = LONG_WINDOW if "1m" in (model or "").lower() else DEFAULT_WINDOW
+    window = LONG_WINDOW if "1m" in (model or "").lower() else DEFAULT_WINDOW
     if observed > window:
         window = LONG_WINDOW
 
@@ -521,8 +391,8 @@ def _cached_measure(path, session_id, configured=None):
                 return tok, win, (int(100 * tok / win) if win else 0)
         except (OSError, ValueError):
             pass
-    tokens, model, declared = _measure_parts(path)
-    window = window_for(model, observed=tokens, configured=configured, declared=declared)
+    tokens, model = _measure_parts(path)
+    window = window_for(model, observed=tokens, configured=configured)
     if cache:
         try:
             with open(cache, "w", encoding="utf-8") as fh:
@@ -705,7 +575,7 @@ def main(argv):
     if len(argv) < 3:
         return 2
     cmd, path = argv[1], argv[2]
-    tokens, model, declared = _measure_parts(path)
+    tokens, model = _measure_parts(path)
     # The project is passed, never guessed. These two commands are handed a transcript and nothing
     # else, and a transcript does not say which project it belongs to. Inferring it from the current
     # directory made the same transcript report two different windows depending on where the
@@ -724,7 +594,7 @@ def main(argv):
     configured = None
     if project:
         configured = (_profile(project).get("gates") or {}).get("context_window")
-    window = window_for(model, observed=tokens, configured=configured, declared=declared)
+    window = window_for(model, observed=tokens, configured=configured)
     if cmd == "measure":
         pct = int(100 * tokens / window) if window else 0
         print("%d %d %d %s" % (tokens, window, pct, model or "unknown"))

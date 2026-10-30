@@ -3253,7 +3253,7 @@ def read_usage(path):
     return (UNSUPPORTED, "unsupported")
 ```
 
-**The caller is `hook()`** (`lib/context_watch.py:358`), the entry point that reads
+**The caller is `hook()`** (`lib/context_watch.py:409`), the entry point that reads
 `transcript_path` off the event and today does `if not transcript or not os.path.exists(transcript):
 return 0` at `:376-377`. That early return is the behaviour this task changes: a transcript that
 exists and does not parse must not take the same silent path as one that is absent. `measure()`
