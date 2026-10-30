@@ -140,8 +140,8 @@ case "$out" in *BLOCK.md*)
   *) ok "a '..' link to a committed file resolves" ;; esac
 rm -rf "$d"
 
-# ---- CLAUDE.md and AGENTS.md are read too ---------------------------------
-# The two files most likely to point an agent at a document, and the two keel writes into itself.
+# ---- CLAUDE.md is read too ------------------------------------------------
+# The file most likely to point an agent at a document, and the one keel writes its block into.
 
 d="$(fixture node-ts)"
 ( cd "$d" || exit 1
@@ -178,6 +178,11 @@ d="$parent/svc-node"
 [ -d "$d" ] && ok "new creates the project directory" || bad "new" "no directory"
 [ -f "$d/.keel/profile.json" ] && ok "new writes a profile" || bad "new" "no profile"
 [ -f "$d/CLAUDE.md" ] && ok "new writes the CLAUDE.md block" || bad "new" "no CLAUDE.md"
+grep -qF '<!-- keel:start' "$d/CLAUDE.md" 2>/dev/null \
+  && ok "new writes no AGENTS.md: CLAUDE.md carries the keel block" \
+  || bad "new writes no AGENTS.md" "CLAUDE.md has no keel block"
+[ -e "$d/AGENTS.md" ] && bad "new writes no AGENTS.md" "new created AGENTS.md" \
+  || ok "new writes no AGENTS.md: no AGENTS.md is created"
 [ -d "$d/docs/keel" ] && ok "new scaffolds the docs root" || bad "new" "no docs root"
 ( cd "$d" && git rev-parse --git-dir >/dev/null 2>&1 ) && ok "new initialises git" || bad "new" "not a repo"
 [ -f "$d/.github/workflows/ci.yml" ] && ok "new writes a CI workflow" || bad "new" "no CI"

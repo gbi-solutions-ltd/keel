@@ -1455,6 +1455,25 @@ named="$(printf '%s\n' "$out" | grep -F 'AGENTS.md' || true)"
   || bad "doctor no longer checks AGENTS.md" "printed: $named"
 rm -rf "$d"
 
+# ---- doctor's referenced-docs scan reads CLAUDE.md and not AGENTS.md -------
+# Both files link the same uncommitted document, so a missing AGENTS.md line is the scan skipping
+# that file and not the link going unseen.
+
+d="$(fixture node-ts)"
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+mkdir -p "$d/docs" && printf 'not committed\n' > "$d/docs/missing.md"
+printf '\nSee [missing](docs/missing.md).\n' >> "$d/AGENTS.md"
+printf '\nSee [missing](docs/missing.md).\n' >> "$d/CLAUDE.md"
+out="$( cd "$d" && "$KEEL" doctor 2>&1 || true )"
+named="$(printf '%s\n' "$out" | grep -F 'AGENTS.md' || true)"
+[ -z "$named" ] \
+  && ok "doctor's referenced-docs scan reads no AGENTS.md: no line names it" \
+  || bad "doctor's referenced-docs scan reads no AGENTS.md" "printed: $named"
+case "$out" in *"CLAUDE.md links 'docs/missing.md'"*)
+    ok "doctor's referenced-docs scan still reads CLAUDE.md: its link gets a line" ;;
+  *) bad "doctor's referenced-docs scan still reads CLAUDE.md" "no line for its link: $out" ;; esac
+rm -rf "$d"
+
 # ---- this repository carries no AGENTS.md ---------------------------------
 # CLAUDE.md carries the same block, and keel no longer writes or reads AGENTS.md.
 

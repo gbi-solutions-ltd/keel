@@ -494,7 +494,7 @@ $(git -c core.quotePath=false ls-tree -r --name-only HEAD 2>/dev/null)
     # the physical path, so under /var every prefix test failed and the check silently found
     # nothing. doctor already runs from the project root everywhere else.
     top="$(pwd)"
-    for f in README.md $(harness_context_file) AGENTS.md "$root"/*.md; do
+    for f in README.md $(harness_context_file) "$root"/*.md; do
         [ -f "$f" ] || continue
         dir="${f%/*}"; [ "$dir" = "$f" ] && dir='.'
         while IFS= read -r target; do
