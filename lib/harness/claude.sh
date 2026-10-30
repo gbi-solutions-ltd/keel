@@ -4,19 +4,19 @@
 # WHAT bin/keel CALLS. These functions, and never a writer by name, so what keel writes for Claude
 # Code lives here and bin/keel stays free of its file names:
 #
+#   harness_context_file               print the context file Claude Code reads, CLAUDE.md
 #   harness_write_config <root>        write Claude Code's committed configuration
 #   harness_write_local_config <root>  write its uncommitted, per-developer configuration
 #   harness_permission_rules           print `deny|<rule>` and `ask|<rule>` lines, one per rule
 #   harness_recommend_plugins          print the plugin ids Claude Code should have, one per line
 #   harness_config_paths               print the paths Claude Code configuration owns, one per line
+#   harness_config_dirs                print the directories those paths live in, one per line
 #   harness_doctor_findings            print `level|message` lines for cmd_doctor, zero or more
 #
-# THE LAST EXISTS BECAUSE OF WHAT cmd_doctor DOES. settings_report_load, plugin_report and
-# boundary_report are Claude Code readers, and cmd_doctor keeps the ordering, the formatting and the
-# counters while this file keeps the knowledge. harness_doctor_findings is the only one of them
-# cmd_doctor calls, so a reader added here reaches the report without cmd_doctor learning its name;
-# this file implements it over the three readers, and a phase with nothing to report prints
-# nothing.
+# THE LAST EXISTS BECAUSE OF WHAT cmd_doctor DOES. It calls harness_context_file, for the markers
+# it checks, and harness_doctor_findings, which this file implements over the Claude Code readers
+# settings_report_load, plugin_report and boundary_report, so a reader added here reaches the report
+# without cmd_doctor learning its name. A phase with nothing to report prints nothing.
 #
 # THE BODIES BELOW WERE MOVED, NOT REWRITTEN. Every byte of what `keel init` writes on Claude Code
 # is asserted against the pre-refactor commit by tests/test-keel-4.sh, which builds the baseline

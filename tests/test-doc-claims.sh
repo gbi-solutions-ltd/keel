@@ -916,13 +916,19 @@ else
 fi
 
 # Read from the register in bin/keel rather than from a list written here, so retiring a seventh key
-# extends this check for free and a list nobody updates cannot quietly stop covering one.
-retired_in_own="$(python3 - <<'PYR'
-import json, re
-src = open("bin/keel").read()
-block = re.search(r"^retired_keys\(\) \{(.*?)^\}", src, re.S | re.M)
-keys = [l.strip().split("|")[0] for l in block.group(1).splitlines() if l.count("|") >= 2] if block else []
-prof = json.load(open(".keel/profile.json"))
+# extends this check for free and a list nobody updates cannot quietly stop covering one. Read by
+# running retired_keys, lifted out of bin/keel, rather than by parsing its source: a row bin/keel
+# prints some other way is still a row. Only the function is evaluated, in a subshell, so nothing
+# else in bin/keel runs.
+# retired_set_in <bin/keel> <profile> prints the register's keys that the profile sets.
+retired_set_in() {
+    local keys
+    keys="$(eval "$(sed -n '/^retired_keys() {/,/^}/p' "$1")"
+            type retired_keys >/dev/null 2>&1 && retired_keys | cut -d'|' -f1)"
+    KEYS="$keys" python3 - "$2" <<'PYR'
+import json, os, sys
+keys = os.environ["KEYS"].split()
+prof = json.load(open(sys.argv[1]))
 def has(p):
     d = prof
     for seg in p.split("."):
@@ -932,12 +938,37 @@ def has(p):
     return True
 print(" ".join(k for k in keys if has(k)))
 PYR
-)"
+}
+retired_in_own="$(retired_set_in bin/keel .keel/profile.json)"
 if [ -z "$retired_in_own" ]; then
     ok "this repository's own profile sets no retired key"
 else
     bad "dogfood profile" "it still sets: $retired_in_own"
 fi
+
+# The same check on a copy of that profile that sets harnesses, the row bin/keel writes as a printf
+# so it can carry a comment. A check that only passes is indistinguishable from one that cannot see.
+retired_tmp="$(mktemp -d)"
+python3 -c "import json,sys;d=json.load(open(sys.argv[1]));d['harnesses']=[];json.dump(d,open(sys.argv[2],'w'))" \
+    .keel/profile.json "$retired_tmp/profile.json"
+case " $(retired_set_in bin/keel "$retired_tmp/profile.json") " in
+  *" harnesses "*) ok "a copy of this repository's profile that sets harnesses is caught naming it" ;;
+  *) bad "dogfood profile" "a copy setting harnesses was not caught" ;;
+esac
+
+# A row spelled another way is still a row: the register is whatever retired_keys prints.
+cat > "$retired_tmp/keel" <<'KEEL'
+retired_keys() {
+    echo "foo.bar|7|gone"
+}
+KEEL
+printf '{"foo": {"bar": 1}}\n' > "$retired_tmp/foo.json"
+if [ "$(retired_set_in "$retired_tmp/keel" "$retired_tmp/foo.json")" = "foo.bar" ]; then
+    ok "a register row printed by echo is read as a row"
+else
+    bad "dogfood profile" "an echo row in retired_keys was not read"
+fi
+rm -rf "$retired_tmp"
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

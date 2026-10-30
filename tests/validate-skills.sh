@@ -788,17 +788,15 @@ fi
 # the previous field set exists to diff against. Whoever writes the removal commit is the only
 # reader that can catch it, which is why the register carries that instruction in its own comment.
 if [ -f templates/profile.schema.json ] && [ -f bin/keel ] && command -v python3 >/dev/null 2>&1; then
-    still_declared="$(python3 - <<'PYR'
-import json, re
+    # Read by running retired_keys, lifted out of bin/keel, rather than by parsing its source: a row
+    # bin/keel prints some other way is still a row doctor shows. Only the function is evaluated, in
+    # this subshell, so nothing else in bin/keel runs.
+    registered="$(eval "$(sed -n '/^retired_keys() {/,/^}/p' bin/keel)"
+                  type retired_keys >/dev/null 2>&1 && retired_keys | cut -d'|' -f1)"
+    still_declared="$(REGISTERED="$registered" python3 - <<'PYR'
+import json, os
 
-src = open("bin/keel").read()
-block = re.search(r"^retired_keys\(\) \{(.*?)^\}", src, re.S | re.M)
-registered = []
-if block:
-    for line in block.group(1).splitlines():
-        m = re.match(r"^\s*(?:printf \x27%s\\n\x27 \x27)?([A-Za-z0-9_.]+)\|[0-9]+\|", line)
-        if m:
-            registered.append(m.group(1))
+registered = os.environ["REGISTERED"].split()
 
 d = json.load(open("templates/profile.schema.json"))
 declared = set()

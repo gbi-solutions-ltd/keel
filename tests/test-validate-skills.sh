@@ -802,6 +802,22 @@ JSON
 run_out "a printf row in the register that the schema still declares is rejected" 1 \
     m_retired_printf_still_declared "retired" yes
 
+# The register is whatever retired_keys prints, so a row spelled another way is still a row.
+m_retired_echo_still_declared() {
+    mkdir -p "$1/templates" "$1/bin"
+    cat > "$1/bin/keel" <<'KEEL'
+SCHEMA_VERSION=1
+retired_keys() {
+    echo "foo.bar|7|gone"
+}
+KEEL
+    cat > "$1/templates/profile.schema.json" <<'JSON'
+{ "properties": { "foo": { "properties": { "bar": { "type": "string" } } } } }
+JSON
+}
+run_out "an echo row in the register that the schema still declares is rejected" 1 \
+    m_retired_echo_still_declared "register names keys .*still declares: foo.bar" yes
+
 # Every key the example template sets is declared in the schema, or a project that copies the
 # example sets a key that does nothing. conventions.branch_prefix was exactly this, pre-existing
 # and undetected: in the example, in neither schema revision, read by nothing.
