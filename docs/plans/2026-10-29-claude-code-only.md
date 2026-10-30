@@ -589,7 +589,8 @@ also written twice.
 - Modify: `tests/validate-skills.sh`
 - Modify: `tests/test-doc-claims.sh`
 - Modify: `lib/harness/claude.sh` (its header comment only)
-- Test: `tests/test-validate-skills.sh`
+- Modify: `CONTRIBUTING.md` (its sentence on where a removed key is registered)
+- Test: `tests/test-validate-skills.sh`, `tests/test-keel-4.sh`
 - Plus each file whose citation into `bin/keel` this task's edits break
 
 **Interfaces:**
@@ -600,20 +601,28 @@ also written twice.
 
 **Depends on:** task 4b
 
+(Corrected by the coordinator on 2026-10-30 after the first implementer stopped without editing:
+behaviour 1 said `tests/test-keel-4.sh` passes unchanged, which its fixed count of Codex notices
+in `bin/keel` makes impossible, and behaviour 2's example quoted the wrong `sed` form and could not
+fail.)
+
 **Behaviours:**
 
 1. `bin/keel` behaves as before. Example: `keel doctor` on a schema 6 profile with `harnesses` still
-   warns that it is retired in schema 7, and `tests/test-keel-4.sh` passes unchanged.
+   warns that it is retired in schema 7. `tests/test-keel-4.sh`'s count of Codex notices moves with
+   the row: `bin/keel` names Codex on exactly 2 lines and `lib/retired-keys.sh` on exactly 1, each
+   ending `# names Codex: the v0.26.0 notice`. `CONTRIBUTING.md` says a removed key gets a line in
+   `lib/retired-keys.sh`.
 2. Both checks source `lib/retired-keys.sh` and run `retired_keys`, with no `sed` and no `eval`.
-   Example: `grep -c 'sed -n "/^retired_keys' tests/validate-skills.sh tests/test-doc-claims.sh`
-   prints 0 for both.
+   Example: `grep -cF "sed -n '/^retired_keys" tests/validate-skills.sh tests/test-doc-claims.sh`
+   prints 0 for both, and neither file evaluates text taken from `bin/keel`.
 3. A register that cannot be read, or reads empty, fails loudly. Example: in a
    `tests/test-validate-skills.sh` fixture whose `lib/retired-keys.sh` is missing, or defines
    `retired_keys` to print nothing, the validator fails with a message naming
    `lib/retired-keys.sh`; `tests/test-doc-claims.sh` fails the same way if the register reads empty.
 4. The test-doc-claims canary does not hard-code a key. Example: it copies the profile, sets the
-   first key `retired_keys` prints, and expects that key named; its temporary directory is removed
-   by an `EXIT` trap.
+   first key `retired_keys` prints (today the dotted `gates.tdd`, so the edit creates nested
+   objects), and expects that key named; its temporary directory is removed by an `EXIT` trap.
 5. `lib/harness/claude.sh`'s header is accurate. Example: `harness_config_paths` is described as
    printing `committed|<path>` and `local|<path>` lines, `harness_doctor_findings` names its phase
    argument, and the paragraph after the list does not call `harness_context_file` "the last".
@@ -637,7 +646,7 @@ A red in either validator is this task's. This is the one boundary run the task 
 
 ```bash
 git add lib/retired-keys.sh bin/keel tests/validate-skills.sh tests/test-doc-claims.sh \
-        lib/harness/claude.sh tests/test-validate-skills.sh
+        lib/harness/claude.sh CONTRIBUTING.md tests/test-validate-skills.sh tests/test-keel-4.sh
 git status --porcelain
 ```
 
