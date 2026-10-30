@@ -499,7 +499,7 @@
             "type": "string"
           },
           "description": "Plugins this project expects, as marketplace-qualified names such as typescript-lsp@claude-plugins-official. keel doctor names any that are not enabled, along with the command that installs them. A value here is preserved when init is re-run, so a curated list survives.",
-          "x-keel-read-by": "code:lib/harness/claude.sh:79"
+          "x-keel-read-by": "code:lib/harness/claude.sh:82"
         },
         "excluded": {
           "type": "array",

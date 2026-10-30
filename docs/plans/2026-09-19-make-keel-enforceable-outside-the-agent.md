@@ -137,7 +137,7 @@ re-litigated: task 0's `Done when` holds, so the task proceeds as done.
 **Idea:** `docs/ideas/write-ci-does-not-match-ship.md`
 
 **Files:**
-- Modify: `bin/keel` (`write_ci` at `bin/keel:1144-1162`; its call site in `cmd_new` at
+- Modify: `bin/keel` (`write_ci` at `bin/keel:988-1047`; its call site in `cmd_new` at
   `bin/keel:1206`; a new call site in `cmd_init` after `bin/keel:842`)
 - Test: `tests/test-keel.sh`
 
@@ -222,7 +222,7 @@ writes the file at all; they exist to stay green once step 3 lands.
 
 - [x] **Step 3: Write the minimal implementation** (not witnessed this session; see provenance note above)
 
-Replace `write_ci` (`bin/keel:1144-1162`):
+Replace `write_ci` (`bin/keel:988-1047`):
 
 ```bash
 write_ci() {

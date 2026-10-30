@@ -1116,8 +1116,29 @@ left="$(grep -nE 'harness_each|HARNESS_SET|harness_set_for_repo|harness_hooks_tr
 codex_lines="$(grep -ni codex "$KEEL")"
 n_codex="$(printf '%s\n' "$codex_lines" | grep -c .)"
 n_noted="$(printf '%s\n' "$codex_lines" | grep -c '# names Codex: the v0.26.0 notice$')"
-[ "$n_codex" = 3 ] && [ "$n_noted" = 3 ] && ok "bin/keel names Codex only in the three v0.26.0 notices" \
-  || bad "bin/keel names Codex only in the three v0.26.0 notices" "$n_codex lines, $n_noted carrying the comment: $(printf '%s\n' "$codex_lines" | grep -v '# names Codex: the v0.26.0 notice$' | head -2 | tr '\n' ' ')"
+[ "$n_codex" = 2 ] && [ "$n_noted" = 2 ] && ok "bin/keel names Codex only in the two v0.26.0 notices" \
+  || bad "bin/keel names Codex only in the two v0.26.0 notices" "$n_codex lines, $n_noted carrying the comment: $(printf '%s\n' "$codex_lines" | grep -v '# names Codex: the v0.26.0 notice$' | head -2 | tr '\n' ' ')"
+# The third notice is the harnesses row, which lives in the register bin/keel sources.
+codex_lines="$(grep -ni codex "$ROOT/lib/retired-keys.sh" 2>&1)"
+n_codex="$(printf '%s\n' "$codex_lines" | grep -c .)"
+n_noted="$(printf '%s\n' "$codex_lines" | grep -c '# names Codex: the v0.26.0 notice$')"
+[ "$n_codex" = 1 ] && [ "$n_noted" = 1 ] && ok "lib/retired-keys.sh names Codex only in its v0.26.0 notice" \
+  || bad "lib/retired-keys.sh names Codex only in its v0.26.0 notice" "$n_codex lines, $n_noted carrying the comment: $(printf '%s\n' "$codex_lines" | head -2 | tr '\n' ' ')"
+
+# The register defines retired_keys and nothing else, and runs nothing when sourced, so the checks
+# that source it run no part of keel. A sourced file that ran a command would run it in every check.
+got="$(/bin/bash -c '. "$1" && declare -F' _ "$ROOT/lib/retired-keys.sh" 2>&1)"
+[ "$got" = "declare -f retired_keys" ] && ok "lib/retired-keys.sh defines retired_keys and nothing else, printing nothing" \
+  || bad "lib/retired-keys.sh defines retired_keys and nothing else, printing nothing" "$(printf '%s' "$got" | head -2 | tr '\n' ' ')"
+
+# Both checks read the register by sourcing it, never by lifting retired_keys out of bin/keel with
+# a sed range and eval, which read a register it could not parse as an empty one and passed.
+for f in tests/validate-skills.sh tests/test-doc-claims.sh; do
+    n_sed="$(grep -cF "sed -n '/^retired_keys" "$ROOT/$f")"
+    n_eval="$(grep -cE '(^|[^[:alnum:]_])eval[[:space:]]+"\$\(' "$ROOT/$f")"
+    [ "$n_sed" = 0 ] && [ "$n_eval" = 0 ] && ok "$f reads the register with no sed range and no eval" \
+      || bad "$f reads the register with no sed range and no eval" "$n_sed sed ranges, $n_eval evals"
+done
 
 # claude.sh keeps its writers and drops the contract it shared with another harness.
 n="$(grep -ic codex "$ROOT/lib/harness/claude.sh")"

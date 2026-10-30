@@ -746,14 +746,14 @@ run_out "an observed: marker naming a file that is not a record is rejected" 1 m
 # validator, because the fixture roots these tests run in have no templates/profile.schema.json.
 run_out "no profile schema present means the fingerprint check stays quiet" 0 noop "fingerprint" no
 
-# A key bin/keel says schema 4 retired, still declared in the schema. The register in bin/keel is
+# A key the register says schema 4 retired, still declared in the schema. lib/retired-keys.sh is
 # what doctor reads to tell a person their profile carries a dead key, and a register naming a key
 # that is still live tells them to remove one that still works. Nothing else can catch it: the
 # fingerprint above is a hash of the field set, so it sees that the set changed and never which way.
 m_retired_key_still_declared() {
-    mkdir -p "$1/templates" "$1/bin"
-    cat > "$1/bin/keel" <<'KEEL'
-SCHEMA_VERSION=1
+    mkdir -p "$1/templates" "$1/bin" "$1/lib"
+    printf 'SCHEMA_VERSION=1\n' > "$1/bin/keel"
+    cat > "$1/lib/retired-keys.sh" <<'KEEL'
 retired_keys() {
     cat <<RETIRED
 gates.tdd|4|it does nothing now.
@@ -765,13 +765,13 @@ KEEL
 JSON
 }
 run_out "a key listed as retired that the schema still declares is rejected" 1 \
-    m_retired_key_still_declared "retired" yes
+    m_retired_key_still_declared "still declares" yes
 
 # And the register stays quiet when it agrees with the schema, or every commit reports it.
 m_retired_key_absent() {
-    mkdir -p "$1/templates" "$1/bin"
-    cat > "$1/bin/keel" <<'KEEL'
-SCHEMA_VERSION=1
+    mkdir -p "$1/templates" "$1/bin" "$1/lib"
+    printf 'SCHEMA_VERSION=1\n' > "$1/bin/keel"
+    cat > "$1/lib/retired-keys.sh" <<'KEEL'
 retired_keys() {
     cat <<RETIRED
 gates.tdd|4|it does nothing now.
@@ -785,12 +785,12 @@ JSON
 run_out "a register that agrees with the schema says nothing" 1 \
     m_retired_key_absent "retired" no
 
-# A row written as a printf argument rather than a heredoc line, which bin/keel does for the row
+# A row written as a printf argument rather than a heredoc line, which the register does for the row
 # that carries a trailing comment, is read as a row too.
 m_retired_printf_still_declared() {
-    mkdir -p "$1/templates" "$1/bin"
-    cat > "$1/bin/keel" <<'KEEL'
-SCHEMA_VERSION=1
+    mkdir -p "$1/templates" "$1/bin" "$1/lib"
+    printf 'SCHEMA_VERSION=1\n' > "$1/bin/keel"
+    cat > "$1/lib/retired-keys.sh" <<'KEEL'
 retired_keys() {
     printf '%s\n' 'harnesses|7|it does nothing now.' # a trailing comment
 }
@@ -800,13 +800,13 @@ KEEL
 JSON
 }
 run_out "a printf row in the register that the schema still declares is rejected" 1 \
-    m_retired_printf_still_declared "retired" yes
+    m_retired_printf_still_declared "still declares" yes
 
 # The register is whatever retired_keys prints, so a row spelled another way is still a row.
 m_retired_echo_still_declared() {
-    mkdir -p "$1/templates" "$1/bin"
-    cat > "$1/bin/keel" <<'KEEL'
-SCHEMA_VERSION=1
+    mkdir -p "$1/templates" "$1/bin" "$1/lib"
+    printf 'SCHEMA_VERSION=1\n' > "$1/bin/keel"
+    cat > "$1/lib/retired-keys.sh" <<'KEEL'
 retired_keys() {
     echo "foo.bar|7|gone"
 }
@@ -817,6 +817,29 @@ JSON
 }
 run_out "an echo row in the register that the schema still declares is rejected" 1 \
     m_retired_echo_still_declared "register names keys .*still declares: foo.bar" yes
+
+# A register that cannot be read, or reads empty, is reported by name. Read as an empty register
+# instead, it checks nothing and passes in silence, which is the failure the check exists to stop.
+m_retired_register_missing() {
+    mkdir -p "$1/templates" "$1/bin"
+    printf 'SCHEMA_VERSION=1\n' > "$1/bin/keel"
+    cat > "$1/templates/profile.schema.json" <<'JSON'
+{ "properties": { "gates": { "properties": { "tdd": { "type": "string" } } } } }
+JSON
+}
+run_out "a missing register is reported naming lib/retired-keys.sh" 1 \
+    m_retired_register_missing "lib/retired-keys.sh" yes
+
+m_retired_register_empty() {
+    mkdir -p "$1/templates" "$1/bin" "$1/lib"
+    printf 'SCHEMA_VERSION=1\n' > "$1/bin/keel"
+    printf 'retired_keys() {\n    :\n}\n' > "$1/lib/retired-keys.sh"
+    cat > "$1/templates/profile.schema.json" <<'JSON'
+{ "properties": { "gates": { "properties": { "tdd": { "type": "string" } } } } }
+JSON
+}
+run_out "a register that prints nothing is reported naming lib/retired-keys.sh" 1 \
+    m_retired_register_empty "lib/retired-keys.sh" yes
 
 # Every key the example template sets is declared in the schema, or a project that copies the
 # example sets a key that does nothing. conventions.branch_prefix was exactly this, pre-existing

@@ -80,12 +80,12 @@ you are covered for.
   or a fenced block, never the colon form. `tests/validate-citations.sh` cannot tell a claim from a
   quotation and must not try, so a document that lists broken citations makes them: this happened
   three times in one afternoon on 2026-09-09, including in the sentence recording it.
-- A key **removed** from `templates/profile.schema.json` gets a line in `bin/keel`'s `retired_keys`
-  in the same commit, saying which schema version removed it and what to do instead. Doctor reads
-  that register to tell a project its profile still carries a dead key, and nothing can detect a
-  removal you did not record: the schema fingerprint is a hash of the field set, so it proves the
-  set moved and can never say which way. The validator checks only the other direction, that no
-  registered key is still declared.
+- A key **removed** from `templates/profile.schema.json` gets a line in `lib/retired-keys.sh`, in
+  its `retired_keys`, in the same commit, saying which schema version removed it and what to do
+  instead. Doctor reads that register to tell a project its profile still carries a dead key, and
+  nothing can detect a removal you did not record: the schema fingerprint is a hash of the field
+  set, so it proves the set moved and can never say which way. The validator checks only the other
+  direction, that no registered key is still declared.
 - Every key in `templates/profile.schema.json` declares `x-keel-read-by`, and the citation it gives
   still resolves. `code:<path>` where something executes, `advisory:<path>` where a markdown file is
   prose a model may follow and nothing asserts it, `human` where a person is the reader,

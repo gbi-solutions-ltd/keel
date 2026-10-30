@@ -10,13 +10,13 @@
 ## The problem
 
 `skills/ship/SKILL.md` states eight gate items a change must clear before it ships. All eight are
-agent-run, prose-enforced checks inside the ship skill's own turn. `write_ci` (`bin/keel:1144-1162`)
+agent-run, prose-enforced checks inside the ship skill's own turn. `write_ci` (`bin/keel:988-1047`)
 generates the only CI pipeline keel produces for a new project, and it reads exactly one profile
 key: `verify.test`. A human pushing directly, a session that compacted before running `ship`, or a
 tool other than the one that wrote the skill bypasses all eight items silently, and the generated
 pipeline notices none of it.
 
-**Evidence.** `write_ci()` at `bin/keel:1144-1162` (called once, from `cmd_new`, when `keel new`
+**Evidence.** `write_ci()` at `bin/keel:988-1047` (called once, from `cmd_new`, when `keel new`
 scaffolds a project) writes `.github/workflows/ci.yml` with one job, `verify`: checkout, a
 stack-conditional language setup, one `Test` step running the literal value of `verify.test`
 (falling back to an `echo` if null), and one hardcoded "refuse committed key material" grep, not

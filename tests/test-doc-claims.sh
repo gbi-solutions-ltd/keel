@@ -915,16 +915,18 @@ else
     bad "dogfood profile" "profile says schema $own_sv, bin/keel says $bin_sv"
 fi
 
-# Read from the register in bin/keel rather than from a list written here, so retiring a seventh key
-# extends this check for free and a list nobody updates cannot quietly stop covering one. Read by
-# running retired_keys, lifted out of bin/keel, rather than by parsing its source: a row bin/keel
-# prints some other way is still a row. Only the function is evaluated, in a subshell, so nothing
-# else in bin/keel runs.
-# retired_set_in <bin/keel> <profile> prints the register's keys that the profile sets.
+# Read from the register rather than from a list written here, so retiring a seventh key extends
+# this check for free and a list nobody updates cannot quietly stop covering one. Read by sourcing
+# lib/retired-keys.sh, in a subshell, and running retired_keys: the file defines that function and
+# runs nothing, so no part of keel runs here.
+# retired_set_in <register> <profile> prints the register's keys that the profile sets, and fails
+# when the register cannot be read or prints no rows: an empty register would find no retired key
+# in any profile, which is a pass that checked nothing.
 retired_set_in() {
     local keys
-    keys="$(eval "$(sed -n '/^retired_keys() {/,/^}/p' "$1")"
-            type retired_keys >/dev/null 2>&1 && retired_keys | cut -d'|' -f1)"
+    # shellcheck source=lib/retired-keys.sh
+    keys="$( . "$1" && retired_keys | cut -d'|' -f1 )"
+    [ -n "$keys" ] || return 1
     KEYS="$keys" python3 - "$2" <<'PYR'
 import json, os, sys
 keys = os.environ["KEYS"].split()
@@ -939,36 +941,69 @@ def has(p):
 print(" ".join(k for k in keys if has(k)))
 PYR
 }
-retired_in_own="$(retired_set_in bin/keel .keel/profile.json)"
-if [ -z "$retired_in_own" ]; then
+if ! retired_in_own="$(retired_set_in lib/retired-keys.sh .keel/profile.json)"; then
+    bad "dogfood profile" "lib/retired-keys.sh could not be read or printed no rows, so no retired key was looked for"
+elif [ -z "$retired_in_own" ]; then
     ok "this repository's own profile sets no retired key"
 else
     bad "dogfood profile" "it still sets: $retired_in_own"
 fi
 
-# The same check on a copy of that profile that sets harnesses, the row bin/keel writes as a printf
-# so it can carry a comment. A check that only passes is indistinguishable from one that cannot see.
 retired_tmp="$(mktemp -d)"
-python3 -c "import json,sys;d=json.load(open(sys.argv[1]));d['harnesses']=[];json.dump(d,open(sys.argv[2],'w'))" \
-    .keel/profile.json "$retired_tmp/profile.json"
-case " $(retired_set_in bin/keel "$retired_tmp/profile.json") " in
-  *" harnesses "*) ok "a copy of this repository's profile that sets harnesses is caught naming it" ;;
-  *) bad "dogfood profile" "a copy setting harnesses was not caught" ;;
+trap 'rm -rf "$retired_tmp"' EXIT
+
+# The same check on a copy of that profile that sets the first key the register prints, dotted ones
+# as nested objects. A check that only passes is indistinguishable from one that cannot see.
+retired_first="$( . lib/retired-keys.sh && retired_keys | awk -F'|' 'NR == 1 {print $1}' )"
+python3 - "$retired_first" .keel/profile.json "$retired_tmp/profile.json" <<'PYS'
+import json, sys
+key, src, dst = sys.argv[1:]
+d = json.load(open(src))
+node = d
+segs = key.split(".")
+for seg in segs[:-1]:
+    node = node.setdefault(seg, {})
+node[segs[-1]] = "set"
+json.dump(d, open(dst, "w"))
+PYS
+case " $(retired_set_in lib/retired-keys.sh "$retired_tmp/profile.json") " in
+  *" ${retired_first:-(no first key)} "*) ok "a copy of this repository's profile that sets $retired_first is caught naming it" ;;
+  *) bad "dogfood profile" "a copy setting the register's first key (${retired_first:-none printed}) was not caught" ;;
 esac
 
 # A row spelled another way is still a row: the register is whatever retired_keys prints.
-cat > "$retired_tmp/keel" <<'KEEL'
+cat > "$retired_tmp/echo-register.sh" <<'KEEL'
 retired_keys() {
     echo "foo.bar|7|gone"
 }
 KEEL
 printf '{"foo": {"bar": 1}}\n' > "$retired_tmp/foo.json"
-if [ "$(retired_set_in "$retired_tmp/keel" "$retired_tmp/foo.json")" = "foo.bar" ]; then
+if [ "$(retired_set_in "$retired_tmp/echo-register.sh" "$retired_tmp/foo.json")" = "foo.bar" ]; then
     ok "a register row printed by echo is read as a row"
 else
     bad "dogfood profile" "an echo row in retired_keys was not read"
 fi
-rm -rf "$retired_tmp"
+
+# A register that reads empty fails rather than finding no retired key, and so does a missing one.
+printf 'retired_keys() {\n    :\n}\n' > "$retired_tmp/empty-register.sh"
+if retired_set_in "$retired_tmp/empty-register.sh" "$retired_tmp/foo.json" >/dev/null 2>&1; then
+    bad "dogfood profile" "a register that prints nothing was read as no retired key"
+else
+    ok "a register that prints nothing fails rather than reading as no retired key"
+fi
+if retired_set_in "$retired_tmp/no-such-register.sh" "$retired_tmp/foo.json" >/dev/null 2>&1; then
+    bad "dogfood profile" "a missing register was read as no retired key"
+else
+    ok "a missing register fails rather than reading as no retired key"
+fi
+
+# CONTRIBUTING.md tells whoever removes a schema key where to register it, and the register is the
+# file both checks source.
+if grep -q "gets a line in .lib/retired-keys.sh." CONTRIBUTING.md; then
+    ok "CONTRIBUTING.md says a removed key gets a line in lib/retired-keys.sh"
+else
+    bad "CONTRIBUTING.md" "it does not say a removed key gets a line in lib/retired-keys.sh"
+fi
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

@@ -343,7 +343,7 @@ Scenario: re-running init after the audit step is already present
   Then the workflow is unchanged: no duplicate step
 ```
 
-**Notes:** `write_ci` (`bin/keel:1188`) already exists and already merges non-destructively;
+**Notes:** `write_ci` (`bin/keel:988`) already exists and already merges non-destructively;
 this session directly tested that it leaves an already-declared `deploy.ci` alone and stays silent
 on an ambiguous CI-marker case. This story extends its step list, not its merge logic.
 

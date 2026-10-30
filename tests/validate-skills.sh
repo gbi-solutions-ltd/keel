@@ -778,21 +778,24 @@ PY
     fi
 fi
 
-# Every key bin/keel's retirement register names is gone from the schema. cmd_doctor reads that
-# register to tell a person their profile still carries a key this keel removed, so a line naming a
-# key the schema still declares tells them to delete a setting that works.
+# Every key the retirement register in lib/retired-keys.sh names is gone from the schema. cmd_doctor
+# reads that register to tell a person their profile still carries a key this keel removed, so a
+# line naming a key the schema still declares tells them to delete a setting that works.
 #
 # WHAT THIS CANNOT SEE, STATED BECAUSE THE REGISTER IS ONLY AS GOOD AS THE HABIT: the other
 # direction, a key removed from the schema and never added to the register. The fingerprint above
 # hashes the field set, so it proves the set moved and can never say which way, and no record of
 # the previous field set exists to diff against. Whoever writes the removal commit is the only
 # reader that can catch it, which is why the register carries that instruction in its own comment.
-if [ -f templates/profile.schema.json ] && [ -f bin/keel ] && command -v python3 >/dev/null 2>&1; then
-    # Read by running retired_keys, lifted out of bin/keel, rather than by parsing its source: a row
-    # bin/keel prints some other way is still a row doctor shows. Only the function is evaluated, in
-    # this subshell, so nothing else in bin/keel runs.
-    registered="$(eval "$(sed -n '/^retired_keys() {/,/^}/p' bin/keel)"
-                  type retired_keys >/dev/null 2>&1 && retired_keys | cut -d'|' -f1)"
+if [ -f templates/profile.schema.json ] && command -v python3 >/dev/null 2>&1; then
+    # Read by sourcing the register in a subshell and running retired_keys, rather than by
+    # parsing its source: a row printed some other way is still a row doctor shows. The file defines
+    # that function and runs nothing. A register that cannot be read, or prints no rows, is reported:
+    # read as empty, it would check nothing and pass.
+    # shellcheck source=lib/retired-keys.sh
+    registered="$( . lib/retired-keys.sh && retired_keys | cut -d'|' -f1 )"
+    [ -n "$registered" ] \
+      || report "lib/retired-keys.sh could not be read or printed no rows, so no retired key was checked against templates/profile.schema.json. The register defines retired_keys, printing one key|version|message row per line."
     still_declared="$(REGISTERED="$registered" python3 - <<'PYR'
 import json, os
 
@@ -809,7 +812,7 @@ print(" ".join(p for p in registered if p in declared))
 PYR
 )"
     [ -z "$still_declared" ] \
-      || report "bin/keel's retirement register names keys templates/profile.schema.json still declares: $still_declared. Doctor tells every project holding one of those to stop setting a key that still works. Either drop the line from retired_keys or remove the key from the schema, and bump SCHEMA_VERSION if it is the second."
+      || report "The retirement register names keys templates/profile.schema.json still declares: $still_declared. Doctor tells every project holding one of those to stop setting a key that still works. Either drop the line from retired_keys in lib/retired-keys.sh or remove the key from the schema, and bump SCHEMA_VERSION in bin/keel if it is the second."
 fi
 
 # Every key templates/keel-profile.example.json sets is declared in templates/profile.schema.json.

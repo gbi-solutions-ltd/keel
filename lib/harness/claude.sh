@@ -9,14 +9,17 @@
 #   harness_write_local_config <root>  write its uncommitted, per-developer configuration
 #   harness_permission_rules           print `deny|<rule>` and `ask|<rule>` lines, one per rule
 #   harness_recommend_plugins          print the plugin ids Claude Code should have, one per line
-#   harness_config_paths               print the paths Claude Code configuration owns, one per line
+#   harness_config_paths               print `committed|<path>` and `local|<path>` lines, one per
+#                                      path Claude Code configuration owns
 #   harness_config_dirs                print the directories those paths live in, one per line
-#   harness_doctor_findings            print `level|message` lines for cmd_doctor, zero or more
+#   harness_doctor_findings <phase>    print `level|message` lines for cmd_doctor's phase, zero or
+#                                      more
 #
-# THE LAST EXISTS BECAUSE OF WHAT cmd_doctor DOES. It calls harness_context_file, for the markers
-# it checks, and harness_doctor_findings, which this file implements over the Claude Code readers
-# settings_report_load, plugin_report and boundary_report, so a reader added here reaches the report
-# without cmd_doctor learning its name. A phase with nothing to report prints nothing.
+# harness_doctor_findings EXISTS BECAUSE OF WHAT cmd_doctor DOES. It calls harness_context_file,
+# for the markers it checks, and harness_doctor_findings, which this file implements over the
+# Claude Code readers settings_report_load, plugin_report and boundary_report, so a reader added
+# here reaches the report without cmd_doctor learning its name. A phase with nothing to report
+# prints nothing.
 #
 # THE BODIES BELOW WERE MOVED, NOT REWRITTEN. Every byte of what `keel init` writes on Claude Code
 # is asserted against the pre-refactor commit by tests/test-keel-4.sh, which builds the baseline

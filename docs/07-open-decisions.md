@@ -667,6 +667,6 @@ any of those reached through `sh -c` or `xargs`. **This is defence in depth and 
 machine that must not talk to the internet needs a sandbox or a firewall, not a rule list.
 
 **It changes what `doctor` says on every project initialised before it.** Missing guardrails are a
-`fail` rather than a warning (`bin/keel:1506-1527`), by design, since these rules are what make the
+`fail` rather than a warning (`lib/harness/claude.sh:556-560`), by design, since these rules are what make the
 bypass default defensible. So an older project reports three missing rules until `keel init` is
 re-run, which merges and leaves existing rules and settings alone.

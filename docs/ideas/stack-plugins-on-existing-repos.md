@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-08-18, from open question 1 of `plsql-stack-detection.md` |
-| Status | **built 2026-08-18**, via `docs/plans/2026-08-18-usable-profile.md`, fully ticked. `plugins.recommended` is written at init, `bin/keel:444`, and read back at `bin/keel:196`. Open question 1 was answered by the requester on 2026-08-18 in favour of reporting, which is what shipped. Status corrected 2026-08-30 |
+| Status | **built 2026-08-18**, via `docs/plans/2026-08-18-usable-profile.md`, fully ticked. `plugins.recommended` is written at init, `bin/keel:444`, and read back at `lib/harness/claude.sh:82`. Open question 1 was answered by the requester on 2026-08-18 in favour of reporting, which is what shipped. Status corrected 2026-08-30 |
 | Recommendation | Build something smaller: write `plugins.recommended` at init so the reporting machinery that already exists starts checking the right list, and have doctor name the install command. Do not silently write into a settings file the project already had |
 | Next | `docs/prd/usable-profile.md` (draft, awaiting approval), written jointly with `profile-key-documentation.md` |
 
@@ -99,7 +99,7 @@ every skill its facts. If effort is scarce, `plsql-stack-detection.md` is worth 
 | `lang_lsp` covers every language keel detects | No detected language is left without a server | Thirteen languages, twelve servers, `typescript` and `javascript` sharing one. Complete | **Yes** |
 | A committed `settings.json` is the norm on a mature repo | The mature path is the common one | `bin/keel:580` says so in its own comment, and the real Oracle repo matches | Partly |
 | A language server measurably improves the experience | The premise of the request | Asserted, not measured. It is a widely held view and cheap to act on | No |
-| Writing `plugins.recommended` is safe | Nothing else consumes that key in a conflicting way | `plugin_report` is the only reader (`bin/keel:153`), and the schema already declares it | **Yes** |
+| Writing `plugins.recommended` is safe | Nothing else consumes that key in a conflicting way | `plugin_report` is the only reader (`lib/harness/claude.sh:140`), and the schema already declares it | **Yes** |
 | Doctor naming a missing plugin leads to it being installed | The reader acts on a warning | Unknown, and it is the whole theory of change for the recommended variant | **No** |
 
 ## What the system says
