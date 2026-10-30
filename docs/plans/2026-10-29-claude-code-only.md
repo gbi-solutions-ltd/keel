@@ -686,7 +686,7 @@ touch, say so and leave it unstaged.
 **Done when:** `tests/test-keel.sh` and `tests/test-keel-4.sh` pass, and
 `tests/validate-citations.sh` and `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 5.1: Build it test first**
+- [x] **Step 5.1: Build it test first** Note: built by the implementer; red reproduced by the spec reviewer against HEAD (303 passed, 6 failed)
 
 Follow `keel:tdd` for each behaviour: write its test from the example, run it, and watch it fail
 for the reason the behaviour names, then write the minimal implementation and watch it pass.
@@ -698,7 +698,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 A red in either validator is this task's. This is the one boundary run the task schedules.
 
-- [ ] **Step 5.2: Hand over**
+- [x] **Step 5.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES; the plan's 'git add AGENTS.md' fails after git rm, the deletion was staged with git rm; doctor's link scan of AGENTS.md moved to task 5b
 
 ```bash
 git add bin/keel AGENTS.md tests/test-keel.sh tests/test-keel-4.sh
@@ -710,6 +710,65 @@ Stage those paths, and each file whose broken citation this task repaired, by na
 `git commit -s -m "feat(init): write CLAUDE.md only, and leave AGENTS.md to other harnesses"`.
 Paste the `git status --porcelain` output into your report; if it lists anything this task did not
 touch, say so and leave it unstaged.
+
+### Task 5b: `keel doctor` reads no `AGENTS.md` at all
+
+Added by the coordinator on 2026-10-30 from task 5's review. Bernard decided on 2026-10-29 that
+`keel doctor` stops checking `AGENTS.md`; task 5 removed the marker check but kept `AGENTS.md` in
+the referenced-docs scan, so a link in it to an uncommitted document still gets a doctor line.
+
+**Story:** G1, ADR-0013
+**Files:**
+- Modify: `bin/keel`
+- Test: `tests/test-keel.sh`, `tests/test-keel-2.sh`
+- Plus each file whose citation into `bin/keel` this task's edits break
+
+**Interfaces:**
+- Consumes: task 5's `bin/keel`
+- Produces: nothing new
+
+**Depends on:** task 5
+
+**Behaviours:**
+
+1. Doctor's referenced-docs scan reads `CLAUDE.md`, `README.md` and the docs folder as before, and not
+   `AGENTS.md`. Example: a repository whose `AGENTS.md` links `docs/missing.md` (an uncommitted file)
+   gets no doctor line naming `AGENTS.md`; the same link in `CLAUDE.md` still gets its line.
+2. `keel new` writes no `AGENTS.md`. Example: after `keel new` in an empty directory, `AGENTS.md` does
+   not exist and `CLAUDE.md` carries the `<!-- keel:start` block.
+3. The comment in `tests/test-keel-2.sh` that calls `AGENTS.md` one of "the two keel writes into
+   itself" says what is true now. Example: it names `CLAUDE.md` as the one file keel writes the block
+   into.
+
+**Done when:** `tests/test-keel.sh` and `tests/test-keel-2.sh` pass, and `tests/validate-citations.sh`
+and `tests/validate-skills.sh` report OK.
+
+- [ ] **Step 5b.1: Build it test first**
+
+Follow `keel:tdd` for each behaviour: write its test from the example, run it, and watch it fail
+for the reason the behaviour names, then write the minimal implementation and watch it pass.
+Run: `tests/test-keel.sh`
+Expected before the implementation: FAIL, the case for behaviour 1 fails because doctor prints a
+line beginning `AGENTS.md links`. Behaviour 2's case passes on arrival, since task 5 already
+removed the writer; say so in the report and prove it able to fail by putting the writer back.
+Expected after: PASS. Quote the failing output in your report.
+
+Run: `tests/run-tests.sh`.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+A red in either validator is this task's. This is the one boundary run the task schedules.
+
+- [ ] **Step 5b.2: Hand over**
+
+```bash
+git add bin/keel tests/test-keel.sh tests/test-keel-2.sh
+git status --porcelain
+```
+
+Stage those paths, and each file whose broken citation this task repaired, by name, and stop.
+**Do not commit.** The coordinator commits after both review passes, with
+`git commit -s -m "fix(doctor): read no AGENTS.md at all"`. Paste the `git status --porcelain`
+output into your report; if it lists anything this task did not touch, say so and leave it
+unstaged.
 
 ### Task 6: the ledger, its generator and its claims hold Claude Code rows only
 
@@ -726,6 +785,7 @@ touch, say so and leave it unstaged.
 - Modify: `docs/05-token-and-memory-design.md`, `docs/07-open-decisions.md` (their
   `harness=codex` claim markers only)
 - Modify: `docs/06-repo-layout.md` (the link to `.codex-plugin/` only)
+- Modify: `lib/harness/claude.sh` (the comment near `harness_context_file` only)
 - Test: `tests/test-harness-resolve.sh`, `tests/test-harness-claims.sh`, `tests/test-supply-chain.sh`
 - Plus each file whose citation into a deleted or changed file breaks. The review found these for
   `lib/harness/codex.sh`: `tests/validate-skills.sh:348`, `tests/test-validate-skills.sh:178`,
@@ -739,7 +799,7 @@ touch, say so and leave it unstaged.
   a harness
 - Produces: a ledger with `provides|claude|...` and `requires|...` rows only
 
-**Depends on:** tasks 2, 2b, 2c, 3, 4, 4b and 4c
+**Depends on:** tasks 2, 2b, 2c, 3, 4, 4b, 4c and 5b
 
 **Behaviours:**
 
@@ -771,6 +831,9 @@ touch, say so and leave it unstaged.
    `tests/test-supply-chain.sh` passes.
 9. Every citation into a deleted file reads as the backticked path without a line, followed by
    "(deleted after v0.26.0)". Example: `tests/validate-citations.sh` reports OK.
+10. `lib/harness/claude.sh`'s comment near `harness_context_file` no longer says keel writes
+    `AGENTS.md` for every repository. Example: `grep -n AGENTS.md lib/harness/claude.sh` prints no
+    line claiming keel writes it. (Added by the coordinator on 2026-10-30 from task 5's report.)
 
 **Done when:** `tests/test-harness-resolve.sh`, `tests/test-harness-claims.sh` and
 `tests/test-supply-chain.sh` pass, and `tests/validate-citations.sh` and `tests/validate-skills.sh`
@@ -796,7 +859,8 @@ git add lib/harness/capabilities tests/generate-harness-artifacts.sh docs/harnes
         hooks/hooks.codex.json .codex-plugin/plugin.json lib/harness/codex.sh \
         tests/fixtures/transcripts/codex.jsonl tests/supply-chain-scan.sh \
         docs/05-token-and-memory-design.md docs/07-open-decisions.md docs/06-repo-layout.md \
-        tests/test-harness-resolve.sh tests/test-harness-claims.sh tests/test-supply-chain.sh
+        lib/harness/claude.sh tests/test-harness-resolve.sh tests/test-harness-claims.sh \
+        tests/test-supply-chain.sh
 git status --porcelain
 ```
 
@@ -914,6 +978,7 @@ touch, say so and leave it unstaged.
 - Modify: `skills/write-plan/references/plan-review.md`
 - Modify: `skills/write-plan/references/plan-template.md`
 - Modify: `skills/keel/references/asking-questions.md`
+- Modify: `skills/context-budget/SKILL.md` (its `AGENTS.md` line only)
 - Modify: `agents/keel-reviewer.md`
 - Modify: `tests/validate-skills.sh`
 - Test: `tests/test-validate-skills.sh`
@@ -944,7 +1009,9 @@ touch, say so and leave it unstaged.
    gets a reason that does not rest on Codex. Example: its comment says a dispatch names its model or
    a delegation profile because `docs/ideas/model-routing.md` measured which model the reading should
    run on, and the comment no longer cites `lib/harness/codex.sh`.
-5. The skills still validate under their budgets. Example: `tests/validate-skills.sh` reports
+5. `skills/context-budget/SKILL.md` no longer says keel writes `AGENTS.md`. Example: its line 23
+   area names `CLAUDE.md` as the file the keel block lives in. (From task 5's report.)
+6. The skills still validate under their budgets. Example: `tests/validate-skills.sh` reports
    "25 skills validated" and no FAIL, and every changed `SKILL.md` stays under the 700 word ceiling.
 
 **Done when:** `tests/test-validate-skills.sh` passes, and `tests/validate-skills.sh` and
@@ -969,7 +1036,8 @@ A red in either validator is this task's. This is the one boundary run the task 
 git add skills/create-skill/SKILL.md skills/security-audit/SKILL.md \
         skills/review-code/references/rubric-pass.md skills/execute-plan/references/subagent-prompts.md \
         skills/write-plan/references/plan-review.md skills/write-plan/references/plan-template.md \
-        skills/keel/references/asking-questions.md agents/keel-reviewer.md tests/validate-skills.sh \
+        skills/keel/references/asking-questions.md skills/context-budget/SKILL.md \
+        agents/keel-reviewer.md tests/validate-skills.sh \
         tests/test-validate-skills.sh
 git status --porcelain
 ```
@@ -1104,6 +1172,11 @@ into your report; if it lists anything this task did not touch, say so and leave
     `profile_set` at `main`, points at `profile_set` again. A citation already wrong at `main` is
     left alone and listed in the report. (From task 4's quality review: `tests/validate-citations.sh`
     checks only that a cited line exists and is not blank.)
+14. No current document or template says keel writes `AGENTS.md`: `README.md` (around line 22),
+    `docs/02-skill-catalog.md` (around 565), `docs/03-install-and-distribution.md` (around 1140 and
+    1148), `docs/snapshot.md` (around 38), `docs/06-repo-layout.md`'s "Five files" sentence,
+    `templates/project-claude-md-block.md` (line 3) and the comment in `lib/merge-claude-md.sh`
+    (line 2). (From task 5's report.)
 13. `docs/06-repo-layout.md`'s `lib/` tree names `lib/retired-keys.sh` (task 4c), and
     `docs/ideas/stack-plugins-on-existing-repos.md`'s "written at init, `bin/keel:444`" points at
     the `plugins.recommended` write. (From task 4c's quality review.)
@@ -1133,7 +1206,8 @@ git add README.md CHANGELOG.md docs/01-architecture.md docs/02-skill-catalog.md 
         docs/05-token-and-memory-design.md docs/06-repo-layout.md docs/07-open-decisions.md \
         docs/snapshot.md docs/standards.md docs/runbooks/cutting-a-release.md \
         docs/ideas/keel-on-codex.md docs/stories/tiered-multi-harness-support.md \
-        docs/ideas/claude-code-features-assessed-2026-10-29.md docs/architecture/claude-code-only.md
+        docs/ideas/claude-code-features-assessed-2026-10-29.md docs/architecture/claude-code-only.md \
+        templates/project-claude-md-block.md lib/merge-claude-md.sh
 git status --porcelain
 ```
 
