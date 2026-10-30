@@ -161,7 +161,7 @@ touch, say so and leave it unstaged.
 **Done when:** `tests/test-sensitive-guard.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 2.1: Build it test first**
+- [x] **Step 2.1: Build it test first** Note: built by the implementer; red quoted (25 passed, 2 failed) and reproduced by the spec reviewer against HEAD's hook
 
 Follow `keel:tdd` for each behaviour that applies under task 1's verdict: write its test from the
 example, run it, and watch it fail for the reason the behaviour names, then write the minimal
@@ -176,7 +176,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 A red in either validator is this task's. This is the one boundary run the task schedules.
 
-- [ ] **Step 2.2: Hand over**
+- [x] **Step 2.2: Hand over** Note: rounds: 1; routing: inherit; loop: full; spec COMPLIES after a retry (first reviewer lost to a network error); quality: no blocking, four should-fix carried into task 2b and task 10
 
 ```bash
 git add hooks/sensitive-guard tests/test-sensitive-guard.sh
@@ -186,6 +186,74 @@ git status --porcelain
 Stage those paths, and any file whose broken citation this task repaired, by name, and stop.
 **Do not commit.** The coordinator commits after both review passes, with
 `git commit -s -m "fix(sensitive-guard): drop the Codex branch the probe allows"`. Paste the
+`git status --porcelain` output into your report; if it lists anything this task did not touch, say
+so and leave it unstaged.
+
+### Task 2b: `sensitive-guard` detects Codex by a signal its hook actually receives
+
+Added by the coordinator on 2026-10-30 from task 2's quality review, which found the refusal keys on
+`CODEX_VERSION` while ADR-0004 records that variable as set for shell commands Codex's exec tool
+runs, and names the `turn_id` field of a hook's stdin payload as the hook-side signal. If the hook
+process does not inherit the variable, the refusal never fires on Codex and the sensitive commit
+goes through with its `ask` discarded.
+
+**Story:** G1, ADR-0013
+**Files:**
+- Modify: `hooks/sensitive-guard`
+- Modify: `docs/architecture/claude-code-only.md` (the probe record in section 7 only)
+- Test: `tests/test-sensitive-guard.sh`
+
+**Interfaces:**
+- Consumes: task 2's refusal block
+- Produces: a probe line in section 7 reading exactly `Codex hook environment has CODEX_VERSION:
+  yes` or `... : no`, and `Codex hook payload has turn_id: yes` or `... : no`
+
+**Depends on:** task 2
+
+**Behaviours:**
+
+1. The signal is measured, not assumed. Example: a probe under a throwaway `CODEX_HOME`, as task 1
+   ran it (the commands are in section 7), adds a `PreToolUse` hook with matcher `Bash` that writes
+   its environment and its stdin to files, runs one `codex exec` of a harmless shell command, and
+   records both lines; `~/.codex/config.toml` is byte-identical afterwards.
+2. The refusal fires on whichever signal the probe found. Examples: if the payload has `turn_id`,
+   an event containing `"turn_id":"t1"` with no `CODEX_VERSION`, a profile listing `src/auth` and
+   `git commit -m x` exits 2 with stderr naming keel v0.26.0; if the environment has `CODEX_VERSION`,
+   the existing case keeps passing; a Claude Code event with neither still gets `ask` and exit 0.
+   The match is a builtin `case` on the raw event, in the style of the commit filter.
+3. The refusal names keel's release once, unambiguously. Example: its stderr reads that keel v0.26.0
+   is the last keel release that supports Codex and gives the install line from section 7's probe
+   record; it does not say "stay on v0.26.0" next to the word Codex alone.
+4. The dead CDPATH guard goes. Example: line 34's `unset CDPATH` and its comment are removed, since
+   no `cd` remains in the hook, and the CDPATH case in `tests/test-sensitive-guard.sh` is either
+   removed or kept as a plain "run by a relative path" case whose comment names no resolver.
+
+**Done when:** `tests/test-sensitive-guard.sh` passes, and `tests/validate-citations.sh` and
+`tests/validate-skills.sh` report OK.
+
+- [ ] **Step 2b.1: Build it test first**
+
+Run the probe for behaviour 1 first and record it; then follow `keel:tdd` for behaviours 2 to 4:
+write each test from its example, watch it fail for the reason it names, then implement.
+Run: `tests/test-sensitive-guard.sh`
+Expected before the implementation: FAIL, the case for behaviour 3 fails because the message says
+"stay on v0.26.0", and, if the probe found `turn_id` only, the case for behaviour 2 fails because
+the hook asks instead of exiting 2. Expected after: PASS. Quote the failing output in your report.
+
+Run: `tests/run-tests.sh`.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+A red in either validator is this task's. This is the one boundary run the task schedules.
+
+- [ ] **Step 2b.2: Hand over**
+
+```bash
+git add hooks/sensitive-guard tests/test-sensitive-guard.sh docs/architecture/claude-code-only.md
+git status --porcelain
+```
+
+Stage those paths, and each file whose broken citation this task repaired, by name, and stop.
+**Do not commit.** The coordinator commits after both review passes, with
+`git commit -s -m "fix(sensitive-guard): detect Codex by the signal its hooks receive"`. Paste the
 `git status --porcelain` output into your report; if it lists anything this task did not touch, say
 so and leave it unstaged.
 
@@ -447,7 +515,7 @@ touch, say so and leave it unstaged.
   a harness
 - Produces: a ledger with `provides|claude|...` and `requires|...` rows only
 
-**Depends on:** tasks 2, 3 and 4
+**Depends on:** tasks 2, 2b, 3 and 4
 
 **Behaviours:**
 
@@ -789,8 +857,9 @@ into your report; if it lists anything this task did not touch, say so and leave
 7. The README claims still check. Example: `tests/test-doc-claims.sh` passes.
 8. The design's failure table matches task 1's probe. Example: the row for a Codex user installing
    from `main` no longer says "nothing loads"; it says Codex loads the Claude Code hook set from
-   `hooks/hooks.json` and that `sensitive-guard` refuses a sensitive commit there, as task 2 left it.
-   (Added by the coordinator on 2026-10-30 from task 1's report.)
+   `hooks/hooks.json` and that `sensitive-guard` refuses a sensitive commit there, as tasks 2 and 2b
+   left it. Section 4's `hooks/*` row and section 8's first bullet no longer say the Codex block is
+   removed. (Added by the coordinator on 2026-10-30 from the reports of tasks 1 and 2.)
 
 **Done when:** `tests/test-doc-claims.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
