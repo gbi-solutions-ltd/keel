@@ -106,10 +106,15 @@ else
 fi
 rm -rf "$r"
 
-# The hook runs no cd, so a CDPATH guard in it guards nothing and suggests a cd that is not there.
-n="$(grep -c CDPATH "$GUARD")"
-if [ "$n" = 0 ]; then printf '  PASS  the hook carries no CDPATH guard, since it runs no cd\n'; pass=$((pass+1))
-else printf '  FAIL  the hook carries no CDPATH guard, since it runs no cd (CDPATH named %s times)\n' "$n"; fail=$((fail+1)); fi
+# A cd in a hook needs a CDPATH guard: with CDPATH set, a relative cd can land elsewhere and print
+# the directory to stdout, which corrupts the hook's JSON. Comments are stripped first, so only a cd
+# the hook runs counts, and the case fails only on a cd with no guard beside it.
+code="$(grep -v '^[[:space:]]*#' "$GUARD")"
+cds="$(printf '%s\n' "$code" | grep -cE '(^|[[:space:];&|(])cd([[:space:]]|$)')"
+guards="$(printf '%s\n' "$code" | grep -c CDPATH)"
+if [ "$cds" -eq 0 ] || [ "$guards" -gt 0 ]; then
+    printf '  PASS  a cd the hook runs is guarded against CDPATH\n'; pass=$((pass+1))
+else printf '  FAIL  a cd the hook runs is guarded against CDPATH (%s cd, no CDPATH guard)\n' "$cds"; fail=$((fail+1)); fi
 
 # A repository that declares no sensitive paths must be untouched, which is almost every repository.
 r="$(mktemp -d)"; fixture "$r" ''
@@ -266,7 +271,7 @@ r="$(mktemp -d)"; fixture "$r" '"src/auth"'
 : > "$r/src/auth/token.go"; git -C "$r" add -A
 ev="$(event "git commit -m x" "$r")"
 
-out="$(printf '%s' "$ev" | ( cd "$r" && CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1 >/dev/null)"; rc=$?
+out="$(printf '%s' "$ev" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1 >/dev/null)"; rc=$?
 if [ "$rc" -eq 2 ]; then printf '  PASS  exits 2 on CODEX_VERSION with no turn_id\n'; pass=$((pass+1))
 else printf '  FAIL  exits 2 on CODEX_VERSION with no turn_id (got %s)\n' "$rc"; fail=$((fail+1)); fi
 
@@ -295,22 +300,47 @@ case "$out" in
     *) printf '  PASS  the refusal does not say "stay on v0.26.0"\n'; pass=$((pass+1)) ;;
 esac
 
-# Codex's hook payload carries a turn_id key, which Claude Code's does not. The one Codex hook
-# environment observed had no CODEX_VERSION, and turn_id on PreToolUse was not observed, so either
-# signal alone refuses. The payload is written compactly, the way the example in the plan gives it.
+# Codex's schema requires a turn_id key on PreToolUse input, and the one Codex hook environment
+# observed had no CODEX_VERSION, so either signal alone refuses. The payload is written compactly,
+# the way the example in the plan gives it.
 tev="$(CMD="git commit -m x" CWD="$r" python3 -c '
 import json, os
 print(json.dumps({"hook_event_name": "PreToolUse", "tool_name": "Bash", "turn_id": "t1",
                   "tool_input": {"command": os.environ["CMD"]}, "cwd": os.environ["CWD"]},
                  separators=(",", ":")))')"
-out="$(printf '%s' "$tev" | ( cd "$r" && env -u CODEX_VERSION "$GUARD" ) 2>&1 >/dev/null)"; rc=$?
+out="$(printf '%s' "$tev" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>&1 >/dev/null)"; rc=$?
 if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'keel v0\.26\.0'; then
     printf '  PASS  exits 2 naming keel v0.26.0 on a turn_id event with no CODEX_VERSION\n'; pass=$((pass+1))
 else printf '  FAIL  exits 2 naming keel v0.26.0 on a turn_id event with no CODEX_VERSION (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
 
+# Claude Code exports CLAUDE_PROJECT_DIR to hook processes and Codex has no such variable, so with
+# it set neither signal refuses. Claude Code's MessageDisplay input already carries turn_id, and a
+# PreToolUse input that gained it must still get the ask rather than a hard block.
+out="$(printf '%s' "$tev" | ( cd "$r" && env -u CODEX_VERSION CLAUDE_PROJECT_DIR=/repo "$GUARD" ) 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q '"permissionDecision": *"ask"'; then
+    printf '  PASS  with CLAUDE_PROJECT_DIR set, a turn_id event gets the ask and exit 0\n'; pass=$((pass+1))
+else printf '  FAIL  with CLAUDE_PROJECT_DIR set, a turn_id event gets the ask and exit 0 (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
+
+out="$(printf '%s' "$ev" | ( cd "$r" && CLAUDE_PROJECT_DIR=/repo CODEX_VERSION=0.153.4 "$GUARD" ) 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q '"permissionDecision": *"ask"'; then
+    printf '  PASS  with CLAUDE_PROJECT_DIR set, CODEX_VERSION gets the ask and exit 0\n'; pass=$((pass+1))
+else printf '  FAIL  with CLAUDE_PROJECT_DIR set, CODEX_VERSION gets the ask and exit 0 (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
+
+# The match is on the key, with its colon. A field whose value is exactly turn_id appears in the raw
+# event as "description":"turn_id", unescaped, so a pattern without the colon reads it as the key.
+dev="$(CWD="$r" python3 -c '
+import json, os
+print(json.dumps({"hook_event_name": "PreToolUse", "tool_name": "Bash",
+                  "tool_input": {"command": "git commit -m x", "description": "turn_id"},
+                  "cwd": os.environ["CWD"]}, separators=(",", ":")))')"
+out="$(printf '%s' "$dev" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q '"permissionDecision": *"ask"'; then
+    printf '  PASS  a value of exactly turn_id is not read as the turn_id key\n'; pass=$((pass+1))
+else printf '  FAIL  a value of exactly turn_id is not read as the turn_id key (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
+
 # The match is on the JSON key. A Claude Code commit whose message says turn_id reaches the hook as
 # \"turn_id\", escaped, so it still gets the ask.
-out="$(event 'git commit -m "turn_id"' "$r" | ( cd "$r" && env -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"; rc=$?
+out="$(event 'git commit -m "turn_id"' "$r" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"; rc=$?
 if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q '"permissionDecision": *"ask"'; then
     printf '  PASS  a commit message naming turn_id is not read as Codex\n'; pass=$((pass+1))
 else printf '  FAIL  a commit message naming turn_id is not read as Codex (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
@@ -319,7 +349,7 @@ else printf '  FAIL  a commit message naming turn_id is not read as Codex (rc %s
 # list is empty declares nothing and must produce nothing, on every harness. Above the empty-list
 # check the refusal would block every commit in a repository that asked for nothing.
 q="$(mktemp -d)"; fixture "$q" ''
-out="$(printf '%s' "$(event "git commit -m x" "$q")" | ( cd "$q" && CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1)"; rc=$?
+out="$(printf '%s' "$(event "git commit -m x" "$q")" | ( cd "$q" && env -u CLAUDE_PROJECT_DIR CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1)"; rc=$?
 if [ "$rc" -eq 0 ] && [ -z "$out" ]; then printf '  PASS  silent on codex when the repo declares nothing\n'; pass=$((pass+1))
 else printf '  FAIL  silent on codex when the repo declares nothing (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
 rm -rf "$q"
@@ -328,18 +358,18 @@ rm -rf "$q"
 # fail-closed python3 branch must not become a prompt on every Read and Grep, and the same argument
 # applies to a hard block: a Codex session running a command that is not a commit, in a repository
 # that DOES declare paths, must be untouched.
-out="$(printf '%s' "$(event "git status" "$r")" | ( cd "$r" && CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1)"; rc=$?
+out="$(printf '%s' "$(event "git status" "$r")" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1)"; rc=$?
 if [ "$rc" -eq 0 ] && [ -z "$out" ]; then printf '  PASS  a non-commit command on codex is untouched\n'; pass=$((pass+1))
 else printf '  FAIL  a non-commit command on codex is untouched (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
 
-out="$(printf '%s' "$(event "ls" "$r")" | ( cd "$r" && CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1)"; rc=$?
+out="$(printf '%s' "$(event "ls" "$r")" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1)"; rc=$?
 if [ "$rc" -eq 0 ] && [ -z "$out" ]; then printf '  PASS  ls on codex in a repo declaring paths is untouched\n'; pass=$((pass+1))
 else printf '  FAIL  ls on codex in a repo declaring paths is untouched (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
 
 # R-01: no Claude Code behaviour changes. The same repository, the same command, without the Codex
 # signal, still reaches the decision it always did. Every case above this block asserts that too,
 # but none of them asserts it beside the refusal, which is where a misplaced one shows.
-out="$(event "git commit -m x" "$r" | ( cd "$r" && env -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"; rc=$?
+out="$(event "git commit -m x" "$r" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"; rc=$?
 if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q '"permissionDecision": *"ask"'; then
     printf '  PASS  a Claude Code event with neither signal still gets the ask and exit 0\n'; pass=$((pass+1))
 else printf '  FAIL  a Claude Code event with neither signal still gets the ask and exit 0 (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi

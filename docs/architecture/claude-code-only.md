@@ -247,8 +247,10 @@ The evidence for the first line is the `SessionStart` hook: it ran with no `CODE
 environment, and its payload's keys were `cwd`, `hook_event_name`, `model`, `permission_mode`,
 `session_id`, `source` and `transcript_path`. For the second, `PreToolUse` never fired: the
 `codex exec` failed authentication (`refresh_token_reused`) before the model asked for a tool, so
-`turn_id` was not observed. Bernard chose on 2026-10-30 to detect both signals rather than probe
-again, so `hooks/sensitive-guard` refuses on either. `shasum ~/.codex/config.toml` gave
+`turn_id` was not observed. The observed `SessionStart` keys are consistent with a schema that
+requires `turn_id` on `PreToolUse` and not on `SessionStart`
+(`codex-rs/hooks/src/schema.rs:275-295`). Bernard chose on 2026-10-30 to detect both signals rather
+than probe again, so `hooks/sensitive-guard` refuses on either. `shasum ~/.codex/config.toml` gave
 `54458c6846a1` before and after, and the throwaway directory was deleted.
 
 ## 8. Security architecture

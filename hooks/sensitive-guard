@@ -100,17 +100,23 @@ if [[ "$profile_text" =~ $empty_paths ]]; then exit 0; fi
 # sets should_block and surfaces stderr as the block reason. So exit 1 here would be quieter than
 # doing nothing, and exit 2 both stops the command and says why.
 #
-# EITHER SIGNAL MEANS CODEX. A Codex hook's payload carries a `turn_id` key and Codex sets
-# CODEX_VERSION for the commands its shell tool runs; Claude Code does neither. Codex's SessionStart
-# hook ran without CODEX_VERSION, and turn_id on PreToolUse was never observed, as recorded at
-# `docs/architecture/claude-code-only.md#Codex hook payload has turn_id: not measured`, so neither
-# alone is trusted to catch it. The key is matched with its quotes, in the style of the commit
-# filter: a commit message naming turn_id arrives JSON-escaped, as \"turn_id\", and does not match.
+# EITHER SIGNAL MEANS CODEX, AND ONLY OUTSIDE CLAUDE CODE. Codex's PreToolUse input requires a
+# `turn_id` key (codex-rs/hooks/src/schema.rs:275-295) and its SessionStart input has none, and
+# Codex sets CODEX_VERSION for the commands its shell tool runs, though its SessionStart hook ran
+# without it: `docs/architecture/claude-code-only.md#Codex hook environment has CODEX_VERSION: no`.
+# Claude Code 2.1.314's PreToolUse input had no turn_id, but its MessageDisplay input does, so a
+# later release could add it to PreToolUse. Claude Code exports CLAUDE_PROJECT_DIR to hook processes
+# and Codex has no such variable, so with it set neither signal can turn the ask into a block. The
+# key is matched with its quotes and colon: a commit message naming turn_id arrives JSON-escaped, as
+# \"turn_id\", and a field whose value is turn_id reads "turn_id" with no colon after it, so neither
+# matches.
 codex=""
-[ -n "${CODEX_VERSION:-}" ] && codex=1
-case "$event" in
-    *'"turn_id"'*) codex=1 ;;
-esac
+if [ -z "${CLAUDE_PROJECT_DIR:-}" ]; then
+    [ -n "${CODEX_VERSION:-}" ] && codex=1
+    case "$event" in
+        *'"turn_id":'*) codex=1 ;;
+    esac
+fi
 if [ -n "$codex" ]; then
     printf 'keel sensitive-guard: Codex discards the ask decision this gate depends on, so it cannot put this commit to a human. keel v0.26.0 is the last keel release that supports Codex; install it with: codex plugin marketplace add gbi-solutions-ltd/keel --ref v0.26.0 && codex plugin add keel@gbi. Blocking rather than pretending.\n' >&2
     exit 2
