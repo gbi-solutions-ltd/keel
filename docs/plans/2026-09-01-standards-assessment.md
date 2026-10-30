@@ -1242,7 +1242,7 @@ the four assessment checks has something definite and derivable to find.
 Two counts elsewhere become wrong when this fixture lands, and this task fixes them rather than
 leaving them. `tests/evals/fixtures/README.md:11-12` reads "Two fixtures have one,
 `commit-outside-a-worktree` and `ship-with-flaky-tests`"; make it three and name this one.
-`tests/evals/stage.sh:46` reads "One scenario needs it"; make it three, since this fixture's
+`tests/evals/stage.sh:117-118` reads "One scenario needs it"; make it three, since this fixture's
 scenario lands in the same task.
 
 Then add a case to `tests/test-eval-harness.sh`, after case 16 and before case 18, using the

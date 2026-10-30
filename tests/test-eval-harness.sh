@@ -990,38 +990,24 @@ else
         "tmp=$([ -d "$d/tmp" ] && echo yes || echo no) recipe=$(grep -F 'claude -p' "$errf" | head -1)"
 fi
 
-# 41b. The Codex recipe carries the same per-arm TMPDIR. --harness changes only the recipe, and a
-# recipe that dropped the TMPDIR for one harness would be a difference in treatment between the two
-# arms of a comparison, which is the fault stage.sh's --harness comment says it exists to avoid.
-errf="$(mktemp "${TMPDIR:-/tmp}/keel-stage-err-XXXXXX")"; selftest_paths+=("$errf")
-d="$(tests/evals/stage.sh --harness codex review-a-sensitive-change 2>"$errf")"; staged+=("$d")
-if [ -n "$d" ] && grep -qF "cd $d/project && TMPDIR=$d/tmp codex exec" "$errf" && [ -d "$d/tmp" ]; then
-    ok "the Codex recipe names TMPDIR=<staged dir>/tmp, and that directory exists"
-else
-    bad "the Codex recipe names TMPDIR=<staged dir>/tmp, and that directory exists" \
-        "tmp=$([ -d "$d/tmp" ] && echo yes || echo no) recipe=$(grep -F 'codex exec' "$errf" | head -1)"
-fi
-
-# 41c. Both recipes close the arm's stdin and say this dispatch runs no isolation check. A dispatch
+# 41c. The recipe closes the arm's stdin and say this dispatch runs no isolation check. A dispatch
 # that is pasted from here has none of the dispatch.sh a gate gets, so the guide says to run the
 # check by hand first, from a disposable workspace (L-01 of docs/audits/2026-10-18-security.md). The
 # README's single-arm recipe is the same dispatch and closes stdin the same way.
 s4_bad=""
-for h in claude codex; do
-    errf="$(mktemp "${TMPDIR:-/tmp}/keel-stage-err-XXXXXX")"; selftest_paths+=("$errf")
-    d="$(tests/evals/stage.sh --harness "$h" review-a-sensitive-change 2>"$errf")"; staged+=("$d")
-    grep -q '< /dev/null$' "$errf" || s4_bad="$s4_bad $h:no-redirect"
-    grep -qF 'no isolation check' "$errf" || s4_bad="$s4_bad $h:no-sentence"
-    grep -qF 'tests/evals/isolation-check.sh' "$errf" || s4_bad="$s4_bad $h:no-script"
-done
+errf="$(mktemp "${TMPDIR:-/tmp}/keel-stage-err-XXXXXX")"; selftest_paths+=("$errf")
+d="$(tests/evals/stage.sh review-a-sensitive-change 2>"$errf")"; staged+=("$d")
+grep -q '< /dev/null$' "$errf" || s4_bad="$s4_bad no-redirect"
+grep -qF 'no isolation check' "$errf" || s4_bad="$s4_bad no-sentence"
+grep -qF 'tests/evals/isolation-check.sh' "$errf" || s4_bad="$s4_bad no-script"
 # The single quotes are the point: the README holds the literal text `$dir`.
 # shellcheck disable=SC2016
 grep -qF -- '--output-format json > "$dir/result.json" < /dev/null' tests/evals/README.md \
     || s4_bad="$s4_bad readme:no-redirect"
 if [ -z "$s4_bad" ]; then
-    ok "both printed recipes and the README's single-arm recipe close stdin, and the guide says to run the check by hand"
+    ok "the printed recipe and the README's single-arm recipe close stdin, and the guide says to run the check by hand"
 else
-    bad "both printed recipes and the README's single-arm recipe close stdin, and the guide says to run the check by hand" "$s4_bad"
+    bad "the printed recipe and the README's single-arm recipe close stdin, and the guide says to run the check by hand" "$s4_bad"
 fi
 
 # 42 to 52. tests/evals/isolation-check.sh reports what an arm searching the machine could find.
@@ -1217,8 +1203,7 @@ fi
 #
 # It existed in no file until 2026-09-06. README said six, results.md said "The gate stays at seven
 # scenarios", and recorded the disagreement as live and unresolved next to a gate entry that ran
-# six. A second supported harness doubles the matrix, and doubling an undefined set gives two
-# undefined sets, so it is settled before the Codex arms are added rather than after.
+# six.
 GATE="$REPO/tests/evals/gate-scenarios"
 # if/then rather than the `A && ok || bad` idiom the other suites use: this file carries no
 # file-wide SC2015 disable and its existing cases are all written this way.
@@ -2130,29 +2115,12 @@ fi
 
 # ---- the dispatch recipe names the harness under test -------------------------------------------
 #
-# S-18 is a `verify` story, not `build`. tests/evals/run.sh is already harness-neutral: it pastes
-# each injected SKILL.md into the prompt as plain text rather than relying on a plugin install, and
-# stage.sh dispatches nothing. The only harness-specific thing in the harness is the guidance a
-# human copies, so that guidance is the only thing that changes.
+# tests/evals/run.sh pastes each injected SKILL.md into the prompt as plain text rather than relying
+# on a plugin install, and stage.sh dispatches nothing. The only harness-specific thing in the eval
+# tooling is the guidance a human copies, so that guidance is what these cases check.
 # The guidance is on stderr and the staged directory on stdout, kept for the cleanup trap: thrown
 # away to /dev/null, every run left the directory behind.
 errf="$(mktemp "${TMPDIR:-/tmp}/keel-stage-err-XXXXXX")"; selftest_paths+=("$errf")
-d="$("$REPO/tests/evals/stage.sh" --harness codex tdd-under-deadline 2>"$errf")"; staged+=("$d")
-out="$(cat "$errf")"
-if printf '%s' "$out" | grep -q 'codex exec'; then
-    ok "codex guidance names codex exec"
-else
-    bad "codex guidance names codex exec" "$out"
-fi
-# Required, not optional: the staged fixture is not a git repository and Codex refuses to run
-# outside one. The Claude recipe needs no equivalent, which is why this is asserted rather than
-# left to whoever copies the line.
-if printf '%s' "$out" | grep -q -- '--skip-git-repo-check'; then
-    ok "codex guidance carries --skip-git-repo-check"
-else
-    bad "codex guidance carries --skip-git-repo-check" "the staged fixture is not a git repo and Codex refuses to run outside one"
-fi
-
 d="$("$REPO/tests/evals/stage.sh" tdd-under-deadline 2>"$errf")"; staged+=("$d")
 out="$(cat "$errf")"
 if printf '%s' "$out" | grep -q 'claude -p'; then
@@ -2161,21 +2129,51 @@ else
     bad "the default guidance is unchanged" "$out"
 fi
 
-# A typo in --harness must REFUSE, not fall back. Falling back prints the Claude recipe for what the
-# operator believes is a Codex arm, which is a difference in treatment between two arms of the same
-# comparison recorded as nothing: the exact fault this harness exists to prevent. It must also
-# refuse before staging, or every typo leaks a directory into TMPDIR.
-out="$("$REPO/tests/evals/stage.sh" --harness gemini tdd-under-deadline 2>&1)"; rc=$?
-if [ "$rc" -ne 0 ] && ! printf '%s' "$out" | grep -q 'claude -p'; then
-    ok "an unknown harness is refused rather than defaulted"
+# stage.sh stages Claude Code only, so --harness is an unknown flag whatever it names. It must
+# refuse before staging, or every such run leaks a directory into TMPDIR, so stdout must be empty.
+# The second harness's name is split in two so this file does not name it, which the case below
+# checks.
+h_bad=""
+for h in claude 'c''odex'; do
+    out="$("$REPO/tests/evals/stage.sh" --harness "$h" tdd-under-deadline 2>"$errf")"; rc=$?
+    [ -n "$out" ] && staged+=("$out")
+    if [ "$rc" -eq 0 ] || [ -n "$out" ] || ! grep -qF 'unknown flag: --harness' "$errf"; then
+        h_bad="$h_bad $h:rc=$rc:stdout=${out:0:60}:stderr=$(head -c 60 "$errf")"
+    fi
+done
+if [ -z "$h_bad" ]; then
+    ok "stage.sh has no --harness option: it is refused as an unknown flag and nothing is staged"
 else
-    bad "an unknown harness is refused rather than defaulted" "rc $rc: ${out:0:90}"
+    bad "stage.sh has no --harness option: it is refused as an unknown flag and nothing is staged" "$h_bad"
+fi
+
+# A run without the option stages the Claude Code recipe exactly as before, character for character.
+d="$("$REPO/tests/evals/stage.sh" tdd-under-deadline 2>"$errf")"; staged+=("$d")
+want="  cd $d/project && TMPDIR=$d/tmp claude -p \"\$(cat ../prompt.md)\" < /dev/null"
+if [ -n "$d" ] && grep -qxF -- "$want" "$errf"; then
+    ok "without an option, stage.sh prints the Claude Code recipe exactly as before"
+else
+    bad "without an option, stage.sh prints the Claude Code recipe exactly as before" \
+        "$(grep -F 'claude -p' "$errf" | head -1)"
+fi
+
+# The eval tooling describes Claude Code only, and so do this file's cases. results.md is history
+# and is left out. The bracket keeps this line from matching itself.
+named=""
+for f in tests/evals/README.md tests/evals/stage.sh tests/evals/gate-scenarios tests/test-eval-harness.sh; do
+    n="$(grep -ic 'c[o]dex' "$REPO/$f")"
+    [ "$n" = 0 ] || named="$named $f:$n"
+done
+if [ -z "$named" ]; then
+    ok "the eval README, stage.sh, the gate scenario list and this file name no second harness"
+else
+    bad "the eval README, stage.sh, the gate scenario list and this file name no second harness" "$named"
 fi
 
 # run.sh assembles the prompt and must stay neutral. A harness named in it is a second place the
-# matrix has to be kept in step, and the one nobody would think to check.
-if grep -q 'claude\|codex' "$REPO/tests/evals/run.sh"; then
-    bad "run.sh names no harness" "$(grep -n 'claude\|codex' "$REPO/tests/evals/run.sh" | head -1)"
+# dispatch recipe has to be kept in step, and the one nobody would think to check.
+if grep -q 'claude' "$REPO/tests/evals/run.sh"; then
+    bad "run.sh names no harness" "$(grep -n 'claude' "$REPO/tests/evals/run.sh" | head -1)"
 else
     ok "run.sh names no harness"
 fi
@@ -2210,13 +2208,12 @@ fi
 #
 # All five said the same thing, "observable in the tool calls under `--output-format stream-json`",
 # which states a real property and then gives one harness's mechanism for it. The property is what
-# the rubric needs; the mechanism belongs in tests/evals/README.md, which documents both and is the
-# one place a second harness has to be added.
+# the rubric needs; the mechanism belongs in tests/evals/README.md, which documents it once.
 #
-# The deny list is the flags, not the harness names. A scenario may legitimately say "Codex" while
-# describing what it measures; what it may not do is tell the scorer to run a command that exists on
-# one harness.
-stray="$(grep -ln -- '--output-format\|--setting-sources\|bypassPermissions\|claude -p\|codex exec' \
+# The deny list is the flags, not the harness name. A scenario may legitimately name Claude Code
+# while describing what it measures; what it may not do is tell the scorer to run a dispatch
+# command.
+stray="$(grep -ln -- '--output-format\|--setting-sources\|bypassPermissions\|claude -p' \
          tests/evals/scenarios/*.md 2>/dev/null | tr '\n' ' ')"
 if [ -z "${stray// /}" ]; then
     ok "no scenario body names a harness's dispatch flags"
