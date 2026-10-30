@@ -4,9 +4,9 @@
 | --- | --- |
 | Extended by | [`architecture/tiered-multi-harness-support.md`](architecture/tiered-multi-harness-support.md), ADR-0003, ADR-0004, ADR-0005; [`architecture/claude-code-only.md`](architecture/claude-code-only.md), ADR-0013, ADR-0014, accepted 2026-10-29, which reverses the multi-harness design |
 
-**Layer 1 below describes Claude Code.** Which gates a harness actually delivers is stated in one
-generated place, `docs/harness-support.md`, and nowhere else. Do not add a sentence
-here saying which harnesses have a gate; `tests/test-harness-claims.sh` will fail it.
+**Layer 1 below describes Claude Code, the only harness keel serves.** Its gates and the Claude
+Code version each needs are stated in one generated place, `docs/harness-support.md`, and nowhere
+else. Add no sentence here saying which gates keel has; `tests/test-harness-claims.sh` will fail it.
 
 ## The core idea
 
@@ -24,9 +24,9 @@ Layer 1  HARNESS GATES   hooks registered with the harness
 ```
 
 <!-- keel:claim gate=review-guard harness=claude -->
-Layer 1 varies by harness. On Claude Code it is five gates in `.claude/settings.json`, the fifth
-`review-guard` (ADR-0010). On another harness it is what that harness's primitives support, not the
-same set; a gate keel cannot deliver there is not registered. See `docs/harness-support.md`.
+Layer 1 is five gates in `.claude/settings.json`, the fifth `review-guard` (ADR-0010). keel serves
+Claude Code only (ADR-0013), and `docs/harness-support.md` lists the gates and the Claude Code
+version each needs.
 
 The split matters. Anything the model can rationalise its way out of belongs in Layer 1.
 Anything every session needs belongs in Layer 2 and must stay small and byte-stable so
@@ -160,9 +160,9 @@ verifies every command in `verify` actually runs.
 
 ## Which model runs a delegated brief
 
-Several skills fan work out to subagents. Those briefs name a **delegation profile**, a name each
-harness resolves to its own model, so the wide mechanical reading does not run on whatever the
-session happens to be pinned to (ADR-0005):
+Several skills fan work out to subagents. Those briefs name a **delegation profile**, a name Claude
+Code resolves to a model through `agents/*.md`, so the wide mechanical reading does not run on
+whatever the session happens to be pinned to (ADR-0005):
 
 | Brief | Delegation profile | Why |
 | --- | --- | --- |
@@ -185,18 +185,18 @@ reasoning is in [`docs/ideas/model-routing.md`](ideas/model-routing.md).
 
 Skills are instructions and a model under pressure negotiates with instructions. superpowers
 answers this with rationalisation tables and all-caps prohibitions, which works, partly. The
-harness answers it better. Where a rule is genuinely non-negotiable, we put it in a hook, on the
-harnesses whose hook protocol can carry it. The mechanisms below are Claude Code's, and the last
-column says which harnesses actually carry each rule. `docs/harness-support.md` is generated from
-the capability manifest and is the authority; this column is prose and can go stale, which is why
-it names harnesses rather than restating what each gate does.
+harness answers it better. Where a rule is genuinely non-negotiable, we put it in a hook. The
+mechanisms below are Claude Code's, the only harness keel serves, and the last column says what
+carries each rule. `docs/harness-support.md` is generated from the capability manifest and is the
+authority on the gates and the Claude Code version each needs; this column is prose and can go
+stale, which is why it names what carries a rule rather than restating what each gate does.
 
 | Rule | Mechanism | Why | Carried on |
 | ------ | ----------- | ----- | ------------ |
-| Session knows keel exists | `SessionStart` hook injecting the router pointer | Model cannot skip what it never sees | Claude Code and Codex |
+| Session knows keel exists | `SessionStart` hook injecting the router pointer | Model cannot skip what it never sees | Claude Code |
 | Edits get a security pattern check | `security-guidance` plugin `PostToolUse` hook | Runs on every edit, no invocation needed | Claude Code only, it is a Claude Code plugin |
 | Diff gets an LLM security review before the turn ends | `security-guidance` plugin `Stop` hook | An automatic audit before code ships, not one somebody has to remember to ask for | Claude Code only, same reason |
-| Format, lint and typecheck pass before a commit | optional `keel guard` `pre-commit` git hook, off until `gates.commit_guard` turns it on | See open decision 4, it can be slow | Either, it is a git hook and not a harness one |
+| Format, lint and typecheck pass before a commit | optional `keel guard` `pre-commit` git hook, off until `gates.commit_guard` turns it on | See open decision 4, it can be slow | git, it is a git hook and not a Claude Code one |
 
 Everything else stays in skills, where judgement belongs.
 

@@ -407,9 +407,8 @@ otherwise see that one step of it ran on a cheaper one, which is the wrong thing
 a plugin whose whole proposition is that the standard of work is known. Leading the description
 rather than trailing it matters for the same reason a trailing tag would fail: a narrow pane
 truncates the end of a label first, which is exactly when the model name matters most.
-**Confirmed on Claude Code**, where `description` is the exact string the harness renders. **Not
-checked on Codex:** this repository has not probed whether Codex renders a dispatch label at all, so
-nothing is claimed there either way, per ADR-0004. Landed in all eight delegating skills:
+**Confirmed on Claude Code**, where `description` is the exact string the harness renders. Landed
+in all eight delegating skills:
 `apex-port-plan`, `shape-idea`, `write-plan`, `security-audit`, `repo-snapshot`, `port-assess`,
 `review-code` and `write-docs`, plus `execute-plan`'s `references/subagent-prompts.md` and `references/parallel-batches.md`.
 
@@ -433,7 +432,7 @@ in this order: the lead is shortened with an ellipsis if the room left keeps at 
 characters, and dropped otherwise; then the token count is dropped; then the end of the label is cut
 with an ellipsis, and only when no form of the row holds the whole label; the model is never cut. So
 a label that fits whole is never cut, and a wider pane never shortens it. It shows and does not
-judge: a flag would have to know how each harness resolves a profile. A row it overrides loses the
+judge: a flag would have to know how Claude Code resolves a profile. A row it overrides loses the
 default row's live progress summary, elapsed time and queued count. The command is the script
 inlined, generated from `lib/subagent_statusline.py` by
 `tests/generate-harness-artifacts.sh subagent-settings`, because `${CLAUDE_PLUGIN_ROOT}` does not
@@ -445,7 +444,7 @@ unexplained; foreground agents, a named agent, an installed plugin and Windows w
 The probe ran an earlier version of the script as a plain `python3 -c` command with a logging
 prelude; the shipped command adds `-I`, the text cleaning (of the description, name, agent type and
 model), the label gate and the narrow-pane order, which have run only under `sh -c` in the test
-suite. Nothing is shown on Codex.
+suite.
 
 **On Claude Code the `keel-fanout` agent file denies the `Edit`, `Write` and `NotebookEdit` tools, since 2026-10-13.** <!-- keel:claim property=agent_tool_denylist harness=claude -->
 Its agent file sets `disallowedTools: Edit, Write, NotebookEdit`, because a fan-out reports leads
@@ -453,16 +452,14 @@ and a reader that edits is a writer nobody reviewed. A tool not named there, suc
 tool, stays available to it. Bash stays too, because fan-out reading runs `git log` and `grep`, so
 a Bash command could still change a file. Nothing pins that a dispatch whose description starts
 `keel-fanout: ` selects this agent, so one that falls back to another agent type is not restricted.
-Codex's agent file carries no equivalent, and nothing claims one.
 
-**The vocabulary changed on 2026-09-06 and the reason is ADR-0005.** It used to be an alias:
-`sonnet` for the fan-outs, `inherit` for judgement. Four of the five accepted words were Anthropic
-model names, which say nothing on a second harness, so a body now names a **delegation profile** and
-each harness resolves it to its own model. keel writes the Codex one to
-`.codex/agents/keel-fanout.toml`. Only `inherit` survives the removal, and it is **not** the neutral
+**A body names a delegation profile, not a model alias.** It used to be an alias: `sonnet` for the
+fan-outs, `inherit` for judgement. A body now names a **delegation profile**, and `agents/*.md` is
+where Claude Code turns a profile into a model, so the measured choice lives in one file per
+profile. Only `inherit` survives as a word a body may name, and it is **not** the neutral
 replacement for the other four: it means the driver's model, which is the deliberate pin on
 judgement work and the opposite of what a fan-out wants. Reading it as neutral inverts the routing
-decision. Full model ids remain excluded, and where a profile resolves is the harness's business
+decision. Full model ids remain excluded, and where a profile resolves is Claude Code's business
 rather than a skill body's.
 
 **Why:** a session's model cannot be changed by a plugin, a hook, or the model itself. Checked
@@ -473,12 +470,9 @@ re-reads context the main thread already holds. The payoff therefore depends on 
 complexity: a router that did would be wrong in the direction nobody notices, since a cheap model
 doing a poor job produces plausible output rather than an error.
 
-Which model each profile should resolve to is still open, and on Codex it is unmeasured: the pins
-in `.codex/agents/keel-fanout.toml` and `.codex/agents/keel-implementer.toml` were chosen from a
-price list (both are `gpt-5-codex-mini`, the second carried over from the first) and nothing has
-checked that either clears its bar, the fan-out quality bar or the one for writing code under a
-gate. Recorded as open question 3 in `docs/ideas/model-routing.md`, which is also the standing
-evidence that a cheaper model passes every structural check and is wrong twice as often.
+Which model each profile should resolve to is still open, recorded as open question 3 in
+`docs/ideas/model-routing.md`, which is also the standing evidence that a cheaper model passes every
+structural check and is wrong twice as often.
 The announcement was asked
 for directly and was originally recorded here as costing nothing. **Corrected 2026-08-20:** it costs
 body words, and in three skills there are none to spare. The rule stays as written and the shortfall

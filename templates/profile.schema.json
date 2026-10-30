@@ -305,7 +305,7 @@
             "warn",
             "off"
           ],
-          "description": "Whether security-audit runs before a change ships, and what its findings do. required says any finding blocks shipping unless the user names an override for it; warn reports the findings and leaves accepting them to the user; off skips the audit before a ship, except on a diff touching a hard-block path, and the report says so; an audit the user asks for runs anyway. A match on a hard-block path is never overridable in conversation, whatever this says. A diff that changes this key or the hard-block paths is gated by the default branch's values. Read by `skills/security-audit/SKILL.md` and by ship's gate item 4, advisorily: it is prose the model follows, not a hook that asserts it, and it applies on both harnesses because skill bodies do.",
+          "description": "Whether security-audit runs before a change ships, and what its findings do. required says any finding blocks shipping unless the user names an override for it; warn reports the findings and leaves accepting them to the user; off skips the audit before a ship, except on a diff touching a hard-block path, and the report says so; an audit the user asks for runs anyway. A match on a hard-block path is never overridable in conversation, whatever this says. A diff that changes this key or the hard-block paths is gated by the default branch's values. Read by `skills/security-audit/SKILL.md` and by ship's gate item 4, advisorily: it is prose the model follows, not a hook that asserts it.",
           "x-keel-read-by": [
             "advisory:skills/security-audit/SKILL.md#gates.security_audit",
             "advisory:skills/ship/SKILL.md#gates.security_audit"
@@ -507,7 +507,7 @@
             "type": "string"
           },
           "description": "Plugins this project deliberately does not want, as marketplace-qualified names. `keel doctor` will not recommend one listed here, even where `plugins.recommended` also carries it, because an exclusion is the later and more specific decision. keel's own plugin is the exception and stays reported, since that warning is about keel not loading at all rather than a skill degrading.",
-          "x-keel-read-by": "code:lib/harness/claude.sh:80"
+          "x-keel-read-by": "code:lib/harness/claude.sh:83"
         }
       }
     },

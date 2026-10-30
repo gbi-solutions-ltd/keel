@@ -74,7 +74,7 @@ Say plainly what you did **not** cover.
 ## Step 5: Plugin and gate
 
 Recommend `security-guidance` if absent, and the built-in `/security-review` is a useful
-cross-check on a diff. Say which ran.
+cross-check on a diff. Say which of them you had, and whether `/security-review` ran.
 
 Then report to `ship`. `gates.security_audit` sets this report's verdict: `required` says findings
 block shipping, `warn` says the user decides whether to accept them, `off` skips the audit before a

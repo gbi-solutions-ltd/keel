@@ -1822,9 +1822,9 @@ gives the 18 locations with line numbers and remedy classes **W** word change, *
 the reason a mechanical pass over the 18 would be wrong:
 
 - **A nineteenth location.**
-  `docs/03-install-and-distribution.md#The skills are no longer Claude-only.` says "The skills
-  themselves stay Claude-only for now". It is true today and false the moment this ships. Class N,
-  and it is the natural home for the Tier B install path.
+  `docs/03-install-and-distribution.md` at v0.26.0 ("The skills are no longer Claude-only.") says
+  "The skills themselves stay Claude-only for now". It is true today and false the moment this
+  ships. Class N, and it is the natural home for the Tier B install path.
 - **`docs/04-plugin-strategy.md` is Claude-shaped across all 221 lines**, not at line 11. Rewrite the
   document with a stated scope line rather than qualifying one row.
 - **`docs/05-token-and-memory-design.md` has no false sentence and a false derivation.** Its
@@ -2137,7 +2137,7 @@ codex"
 
 Parse `--harness <list>` in `cmd_init`'s flag loop (`:909`) alongside `-y`, `--team` and `--force`.
 
-**Invalidate the JSON cache before re-reading.** `bin/keel:127-135` caches a flattened profile per
+**Invalidate the JSON cache before re-reading.** `bin/keel:105-113` caches a flattened profile per
 process keyed on filename, and `cmd_init` rewrites `.keel/profile.json` during the run. Anything
 reading the profile after the write, `harness_set_for_repo` included when `init` is re-run in a
 session, must clear `JSON_CACHE_FILE` first or it reads the pre-write copy.

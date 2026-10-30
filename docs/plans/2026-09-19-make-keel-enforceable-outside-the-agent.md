@@ -138,7 +138,7 @@ re-litigated: task 0's `Done when` holds, so the task proceeds as done.
 
 **Files:**
 - Modify: `bin/keel` (`write_ci` at `bin/keel:987-1046`; its call site in `cmd_new` at
-  `bin/keel:1206`; a new call site in `cmd_init` after `bin/keel:842`)
+  `bin/keel:1206`; a new call site in `cmd_init` after `bin/keel:611`)
 - Test: `tests/test-keel.sh`
 
 **Interfaces:**
@@ -321,7 +321,7 @@ call, not assumed here):
   written, which contradicts the guard's own comment. Untested by this task's fixtures (only the
   single-marker case is covered).
 - The verify-key list `test_integration lint format typecheck build e2e security` in `write_ci`'s
-  loop hand-repeats keys `write_profile` (`bin/keel:539`) already enumerates, which
+  loop hand-repeats keys `write_profile` (`bin/keel:315`) already enumerates, which
   `docs/standards.md:254` ("One definition per verify command") names as exactly the drift pattern
   to avoid.
 
@@ -355,7 +355,7 @@ locating that same content at its new position, not by guessing an offset. One d
 surfaced in the second round: `docs/harness-support.md` is generated from
 `tests/generate-harness-artifacts.sh support-page`, itself reading `lib/harness/capabilities` as
 its source of truth; the first citation-fix round had hand-corrected the *generated* doc (the stale
-`bin/keel` line number it named, to the content's real location, `lib/harness/claude.sh:240-247`) without fixing
+`bin/keel` line number it named, to the content's real location, `lib/harness/claude.sh:243-250`) without fixing
 the source line in `lib/harness/capabilities`, which `tests/test-harness-claims.sh` caught as
 doc-generator drift. Fixed at the source and regenerated; `diff` against a fresh generator run is
 now empty. `tests/validate-citations.sh` reports 0 stale citations and `tests/run-tests.sh` is
@@ -1885,7 +1885,7 @@ A further independent read against the tree, after the first pass's fixes were i
 blocked; both are folded in above.
 
 - **Blocking, fixed:** task 3's test could never fail-then-pass. `keel init` writes
-  `gates.commit_guard` as `"off"` (`bin/keel:374`, confirmed by running init on a fixture), and the
+  `gates.commit_guard` as `"off"` (`bin/keel:352`, confirmed by running init on a fixture), and the
   test's "baseline, gate required" commit never set it to `required`, so old and new were both `off`
   and the refusal was unobservable. The test now sets `required` before the baseline commit.
 - **Blocking, fixed:** `tests/validate-skills.sh` was already red on this branch, 4 problems, all em

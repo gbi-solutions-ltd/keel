@@ -444,7 +444,7 @@ failures.
 
 ```
 docs/architecture/tiered-multi-harness-support.md:41                   bin/keel:2061            past the end, bin/keel is 1944 lines
-docs/ideas/keel-on-codex.md:231                                        bin/keel:576-590         first line blank
+docs/ideas/keel-on-codex.md:234                                        bin/keel:576-590         first line blank
 docs/ideas/leon-van-zyl-skill-collection.md:262                        bin/keel:2008            past the end
 docs/ideas/profile-schema-drift.md:70                                  bin/keel:1207            blank
 docs/ideas/profile-schema-drift.md:102                                 bin/keel:1207            blank
@@ -471,7 +471,7 @@ docs/prd/profile-sync.md:96                                            bin/keel:
 docs/prd/usable-profile.md:115                                         bin/keel:290             blank
 docs/stories/context-window-at-init.md:288                             bin/keel:290             blank
 docs/stories/profile-sync.md:260                                       bin/keel:1019-1020       blank
-docs/stories/tiered-multi-harness-support.md:152                       bin/keel:2061            past the end
+docs/stories/tiered-multi-harness-support.md:155                       bin/keel:2061            past the end
 docs/stories/usable-profile.md:453                                     bin/keel:290             blank
 ```
 

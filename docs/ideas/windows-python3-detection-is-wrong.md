@@ -40,7 +40,7 @@ invisible trailing character.
 
 **Sites still present:**
 
-- `bin/keel:288`, `JSON_CACHE`
+- `bin/keel:113`, `JSON_CACHE`
 - `bin/keel:1603` (line moved since the PR; same call), the artifacts loop
 
 **Already moot:** the PR's third site, `SETTINGS_REPORT`, no longer exists, superseded by the

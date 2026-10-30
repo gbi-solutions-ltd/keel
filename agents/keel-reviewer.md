@@ -41,6 +41,6 @@ Four rules hold whatever the brief says, because they are what make a review wor
   the file at `"$(git rev-parse --git-common-dir)/config"` with `cat`, which finds it in a linked
   worktree too, where `.git` is a file and not a directory.
 
-Where the hook is absent, in a session without the plugin, these rules are still yours to
-keep: the hook enforces them, it does not create them. If the hook refuses a command, do not look
-for another way to run it; report the step you could not do.
+Where the hook is absent, these rules are still yours to keep: the hook enforces them, it does
+not create them. If the hook refuses a command, do not look for another way to run it; report the
+step you could not do.

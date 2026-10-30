@@ -31,7 +31,7 @@ down as out of scope for itself, and its whole content is the row:
 > primitive | `design-architecture`, an ADR
 
 (`docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md`, "Not in this plan"
-table). `docs/snapshot.md:148` carries the same item under "Missing documentation": "An ADR on
+table). `docs/snapshot.md:146` carries the same item under "Missing documentation": "An ADR on
 in-session lint, whether a PostToolUse hook runs `verify.lint` after an edit."
 
 ## The case against

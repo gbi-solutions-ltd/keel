@@ -309,9 +309,9 @@ for style in output-styles/*.md; do
 done
 
 # A brief dispatched to a model alias that does not exist is a brief dispatched to nothing, and the
-# failure is silent. Of the five aliases Claude Code accepts, a skill may name one. A full id is
-# also valid and is deliberately not permitted here: an id pinned in a skill goes stale without
-# anything noticing, while an alias tracks the current model.
+# failure is silent. Of the five aliases Claude Code accepts, a skill may name only `inherit`. A
+# full id is also valid and is deliberately not permitted here: an id pinned in a skill goes stale
+# without anything noticing, while an alias tracks the current model.
 #
 # The marker is the word `model` before the alias, not `on`. `on \`x\`` was the first pattern and it
 # collided with seven existing phrases, `on \`main\`` three times among them, so the rule would have

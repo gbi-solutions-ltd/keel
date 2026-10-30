@@ -45,7 +45,7 @@ thinner than even the pipeline the project that ships it actually relies on.
 ## Two things this is not
 
 **Not a call to CI-enforce review, docs, or plan state.** Decision 3
-(`docs/07-open-decisions.md:163-236`) already establishes the house posture: a skill's compliance
+(`docs/07-open-decisions.md:163-231`) already establishes the house posture: a skill's compliance
 is unwitnessable from outside the model's own turn unless the check is external and mechanical. A
 review having happened, docs being current, and plan checkboxes being ticked are judgment calls,
 not commands with exit codes. Proposing to CI-enforce them contradicts that reasoning rather than

@@ -1,5 +1,8 @@
 # Idea: keel on OpenAI Codex CLI
 
+> Superseded on 2026-10-29 by ADR-0013
+> ([`ADR-0013-claude-code-is-the-only-harness.md`](../decisions/ADR-0013-claude-code-is-the-only-harness.md)).
+
 | | |
 |---|---|
 | Raised by | Bernard, 2026-09-05 |
@@ -135,7 +138,7 @@ and it is the one keel spent a decision on avoiding.
 
 | Option | What it costs | Why not this |
 |---|---|---|
-| Do nothing | Zero | This is the recommendation. keel already dual-writes `AGENTS.md` (`bin/keel:648-649`), so Codex users get Layer 2 today. It is honest, already shipped, and already documented as a deliberate stop (`docs/03-install-and-distribution.md#and nothing else, which is the tier below.`) |
+| Do nothing | Zero | This is the recommendation. keel already dual-writes `AGENTS.md` (`bin/keel:648-649`), so Codex users get Layer 2 today. It is honest, already shipped, and already documented as a deliberate stop (`docs/03-install-and-distribution.md` at v0.26.0, "and nothing else, which is the tier below.") |
 | Do it manually | A Codex user clones keel and copies `skills/` into `.agents/skills/` themselves | Actually works, and is worth documenting as an unsupported recipe. It is not "first-class" and makes no guarantee, which is the point: it does not pretend |
 | Buy it | Nothing to buy | No product ports an SOP's enforcement layer between agent harnesses. Not an option |
 | Build something smaller | Ship Layers 2 and 3 on Codex (skills, `AGENTS.md`, the session router, `done-guard`, `context-watch`) and document `sensitive-guard` as absent | **This is the tempting one and it is what the constraint forbids.** keel with three of four gates is not keel at the same level of guarantee; it is keel with the security gate quietly missing on one of its two supported harnesses |
@@ -327,8 +330,9 @@ Five places need a new section rather than a word change: `docs/03-install-and-d
 `docs/07-open-decisions.md` decisions 3 and 12, `docs/05-token-and-memory-design.md`, and README's
 Install and Upgrading sections.
 
-`docs/03-install-and-distribution.md#The skills are no longer Claude-only.` is confirmed exactly
-as the requester described it, and is the sentence to keep true rather than work around:
+`docs/03-install-and-distribution.md` at v0.26.0 ("The skills are no longer Claude-only.") is
+confirmed exactly as the requester described it, and is the sentence to keep true rather than
+work around:
 
 > The skills themselves stay Claude-only for now; porting them is a later decision, not a Phase 1
 > one.
@@ -365,9 +369,9 @@ supported", that is a no, and it should be written down as one in
 naming the missing primitive so the next person does not re-derive this.
 
 What happens next is that nothing is built, and
-`docs/03-install-and-distribution.md#The skills are no longer Claude-only.` gains a paragraph
-naming Codex, `permissionDecision: "ask"`, and `openai/codex#28437`. Separately and regardless of
-this decision, `hooks/sensitive-guard:13` should be repaired to cite `bin/keel:558`.
+`docs/03-install-and-distribution.md` at v0.26.0 ("The skills are no longer Claude-only.") gains a
+paragraph naming Codex, `permissionDecision: "ask"`, and `openai/codex#28437`. Separately and
+regardless of this decision, `hooks/sensitive-guard:13` should be repaired to cite `bin/keel:558`.
 
 **The single fact that would flip this:** `openai/codex#28437` shipping `permissionDecision: "ask"`
 as a native approval prompt, *and* that prompt surviving `approval_policy = "never"`. Both halves.

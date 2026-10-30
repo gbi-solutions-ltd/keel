@@ -186,16 +186,11 @@ documented for users, not just known to the model.
 belong here rather than only in the plan, because both change what this decision promised.
 
 <!-- keel:claim gate=sensitive-guard harness=claude -->
-**Everything in this section is a Claude Code guarantee and nothing more**, added 2026-09-06 when
-Tier B shipped. The block needs a hook that can put a command to a human, which Codex CLI does not
-offer, so `sensitive-guard` is absent there rather than weakened.
-
-<!-- keel:claim gate=sensitive-guard harness=claude -->
-`keel init` registers nothing for it on Codex. A repository declaring `hard_block_paths` and serving
-both is protected for its Claude Code users and not for its Codex users.
-`docs/harness-support.md` is the whole picture, and since 2026-09-06 `keel doctor` says it on the
-machine too: it names the harness it is running under, lists the gates that harness gets, and where
-a repository declares the field above, warns that the block is not enforced for those users.
+**Everything in this section is a Claude Code guarantee**, because the block needs a hook that can
+put a command to a human and keel serves Claude Code only. `docs/harness-support.md` is the whole
+picture, and `keel doctor` says it on the machine too: it lists the gates Claude Code gets.
+The hook refuses every commit in a repository that declares sensitive paths when
+Codex runs it, naming v0.26.0 as the last keel release with Codex support.
 
 <!-- keel:claim gate=sensitive-guard harness=claude -->
 **The field is `hard_block_paths` at the top level of the profile, not `gates.hard_block_paths`.**
@@ -575,11 +570,11 @@ score that case as a partial so it is visible if it persists.
 
 Raised because the posture every engineer gets had never been recorded as a decision. `keel init`
 writes `permissions.defaultMode: bypassPermissions` into `.claude/settings.local.json`
-(`lib/harness/claude.sh:383-406`), and `init` runs on every machine, so a per-machine file written by a shared
+(`lib/harness/claude.sh:386-409`), and `init` runs on every machine, so a per-machine file written by a shared
 tool is a team default by another name.
 
 **One correction to the framing this was raised under.** The argument is not confined to a code
-comment: `docs/03-install-and-distribution.md:86-123` carries it in full, with the surviving-rule
+comment: `docs/03-install-and-distribution.md:82-119` carries it in full, with the surviving-rule
 table and the live-session verification. What was missing is a decision entry, which is this one.
 
 ### The load-bearing fact, checked rather than reasoned
@@ -605,7 +600,7 @@ decision, that init disables keel's own guardrails, does not hold.
 
 ### What the rules do not reach, which is the actual residual
 
-The guardrails are 13 deny and 10 ask rules (`lib/harness/claude.sh:233-291`), wider than a summary of ".env,
+The guardrails are 13 deny and 10 ask rules (`lib/harness/claude.sh:236-294`), wider than a summary of ".env,
 secrets, pem, id_rsa" suggests, because they also close the common Bash shapes. The residual is
 still large, and it is a **machine-level** residual rather than a repository-level one:
 

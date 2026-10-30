@@ -9,6 +9,30 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- **Codex support is removed, and v0.26.0 is the last keel release with Codex support** (ADR-0013).
+  A Codex user installs that tag with `codex plugin marketplace add gbi-solutions-ltd/keel --ref
+  v0.26.0 && codex plugin add keel@gbi`, and a separate keel plugin for Codex is planned.
+  `.codex-plugin/plugin.json`, `hooks/hooks.codex.json` and `lib/harness/codex.sh` are deleted, and
+  the capability ledger holds Claude Code rows only (ADR-0014). `done-guard` and the context watch
+  read Claude Code transcripts only. Skills and agents name no other harness, and
+  `tests/validate-skills.sh` fails one that names Codex.
+- `keel init` refuses `--harness`, and `keel init` and `keel new` write the managed block to
+  `CLAUDE.md` only: no `AGENTS.md` and no `.codex/` files. An existing `AGENTS.md` is left byte for
+  byte and unstaged, and `keel doctor` no longer reads it. `profile.harnesses` is retired in schema
+  7: a schema 6 profile still loads, and doctor's retired-key warning names the key. The register of
+  retired keys is `lib/retired-keys.sh`, which `bin/keel` and both checks source. Doctor no longer
+  detects a harness, so outside Claude Code it reports one fewer warning: "cannot determine which
+  harness is running" is gone. `keel doctor --json` and `keel-fleet` drop the harness set.
+- `keel doctor` checks the installed Claude Code against keel's minimum, the highest version among
+  the evidenced Claude Code rows a gate requires in the capability ledger: 2.1.302 today, stated in
+  `README.md`. Each warning names its cause: `claude` not found, older than the minimum, no version
+  in its output, or stopped after 5 seconds, when doctor kills it. An unreadable minimum is a
+  warning, never a pass.
+- `hooks/sensitive-guard` no longer reads the capability ledger, and keeps one Codex refusal. On a
+  commit in a repository declaring a non-empty `hard_block_paths`, with `CLAUDE_PROJECT_DIR` empty
+  and either `CODEX_VERSION` set or a `"turn_id":` key in the event, it exits 2 with a message
+  naming v0.26.0 and its Codex install line. Claude Code sets `CLAUDE_PROJECT_DIR` for every hook,
+  so there the guard asks as before, and any other unexpected exit asks.
 - Development moved into the public repository. Work lands through short-lived branches and
   pull requests into `main`, and a release is a version-bump pull request followed by an annotated
   tag and a GitHub release in the same repository (`docs/runbooks/cutting-a-release.md`).
@@ -39,10 +63,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
   read it or rewrites each field to test it for blanks: `keel doctor --fast` 1.08s to 0.95s, best
   of six. Sourcing it by a relative path and then changing directory, sourcing it through a symlink,
   or sourcing it with `CDPATH` set no longer turns every gate dark. `bin/keel`, `bin/keel-fleet` and
-  the session-start, context-watch and sensitive-guard hooks unset `CDPATH`, so run by a relative
-  path with it set they no longer report an incomplete install, fall back to another `keel`, go
-  silent or ask on a commit they should let through. The eval scripts under `tests/evals/` and the
-  `dispatch.sh` that `gate.sh` writes unset it too.
+  the session-start and context-watch hooks unset `CDPATH`, so run by a relative path with it set
+  they no longer report an incomplete install, fall back to another `keel` or go silent. The eval
+  scripts under `tests/evals/` and the `dispatch.sh` that `gate.sh` writes unset it too.
 - `hooks/sensitive-guard` asks when it fails unexpectedly. Claude Code lets a tool call proceed on
   any hook exit but 0 and 2, so a crash in the guard, such as the embedded Python raising on an
   event whose `tool_input` is a string rather than an object, let a commit touching

@@ -1931,11 +1931,11 @@ block, which is the `gates` block.
 
 **The substance separates them further, in both directions.**
 
-Sonnet found three real contradictions haiku did not. The largest: `docs/06-repo-layout.md:183-185`
+Sonnet found three real contradictions haiku did not. The largest: `docs/06-repo-layout.md:180-182`
 states `plugin.json` carries `"license": "SEE LICENSE IN LICENSE"` "because keel is proprietary to
 GBi Solutions Ltd", while `.claude-plugin/plugin.json:10` is `"MIT"` and `LICENSE:1` is MIT. Verified
 by reading all three. It also found that `doctor` prints `ok` for checks it skipped when git is
-absent (`bin/keel:288-290`, `:766`, `:1264`, all verified), and that `docs/06-repo-layout.md:104-108`
+absent (`bin/keel:288-290`, `:766`, `:1264`, all verified), and that `docs/06-repo-layout.md:100-104`
 omits `hooks/done-guard`, which is wired at `hooks/hooks.json:55-80`.
 
 Haiku was not merely worse. It found the decision log contradicting itself in its own header,
@@ -2667,9 +2667,9 @@ written as prose cannot be marked uncited, so writing prose is how a document sc
 
 **Section 8 is one finding written two ways.** Both documents report that `tests/evals/` is absent.
 The delegated arm writes one prose paragraph carrying `.keel/profile.json:22`,
-`CONTRIBUTING.md:138-142`, `CHANGELOG.md:10-18` and `tests/export-public.sh:43-48`: **counted as zero
+`CONTRIBUTING.md:138-142`, `CHANGELOG.md:10-42` and `tests/export-public.sh:43-48`: **counted as zero
 rows**, so four citations earned nothing and cost nothing. The inline arm writes a numbered item with
-five nested bullets, better organised and citing `docs/06-repo-layout.md:138` and `CLAUDE.md:19` on
+five nested bullets, better organised and citing `docs/06-repo-layout.md:134` and `CLAUDE.md:19` on
 top: **counted as six rows, five uncited**. One of those is "`tests/test-eval-harness.sh` fails 15 of
 18 assertions", which is an **observed test result with no line to cite and no hatch word**, penalised
 for being a measurement rather than a reference.

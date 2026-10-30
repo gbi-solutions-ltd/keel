@@ -13,7 +13,7 @@ The install documents tell a new user to clone the repository and symlink `bin/k
 with a claim about Claude Code that is now false. At release, an external user has no clone, so the
 documented path does not describe the install they will actually perform.
 
-**Evidence.** `README.md:12-14` and `docs/03-install-and-distribution.md:23,40` both state that
+**Evidence.** `README.md:12-14` and `docs/03-install-and-distribution.md:23,36` both state that
 plugins do not extend PATH. Checked 2026-08-16 against the plugins reference and against this
 session: a plugin's `bin/` directory is added to the Bash tool's PATH, and this session's PATH ends
 with the keel repo's `bin`, where `keel version` prints `0.6.1`.
@@ -61,7 +61,7 @@ marketplace install puts `keel` on the system PATH.
 | Finding | Evidence | What it means for the idea |
 |---|---|---|
 | The stated reason for the symlink is false | `README.md:13-14`; `docs/03-install-and-distribution.md` | The claim, not just the step, has to change |
-| The symlink is documented as a first-class install step | `docs/03-install-and-distribution.md:44-47` | It becomes optional, and needs a new and narrower justification |
+| The symlink is documented as a first-class install step | `docs/03-install-and-distribution.md:40-43` | It becomes optional, and needs a new and narrower justification |
 | Upgrading assumes the CLI lives in a clone updated by `git pull` | `README.md:98-102`, the three-layer table | Under a marketplace install there is no clone. The table collapses from three layers to two |
 | `bin/keel` guards against a partial install | `bin/keel:35` | The guard exists. Whether it passes from a cache copy is untested and is the one real risk here |
 | Distribution is already declared as the marketplace | `.keel/profile.json`, `deploy.target` and `deploy.note` | The profile already says what the documents do not |

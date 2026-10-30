@@ -1069,7 +1069,7 @@ access to this repository's PRD, so the identifier is a dangling pointer into a 
 open.
 
 **Not "`bin/keel` ships them".** `bin/keel` copies nothing under `skills/`, which
-`docs/03-install-and-distribution.md:35` states outright ("Skills are never copied into a repo") and
+`docs/03-install-and-distribution.md:31` states outright ("Skills are never copied into a repo") and
 `docs/06-repo-layout.md` repeats at "Nothing under `skills/` is ever copied". An adopter reaches
 these files through the plugin's own cache. A draft of this paragraph named the wrong mechanism,
 which is the fourth time in this plan a mechanism has been asserted without being opened.
@@ -1535,7 +1535,7 @@ have gone. Can you tell me what conventions it actually follows?
 
 Update `README.md:188` from `10 scenarios exist` to `11 scenarios exist`,
 `tests/evals/README.md` from `Ten scenarios exist` to `Eleven scenarios exist`, and
-**`docs/06-repo-layout.md:177` from `# 10 scenarios, 10 fixtures` to `11`**. That document is in
+**`docs/06-repo-layout.md:174` from `# 10 scenarios, 10 fixtures` to `11`**. That document is in
 this task's Files list and an earlier draft listed it without commissioning the edit anywhere, which
 is the same listed-but-not-commissioned asymmetry that let task 3 loosen a check with no coverage.
 Nothing pins it either: `tests/test-doc-claims.sh` asserts the scenario count against `README.md`

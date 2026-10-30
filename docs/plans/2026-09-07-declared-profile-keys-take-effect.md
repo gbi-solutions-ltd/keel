@@ -40,14 +40,14 @@ Twenty-two keys, one verdict each. `harnesses` is stated for every `gates.*` key
 | 3 | `gates.review` | **retire** | n/a | n/a | `skills/ship/SKILL.md` names no `gates.*` key and its step 5, "`review-code` has run and nothing blocking remains", is unconditional. A key whose only possible effect is to weaken a gate the skill runs anyway is a key whose `off` value is a lie |
 | 4 | `gates.observability` | **retire** | n/a | n/a | No mechanism is proposed anywhere in the tree, and the census found no reader, no named reader and no idea record |
 | 5 | `gates.docs_updated` | **retire** | n/a | n/a | Same as `gates.review`. `skills/ship/SKILL.md` step 6 is unconditional |
-| 6 | `plugins.excluded` | **wire** | `plugin_report` in `lib/harness/claude.sh` | **claude only** | `plugins.recommended` is read at `lib/harness/claude.sh:63` and there is no Codex counterpart of that report. ADR-0004: the description must say so, and task 4 writes it |
+| 6 | `plugins.excluded` | **wire** | `plugin_report` in `lib/harness/claude.sh` | **claude only** | `plugins.recommended` is read at `lib/harness/claude.sh:66` and there is no Codex counterpart of that report. ADR-0004: the description must say so, and task 4 writes it |
 | 7 | `conventions.working_branch` | **retire** | n/a | n/a | The brief's proposed home does not work: the push guard at `bin/keel:2545-2549` protects `default_branch` and already permits a push to any other branch, so reading `working_branch` there would change nothing |
 | 8 | `deploy.target` | **human-read** | n/a | n/a | See the deploy set, below |
 | 9 | `observability.log_shipping` | **retire** | n/a | n/a | `observability.backend` already makes the distinction: `none` in the table at `skills/coding-standards/references/observability.md:19-24` is "Structured logs to stdout only". The key appears only inside that file's JSON example at `:11-17` and nothing branches on it |
 | 10 | `notes` | **human-read** | n/a | n/a | It was written for a skill to read and no skill can afford to: `hooks/session-start` has 4 characters of headroom against the 1,285 limit at `tests/validate-skills.sh:522`. The corrected description says plainly that no skill reads it |
 | 11 | `project.name` | **human-read** | n/a | n/a | Written by `bin/keel:505`, read by nothing. "used in generated documents and reports" is the false half |
 | 12 | `project.description` | **human-read** | n/a | n/a | "Skills quote it at the top of a snapshot or a PRD" is false; no skill names it. The rest of the description, "Left empty by init because only a human knows the answer", is already the human-read case |
-| 13 | `stack.package_manager` | **already wired, description corrected** | `bin/keel:693-696` | n/a | The census was wrong: init branches on empty against set to decide whether to print its note. "Skills prefix commands with it" is the false half |
+| 13 | `stack.package_manager` | **already wired, description corrected** | `bin/keel:670-673` | n/a | The census was wrong: init branches on empty against set to decide whether to print its note. "Skills prefix commands with it" is the false half |
 | 14 | `stack.datastores` | **human-read** | n/a | n/a | Detected by `lib/detect-stack.sh` and written by `bin/keel:508`; no skill reads it back. "Skills use it to know which failure modes are worth asking about" is false |
 | 15 | `verify.e2e` | **wire** | `cmd_doctor` reports it without running it | all, harness-neutral | Class C: written into every profile by `bin/keel:516` and read nowhere, so the evidence of wiring is in the user's own file. Cheapest real win in the list |
 | 16 | `verify.test_integration` | **already wired. No change** | `skills/tdd/SKILL.md:31` and `:67` | both, advisory | The census was wrong. "Where a behaviour touches persistence, test against a running database. Use `verify.test_integration` from the profile" is a real branch. Its description is accurate |
@@ -783,7 +783,7 @@ say so rather than adding a sentence back to the schema by hand.
 | `code:bin/keel:1598` | `keel_version` |
 | `code:bin/keel#echo service` | `project.kind` |
 | `advisory:skills/keel/references/tool-choices.md:21` | `stack.language` |
-| `code:bin/keel:693` | `stack.package_manager` |
+| `code:bin/keel:670` | `stack.package_manager` |
 | `code:bin/keel:1714`, `advisory:skills/coding-standards/references/house-defaults.md:30` | `stack.has_ui` |
 | `advisory:skills/coding-standards/references/house-defaults.md:30` | `stack.framework` |
 | `advisory:skills/keel/references/tool-choices.md:22` | `stack.also` |
@@ -818,7 +818,7 @@ say so rather than adding a sentence back to the schema by hand.
 | `code:hooks/session-start:111` | `conventions.response_style` |
 | `code:hooks/session-start:116` | `conventions.explain_level` |
 | `advisory:skills/coding-standards/references/observability.md:19` | `observability.backend` |
-| `code:lib/harness/claude.sh:63` | `plugins.recommended` |
+| `code:lib/harness/claude.sh:66` | `plugins.recommended` |
 | `code:bin/keel:332` | `docs_root` |
 
 `conventions.commit_style` and `stack.also` are marked `advisory:` and are the same defect as
@@ -2244,7 +2244,7 @@ In `bin/keel:37`, `SCHEMA_VERSION=4`.
 **`write_profile` writes two of the retired keys and both lines change.** `bin/keel:531` is the last
 line of a comment; the two `printf` lines are `:532` and `:533`. Checked on 2026-09-07.
 
-`bin/keel:374`, the gates line, becomes:
+`bin/keel:352`, the gates line, becomes:
 
 ```bash
       printf '  "gates": { "coding_standards": "warn", "security_audit": "required", "commit_guard": "off", "done_verified": "warn", "context_window": 200000 },\n'

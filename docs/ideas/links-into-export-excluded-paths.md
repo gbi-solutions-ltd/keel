@@ -9,7 +9,7 @@
 
 ## The problem
 
-`tests/validate-skills.sh:285` resolves every markdown link in `docs/` and the root against the
+`tests/validate-skills.sh:286` resolves every markdown link in `docs/` and the root against the
 filesystem it is run on:
 
 ```sh

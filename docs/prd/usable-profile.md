@@ -80,7 +80,7 @@ building there.
   applies to enabling plugins for everyone who clones.
 - Verifying that an enabled plugin resolves to something installed. Out of scope, see section 11.
 - Changing the stack-to-plugin mapping, which is complete.
-- A `keel keys` command. `docs/03-install-and-distribution.md:195-196` records that the CLI
+- A `keel keys` command. `docs/03-install-and-distribution.md:185-186` records that the CLI
   deliberately does not parse the profile back, and departing from that deserves its own argument.
 
 ## 4. Users and personas

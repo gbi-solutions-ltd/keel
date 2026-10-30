@@ -17,7 +17,7 @@ nothing checks either, so the guarantee a user gets varies by which skill they h
 
 - **Verified 2026-10-12 by mutation.** `agents/` is outside every content rule that governs
   `skills/`. The content loop is `find skills templates output-styles`
-  (`tests/validate-skills.sh:207`); `docs/` has its own; `agents/` is in neither. An em dash was
+  (`tests/validate-skills.sh:208`); `docs/` has its own; `agents/` is in neither. An em dash was
   appended to `agents/keel-fanout.md`, the validator was run, and it reported 0 FAIL. The file was
   restored.
 - **Verified by reading.** The rules are restated across three and four files respectively. "If

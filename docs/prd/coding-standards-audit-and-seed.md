@@ -205,7 +205,7 @@ dropped and its library-gap report becomes a separate concern.
 
 **Splitting into a 26th skill was considered and is not proposed.** The description budget allows
 it, at 1,130 tokens of 1,320 with room for about four more skills, but
-`docs/07-open-decisions.md:339`
+`docs/07-open-decisions.md:334`
 says to revisit granularity as "which of these should merge" rather than by adding, and a second
 skill would put convention derivation in two places. Recorded as rejected rather than unconsidered.
 
@@ -283,7 +283,7 @@ is whether a mode's steps are followed from a reference, not whether a plugin wo
 |---|---|---|
 | CON-01 | 900 word body ceiling, 700 enforced as a warning. | `ADR-0001` |
 | CON-02 | Descriptions sum to at most 1,320 tokens; 1,130 used. | `tests/validate-skills.sh` |
-| CON-03 | Skill granularity is revisited as "which should merge", not by adding a skill. | `docs/07-open-decisions.md:339` |
+| CON-03 | Skill granularity is revisited as "which should merge", not by adding a skill. | `docs/07-open-decisions.md:334` |
 | CON-04 | A reference is reached for because a reader needs it at one step, never to buy words. | `docs/standards.md`, "instruction at the point of use" |
 | CON-05 | Nothing in an assessment modifies what is assessed, and this extends to audit. | `references/assessment-report.md:3-5` |
 

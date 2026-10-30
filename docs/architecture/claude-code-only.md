@@ -97,7 +97,7 @@ flowchart TB
 | `lib/harness/resolve.sh` | Answers "is this gate active" and "what minimum version" from the ledger. Kept because `keel doctor` and the generator consult it and the evidence rule lives in it. `hooks/sensitive-guard` stops sourcing it: on Claude Code `ask` is always honoured, so the guard has nothing left to ask the ledger | G2 | The ledger |
 | `lib/harness/claude.sh` | Claude Code's writers for `keel init`. No longer one side of a two-file contract, so it may fold into `bin/keel` or stay; the plan decides | G1 | `bin/keel` |
 | `bin/keel` | `init`, `doctor`, `plan`, `scan`. Loses `--harness`, `HARNESS_SET`, `harness_each`, `harness_set_for_repo`, the Codex trust parser and the `AGENTS.md` writes. `doctor` gains the minimum version check | G1, G2, G3 | The ledger, the resolver |
-| `hooks/*` | Unchanged in purpose. Lose the Codex branches: the `CODEX_VERSION` and exit 2 block in `sensitive-guard`, the rollout reader in `done-guard` | G1 | python3 |
+| `hooks/*` | Unchanged in purpose. `done-guard` loses its rollout reader. `sensitive-guard` keeps one Codex refusal, exit 2 on a sensitive commit when `CLAUDE_PROJECT_DIR` is empty and `CODEX_VERSION` or a `"turn_id":` key is present, naming v0.26.0 | G1 | python3 |
 | `lib/context_watch.py` | Loses `_measure_codex`, the Codex window and the format switch | G1 | Transcripts |
 | `tests/generate-harness-artifacts.sh` | Generates `hooks/hooks.json`, `settings.json` and `docs/harness-support.md` for one harness. Stops generating `hooks/hooks.codex.json` | G2 | The ledger |
 | `skills/`, `agents/` | Free to use Claude Code frontmatter and body syntax. The Codex sentences and "where the harness has it" hedges go | G1 | Nothing |
@@ -136,7 +136,7 @@ sequenceDiagram
     participant C as claude --version
     U->>D: keel doctor
     D->>L: highest version a shipped gate requires
-    L-->>D: 2.1.295
+    L-->>D: 2.1.302
     D->>C: read installed version
     alt claude not on PATH or output unparseable
         C-->>D: no version
@@ -182,8 +182,8 @@ cannot translate is that port's decision.
 | A repository still holds keel-written `.codex/` files | `keel doctor` | Left alone, reported as not managed by this plugin | Delete them, or let `keel-codex` take them over |
 | A stale `AGENTS.md` managed block | Not detected by this plugin | Left alone. Its readers are other harnesses | Their port's `init` rewrites it |
 | A port silently ships Claude-only text it could not translate | Not detectable here | Cursor or Codex users read instructions naming features they lack | The port adds a frontmatter allowlist and fails on unmatched rules |
-| A Codex user installs from `main` after this change | No `.codex-plugin/` exists, so Codex finds no plugin | Fails **closed**: nothing loads rather than a half-working gate | Install from the `v0.26.0` tag until `keel-codex` ships |
-| `sensitive-guard` exits 2 for a reason other than the removed Codex block | The `EXIT` trap from PR #7 | With the deliberate exit 2 gone, the trap can map 2 to `ask` as well | The plan decides whether the trap's `0|2` becomes `0` |
+| A Codex user installs from `main` after this change | Codex installs keel from `.claude-plugin/` alone and loads the Claude Code hook set from `hooks/hooks.json` (the probe below) | `sensitive-guard` refuses a commit in a repository declaring `hard_block_paths`, with exit 2 and a message naming v0.26.0, so the one gate that needs `ask` fails **closed** | Install from the `v0.26.0` tag until `keel-codex` ships |
+| `sensitive-guard` exits 2 for a reason other than the Codex refusal | Not detected: the `EXIT` trap from PR #7 leaves exit 2 alone, because the Codex refusal exits 2 deliberately | Claude Code blocks the tool call on exit 2, so it fails **closed**. Any other unexpected exit asks | None needed |
 
 ### Probe: Codex without `.codex-plugin/`
 
@@ -250,7 +250,8 @@ environment, and its payload's keys were `cwd`, `hook_event_name`, `model`, `per
 `turn_id` was not observed. The observed `SessionStart` keys are consistent with a schema that
 requires `turn_id` on `PreToolUse` and not on `SessionStart`
 (`codex-rs/hooks/src/schema.rs:275-295`). Bernard chose on 2026-10-30 to detect both signals rather
-than probe again, so `hooks/sensitive-guard` refuses on either. `shasum ~/.codex/config.toml` gave
+than probe again, so `hooks/sensitive-guard` refuses on either, and only when `CLAUDE_PROJECT_DIR`
+is empty. `shasum ~/.codex/config.toml` gave
 `54458c6846a1` before and after, and the throwaway directory was deleted.
 
 ## 8. Security architecture
@@ -258,9 +259,12 @@ than probe again, so `hooks/sensitive-guard` refuses on either. `shasum ~/.codex
 The trust boundaries do not change: the hooks still run with the developer's permissions, and the
 gates still answer from `.keel/profile.json`. Two things move.
 
-- **`sensitive-guard` loses its Codex arm.** On Codex it exited 2 because Codex discards `ask`.
-  With no Codex path, the only remaining decisions are `ask` and silence, which removes one branch
-  from the most sensitive hook. Codex users keep v0.26.0's behaviour until they move to `keel-codex`.
+- **`sensitive-guard` keeps one Codex refusal and stops reading the ledger.** Codex runs
+  `hooks/hooks.json` and discards `ask`, so on a commit in a repository declaring
+  `hard_block_paths` the guard exits 2 and names v0.26.0 when `CLAUDE_PROJECT_DIR` is empty and
+  `CODEX_VERSION` or a `"turn_id":` key is present. Claude Code sets `CLAUDE_PROJECT_DIR` for every
+  hook, so neither signal turns its `ask` into a block. Codex users keep v0.26.0's behaviour until
+  they move to `keel-codex`.
 - **Adopting `onFailure: "block"`** (item 1 of the idea record) becomes possible without a
   per-harness condition. It is gated on the minimum version this design derives.
 
@@ -305,8 +309,8 @@ Still open, none blocking `write-plan`:
 
 5. **Does `lib/harness/claude.sh` fold into `bin/keel`?** With no second implementation the
    six-function contract has no reason to exist. Deciding it is a refactoring choice for the plan.
-6. **Does the `EXIT` trap in `sensitive-guard` stop exempting exit 2?** Depends on PR #7 landing
-   first. The plan decides.
+6. **Does the `EXIT` trap in `sensitive-guard` stop exempting exit 2?** No, answered by the plan:
+   the Codex refusal still exits 2 deliberately (section 8).
 7. **Should `keel-cursor`'s generator move to the public repository and fail on unknown
    frontmatter?** The port's maintainer decides. It does not block this repository.
 

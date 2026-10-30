@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-08-18, from open question 1 of `plsql-stack-detection.md` |
-| Status | **built 2026-08-18**, via `docs/plans/2026-08-18-usable-profile.md`, fully ticked. `plugins.recommended` is written at init, `bin/keel:444`, and read back at `lib/harness/claude.sh:82`. Open question 1 was answered by the requester on 2026-08-18 in favour of reporting, which is what shipped. Status corrected 2026-08-30 |
+| Status | **built 2026-08-18**, via `docs/plans/2026-08-18-usable-profile.md`, fully ticked. `plugins.recommended` is written at init, `bin/keel:366`, and read back at `lib/harness/claude.sh:82`. Open question 1 was answered by the requester on 2026-08-18 in favour of reporting, which is what shipped. Status corrected 2026-08-30 |
 | Recommendation | Build something smaller: write `plugins.recommended` at init so the reporting machinery that already exists starts checking the right list, and have doctor name the install command. Do not silently write into a settings file the project already had |
 | Next | `docs/prd/usable-profile.md` (draft, awaiting approval), written jointly with `profile-key-documentation.md` |
 

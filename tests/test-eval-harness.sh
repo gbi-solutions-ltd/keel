@@ -990,7 +990,7 @@ else
         "tmp=$([ -d "$d/tmp" ] && echo yes || echo no) recipe=$(grep -F 'claude -p' "$errf" | head -1)"
 fi
 
-# 41c. The recipe closes the arm's stdin and say this dispatch runs no isolation check. A dispatch
+# 41c. The recipe closes the arm's stdin and says this dispatch runs no isolation check. A dispatch
 # that is pasted from here has none of the dispatch.sh a gate gets, so the guide says to run the
 # check by hand first, from a disposable workspace (L-01 of docs/audits/2026-10-18-security.md). The
 # README's single-arm recipe is the same dispatch and closes stdin the same way.

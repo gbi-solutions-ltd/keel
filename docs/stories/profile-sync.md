@@ -73,10 +73,10 @@ Scenario: the path written is relative to the repository root
   Then the value written starts with docs_root and is not an absolute path
 ```
 
-**Notes:** NFR-02 says the write goes through `profile_set` (`bin/keel:973-1017`) rather than a
+**Notes:** NFR-02 says the write goes through `profile_set` (`bin/keel:699-760`) rather than a
 second writer, so the file's formatting matches what `keel profile set` produces. CON-01: every
-`artifacts.*` key is already seeded by `write_profile` at `bin/keel:389-392`, so `profile_set`'s
-refusal of unknown paths (`:990-998`) is not in the way. NFR-01 needs no work of its own, only the
+`artifacts.*` key is already seeded by `write_profile` at `bin/keel:367-370`, so `profile_set`'s
+refusal of unknown paths (`:715-724`) is not in the way. NFR-01 needs no work of its own, only the
 absence of a new dependency, which the coverage table records against this story.
 
 **A choice this story makes:** a directory key is written without a trailing slash, `docs/decisions`

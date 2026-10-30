@@ -60,7 +60,7 @@ authority fix, and it lives partly outside this codebase.
 1. Which loosening moves belong on the allow-list, and should it be a fixed table in `bin/keel` or
    itself a small declarative block (so it can be shared with `doctor --json`)?
 2. Should the pre-push refusal be a hard block or a `warn`-then-`required` escalation, consistent
-   with the house posture in Decision 3 (`docs/07-open-decisions.md:163-236`, "enforced with escape
+   with the house posture in Decision 3 (`docs/07-open-decisions.md:163-231`, "enforced with escape
    hatches")?
 3. Does `keel guard install` need to become a stronger recommendation (e.g. checked by `doctor`) now
    that it is the one mechanism doing real work here?

@@ -198,7 +198,7 @@ that citation points past the end of the file and the suite goes red. Added to s
 
 **Interfaces:**
 - Consumes: `report` (`tests/test-validate-skills.sh` has its own; the validator's is at
-  `tests/validate-skills.sh:95`), `frontmatter_of` (`:101`), and the content `find` loop (`:207`).
+  `tests/validate-skills.sh:96`), `frontmatter_of` (`:101`), and the content `find` loop (`:207`).
   In the test file: `run` (`:55`), `check_reports` (`:818`), `fixture_valid` (`:21`)
 - Produces: a frontmatter rule for `agents/*.md`, with a floor. No function other skills call
 

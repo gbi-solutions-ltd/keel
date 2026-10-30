@@ -1,5 +1,8 @@
 # Stories: tiered multi-harness support
 
+> Superseded on 2026-10-29 by ADR-0013
+> ([`ADR-0013-claude-code-is-the-only-harness.md`](../decisions/ADR-0013-claude-code-is-the-only-harness.md)).
+
 | | |
 |---|---|
 | Derived from | [`../architecture/tiered-multi-harness-support.md`](../architecture/tiered-multi-harness-support.md), accepted, and ADR-0003, ADR-0004, ADR-0005, all `accepted` 2026-09-05 |
