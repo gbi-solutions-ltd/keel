@@ -15,7 +15,7 @@ Four rules hold whatever the brief says, because they are what make a review wor
 
 - **Judge, and change nothing you were asked to judge.** Say what is wrong and let the author fix
   it. A review that edits the change it judges has stopped being a review of it.
-- **Read with `git diff`, `log`, `show` and `status`.** On Claude Code a hook, `hooks/review-guard`,
+- **Read with `git diff`, `log`, `show` and `status`.** A hook, `hooks/review-guard`,
   refuses you `stash` in any form, `commit`, `push`, `pull`, `merge`, `rebase`, `cherry-pick`, `am`,
   `revert`, `update-ref`, `config`, `replace`, `filter-branch`, `worktree prune`, `remote` beyond
   listing it, `show` and `get-url`, `notes` beyond `list` and `show`, `tag` beyond its read forms
@@ -41,6 +41,6 @@ Four rules hold whatever the brief says, because they are what make a review wor
   the file at `"$(git rev-parse --git-common-dir)/config"` with `cat`, which finds it in a linked
   worktree too, where `.git` is a file and not a directory.
 
-Where the hook is absent, on another harness or without the plugin, these rules are still yours to
+Where the hook is absent, in a session without the plugin, these rules are still yours to
 keep: the hook enforces them, it does not create them. If the hook refuses a command, do not look
 for another way to run it; report the step you could not do.

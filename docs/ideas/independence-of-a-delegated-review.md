@@ -22,11 +22,11 @@ nothing checks either, so the guarantee a user gets varies by which skill they h
   restored.
 - **Verified by reading.** The rules are restated across three and four files respectively. "If
   nothing blocks, say so in the first line" appears in
-  `skills/review-code/SKILL.md#If nothing blocks`, `skills/write-plan/references/plan-review.md:74`
+  `skills/review-code/SKILL.md#If nothing blocks`, `skills/write-plan/references/plan-review.md:73`
   and `skills/execute-plan/references/subagent-prompts.md`. The cite-a-location rule appears in
   those first two, in `skills/shape-idea/SKILL.md:42`, and twice in `agents/keel-fanout.md`.
 - **Verified by reading.** `write-plan` dispatches a reviewer (`SKILL.md#Then dispatch a reviewer`)
-  whose brief forbids the authoring context (`plan-review.md:83`), and `execute-plan` dispatches two
+  whose brief forbids the authoring context (`plan-review.md:82`), and `execute-plan` dispatches two
   (`skills/execute-plan/references/subagent-prompts.md#Dispatch implementation and both reviews`).
   `review-code` carries `Agent` in its `allowed-tools` (`:4`). Before task 3 it dispatched nothing:
   step 2 offered an external plugin and fell back to an inline pass. Since task 3 it dispatches its
@@ -102,7 +102,7 @@ answer for that shape: `docs/ideas/lint-after-each-edit.md` was declined on exac
 |---|---|---|
 | The plan-review scenario asked for is shipped | `skills/write-plan/SKILL.md#Then dispatch a reviewer`, brief at `references/plan-review.md`, model `inherit` | `skeptic` duplicates a working mechanism |
 | That brief exists because of a measured run, and its finding is the one `skeptic` omits | `plan-review.md`: a run given four self-review items over a flawed plan passed all four and found the central defect only because it opened a source file unprompted | A reviewer not told to read the repository is the reviewer that failed. `skeptic` never says to, and its `tools:` line omits Bash |
-| `skeptic` inverts a rule stated in three places | "Do not praise the plan" against `skills/review-code/SKILL.md#If nothing blocks, say so in the first line`, `plan-review.md:74`, `subagent-prompts.md` | A reviewer forbidden from approving invents findings. `review-code` step 4 requires saying when nothing blocks and naming what was checked |
+| `skeptic` inverts a rule stated in three places | "Do not praise the plan" against `skills/review-code/SKILL.md#If nothing blocks, say so in the first line`, `plan-review.md:73`, `subagent-prompts.md` | A reviewer forbidden from approving invents findings. `review-code` step 4 requires saying when nothing blocks and naming what was checked |
 | `skeptic` caps findings at five | Against `skills/review-code/SKILL.md#If nothing blocks, say so in the first line` and the cap-at-ten rule, which treats exceeding it as the finding | A cap drops the sixth finding with no signal |
 | Three of the five files name a vendor model alias | `code-reviewer: opus`, `builder: sonnet`, `docs-scout: haiku` | `docs/standards.md#A dispatch names its model, and says so` puts judging and gated writing on `inherit`, and the validator has failed a vendor alias in a skill body since 2026-09-06. `agents/` is unchecked, so these would enter through the one directory the rule does not reach |
 | Each role file duplicates a stronger skill | `code-reviewer` against `review-code` plus a 2,574 word rubric; `bug-hunter` against `debug`; `builder` against the implementer brief; `skeptic` against `plan-review.md`; `docs-scout` against `keel-fanout` | A role agent does not load the skill it is named after, so it would review against four lines instead of the rubric. That is the false-delegation-map class that the delegation check, `tests/validate-skills.sh#Every documented delegation must be one the skill actually makes`, exists to prevent, and its floor is `tests/validate-skills.sh#"$delegation_pairs" -ge 8` |

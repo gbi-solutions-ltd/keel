@@ -20,7 +20,7 @@ These load into every request in every session:
 | Source | How to measure |
 |---|---|
 | `CLAUDE.md`, and any imported file | `wc -c`, divided by about 3.6 for tokens |
-| `AGENTS.md`, if present | Same |
+| keel's managed block, inside `CLAUDE.md` | Its share of the row above, about 450 tokens |
 | `SessionStart` hook output | Run the hook, measure what it prints |
 | Skill descriptions | Sum the description characters of every installed skill and divide by about 3.6 |
 

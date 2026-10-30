@@ -174,8 +174,8 @@ run "an em dash in an agent file is rejected" 1 m_agent_em_dash
 
 # The model value is the one field a dispatching skill cannot override, so a typo here routes every
 # dispatch naming this profile to nothing. The vendor set is allowed HERE and rejected in a skill
-# body: an agent file is where a harness resolves a profile to a model, which is the indirection
-# `lib/harness/codex.sh` (deleted after v0.26.0) relied on to map keel-fanout to a Codex model.
+# body: agents/*.md is where Claude Code turns a delegation profile into a model, so an agent file
+# is the one place a model alias belongs.
 m_agent_bad_model() {
     mkdir -p "$1/agents"
     printf -- '---\nname: a\ndescription: Use when testing.\nmodel: gpt-4o\n---\n\nBody.\n' \
@@ -1408,6 +1408,21 @@ m_wh_plan_document() {
 }
 run "a withheld document with a dash and a broken link is not checked" 0 m_wh_audit_document
 run "the same text in a plan is checked" 1 m_wh_plan_document
+
+# No skill or agent names Codex. The needle is the reported file and line, so the case proves the
+# rule lists where the name is, not only that something failed.
+m_skill_names_codex() { printf '\nOn Codex, run it by hand.\n' >> "$1/skills/example/SKILL.md"; }
+m_agent_names_codex() {
+    mkdir -p "$1/agents"
+    printf -- '---\nname: a\ndescription: Use when testing.\nmodel: inherit\n---\n\nOn codex too.\n' \
+        > "$1/agents/a.md"
+}
+m_skill_names_claude_code() { printf '\nOn Claude Code, run it by hand.\n' >> "$1/skills/example/SKILL.md"; }
+check_reports "a skill naming Codex is reported with its line" yes \
+  "skills/example/SKILL.md:15:On Codex" m_skill_names_codex
+run "a skill naming Codex is rejected" 1 m_skill_names_codex
+run "an agent naming codex in lower case is rejected" 1 m_agent_names_codex
+run "a skill naming only Claude Code passes" 0 m_skill_names_claude_code
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

@@ -309,7 +309,7 @@ for style in output-styles/*.md; do
 done
 
 # A brief dispatched to a model alias that does not exist is a brief dispatched to nothing, and the
-# failure is silent. The five aliases below are the ones Claude Code accepts. A full model id is
+# failure is silent. Of the five aliases Claude Code accepts, a skill may name one. A full id is
 # also valid and is deliberately not permitted here: an id pinned in a skill goes stale without
 # anything noticing, while an alias tracks the current model.
 #
@@ -320,13 +320,13 @@ done
 # `Model \`inherit\`` at the start of a sentence. Until 2026-08-20 that pin was invisible here, so a
 # capital M was a way to hold an unchecked alias.
 #
-# UNTIL 2026-09-06 THIS ACCEPTED sonnet, opus, haiku, fable OR inherit, and four of those are
-# Anthropic model names that mean nothing on a second harness. Only `inherit` survives: it is
-# neutral and says "the driver's model", which is a real instruction on any harness. Everything else
-# is now a delegation profile, a name each harness resolves to its own model, written for Codex at
-# .codex/agents/keel-fanout.toml by lib/harness/codex.sh. ADR-0005.
+# ONLY `inherit` IS ACCEPTED, and it says "the driver's model". Every other dispatch names a
+# delegation profile such as keel-fanout, because docs/ideas/model-routing.md measured which model
+# the reading should run on: on 2026-08-20 haiku passed every structural check on repo-snapshot's
+# briefs and cited wrongly twice as often as sonnet. agents/*.md is where Claude Code turns a
+# delegation profile into a model, so the measured choice lives in one file per profile. ADR-0005.
 #
-# `inherit` IS NOT THE NEUTRAL REPLACEMENT FOR THE OTHER FOUR, and reading it as one inverts the
+# `inherit` IS NOT THE NEUTRAL REPLACEMENT FOR A VENDOR ALIAS, and reading it as one inverts the
 # routing decision: it means the driver's model, where a fan-out wants a cheaper one.
 # docs/ideas/model-routing.md is the standing evidence that the cheaper model can pass every
 # structural check and be wrong twice as often, which is why a profile is a name a harness resolves
@@ -345,9 +345,9 @@ bad_models=$(grep -rhoiE 'model `[a-z0-9.-]+`' skills/*/SKILL.md skills/*/refere
 # typo there routes every dispatch naming the profile to nothing and does it silently.
 #
 # THE VENDOR SET IS ALLOWED HERE AND REJECTED IN A SKILL BODY, deliberately. The check above exists
-# so a skill names a profile rather than a model; this file is the one place the profile becomes a
-# model, which is the indirection `lib/harness/codex.sh` (deleted after v0.26.0) relied on to map
-# keel-fanout to a Codex model. Forbidding the alias here would leave the mapping nowhere to live.
+# so a skill names a profile rather than a model; agents/*.md is where Claude Code turns a
+# delegation profile into a model, the one place the measured choice is written down. Forbidding
+# the alias here would leave the mapping nowhere to live.
 # The set is what the harness accepts, not what this tree uses: nothing here names fable, and a set
 # narrowed to current usage would reject a correct file the day somebody needs one.
 #
@@ -1066,6 +1066,15 @@ PYRB
     # is false and whose needle no test asserts is the delegation floor's mistake, which
     # tests/test-validate-skills.sh copies from nobody on purpose.
 fi
+
+# No skill or agent names Codex. Claude Code is keel's only harness, ADR-0013, and ports for other
+# harnesses translate from a pinned tag. A sentence naming another harness is one a model reads on
+# every load and has to decide does not apply, and each one held back wording that could state
+# plainly what Claude Code does. Every line is listed, so the failure says where to look.
+codex_lines=$(grep -rniI 'codex' skills agents 2>/dev/null || true)
+while IFS= read -r hit; do
+    [ -n "$hit" ] && report "$hit: names Codex, and Claude Code is the only harness (ADR-0013)"
+done <<< "$codex_lines"
 
 if [ "$errors" -eq 0 ]; then
     count=$(find skills -name SKILL.md 2>/dev/null | wc -l | tr -d ' ')
