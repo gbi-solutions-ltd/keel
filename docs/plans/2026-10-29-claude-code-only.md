@@ -1343,7 +1343,22 @@ into your report; if it lists anything this task did not touch, say so and leave
 **Done when:** `tests/test-doc-claims.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 10.1: Build it test first**
+**Review, 2026-10-30.** The first spec review returned DEVIATES on four points. Bernard chose a
+targeted fix pass on the staged work instead of discarding it, and accepted by name the 13
+citations the sweep repointed although they were already wrong at `main` (they were judged against
+`d6c421a`), since each now lands on the content its sentence names. The fix pass names 2.1.302 in
+the idea record, reverts the four `bin/keel:626` repoints (ADR-0004 and the 2026-09-05 design), and
+restates the sweep's counts. The 13 accepted rows: `docs/07-open-decisions.md:578` and `:608`;
+`docs/ideas/declared-profile-keys-take-effect.md:92`; `docs/ideas/leon-van-zyl-skill-collection.md:144`;
+`docs/ideas/snapshot-records-its-own-path.md:85`; `docs/plans/2026-08-30-profile-sync.md:47`;
+`docs/plans/2026-09-05-tiered-multi-harness-support.md:2140`;
+`docs/plans/2026-09-07-declared-profile-keys-take-effect.md:50`, `:786` and `:2247`;
+`docs/plans/2026-09-19-make-keel-enforceable-outside-the-agent.md:1888`; `docs/prd/profile-sync.md:112`;
+`docs/stories/profile-sync.md:78`. A 14th, `docs/stories/profile-sync.md:76`, which the sweep moved
+onto the same wrong lines, Bernard accepted on 2026-10-30 to be pointed at `profile_set` and its
+unknown-path refusal.
+
+- [x] **Step 10.1: Build it test first** Note: built by the implementer and two targeted fix passes Bernard chose over a discard; behaviour 1 grep 63 lines before, 9 after (each naming v0.26.0)
 
 Follow `keel:tdd`. Behaviour 1's grep is the failing test: run it before the edits, watch it list
 the current Codex sentences, then edit until it prints only lines containing `v0.26.0`.
@@ -1357,7 +1372,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 A red in either validator is this task's. This is the one boundary run the task schedules.
 
-- [ ] **Step 10.2: Hand over**
+- [x] **Step 10.2: Hand over** Note: rounds: 4 (one implementer, three fix passes); routing: inherit; loop: full; spec DEVIATES then COMPLIES on re-review with 14 accepted citation repoints; quality blocking (docs/01) fixed and re-reviewed
 
 ```bash
 git add README.md CHANGELOG.md docs/01-architecture.md docs/02-skill-catalog.md \
