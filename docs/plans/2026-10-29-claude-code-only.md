@@ -548,7 +548,7 @@ reads the key as `printf '%s\n' 'harnesses` and cannot see it.
 **Done when:** `tests/test-doc-claims.sh` and `tests/test-validate-skills.sh` pass, and
 `tests/validate-citations.sh` and `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 4b.1: Build it test first**
+- [x] **Step 4b.1: Build it test first** Note: built by the implementer; both reds reproduced by the spec reviewer against HEAD's parsers
 
 Follow `keel:tdd` for each behaviour: write its test from the example, run it, and watch it fail
 for the reason the behaviour names, then write the minimal implementation and watch it pass.
@@ -561,7 +561,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 A red in either validator is this task's. This is the one boundary run the task schedules.
 
-- [ ] **Step 4b.2: Hand over**
+- [x] **Step 4b.2: Hand over** Note: rounds: 1; routing: inherit; loop: full; spec COMPLIES; quality: no blocking, the extraction can fail silently and is duplicated, which task 4c removes
 
 ```bash
 git add tests/test-doc-claims.sh tests/validate-skills.sh lib/harness/claude.sh tests/test-validate-skills.sh
@@ -573,6 +573,79 @@ Stage those paths, and each file whose broken citation this task repaired, by na
 `git commit -s -m "test: read the retired-key register by running it"`. Paste the
 `git status --porcelain` output into your report; if it lists anything this task did not touch, say
 so and leave it unstaged.
+
+### Task 4c: the retired-key register lives in a file both bin/keel and the checks source
+
+Added by the coordinator on 2026-10-30 from task 4b's quality review. Task 4b's checks extract
+`retired_keys` from `bin/keel` with a `sed` range and `eval`, and when that extraction fails (a
+header written `retired_keys () {`, a row starting with `}`, an unbound variable) both read an empty
+register and pass in silence, which is the blindness task 4b set out to close. The extraction is
+also written twice.
+
+**Story:** G1, ADR-0013
+**Files:**
+- Create: `lib/retired-keys.sh`
+- Modify: `bin/keel`
+- Modify: `tests/validate-skills.sh`
+- Modify: `tests/test-doc-claims.sh`
+- Modify: `lib/harness/claude.sh` (its header comment only)
+- Test: `tests/test-validate-skills.sh`
+- Plus each file whose citation into `bin/keel` this task's edits break
+
+**Interfaces:**
+- Consumes: `retired_keys` as task 4 left it in `bin/keel`
+- Produces: `lib/retired-keys.sh`, defining `retired_keys` (same output: one `path|version|message`
+  row per line) and nothing else, with no top-level command; `bin/keel` sources it and lists it in
+  its install check (`_need`)
+
+**Depends on:** task 4b
+
+**Behaviours:**
+
+1. `bin/keel` behaves as before. Example: `keel doctor` on a schema 6 profile with `harnesses` still
+   warns that it is retired in schema 7, and `tests/test-keel-4.sh` passes unchanged.
+2. Both checks source `lib/retired-keys.sh` and run `retired_keys`, with no `sed` and no `eval`.
+   Example: `grep -c 'sed -n "/^retired_keys' tests/validate-skills.sh tests/test-doc-claims.sh`
+   prints 0 for both.
+3. A register that cannot be read, or reads empty, fails loudly. Example: in a
+   `tests/test-validate-skills.sh` fixture whose `lib/retired-keys.sh` is missing, or defines
+   `retired_keys` to print nothing, the validator fails with a message naming
+   `lib/retired-keys.sh`; `tests/test-doc-claims.sh` fails the same way if the register reads empty.
+4. The test-doc-claims canary does not hard-code a key. Example: it copies the profile, sets the
+   first key `retired_keys` prints, and expects that key named; its temporary directory is removed
+   by an `EXIT` trap.
+5. `lib/harness/claude.sh`'s header is accurate. Example: `harness_config_paths` is described as
+   printing `committed|<path>` and `local|<path>` lines, `harness_doctor_findings` names its phase
+   argument, and the paragraph after the list does not call `harness_context_file` "the last".
+
+**Done when:** `tests/test-validate-skills.sh`, `tests/test-doc-claims.sh` and `tests/test-keel-4.sh`
+pass, and `tests/validate-citations.sh` and `tests/validate-skills.sh` report OK.
+
+- [ ] **Step 4c.1: Build it test first**
+
+Follow `keel:tdd` for each behaviour: write its test from the example, run it, and watch it fail
+for the reason the behaviour names, then write the minimal implementation and watch it pass.
+Run: `tests/test-validate-skills.sh`
+Expected before the implementation: FAIL, the case for behaviour 3 fails because a missing or empty
+register passes in silence. Expected after: PASS. Quote the failing output in your report.
+
+Run: `tests/run-tests.sh`.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+A red in either validator is this task's. This is the one boundary run the task schedules.
+
+- [ ] **Step 4c.2: Hand over**
+
+```bash
+git add lib/retired-keys.sh bin/keel tests/validate-skills.sh tests/test-doc-claims.sh \
+        lib/harness/claude.sh tests/test-validate-skills.sh
+git status --porcelain
+```
+
+Stage those paths, and each file whose broken citation this task repaired, by name, and stop.
+**Do not commit.** The coordinator commits after both review passes, with
+`git commit -s -m "refactor(keel): keep the retired-key register in a file the checks source"`.
+Paste the `git status --porcelain` output into your report; if it lists anything this task did not
+touch, say so and leave it unstaged.
 
 ### Task 5: `keel init` stops writing `AGENTS.md`
 
@@ -657,7 +730,7 @@ touch, say so and leave it unstaged.
   a harness
 - Produces: a ledger with `provides|claude|...` and `requires|...` rows only
 
-**Depends on:** tasks 2, 2b, 2c, 3, 4 and 4b
+**Depends on:** tasks 2, 2b, 2c, 3, 4, 4b and 4c
 
 **Behaviours:**
 
