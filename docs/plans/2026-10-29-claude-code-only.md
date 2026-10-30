@@ -101,13 +101,13 @@ are, so no task's files are fully known before it runs and none may share a tree
 **Done when:** there is no command. This is a probe against an external tool, and its output is the
 record; the reviewer checks the record names its commands and that `~/.codex` was not touched.
 
-- [ ] **Step 1.1: There is no test for this**
+- [x] **Step 1.1: There is no test for this** Note: probe run by the implementer, not witnessed by the coordinator; spec reviewer re-checked the ~/.codex checksum and the tag commit
 
 This task is a probe of Codex's behaviour, which no test in this repository can exercise. Run it as
 the behaviours say, then write the record. Run `tests/validate-citations.sh` after writing it.
 Expected: OK.
 
-- [ ] **Step 1.2: Hand over**
+- [x] **Step 1.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES, three wording points noted (install line joins two commands)
 
 ```bash
 git add docs/architecture/claude-code-only.md
@@ -143,11 +143,17 @@ touch, say so and leave it unstaged.
    the variable; a `python3` shim earlier on `PATH` that exits 2 makes the same commit print the
    `ask` decision with "the guard failed unexpectedly" and exit 0; `grep -ic codex
    hooks/sensitive-guard tests/test-sensitive-guard.sh` prints 0 for both.
-3. **If task 1's verdict is `yes`:** the hook keeps one refusal, with no resolver: `CODEX_VERSION`
-   set makes it print to stderr that Codex discards `ask` and that Codex users stay on v0.26.0, and
-   exit 2, before reading any profile. A comment above it cites task 1's record. The trap keeps
-   exempting 0 and 2. Example: with `CODEX_VERSION=0.153.4` set in a repository with no
-   `.keel/profile.json`, any Bash event gets exit 2 and the stderr line naming v0.26.0.
+3. **If task 1's verdict is `yes`:** the hook keeps one refusal, with no resolver, at the point it
+   refuses today: after the cheap gate and the empty-list check, so only a command that looks like a
+   commit in a repository declaring a non-empty `hard_block_paths` reaches it, keeping the header's
+   rule that a repository asking for nothing is never blocked. There, `CODEX_VERSION` set makes it
+   print to stderr that Codex discards `ask` and that Codex users stay on v0.26.0, and exit 2. A
+   comment above it cites task 1's record. The trap keeps exempting 0 and 2. Examples: with
+   `CODEX_VERSION=0.153.4` set, a profile listing `src/auth` and `git commit -m x`, the hook exits 2
+   and its stderr names v0.26.0; with the same variable and `ls`, or with a profile declaring
+   `"hard_block_paths": []`, it exits 0 with no output.
+   (Corrected by the coordinator on 2026-10-30, before task 2 was dispatched: the first wording
+   refused every Bash event on Codex, which contradicted the hook's own invariant.)
 4. Everything the hook did on Claude Code is unchanged. Example: the existing cases that set no
    `CODEX_VERSION` and do not depend on the resolver pass unchanged, including the crash case and
    the unreadable-profile case.
@@ -750,10 +756,11 @@ into your report; if it lists anything this task did not touch, say so and leave
   superseded status line at the top of each, nothing else)
 - Modify: `docs/ideas/claude-code-features-assessed-2026-10-29.md` (its Next row and its case
   against, per behaviour 6)
+- Modify: `docs/architecture/claude-code-only.md` (section 7's Codex rows, per behaviour 8)
 - Test: `tests/test-doc-claims.sh`
 
 **Interfaces:**
-- Consumes: tasks 1 to 9; task 1's install line
+- Consumes: tasks 1 to 9; task 1's verdict and install lines
 - Produces: nothing
 
 **Depends on:** tasks 1 to 9
@@ -780,6 +787,10 @@ into your report; if it lists anything this task did not touch, say so and leave
    of guarantee; item 8's verdict notes its ADR-0005 reason is gone and the item is reopened; and the
    minimum it names is 2.1.302, per task 7.
 7. The README claims still check. Example: `tests/test-doc-claims.sh` passes.
+8. The design's failure table matches task 1's probe. Example: the row for a Codex user installing
+   from `main` no longer says "nothing loads"; it says Codex loads the Claude Code hook set from
+   `hooks/hooks.json` and that `sensitive-guard` refuses a sensitive commit there, as task 2 left it.
+   (Added by the coordinator on 2026-10-30 from task 1's report.)
 
 **Done when:** `tests/test-doc-claims.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
@@ -806,7 +817,7 @@ git add README.md CHANGELOG.md docs/01-architecture.md docs/02-skill-catalog.md 
         docs/05-token-and-memory-design.md docs/06-repo-layout.md docs/07-open-decisions.md \
         docs/snapshot.md docs/standards.md docs/runbooks/cutting-a-release.md \
         docs/ideas/keel-on-codex.md docs/stories/tiered-multi-harness-support.md \
-        docs/ideas/claude-code-features-assessed-2026-10-29.md
+        docs/ideas/claude-code-features-assessed-2026-10-29.md docs/architecture/claude-code-only.md
 git status --porcelain
 ```
 
