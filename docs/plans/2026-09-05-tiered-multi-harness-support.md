@@ -1681,7 +1681,7 @@ coordinator commits after both review passes, with
 > Four things the steps did not have right:
 >
 > 1. **The capability row breaks two of the manifest's own rules as written.** Its `<source>` has no
->    `vendor:` or `probe:` prefix, which `tests/test-harness-resolve.sh:72` fails outright, and its
+>    `vendor:` or `probe:` prefix, which `tests/test-harness-resolve.sh:89` fails outright, and its
 >    `<version>` is `0.18.0`, which is **keel's** version where the file's header says the column is
 >    the harness's and that `keel doctor`'s comparison means nothing if keel's goes there. The row
 >    landed as a `probe:` citing ADR-0001 and `tests/evals/results.md` at "Both bodies over the 700
@@ -2564,7 +2564,7 @@ passes, with `git commit -m "feat(harness): ship the Codex plugin manifest"`.
 > `provides` row is unsafe; a doctor line that cries wolf on every machine gets ignored, which
 > costs more than it saves.
 >
-> **2. The two context window messages at `bin/keel:1592` and `:1552` are Claude Code numbers.**
+> **2. The two context window messages at `bin/keel:1608` and `:1552` are Claude Code numbers.**
 > They say the watchdog is "assuming 200000" and that a value below "the $cwdef default" has no
 > effect. Since 2026-09-06 a Codex rollout states its own window, `model_context_window`, 258400 on
 > the probed session, so on Codex both sentences name the wrong baseline. This was left to this task
@@ -3980,7 +3980,7 @@ correct.** Fixed in place:
 | Task 4 step 2 mutated a tracked file while `MAX_JOBS=4` jobs read it | `tests/run-tests.sh#capped at 4 concurrent` | task 4 |
 | A one-line tag lookback fails any claim that wraps | the support page's own paragraph | task 5 |
 | Task 7's committed baseline contradicts the suite's stated policy | `tests/keel-test-lib.sh#Fixtures are generated per` | task 7 |
-| `cmd_doctor` would call functions that exist for one harness only | `bin/keel:1369` | task 7, sixth contract function |
+| `cmd_doctor` would call functions that exist for one harness only | `bin/keel:1385` | task 7, sixth contract function |
 
 ### Not fixed, with reasons
 

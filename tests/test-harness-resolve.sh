@@ -67,6 +67,23 @@ got="$(provenance_gaps "$fx" | sort | tr '\n' ' ')"
   || bad "the provenance check fires on empty, blank and wrong-arity rows" "got: $got"
 rm -f "$fx"
 
+# Every version is dotted numbers. harness_version_ge does arithmetic on each field, so a 2.1.x
+# would reach keel doctor as an arithmetic error rather than as a ledger row to fix; caught here,
+# it names the row.
+version_gaps() {   # version_gaps <file>
+    awk -F'|' '$1=="provides" && $5 !~ /^[0-9]+(\.[0-9]+)+$/ {print $2"/"$3}' "$1"
+}
+odd="$(version_gaps "$CAP")"
+[ -z "$odd" ] && ok "a malformed ledger version is caught by the ledger test: every provides row's version is dotted numbers" \
+  || bad "a malformed ledger version is caught by the ledger test: every provides row's version is dotted numbers" "$odd"
+fx="$(mktemp)"
+printf 'provides|ghost|a|src|2.1.302|2026-01-01\nprovides|ghost|b|src|2.1.x|2026-01-01\nprovides|ghost|c|src|2|2026-01-01\n' > "$fx"
+got="$(version_gaps "$fx" | tr '\n' ' ')"
+[ "$got" = "ghost/b ghost/c " ] \
+  && ok "a malformed ledger version is caught by the ledger test: a fixture with 2.1.x fails it" \
+  || bad "a malformed ledger version is caught by the ledger test: a fixture with 2.1.x fails it" "got: ${got:-<none>}"
+rm -f "$fx"
+
 # Every source says which kind of evidence it is. A keel file is neither kind.
 unkinded="$(awk -F'|' '$1=="provides" && $4 !~ /^(vendor|probe):/ {print $2"/"$3}' "$CAP")"
 [ -z "$unkinded" ] && ok "every source is marked vendor: or probe:" \

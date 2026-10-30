@@ -1282,50 +1282,66 @@ PY
         harness_gate_active claude "$g" || warn "claude does not get $g"
     done
     # The installed Claude Code against keel's minimum, the highest version a gate's primitive was
-    # verified on, which lib/harness/resolve.sh derives from the ledger. KEEL_CLAUDE names the
-    # command and defaults to `claude`. Set but empty is an error and not a fallback, the rule
-    # KEEL_CAPABILITIES follows in lib/harness/resolve.sh, so it names no command and doctor cannot
-    # tell. The command runs in the background and is polled, then killed after five seconds: a
-    # claude stopped at a login or an update prompt must not stop doctor, neither `timeout` nor
-    # `gtimeout` can be assumed, and bash 3.2 has no `wait -n`. Its output goes to a file rather
-    # than a $( ), where a child it left behind would hold the pipe open past the kill. Parsed in
-    # bash, because doctor's python3 starts are budgeted (tests/test-keel.sh). Ten polls a tenth of a
-    # second apart, which is when a working claude answers, then four a second apart: five seconds
-    # in fourteen sleeps rather than fifty, since each is a process start and fifty of them added
-    # half a second to a hung run. `sleep 0.1` takes a fraction on macOS, GNU and BusyBox.
-    local cc_cmd="${KEEL_CLAUDE-claude}" cc_min cc_out cc_pid cc_n=0 cc_ver="" cc_late="" cc_gv
-    cc_min="$(harness_min_version)"
-    if cc_out="$(mktemp)"; then
-        "$cc_cmd" --version </dev/null >"$cc_out" 2>/dev/null &
-        cc_pid=$!
-        while kill -0 "$cc_pid" 2>/dev/null && [ "$cc_n" -lt 14 ]; do
-            if [ "$cc_n" -lt 10 ]; then sleep 0.1; else sleep 1; fi
-            cc_n=$((cc_n+1))
-        done
-        if kill -0 "$cc_pid" 2>/dev/null; then
-            kill "$cc_pid" 2>/dev/null
-        else
-            read -r cc_ver _ < "$cc_out"
-        fi
-        wait "$cc_pid" 2>/dev/null
-        rm -f "$cc_out"
-    fi
-    cc_ver="${cc_ver%$'\r'}"
-    case "$cc_ver" in
-      *[!0-9.]*|.*|*.|*..*) cc_ver="" ;;
-      *.*) ;;
-      *) cc_ver="" ;;
-    esac
-    if [ -z "$cc_ver" ]; then
-        warn "cannot tell whether this Claude Code runs keel's gates: '$cc_cmd --version' printed no version within 5 seconds. keel needs Claude Code $cc_min or later."
-    elif harness_version_ge "$cc_ver" "$cc_min"; then
-        good "Claude Code $cc_ver meets keel's minimum, $cc_min"
+    # verified on, which lib/harness/resolve.sh derives from the ledger. No minimum is a warning of
+    # its own and never a pass: harness_version_ge counts every version at or above nothing.
+    # KEEL_CLAUDE names the command and defaults to `claude`. Set but empty is an error and not a
+    # fallback, the rule KEEL_CAPABILITIES follows in lib/harness/resolve.sh, so it names no command
+    # and doctor cannot tell. The command runs in the background and is polled, then killed after
+    # five seconds: a claude stopped at a login or an update prompt must not stop doctor, neither
+    # `timeout` nor `gtimeout` can be assumed, and bash 3.2 has no `wait -n`. The kill is SIGKILL,
+    # because a claude that ignores SIGTERM held an unbounded `wait`, and a --version run has
+    # nothing to clean up. Its output goes to a file rather than a $( ), where a child it left
+    # behind would hold the pipe open past the kill. Parsed in bash, because doctor's python3
+    # starts are budgeted (tests/test-keel.sh): the first line whose first word, less a leading v,
+    # starts with a dotted number, so `v2.1.312`, `2.1.303-beta.1` and a warning line before the
+    # version all read. Ten polls a tenth of a second apart, which is when a working claude
+    # answers, then four a second apart: five seconds in fourteen sleeps rather than fifty, since
+    # each is a process start and fifty of them added half a second to a hung run. `sleep 0.1`
+    # takes a fraction on macOS, GNU and BusyBox. Each warning names its cause, since the fix for a
+    # missing command, a hung one and one printing something else differs.
+    local cc_cmd="${KEEL_CLAUDE-claude}" cc_min cc_out cc_pid cc_n=0 cc_ver="" cc_why="" cc_w
+    local cc_late="" cc_gv
+    if ! cc_min="$(harness_min_version)"; then
+        warn "cannot read keel's minimum Claude Code version from the capability ledger, so this Claude Code is not checked against it"
     else
-        for g in $(harness_gates); do
-            cc_gv="$(harness_gate_version "$g")" || continue
-            harness_version_ge "$cc_ver" "$cc_gv" || cc_late="$cc_late, $g ($cc_gv)"
-        done
-        warn "Claude Code $cc_ver is older than keel's minimum, $cc_min. These gates rest on a primitive verified only on a later version: ${cc_late#, }. Update Claude Code, or treat them as unverified here."
+        if ! command -v "$cc_cmd" >/dev/null 2>&1; then
+            cc_why="'$cc_cmd' was not found"
+        elif ! cc_out="$(mktemp)"; then
+            cc_why="no temporary file for the output of '$cc_cmd --version'"
+        else
+            "$cc_cmd" --version </dev/null >"$cc_out" 2>/dev/null &
+            cc_pid=$!
+            while kill -0 "$cc_pid" 2>/dev/null && [ "$cc_n" -lt 14 ]; do
+                if [ "$cc_n" -lt 10 ]; then sleep 0.1; else sleep 1; fi
+                cc_n=$((cc_n+1))
+            done
+            if kill -0 "$cc_pid" 2>/dev/null; then
+                kill -KILL "$cc_pid" 2>/dev/null
+                cc_why="'$cc_cmd --version' was stopped after 5 seconds without answering"
+            else
+                while read -r cc_w _ || [ -n "$cc_w" ]; do
+                    cc_w="${cc_w#v}"; cc_w="${cc_w%%[!0-9.]*}"
+                    case "$cc_w" in
+                      .*|*.|*..*) ;;
+                      *.*) cc_ver="$cc_w"; break ;;
+                    esac
+                done < "$cc_out"
+                cc_why="'$cc_cmd --version' ran, but its output named no version"
+            fi
+            wait "$cc_pid" 2>/dev/null
+            rm -f "$cc_out"
+        fi
+        if [ -z "$cc_ver" ]; then
+            warn "cannot tell whether this Claude Code runs keel's gates: $cc_why. keel needs Claude Code $cc_min or later."
+        elif harness_version_ge "$cc_ver" "$cc_min"; then
+            good "Claude Code $cc_ver meets keel's minimum, $cc_min"
+        else
+            for g in $(harness_gates); do
+                cc_gv="$(harness_gate_version "$g")" || continue
+                harness_version_ge "$cc_ver" "$cc_gv" || cc_late="$cc_late, $g ($cc_gv)"
+            done
+            warn "Claude Code $cc_ver is older than keel's minimum, $cc_min. These gates rest on a primitive verified only on a later version: ${cc_late#, }. Update Claude Code, or treat them as unverified here."
+        fi
     fi
     if grep -q '"hard_block_paths"' .keel/profile.json 2>/dev/null; then
         harness_provides claude pretooluse_ask \

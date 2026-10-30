@@ -1920,12 +1920,12 @@ reading the cited line and asking whether it says what the document says it says
 Haiku's failures are systematic rather than random. It is consistently **one line low on
 `.keel/profile.json`**, citing `:11` for `language` (line 10), `:13` for `framework` (line 12) and
 `:14` for `package_manager` (line 13), three separate claims in three separate sections all off by
-the same one. It cites `bin/keel:1909` for the `keel init` dispatch, which is the `*) die "unknown
+the same one. It cites `bin/keel:1925` for the `keel init` dispatch, which is the `*) die "unknown
 command"` catch-all, the dispatch being at `:1845`. It cites `.gitignore:9-11` for an evals carve-out
 that is at `:20`. It cites `lib/apex_export.py:123-134` for when SQLcl is invoked, which is a SQL
 header constant.
 
-Sonnet's three are `bin/keel:1914-1922` for the profile defaults, which are past the end of a
+Sonnet's three are `bin/keel:1930-1938` for the profile defaults, which are past the end of a
 1,864-line file and actually at `:430-444`, and `.keel/profile.json:36-40` for the `observability`
 block, which is the `gates` block.
 
@@ -2661,7 +2661,7 @@ both be true unless the denominator is wrong. It is.
 **Section 5, delegated, scores zero of zero because it is invisible, not because it passed.** Opened
 and read: it is prose paragraphs plus two fenced blocks, and the instrument skips fenced blocks and
 counts only table rows and bullets. It carries real claims and real citations
-(`.github/workflows/ci.yml:23-28`, `.keel/profile.json:30-35`, `bin/keel:1846`) and real uncited ones
+(`.github/workflows/ci.yml:23-28`, `.keel/profile.json:30-35`, `bin/keel:1862`) and real uncited ones
 ("`timeout` is absent on this macOS host"), and **none of them scored in either direction**. A section
 written as prose cannot be marked uncited, so writing prose is how a document scores well.
 
@@ -5622,7 +5622,7 @@ parallel merge") in one of four runs under load, and once on the Mac. The output
 satisfies every assertion, so the assertion is what flaked: `printf '%s\n' "$out" | grep -qx ...`
 under `set -o pipefail` fails when `grep -q` exits before `printf` has written, with status 141.
 Measured on 18,000 trials of the bare pattern, six in parallel: five failures. About 190 sites in
-`tests/*.sh` have that shape, and so do `bin/keel:1619` and
+`tests/*.sh` have that shape, and so do `bin/keel:1635` and
 `tests/generate-harness-artifacts.sh:118`. It was not fixed in this change, because a rewrite of
 that many assertions was not this change's to make. **It is fixed afterwards** by `tests/grep-quiet.sh`
 and the one-line `set` form in every test file that has such a pipeline, with a lint in

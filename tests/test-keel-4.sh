@@ -1236,6 +1236,18 @@ cv_fx="$(fixture node-ts)"
 ( cd "$cv_fx" && "$KEEL" init -y >/dev/null 2>&1 )
 cv_min="$(bash -c ". '$ROOT/lib/harness/resolve.sh'; harness_min_version")"
 cv_stub="$(mktemp -d)"
+# A stub that hangs writes its pid first, and exec keeps that pid for the sleep, so the sleep can
+# be found and killed if doctor left it running. ps names the command, so a pid reused since is not
+# killed. The trap repeats tests/keel-test-lib.sh's own, which a second trap on EXIT replaces.
+cv_reap() {
+    local p
+    [ -f "$cv_stub/pids" ] || return 0
+    while read -r p; do
+        case "$(ps -p "$p" -o comm= 2>/dev/null)" in *sleep) kill -9 "$p" 2>/dev/null ;; esac
+    done < "$cv_stub/pids"
+    return 0
+}
+trap 'cv_reap; rm -rf "$FIXTURE_CACHE" "$(dirname "$KEEL_CLAUDE")"' EXIT
 cv_doctor() {   # cv_doctor <stub body>; doctor --fast's output with KEEL_CLAUDE running that body
     printf '#!/bin/sh\n%s\n' "$1" > "$cv_stub/claude"
     chmod +x "$cv_stub/claude"
@@ -1251,6 +1263,34 @@ case "$line" in
   "ok    "*2.1.312*"$cv_min"*) ok "doctor compares Claude Code with the minimum: 2.1.312 is a good line naming both" ;;
   *) bad "doctor compares Claude Code with the minimum: 2.1.312 is a good line naming both" "line: ${line:-<none>}" ;;
 esac
+
+# Common version spellings parse: a leading v, a pre-release suffix, and a warning line printed
+# before the version.
+spelling() {   # spelling <case name> <stub body> <version doctor must name>
+    local line; line="$(cv_line "$(cv_doctor "$2")")"
+    case "$line" in
+      "ok    Claude Code $3 meets"*"$cv_min") ok "$1" ;;
+      *) bad "$1" "line: ${line:-<none>}" ;;
+    esac
+}
+spelling "common version spellings parse: v2.1.312 is 2.1.312" "echo v2.1.312" 2.1.312
+spelling "common version spellings parse: 2.1.303-beta.1 (Claude Code) is 2.1.303" \
+  "echo '2.1.303-beta.1 (Claude Code)'" 2.1.303
+spelling "common version spellings parse: a version on the line after a warning is read" \
+  "echo 'Warning: an update is available'; echo '2.1.305 (Claude Code)'" 2.1.305
+
+# An empty minimum never reads as a pass: harness_version_ge counts any version at or above
+# nothing, so an unreadable ledger would otherwise print the good line with no minimum in it.
+cv_empty="$cv_stub/empty-ledger"; : > "$cv_empty"
+printf '#!/bin/sh\necho 2.1.312\n' > "$cv_stub/claude"; chmod +x "$cv_stub/claude"
+out="$( cd "$cv_fx" && KEEL_CAPABILITIES="$cv_empty" KEEL_CLAUDE="$cv_stub/claude" "$KEEL" doctor --fast 2>&1 )"
+if ! printf '%s\n' "$out" | grep -q "^WARN  cannot read keel's minimum Claude Code version"; then
+    bad "an empty minimum never reads as a pass" "no warning; Claude Code lines: $(printf '%s\n' "$out" | grep 'Claude Code' | tr '\n' ' ')"
+elif printf '%s\n' "$out" | grep -qE '^ok +Claude Code'; then
+    bad "an empty minimum never reads as a pass" "a good line as well: $(printf '%s\n' "$out" | grep -E '^ok +Claude Code')"
+else
+    ok "an empty minimum never reads as a pass"
+fi
 
 # The gates this version is too old for, worked out from the ledger the way doctor must.
 # shellcheck source=lib/harness/resolve.sh
@@ -1275,10 +1315,11 @@ done
   && ok "doctor compares Claude Code with the minimum: 2.1.280 warns, naming each gate verified only later" \
   || bad "doctor compares Claude Code with the minimum: 2.1.280 warns, naming each gate verified only later" "$miss; line: ${line:-<none>}"
 
-cannot_tell() {   # cannot_tell <case name> <doctor output>; the warning, and no good line beside it
+# cannot_tell <case name> <doctor output> <cause>: the warning, naming that cause, and no good line.
+cannot_tell() {
     local line; line="$(cv_line "$2")"
     case "$line" in
-      "WARN  cannot tell whether this Claude Code runs keel's gates"*)
+      "WARN  cannot tell whether this Claude Code runs keel's gates: "*"$3"*)
         if printf '%s\n' "$2" | grep -qE '^ok    Claude Code [0-9]'; then
             bad "$1" "a good line as well: $line"
         else
@@ -1288,19 +1329,37 @@ cannot_tell() {   # cannot_tell <case name> <doctor output>; the warning, and no
     esac
 }
 out="$( cd "$cv_fx" && KEEL_CLAUDE="$cv_stub/no-such-claude" "$KEEL" doctor --fast 2>&1 )"
-cannot_tell "doctor compares Claude Code with the minimum: a command that does not exist cannot tell" "$out"
+cannot_tell "the warning names its cause: a command that does not exist was not found" "$out" "was not found"
 out="$(cv_doctor "echo garbage")"
-cannot_tell "doctor compares Claude Code with the minimum: output with no version cannot tell" "$out"
+cannot_tell "the warning names its cause: output with no version named no version" "$out" "its output named no version"
 
-# A claude that hangs, on a login or an update prompt, must not hang doctor. exec, so the kill
-# reaches the sleep itself rather than a shell that would leave it running.
-TIMEFORMAT=%R
-cv_secs="$( { time cv_doctor "exec sleep 10" > "$cv_stub/out"; } 2>&1 )"
-unset TIMEFORMAT
-cannot_tell "doctor compares Claude Code with the minimum: one that hangs is killed and cannot tell" "$(cat "$cv_stub/out")"
-[ "${cv_secs%.*}" -ge 5 ] 2>/dev/null && [ "${cv_secs%.*}" -lt 7 ] \
-  && ok "doctor compares Claude Code with the minimum: one that hangs is killed after 5 seconds, and doctor ends inside 7 ($cv_secs)" \
-  || bad "doctor compares Claude Code with the minimum: one that hangs is killed after 5 seconds, and doctor ends inside 7" "took ${cv_secs:-?} seconds"
+# A claude that hangs, on a login or an update prompt, must not hang doctor, and neither must one
+# that ignores SIGTERM. Each stub sleeps 60 seconds and doctor must end inside 30, so a loaded
+# machine slowing doctor down does not turn the case red. The floor of 5 is the kill's own delay.
+hung() {   # hung <stub body>; doctor's output into $cv_stub/out, its seconds into cv_secs
+    local TIMEFORMAT=%R
+    cv_secs="$( { time cv_doctor "echo \$\$ >> '$cv_stub/pids'; $1" > "$cv_stub/out"; } 2>&1 )"
+}
+gone() {   # gone; 0 when no pid a stub wrote is still a running process
+    local p
+    while read -r p; do kill -0 "$p" 2>/dev/null && return 1; done < "$cv_stub/pids"
+    return 0
+}
+hung "exec sleep 60"
+cannot_tell "the warning names its cause: one that hangs was stopped after 5 seconds" "$(cat "$cv_stub/out")" "stopped after 5 seconds"
+[ "${cv_secs%.*}" -ge 5 ] 2>/dev/null && [ "${cv_secs%.*}" -lt 30 ] \
+  && ok "the hang test does not depend on doctor's speed: one that hangs is killed after 5 seconds, and doctor ends inside 30 ($cv_secs)" \
+  || bad "the hang test does not depend on doctor's speed: one that hangs is killed after 5 seconds, and doctor ends inside 30" "took ${cv_secs:-?} seconds"
+cv_reap
+
+hung "trap '' TERM; exec sleep 60"
+cannot_tell "a claude that ignores SIGTERM is still stopped: the timed-out warning" "$(cat "$cv_stub/out")" "stopped after 5 seconds"
+[ "${cv_secs%.*}" -lt 30 ] 2>/dev/null \
+  && ok "a claude that ignores SIGTERM is still stopped: doctor ends inside 30 seconds ($cv_secs)" \
+  || bad "a claude that ignores SIGTERM is still stopped: doctor ends inside 30 seconds" "took ${cv_secs:-?} seconds"
+gone && ok "a claude that ignores SIGTERM is still stopped: no stub process is left running" \
+  || bad "a claude that ignores SIGTERM is still stopped: no stub process is left running" "pids: $(tr '\n' ' ' < "$cv_stub/pids")"
+cv_reap
 
 # The suite's own doctor runs: tests/keel-test-lib.sh exports a KEEL_CLAUDE that prints the
 # current minimum, so the roughly 140 of them print the same line on a machine with claude on PATH
