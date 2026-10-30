@@ -262,6 +262,79 @@ Stage those paths, and each file whose broken citation this task repaired, by na
 `git status --porcelain` output into your report; if it lists anything this task did not touch, say
 so and leave it unstaged.
 
+### Task 2c: `sensitive-guard` never reads a Claude Code session as Codex
+
+Added by the coordinator on 2026-10-30 from task 2b's quality review. Claude Code 2.1.314's
+`MessageDisplay` hook input already carries `turn_id`, so if its `PreToolUse` input ever gains one,
+the refusal would hard-block sensitive commits on Claude Code. Bernard chose on 2026-10-30 to gate
+the refusal on `CLAUDE_PROJECT_DIR` being empty: Claude Code exports it to hook processes, and the
+Codex 0.153.4 binary has no such variable.
+
+**Story:** G1, ADR-0013
+**Files:**
+- Modify: `hooks/sensitive-guard`
+- Modify: `docs/architecture/claude-code-only.md` (the "Probe: what a Codex hook receives" record only)
+- Test: `tests/test-sensitive-guard.sh`
+
+**Interfaces:**
+- Consumes: task 2b's refusal and its two detection signals
+- Produces: nothing new
+
+**Depends on:** task 2b
+
+**Behaviours:**
+
+1. The refusal fires only when `CLAUDE_PROJECT_DIR` is empty or unset, and then on either signal.
+   Examples, each with a profile listing `src/auth`, `src/auth/t.go` staged and `git commit -m x`:
+   `CLAUDE_PROJECT_DIR` unset and `"turn_id":"t1"` in the event exits 2; `CLAUDE_PROJECT_DIR` unset
+   and `CODEX_VERSION=0.153.4` exits 2; `CLAUDE_PROJECT_DIR=/repo` with `"turn_id":"t1"` in the event
+   prints the `ask` decision and exits 0; `CLAUDE_PROJECT_DIR=/repo` with `CODEX_VERSION=0.153.4`
+   prints the `ask` decision and exits 0. Every Codex case sets or unsets the variable explicitly,
+   so the result does not depend on the environment the suite runs in.
+2. The `turn_id` match is on the key, not a value. Example: the pattern is `*'"turn_id":'*`, an
+   event whose `tool_input.description` is exactly `turn_id` (so the raw event holds
+   `"description":"turn_id"`) with `CLAUDE_PROJECT_DIR` unset and no `CODEX_VERSION` gets `ask`, and
+   the compact `"turn_id":"t1"` event still exits 2.
+3. The hook's comment states what is known and cites it. Example: it says Codex's `PreToolUse`
+   input requires `turn_id` per its schema (the citation already used in
+   `docs/decisions/ADR-0004-a-guarantee-belongs-to-a-repository-and-harness-pair.md`), that its
+   `SessionStart` input has none, that Claude Code's `PreToolUse` input had none on 2.1.314 while its
+   `MessageDisplay` input does, and that `CLAUDE_PROJECT_DIR` is why that cannot turn into a block.
+   The probe record gains one sentence saying the observed `SessionStart` keys are consistent with
+   a schema that requires `turn_id` on `PreToolUse` and not on `SessionStart`.
+4. The CDPATH case asserts behaviour, not text. Example: the case added by task 2b that greps the
+   hook for `CDPATH` is removed, or replaced by one that fails only when the hook contains a `cd`
+   and no `CDPATH` guard; the plain relative-path case stays.
+
+**Done when:** `tests/test-sensitive-guard.sh` passes, and `tests/validate-citations.sh` and
+`tests/validate-skills.sh` report OK.
+
+- [ ] **Step 2c.1: Build it test first**
+
+Follow `keel:tdd` for each behaviour: write its test from the example, run it, and watch it fail
+for the reason the behaviour names, then write the minimal implementation and watch it pass.
+Run: `tests/test-sensitive-guard.sh`
+Expected before the implementation: FAIL, the cases for behaviour 1 with `CLAUDE_PROJECT_DIR=/repo`
+fail because the hook exits 2, and the case for behaviour 2 fails because a `"turn_id"` value is
+read as the key. Expected after: PASS. Quote the failing output in your report.
+
+Run: `tests/run-tests.sh`.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+A red in either validator is this task's. This is the one boundary run the task schedules.
+
+- [ ] **Step 2c.2: Hand over**
+
+```bash
+git add hooks/sensitive-guard tests/test-sensitive-guard.sh docs/architecture/claude-code-only.md
+git status --porcelain
+```
+
+Stage those paths, and each file whose broken citation this task repaired, by name, and stop.
+**Do not commit.** The coordinator commits after both review passes, with
+`git commit -s -m "fix(sensitive-guard): never read a Claude Code session as Codex"`. Paste the
+`git status --porcelain` output into your report; if it lists anything this task did not touch, say
+so and leave it unstaged.
+
 ### Task 3: `done-guard` and the context watch read Claude Code transcripts only
 
 **Story:** G1, ADR-0013
@@ -292,9 +365,11 @@ so and leave it unstaged.
 2. A rollout-shaped transcript is no longer read as one, so the guard stays silent on it, which is
    its fail-open behaviour for a transcript it cannot read. Example: a transcript written inline in
    the test, one row in the rollout shape the old reader recognised (a `turn_context` row then a
-   `function_call` row for `apply_patch` editing `src/a.py`, and no test run), under
+   `custom_tool_call` row for `apply_patch` editing `src/a.py`, and no test run), under
    `gates.done_verified: required`, makes `done-guard` block before this task and produce no output
-   and exit 0 after it.
+   and exit 0 after it. (Corrected by the coordinator on 2026-10-30 from task 3's report: the old
+   reader picks up `custom_tool_call` rows only, so a `function_call` row was silent before the task
+   and its test could not have gone red.)
 3. The context watch measures Claude Code transcripts as before. Example: the existing Claude Code
    cases in `tests/test-context-watch.sh` pass unchanged, and the cases for a declared window on a
    rollout are removed.
@@ -307,7 +382,7 @@ so and leave it unstaged.
 **Done when:** `tests/test-done-guard.sh` and `tests/test-context-watch.sh` pass, and
 `tests/validate-citations.sh` and `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 3.1: Build it test first**
+- [x] **Step 3.1: Build it test first** Note: built by the implementer; red quoted (22 passed, 1 failed) and reproduced by the spec reviewer against HEAD; behaviour 2's row type corrected in the plan from the implementer's finding
 
 Follow `keel:tdd` for each behaviour: write its test from the example, run it, and watch it fail
 for the reason the behaviour names, then write the minimal implementation and watch it pass.
@@ -319,7 +394,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 A red in either validator is this task's. This is the one boundary run the task schedules.
 
-- [ ] **Step 3.2: Hand over**
+- [x] **Step 3.2: Hand over** Note: rounds: 1; routing: inherit; loop: full; spec COMPLIES; quality: no blocking, three should-fix (snapshot.md:173 citation moved to task 10, a test comment, the schema sentence task 4 owns) and six consider, in the final report
 
 ```bash
 git add hooks/done-guard lib/context_watch.py templates/profile.schema.json \
@@ -520,7 +595,7 @@ touch, say so and leave it unstaged.
   a harness
 - Produces: a ledger with `provides|claude|...` and `requires|...` rows only
 
-**Depends on:** tasks 2, 2b, 3 and 4
+**Depends on:** tasks 2, 2b, 2c, 3 and 4
 
 **Behaviours:**
 
