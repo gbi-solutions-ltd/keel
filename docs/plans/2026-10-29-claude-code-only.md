@@ -630,7 +630,7 @@ fail.)
 **Done when:** `tests/test-validate-skills.sh`, `tests/test-doc-claims.sh` and `tests/test-keel-4.sh`
 pass, and `tests/validate-citations.sh` and `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 4c.1: Build it test first**
+- [x] **Step 4c.1: Build it test first** Note: built by the second implementer after the plan correction; reds reproduced by the spec reviewer against HEAD (124/5, 61/3, 112/4)
 
 Follow `keel:tdd` for each behaviour: write its test from the example, run it, and watch it fail
 for the reason the behaviour names, then write the minimal implementation and watch it pass.
@@ -642,7 +642,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 A red in either validator is this task's. This is the one boundary run the task schedules.
 
-- [ ] **Step 4c.2: Hand over**
+- [x] **Step 4c.2: Hand over** Note: rounds: 2 (the first stopped on a plan defect, no edits); routing: inherit; loop: full; spec COMPLIES with the full suite green on the staged tree; quality: no blocking, a partially failing register still reads as shorter (follow-up)
 
 ```bash
 git add lib/retired-keys.sh bin/keel tests/validate-skills.sh tests/test-doc-claims.sh \
@@ -1104,6 +1104,9 @@ into your report; if it lists anything this task did not touch, say so and leave
     `profile_set` at `main`, points at `profile_set` again. A citation already wrong at `main` is
     left alone and listed in the report. (From task 4's quality review: `tests/validate-citations.sh`
     checks only that a cited line exists and is not blank.)
+13. `docs/06-repo-layout.md`'s `lib/` tree names `lib/retired-keys.sh` (task 4c), and
+    `docs/ideas/stack-plugins-on-existing-repos.md`'s "written at init, `bin/keel:444`" points at
+    the `plugins.recommended` write. (From task 4c's quality review.)
 
 **Done when:** `tests/test-doc-claims.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
@@ -1191,5 +1194,7 @@ touch, say so and leave it unstaged.
   `CLAUDE_PROJECT_DIR` turns the refusal off. `done-guard`: a transcript whose rows parse but match
   no Claude Code shape reads as a clean turn instead of warning. `lib/context_watch.py`: on a
   non-Claude transcript `transcript_kind` reads the whole file on every call.
+  The retired-key checks treat a register that prints some rows and then fails as a shorter
+  register; both should read the subshell's exit status (task 4c's quality review).
 - **Not in this plan.** `keel-cursor`'s generator reads the archived `keel-internal` checkout; that
   is the port's to fix. The idea record's items are the next plan.
