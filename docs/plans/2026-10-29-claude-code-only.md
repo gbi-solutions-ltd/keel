@@ -1394,6 +1394,82 @@ Stage those paths, and each file whose broken citation this task repaired, by na
 Paste the `git status --porcelain` output into your report; if it lists anything this task did not
 touch, say so and leave it unstaged.
 
+### Task 11: close what the branch-wide reviews found
+
+Added by the coordinator on 2026-10-30 from the branch's security audit, its `/code-review` pass and
+its rubric pass. The audit's finding is on a `hard_block_paths` path, so it blocks shipping
+whatever the gate says; the rubric pass's two surviving mutants are Blocking by its rules.
+
+**Story:** G1, G2, ADR-0013, ADR-0014
+**Files:**
+- Modify: `hooks/sensitive-guard`
+- Modify: `lib/harness/resolve.sh` (only if behaviour 3 needs it)
+- Create: `docs/decisions/ADR-0015-sensitive-guard-keeps-a-codex-refusal.md`
+- Modify: `docs/decisions/ADR-0013-claude-code-is-the-only-harness.md` (its status row only)
+- Test: `tests/test-sensitive-guard.sh`, `tests/test-harness-resolve.sh`, `tests/test-keel-fleet.sh`
+- Plus the six documents citing `bin/keel:648-649` (behaviour 5)
+
+**Interfaces:**
+- Consumes: everything tasks 1 to 10 left
+- Produces: nothing new
+
+**Depends on:** task 10
+
+**Behaviours:**
+
+1. A nested empty list does not turn the guard off (audit M-01). Example: a profile whose top-level
+   `hard_block_paths` lists `auth` and which also holds `"_notes":{"hard_block_paths":[]}`, with
+   `auth/x` staged, makes `git commit -m x` print the `ask` decision; a profile whose top-level list
+   is `[]` still gets no output and exit 0.
+2. A commit that stages `.keel/profile.json` asks. Example: in a repository whose profile lists `auth`,
+   staging a change to `.keel/profile.json` alone and running `git commit -m x` prints the `ask`
+   decision naming the profile, since that commit can change the list that judges it.
+3. Version comparison is tested where it can break (rubric mutant 1). Example: `harness_version_ge
+   2.1.10 2.1.09` returns 0 and `harness_version_ge 2.1.08 2.1.7` returns 0; removing `10#` from
+   `resolve.sh` makes these cases fail.
+4. A seven-field row is not evidence for the minimum (rubric mutant 2). Example: adding
+   `provides|claude|p2|src|2.1.500|2026-01-01|extra` to the fixture whose minimum is 2.1.296 leaves
+   `harness_min_version` at 2.1.296; removing the field-count check makes the case fail.
+5. The six citations of `bin/keel:648-649` (ADR-0004 line 21, `docs/ideas/keel-on-codex.md` lines 141
+   and 219, `docs/architecture/tiered-multi-harness-support.md` lines 257, 592 and 612), whose
+   dual-write line task 5 deleted, read "`bin/keel` at v0.26.0" instead of a line number.
+6. The fleet test reads the right column. Example: in `tests/test-keel-fleet.sh` the "problems column
+   reflects the real count" case reads the problems field (the fifth, now that the harnesses column
+   is gone) and fails when keel-fleet prints a wrong problems count.
+7. ADR-0015 records the amendment to ADR-0013. It is `proposed`, names Bernard's decisions of
+   2026-10-30 (keep a Codex refusal in `sensitive-guard`, detect `CODEX_VERSION` or a `turn_id`
+   key only when `CLAUDE_PROJECT_DIR` is empty; name v0.26.0 wherever Codex users are told how to
+   continue), and says ADR-0013's Consequences and Verification clauses on these two points are
+   amended by it. ADR-0013's status row reads "accepted, amended by ADR-0015 (proposed)".
+
+**Done when:** `tests/test-sensitive-guard.sh`, `tests/test-harness-resolve.sh` and
+`tests/test-keel-fleet.sh` pass, and `tests/validate-citations.sh` and `tests/validate-skills.sh`
+report OK.
+
+- [ ] **Step 11.1: Build it test first**
+
+Follow `keel:tdd` for behaviours 1 to 4 and 6: write each test from its example and watch it fail
+for the reason named (for 3 and 4, by removing `10#` or the field-count check in a scratch copy),
+then implement. Behaviours 5 and 7 are documents.
+Run: `tests/test-sensitive-guard.sh`
+Expected before: FAIL, behaviour 1's case gets no output where it should ask. Expected after: PASS.
+
+Run: `tests/run-tests.sh`.
+Expected: PASS. This is the one boundary run the task schedules.
+
+- [ ] **Step 11.2: Hand over**
+
+```bash
+git add hooks/sensitive-guard tests/test-sensitive-guard.sh tests/test-harness-resolve.sh \
+        tests/test-keel-fleet.sh docs/decisions/ADR-0015-sensitive-guard-keeps-a-codex-refusal.md \
+        docs/decisions/ADR-0013-claude-code-is-the-only-harness.md
+git status --porcelain
+```
+
+Stage those paths, `lib/harness/resolve.sh` if changed, and each file whose citation this task
+repaired, by name, and stop. **Do not commit.** The coordinator commits after both review passes,
+with `git commit -s -m "fix(sensitive-guard): judge only the top-level list, and ask when the profile changes"`.
+
 ## Notes for the coordinator
 
 - **The minimum is 2.1.302, not 2.1.295.** The idea record proposed 2.1.295 because `onFailure`
