@@ -62,7 +62,7 @@ Stop, SubagentStop and PreCompact. No PostToolUse hook is registered.
 
 <!-- keel:claim gate=sensitive-guard harness=claude -->
 **Codex.** `hooks/hooks.codex.json` omits sensitive-guard. This is deliberate: sensitive-guard
-requires an ask primitive (lib/harness/capabilities:118) that no Codex row provides.
+requires an ask primitive (lib/harness/capabilities:96) that no Codex row provides.
 
 <!-- keel:claim gate=done-guard harness=claude -->
 **Critical path: an agent claims done.** The Stop hook runs done-guard, which reads the turn's

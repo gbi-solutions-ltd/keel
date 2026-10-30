@@ -35,42 +35,27 @@
 #
 # WHAT "ATTRIBUTED" MEANS, AND WHY IT IS NOT "carries isSidechain". It said the latter until
 # 2026-09-06, and that was the schema-in-the-name mistake of the paragraph below wearing a
-# different hat: `isSidechain` is a Claude Code row field, so a primitive demanding one could only
-# ever be held by Claude Code. What done-guard cannot function without is knowing that the calls it
-# is reading are this agent's. Claude Code answers that with a per-row flag, because it interleaves
-# a subagent's rows into the main transcript. Codex answers it by never interleaving: a subagent is
-# its own thread with its own rollout, handed over as agent_transcript_path on SubagentStop, and
-# every record carries its own thread id and turn id. That is strictly finer than a boolean, so it
-# earns the primitive. The rule this settles, for the next harness: the primitive asks whether the
-# turn's calls can be told from another agent's, never how.
+# different hat: `isSidechain` is how Claude Code answers the question, not the question. What
+# done-guard cannot function without is knowing that the calls it is reading are this agent's.
+# Claude Code answers that with a per-row flag, because it interleaves a subagent's rows into the
+# main transcript. The primitive asks whether the turn's calls can be told from another agent's,
+# never how.
 #
-# A PRIMITIVE NAMES A CAPABILITY, AND <source> IS WHERE ONE HARNESS'S SHAPE BELONGS. The Claude rows
+# A PRIMITIVE NAMES A CAPABILITY, AND <source> IS WHERE THE HARNESS'S SHAPE BELONGS. The Claude rows
 # for these two cite message.usage and message.content[] tool_use blocks because that is how Claude
-# Code satisfies them; a second harness satisfying the same two in a completely different format
-# gets a row that is just as honest, and that is what lib/context_watch.py's two parsers exist to
-# absorb. Until 2026-09-05 both were named after Claude Code's own transcript format, which put our
-# schema in the primitive rather than in its evidence and so pinned Tier B at one gate by
-# construction: no second harness could ever hold a row named for a wire format, however much
-# evidence it had. A name that cannot be earned does not fail closed, it fails permanently.
+# Code satisfies them; a change in that format changes the evidence, not the primitive. Until
+# 2026-09-05 both were named after Claude Code's own transcript format, which put our schema in the
+# primitive rather than in its evidence. A name that only one wire format can earn does not fail
+# closed when the format moves, it fails permanently.
 # tests/test-harness-resolve.sh keeps schema words out of this column.
-#
-# Codex earned all three on 2026-09-06, in task 14 of the tiered multi-harness plan, so `done-guard`
-# and `context-watch` resolve ACTIVE there and Tier B is three gates rather than one. The rows are
-# probes against tests/fixtures/transcripts/codex.jsonl, a rollout captured from inside a live Stop
-# hook, and the parsers that read it are lib/context_watch.py's _measure_codex and
-# hooks/done-guard's codex_turn_tool_calls. Neither row was added before its parser worked against
-# that capture: a row whose parser returns nothing is the "looks installed and is not" failure this
-# file exists to prevent, dressed as evidence. ADR-0003 is the standing rule, absent evidence fails.
 #
 # `subagent_transcript_path` is PROVIDED and required by nothing, deliberately. done-guard reads it
 # only on SubagentStop and falls back to transcript_path when it is absent (hooks/done-guard:219-220),
-# so requiring it would disable the whole gate on a harness whose Stop path works. Under-requiring
-# resolved done-guard active on Codex; over-requiring would resolve it inactive where it works. The
-# rule is that a gate requires what it cannot function without, not everything it can use.
-# Collapsing the three into one primitive resolved done-guard ACTIVE on Codex on the strength of
-# stop_blocking alone, where it would have read a Codex transcript looking for Claude Code rows and
-# failed open in silence. Caught in review on 2026-09-05, before it shipped, which is the whole
-# point of the file.
+# so requiring it would disable the whole gate where its Stop path works. The rule is that a gate
+# requires what it cannot function without, not everything it can use. Collapsing the three
+# transcript primitives into one would resolve done-guard ACTIVE on the strength of stop_blocking
+# alone, where it may not be able to read the turn's calls, and it would fail open in silence.
+# Caught in review on 2026-09-05, before it shipped, which is the whole point of the file.
 #
 # NOT EVERY PRIMITIVE IS A THING THE HARNESS DOES. `validated_word_ceiling` is the odd one and it is
 # deliberate: it asks whether bodies held under keel's own 700 word ceiling have been VALIDATED on
@@ -81,17 +66,9 @@
 # is that the rule there is about not citing keel as proof of a HARNESS behaviour. An eval arm we
 # ran is an observation somebody made and recorded, so it is a probe like any other.
 #
-# There is deliberately NO codex row. Bodies under keel's word ceiling have been checked by arms
-# only on Claude Code, and the 44-tokens-per-description figure was calibrated against its preload;
-# Codex budgets a share of the context window instead and silently shortens or drops descriptions
-# under pressure. So the ceiling is inherited and unvalidated there until S-19 runs arms there, and
-# any document saying it holds on Codex is making a false claim today. The absence of the row is
-# what fails that document's build.
-#
 # `pretooluse_agent_type` is whether a PreToolUse hook's input names the agent that made the call,
 # and leaves it out for the main session. hooks/review-guard cannot tell a keel reviewer from the
-# author without it, so it requires it, and Codex has no row because whether its hook input names
-# the dispatched agent is unrecorded: the guard is dark there and the prompts keep the rule.
+# author without it, so it requires it.
 #
 # ADR-0003: a primitive with no source, version and date is treated as not provided. Absent
 # evidence fails, never passes. Do not add a row you have not checked.
@@ -111,16 +88,6 @@ provides|claude|validated_word_ceiling|probe:ADR-0011's 700 word ceiling is a po
 provides|claude|agent_tool_denylist|probe:a plugin agent with disallowedTools Edit, Write, NotebookEdit reported no Write tool and created no file, task 1 of docs/plans/2026-10-13-harness-held-dispatch-guarantees.md|2.1.296|2026-10-13
 provides|claude|pretooluse_agent_type|probe:a plugin PreToolUse hook on Bash, loaded with --plugin-dir, logged no agent_type for the main session, general-purpose for a general-purpose subagent and hprobe:reviewer for the plugin's own agent, and its deny of that agent's git stash held under bypassPermissions, docs/plans/2026-10-17-reviewer-git-guard.md|2.1.302|2026-10-17
 provides|claude|subagent_row_model|probe:a plugin settings.json subagentStatusLine, written as an inline python3 -c command because CLAUDE_PLUGIN_ROOT does not resolve there and loaded with --plugin-dir on macOS, ran for two plugin agents under a parent on claude-haiku-5-5, showed claude-sonnet-5-5 on the sonnet agent's row and had both rows overridden in a captured interactive session of background agents, step 2.1 of docs/plans/2026-10-13-harness-held-dispatch-guarantees.md|2.1.296|2026-10-13
-
-provides|codex|session_context_injection|vendor:openai/codex@rust-v0.153.4 codex-rs/hooks/schema/generated/session-start.command.output.schema.json|0.153.4|2026-09-05
-provides|codex|stop_blocking|vendor:openai/codex@rust-v0.153.4 codex-rs/hooks/src/events/stop.rs:295|0.153.4|2026-09-05
-provides|codex|pretooluse_deny|vendor:openai/codex@rust-v0.153.4 codex-rs/core/tests/suite/hooks.rs::plugin_pre_tool_use_blocks_exec_command_before_execution|0.153.4|2026-09-05
-provides|codex|transcript_path|vendor:learn.chatgpt.com/docs/hooks common input transcript_path|0.153.4|2026-09-05
-provides|codex|transcript_turn_usage|probe:tests/fixtures/transcripts/codex.jsonl, a rollout captured from a live 0.153.4 Stop hook, whose 2 token_usage_records state payload.usage.total_tokens 13993 then 14023 and whose token_count records state model_context_window 258400|0.153.4|2026-09-06
-provides|codex|transcript_turn_tool_calls|probe:the same capture, one custom_tool_call with its custom_tool_call_output, 6 of its 9 records carrying that turn's id, the three that do not being session_meta and the two token_count records|0.153.4|2026-09-06
-provides|codex|permission_rules_path_globs|vendor:openai/codex@rust-v0.153.4 codex-rs/protocol/src/permissions.rs:105|0.153.4|2026-09-05
-provides|codex|plugin_marketplace|vendor:developers.openai.com/plugins/build/plugins|0.153.4|2026-09-05
-provides|codex|execpolicy_command_prompt|vendor:openai/codex@rust-v0.153.4 codex-rs/execpolicy/src/decision.rs Decision::Prompt|0.153.4|2026-09-05
 
 requires|session-start|session_context_injection
 requires|done-guard|stop_blocking

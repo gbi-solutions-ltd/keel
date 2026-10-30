@@ -239,7 +239,6 @@ state is summarised into a paragraph. The work continues on a worse foundation a
 whoever picks it up next.
 
 <!-- keel:claim gate=context-watch harness=claude -->
-<!-- keel:claim gate=context-watch harness=codex -->
 `hooks/context-watch` measures it instead. Registered on three events:
 
 | Event | What it does |
@@ -295,7 +294,6 @@ teammate picking up the branch from GitHub gets the branch without the note, and
 the rare case where sharing it is wanted.
 
 <!-- keel:claim gate=session-start harness=claude -->
-<!-- keel:claim gate=session-start harness=codex -->
 **`.keel/handoff.seen` is an empty marker beside it, git-ignored the same way, and it exists because
 nothing deletes a handoff.** The `session-start` gate fires on startup and clear as well as compact,
 so naming the file whenever it is present made the pointer permanent: from the first compaction
@@ -323,7 +321,6 @@ Everything above budgets **input**: what sits in the prefix of every request. Re
 carries the block also carries however many tokens the model chooses to write back.
 
 <!-- keel:claim gate=session-start harness=claude -->
-<!-- keel:claim gate=session-start harness=codex -->
 **The rule is on by default and it is not free.** `hooks/session-start` selects one paragraph from
 `conventions.response_style` and `conventions.explain_level` together, so there are four forms and
 not two. Every form also carries the loaded plugin's version since 2026-09-02. Measured 2026-09-02

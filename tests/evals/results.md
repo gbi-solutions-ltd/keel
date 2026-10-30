@@ -5623,7 +5623,7 @@ satisfies every assertion, so the assertion is what flaked: `printf '%s\n' "$out
 under `set -o pipefail` fails when `grep -q` exits before `printf` has written, with status 141.
 Measured on 18,000 trials of the bare pattern, six in parallel: five failures. About 190 sites in
 `tests/*.sh` have that shape, and so do `bin/keel:1573` and
-`tests/generate-harness-artifacts.sh:126`. It was not fixed in this change, because a rewrite of
+`tests/generate-harness-artifacts.sh:115`. It was not fixed in this change, because a rewrite of
 that many assertions was not this change's to make. **It is fixed afterwards** by `tests/grep-quiet.sh`
 and the one-line `set` form in every test file that has such a pipeline, with a lint in
 `tests/test-grep-quiet.sh` (`docs/plans/2026-10-21-flake-and-batched-scenario.md`; the stress run is

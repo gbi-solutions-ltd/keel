@@ -132,7 +132,7 @@ Two mechanisms are used, and each carries a different guarantee under ADR-0004:
 
 The one axis on which a harness split would appear is a gate escalated to a hook that puts a
 command to a human. That needs `pretooluse_ask`, which Codex does not provide
-(`lib/harness/codex.sh:5-6`, citing the vendor's own `permissions.rs`), and it is why
+(`lib/harness/codex.sh` (deleted after v0.26.0), citing the vendor's own `permissions.rs`), and it is why
 `sensitive-guard` is Claude Code only. **No task here proposes one.** `plugins.excluded` is the
 single Claude-only wiring, and for a different reason: `plugin_report` lives in
 `lib/harness/claude.sh` and has no Codex counterpart.
@@ -156,7 +156,7 @@ must still obey them.
   A **description** change is not a field-set change: the fingerprint at
   `tests/validate-skills.sh:761-771` hashes property paths only, so tasks 1 to 5 move nothing.
 - `docs/profile-keys.md` is in scope for the unregistered-harness-claim scan
-  (`tests/test-harness-claims.sh:139-147` puts depth-1 `docs/*.md` in scope). **A description
+  (`tests/test-harness-claims.sh:134-142` puts depth-1 `docs/*.md` in scope). **A description
   containing `done-guard`, `sensitive-guard`, `context-watch`, `session-start`, `900-word`,
   `word ceiling`, `description budget` or `hard_block_paths` needs a `CLAIMS` entry in
   `tests/generate-profile-keys.sh#print("# Profile keys")`, or the build goes red.** No description written by this
@@ -872,7 +872,7 @@ row = re.compile("^\\| \x60([^\x60]+)\x60 \\| [^|]* \\| [^|]* \\| [^|]* \\| (.*)
 ```
 
 **Add three `CLAIMS` entries in `tests/generate-profile-keys.sh#print("# Profile keys")`.** The new column prints
-citations, and three of them name gate vocabulary that `tests/test-harness-claims.sh:207` scans for
+citations, and three of them name gate vocabulary that `tests/test-harness-claims.sh:211` scans for
 in any depth-1 `docs/*.md`, which `docs/profile-keys.md` is. `gates.done_verified` and
 `hard_block_paths` are already safe because their rows carry a tag and `untagged_claims` skips a
 line that has one (`:226`). These three are not:
@@ -2017,7 +2017,7 @@ replaced by:
 
 > Neither has a Codex counterpart, so on that harness nothing watches between runs. Say so.
 
-That keeps the words "Claude Code" in the body, which `tests/test-harness-claims.sh:430-433`
+That keeps the words "Claude Code" in the body, which `tests/test-harness-claims.sh` item 9 (deleted after v0.26.0)
 requires: it checks that a plugin instruction naming a one-harness mechanism names the harness.
 
 The clause that leaves, from the gate paragraph:

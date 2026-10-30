@@ -356,7 +356,7 @@ touch, say so and leave it unstaged.
 > prevent:
 >
 > 1. **A whitespace-only provenance field granted the primitive.** `[ -n "$f4" ]` accepts a single
->    space. `tests/test-harness-resolve.sh:35-37` had already settled this and says the opposite in
+>    space. `tests/test-harness-resolve.sh:41-43` had already settled this and says the opposite in
 >    its own comment, so the validator and the resolver were applying two different definitions of
 >    absent evidence to the same row. A trailing space is invisible in a diff.
 > 2. **A manifest with no trailing newline dropped its last row.** `read` returns non-zero on a
@@ -1681,7 +1681,7 @@ coordinator commits after both review passes, with
 > Four things the steps did not have right:
 >
 > 1. **The capability row breaks two of the manifest's own rules as written.** Its `<source>` has no
->    `vendor:` or `probe:` prefix, which `tests/test-harness-resolve.sh:66` fails outright, and its
+>    `vendor:` or `probe:` prefix, which `tests/test-harness-resolve.sh:72` fails outright, and its
 >    `<version>` is `0.18.0`, which is **keel's** version where the file's header says the column is
 >    the harness's and that `keel doctor`'s comparison means nothing if keel's goes there. The row
 >    landed as a `probe:` citing ADR-0001 and `tests/evals/results.md` at "Both bodies over the 700

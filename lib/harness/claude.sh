@@ -413,9 +413,7 @@ PY
 # Thin on purpose. Each one names the writers above rather than inlining them, so the diff that
 # moved them is readable and the bodies stay comparable with the pre-refactor file.
 
-# The context file this harness reads. AGENTS.md is deliberately NOT here: keel writes it for every
-# repository because Cursor, Copilot CLI and Gemini CLI read it too, so it is neutral ground rather
-# than one harness's file. CLAUDE.md is Claude Code's alone.
+# The context file Claude Code reads, and the one keel init writes.
 harness_context_file() {
     printf 'CLAUDE.md\n'
 }

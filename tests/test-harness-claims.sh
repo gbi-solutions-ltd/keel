@@ -9,7 +9,7 @@
 # Overlaps tests/test-harness-resolve.sh on two checks, and the overlap is not an oversight. That
 # file proves the GENERATOR is correct; this one proves the COMMITTED ARTIFACT is not stale. They
 # coincide today only because the artifacts are generated, and the day somebody hand-edits
-# hooks/hooks.codex.json is the day they stop coinciding, which is the day this file earns its keep.
+# hooks/hooks.json is the day they stop coinciding, which is the day this file earns its keep.
 #
 # shellcheck disable=SC2015  # see tests/test-harness-resolve.sh for why.
 set -uo pipefail
@@ -29,25 +29,22 @@ matches_generator() {   # matches_generator <harness> <file>
     diff -q <("$GEN" "$1") "$2" >/dev/null 2>&1
 }
 
-for pair in "claude:hooks/hooks.json" "codex:hooks/hooks.codex.json"; do
-    h="${pair%%:*}"; f="${pair#*:}"
-    if matches_generator "$h" "$f"; then
-        ok "$f matches the generator"
-    else
-        bad "$f matches the generator" "hand-edited or stale. Run: $GEN $h > $f"
-    fi
-done
+if matches_generator claude hooks/hooks.json; then
+    ok "hooks/hooks.json matches the generator"
+else
+    bad "hooks/hooks.json matches the generator" "hand-edited or stale. Run: $GEN claude > hooks/hooks.json"
+fi
 
-# ...and the comparison fires. The two cases above pass just as well against a check that compares
-# nothing, because the committed artifacts are correct; that is the whole hazard this file exists
+# ...and the comparison fires. The case above passes just as well against a check that compares
+# nothing, because the committed artifact is correct; that is the whole hazard this file exists
 # to name, applied to itself.
 #
 # ON A COPY, NEVER ON THE TRACKED FILE. tests/run-tests.sh runs four test files at once, so a case
-# that edited hooks/hooks.codex.json mid-run would corrupt whatever another job was reading, and a
+# that edited hooks/hooks.json mid-run would corrupt whatever another job was reading, and a
 # suite that fails depending on scheduling is worse than one that does not check.
 stale="$(mktemp)"
-cp hooks/hooks.codex.json "$stale"; printf '\n' >> "$stale"
-matches_generator codex "$stale" \
+cp hooks/hooks.json "$stale"; printf '\n' >> "$stale"
+matches_generator claude "$stale" \
   && bad "the staleness comparison fires on an edited copy" "an edited file matched" \
   || ok "the staleness comparison fires on an edited copy"
 rm -f "$stale"
@@ -60,7 +57,7 @@ rm -f "$stale"
 # and passes a seven-field row outright. lib/harness/resolve.sh refuses both, so the check and the
 # thing it checks would have disagreed about what "absent evidence" means, and the direction of the
 # disagreement is that this file calls a row good which the resolver treats as no evidence at all.
-# The same two holes are recorded at tests/test-harness-resolve.sh:36, where they were found.
+# The same two holes are recorded at tests/test-harness-resolve.sh:42, where they were found.
 provenance_gaps() {   # provenance_gaps <file>
     awk -F'|' '$1=="provides" && (NF!=6 || $4 ~ /^[[:space:]]*$/ || $5 ~ /^[[:space:]]*$/ || $6 ~ /^[[:space:]]*$/) {print $2"/"$3}' "$1"
 }
@@ -81,32 +78,30 @@ got="$(provenance_gaps "$fx" | sort | tr '\n' ' ')"
   || bad "the provenance check fires on empty, blank and wrong-arity rows" "got: $got"
 rm -f "$fx"
 
-# 3. async false on every command entry, in both manifests.
+# 3. async false on every command entry.
 #
-# This is the quietest way this design can fail. codex-rs/hooks/src/engine/mod.rs:141-156 gates
-# every control effect on the hook being synchronous, and that gate covers the exit-2 path in
-# pre_tool_use.rs AND the stdout decision path in stop.rs. Flip this one flag and sensitive-guard
-# stops blocking and done-guard stops holding the turn open, while both stay installed, registered
-# and reported as present. Nothing else in the suite would notice.
+# This is the quietest way this design can fail. A hook that runs asynchronously cannot apply a
+# control effect: flip this one flag and sensitive-guard stops blocking and done-guard stops holding
+# the turn open, while both stay installed, registered and reported as present. Nothing else in the
+# suite would notice.
 all_synchronous() {   # all_synchronous <file>
     [ "$(grep -c '"type": "command"' "$1")" = "$(grep -c '"async": false' "$1")" ]
 }
 
-for f in hooks/hooks.json hooks/hooks.codex.json; do
-    n_cmd="$(grep -c '"type": "command"' "$f")"
-    if all_synchronous "$f"; then
-        ok "$f: all $n_cmd command hooks are synchronous"
-    else
-        bad "$f: all command hooks are synchronous" \
-          "$n_cmd commands, $(grep -c '"async": false' "$f") with async false"
-    fi
-done
+f=hooks/hooks.json
+n_cmd="$(grep -c '"type": "command"' "$f")"
+if all_synchronous "$f"; then
+    ok "$f: all $n_cmd command hooks are synchronous"
+else
+    bad "$f: all command hooks are synchronous" \
+      "$n_cmd commands, $(grep -c '"async": false' "$f") with async false"
+fi
 
-# ...and it fires. Both manifests are correct, so the two cases above pass against a check that
-# compares a number with itself, which is what a mutation sweep found them doing. One flag flipped
-# on a copy is the whole difference between three gates and three pieces of advice.
+# ...and it fires. The manifest is correct, so the case above passes against a check that compares
+# a number with itself, which is what a mutation sweep found it doing. One flag flipped on a copy
+# is the whole difference between five gates and five pieces of advice.
 flipped="$(mktemp)"
-sed 's/"async": false/"async": true/' hooks/hooks.codex.json > "$flipped"
+sed 's/"async": false/"async": true/' hooks/hooks.json > "$flipped"
 all_synchronous "$flipped" \
   && bad "the synchronous check fires on a flipped flag" "an async manifest passed" \
   || ok "the synchronous check fires on a flipped flag"
@@ -183,18 +178,27 @@ fi
 [ -z "${bad_claims// /}" ] && ok "every tagged claim is granted by the capability manifest" \
   || bad "every tagged claim is granted by the capability manifest" "$bad_claims"
 
+# keel serves Claude Code alone (ADR-0013), so a claim marker naming another harness in a current
+# document claims something about a plugin that does not exist. The registry above refuses it once
+# the ledger holds no row for that harness; this names the leftover directly.
+codex_tagged=""
+if [ "${#scoped[@]}" -gt 0 ]; then
+    codex_tagged="$(grep -l 'harness=codex' "${scoped[@]}" 2>/dev/null | tr '\n' ' ')"
+fi
+[ -z "${codex_tagged// /}" ] && ok "no current document carries a harness=codex claim marker" \
+  || bad "no current document carries a harness=codex claim marker" "$codex_tagged"
+
 # ...and it fires, on the three shapes it has to catch. Without this the case above passes against a
 # predicate that never reports anything, and every document in the tree could claim whatever it
-# liked. The ceiling case is the S-19 hazard specifically: bodies under keel's word ceiling have
-# been checked by eval arms only on Claude Code and no arm has run on Codex, so a sentence saying
-# the ceiling holds there is false today and this is what makes it a red build.
+# liked. The withheld gate is one with no requires row, and the unvalidated property is one the
+# ledger holds no claude row for: a claim either way that nothing in the ledger grants.
 cf="$(mktemp -d)"
-printf '<!-- keel:claim gate=sensitive-guard harness=codex -->\n' > "$cf/gate.md"
-printf '<!-- keel:claim property=validated_word_ceiling harness=codex -->\n' > "$cf/ceiling.md"
-printf '<!-- keel:claim harness=codex -->\n' > "$cf/malformed.md"
-printf '<!-- keel:claim gate=session-start harness=codex -->\n' > "$cf/good.md"
+printf '<!-- keel:claim gate=no-such-gate harness=claude -->\n' > "$cf/gate.md"
+printf '<!-- keel:claim property=no_such_primitive harness=claude -->\n' > "$cf/ceiling.md"
+printf '<!-- keel:claim harness=claude -->\n' > "$cf/malformed.md"
+printf '<!-- keel:claim gate=session-start harness=claude -->\n' > "$cf/good.md"
 got="$(claim_gaps "$cf/gate.md" "$cf/ceiling.md" "$cf/malformed.md" "$cf/good.md" | sed "s|$cf/||" | tr '\n' ' ')"
-[ "$got" = "gate.md:codex/sensitive-guard ceiling.md:codex/validated_word_ceiling malformed.md:malformed " ] \
+[ "$got" = "gate.md:claude/no-such-gate ceiling.md:claude/no_such_primitive malformed.md:malformed " ] \
   && ok "the claim registry fires on a withheld gate, an unvalidated property and a malformed tag" \
   || bad "the claim registry fires on a withheld gate, an unvalidated property and a malformed tag" "got: $got"
 rm -rf "$cf"
@@ -299,99 +303,68 @@ else
       "run: tests/generate-profile-keys.sh > docs/profile-keys.md"
 fi
 
-# 7. It says what Tier B cannot claim, once, where everything else points.
-#
-# The section heading and the two nouns, not a turn of phrase. This task was written asking for the
-# string "not enforced" and the paragraph it also specifies says "absent on Codex, not degraded",
-# which is the more precise claim and the one the design argues for: the gate is not installed
-# there, so there is nothing to enforce weakly. Asserting the looser phrase would have forced the
-# page to say something worse than it means. What must not be lost is the section and its subject.
-for phrase in '## What Tier B cannot claim' 'sensitive-guard' 'hard_block_paths' 'Codex'; do
-    grep -qF "$phrase" docs/harness-support.md 2>/dev/null \
-      && ok "support page states: $phrase" \
-      || bad "support page states: $phrase" "absent"
+# 7. The support page describes one harness: a gates table with a single claude column, provenance
+# rows for claude alone, and no section about what a second harness cannot claim.
+grep -qx '| Gate | claude |' docs/harness-support.md 2>/dev/null \
+  && ok "the support page's gates table has the columns Gate and claude" \
+  || bad "the support page's gates table has the columns Gate and claude" \
+    "header: $(grep -m1 '^| Gate' docs/harness-support.md)"
+grep -q '^| codex |' docs/harness-support.md 2>/dev/null \
+  && bad "the support page's provenance table has no codex row" "$(grep -c '^| codex |' docs/harness-support.md) rows" \
+  || ok "the support page's provenance table has no codex row"
+grep -qF 'What Tier B cannot claim' docs/harness-support.md 2>/dev/null \
+  && bad "the support page has no Tier B section" "the section is present" \
+  || ok "the support page has no Tier B section"
+
+# 8. One skills directory, and what ships is what git tracks.
+dupes="$(git ls-files 'skills/*/SKILL.md' | sed 's#.*/\([^/]*\)/SKILL.md#\1#' | sort | uniq -d)"
+[ -z "$dupes" ] && ok "no skill appears twice in the tree" || bad "no skill appears twice" "$dupes"
+
+# ...and the manifests actually ship. The export that once produced the public tree is gone
+# because the public repository is the tree: what ships is what git tracks. A machine holding
+# the private clone also holds docs/audits, so the validators run on a copy of the tracked
+# files, which is how that machine sees what a fresh clone sees. That is public CI's condition.
+# shellcheck source=tests/withheld.sh
+. tests/withheld.sh
+miss=""
+for f in .claude-plugin/plugin.json hooks/hooks.json skills/keel/SKILL.md; do
+    git ls-files --error-unmatch "$f" >/dev/null 2>&1 || miss="$miss $f"
 done
+[ -z "$miss" ] && ok "the plugin manifest and the hook manifest are tracked, so they ship" \
+  || bad "the plugin manifest and the hook manifest are tracked, so they ship" "untracked:$miss"
 
-# 8. One skills directory, two plugin manifests. Drift is impossible because there is nothing to
-# drift from: both harnesses load the same skills/ tree, so there is one copy of every skill and
-# nothing is vendored, copied or synchronised.
-M=.codex-plugin/plugin.json
-if [ -f "$M" ]; then
-    [ "$(python3 -c 'import json;print(json.load(open(".codex-plugin/plugin.json"))["skills"])')" = "./skills/" ] \
-      && ok "codex manifest points at ./skills/" || bad "codex manifest points at ./skills/" "wrong value"
-    [ "$(python3 -c 'import json;print(json.load(open(".codex-plugin/plugin.json"))["hooks"])')" = "./hooks/hooks.codex.json" ] \
-      && ok "codex manifest points at the Tier B hook manifest" \
-      || bad "codex manifest points at the Tier B hook manifest" "wrong value"
-
-    # Both manifests name the SAME skills directory. Pointing them at different trees is the drift
-    # this design exists to make impossible, and it would be one edit away with nothing else to
-    # notice: the skills would still load on both harnesses, and slowly stop matching.
-    cs="$(python3 -c 'import json;print(json.load(open(".claude-plugin/plugin.json")).get("skills","./skills/"))' 2>/dev/null)"
-    xs="$(python3 -c 'import json;print(json.load(open(".codex-plugin/plugin.json"))["skills"])')"
-    [ "$cs" = "$xs" ] && ok "both plugin manifests name the same skills directory" \
-      || bad "both plugin manifests name the same skills directory" "claude=$cs codex=$xs"
-
-    # The hook manifest it names has to exist, or Codex loads a plugin that registers nothing and
-    # says nothing about it, which is this design's dominant failure wearing a different hat.
-    [ -f hooks/hooks.codex.json ] && ok "the hook manifest the codex plugin names exists" \
-      || bad "the hook manifest the codex plugin names exists" "hooks/hooks.codex.json absent"
-
-    dupes="$(git ls-files 'skills/*/SKILL.md' | sed 's#.*/\([^/]*\)/SKILL.md#\1#' | sort | uniq -d)"
-    [ -z "$dupes" ] && ok "no skill appears twice in the tree" || bad "no skill appears twice" "$dupes"
-
-    # ...and both manifests actually ship. The export that once produced the public tree is gone
-    # because the public repository is the tree: what ships is what git tracks. A machine holding
-    # the private clone also holds docs/audits, so the validators run on a copy of the tracked
-    # files, which is how that machine sees what a fresh clone sees. That is public CI's condition.
-    # shellcheck source=tests/withheld.sh
-    . tests/withheld.sh
-    miss=""
-    for f in .claude-plugin/plugin.json .codex-plugin/plugin.json \
-             hooks/hooks.json hooks/hooks.codex.json skills/keel/SKILL.md; do
-        git ls-files --error-unmatch "$f" >/dev/null 2>&1 || miss="$miss $f"
-    done
-    [ -z "$miss" ] && ok "both plugin manifests and both hook manifests are tracked, so they ship" \
-      || bad "both plugin manifests and both hook manifests are tracked, so they ship" "untracked:$miss"
-
-    xd="$(mktemp -d)"
-    while IFS= read -r f; do
-        mkdir -p "$xd/$(dirname "$f")"
-        cp -p "$f" "$xd/$f" 2>/dev/null
-    done < <(git ls-files)
-    held=""
-    for w in $(withheld_list); do
-        [ -e "$xd/$w" ] && held="$held $w"
-    done
-    [ -z "$held" ] && ok "a fresh clone holds no withheld path" \
-      || bad "a fresh clone holds no withheld path" "present:$held"
-    if xc="$(cd "$xd" && tests/validate-citations.sh 2>&1)"; then
-        ok "every citation resolves in a fresh clone"
-    else
-        bad "every citation resolves in a fresh clone" "$(printf '%s\n' "$xc" | grep '^FAIL' | head -3)"
-    fi
-    if xc="$(cd "$xd" && tests/validate-skills.sh 2>&1)"; then
-        ok "every relative link resolves in a fresh clone"
-    else
-        bad "every relative link resolves in a fresh clone" "$(printf '%s\n' "$xc" | grep '^FAIL' | head -3)"
-    fi
-    rm -rf "$xd"
+xd="$(mktemp -d)"
+while IFS= read -r f; do
+    mkdir -p "$xd/$(dirname "$f")"
+    cp -p "$f" "$xd/$f" 2>/dev/null
+done < <(git ls-files)
+held=""
+for w in $(withheld_list); do
+    [ -e "$xd/$w" ] && held="$held $w"
+done
+[ -z "$held" ] && ok "a fresh clone holds no withheld path" \
+  || bad "a fresh clone holds no withheld path" "present:$held"
+if xc="$(cd "$xd" && tests/validate-citations.sh 2>&1)"; then
+    ok "every citation resolves in a fresh clone"
 else
-    bad ".codex-plugin/plugin.json exists" "absent"
+    bad "every citation resolves in a fresh clone" "$(printf '%s\n' "$xc" | grep '^FAIL' | head -3)"
 fi
+if xc="$(cd "$xd" && tests/validate-skills.sh 2>&1)"; then
+    ok "every relative link resolves in a fresh clone"
+else
+    bad "every relative link resolves in a fresh clone" "$(printf '%s\n' "$xc" | grep '^FAIL' | head -3)"
+fi
+rm -rf "$xd"
 
-# 8. A delegation profile a skill body names must RESOLVE ON EVERY HARNESS KEEL SERVES.
+# 8. A delegation profile a skill body names must RESOLVE ON CLAUDE CODE.
 #
-# ADR-0005's Verification clause, made checkable. A body that names a profile no harness defines is
-# an unpinned dispatch wearing a pin: it inherits whatever the driver is paying for, and the output
-# looks like output either way, which is the failure tests/validate-skills.sh already says its own
-# model rule exists to catch. The first version of `keel-fanout` existed for Codex alone and seven
-# bodies named it, so on Claude Code the routing that docs/standards.md records as measured firing
-# on 2026-08-20 was silently gone. Nothing anywhere said so, which is why this check is here rather
+# ADR-0005's Verification clause, made checkable. A body that names a profile no agent file defines
+# is an unpinned dispatch wearing a pin: it inherits whatever the driver is paying for, and the
+# output looks like output either way, which is the failure tests/validate-skills.sh already says
+# its own model rule exists to catch. Seven bodies once named `keel-fanout` while this plugin
+# shipped no agent file for it, so the routing that docs/standards.md records as measured firing on
+# 2026-08-20 was silently gone. Nothing anywhere said so, which is why this check is here rather
 # than in a sentence.
-#
-# Both halves are checked because they fail independently and in opposite directions: the Claude
-# Code side is a file this plugin ships, the Codex side is a file lib/harness/codex.sh writes into
-# the project at init. Deleting either leaves the other passing.
 # shellcheck disable=SC2016  # the backticks are the pattern being matched, not a substitution
 profiles="$(grep -rhoE 'delegation profile `[a-z0-9-]+`' skills/*/SKILL.md skills/*/references/*.md 2>/dev/null \
     | sed 's/^delegation profile `//; s/`$//' | sort -u)"
@@ -401,14 +374,6 @@ for prof in $profiles; do
     [ -f "agents/$prof.md" ] \
       && ok "delegation profile $prof resolves on claude" \
       || bad "delegation profile $prof resolves on claude" "skills name it and this plugin ships no agents/$prof.md"
-    # BOTH the path and the declared name, and a mutation sweep is why. `grep -q "$prof"` alone
-    # matched the .toml FILENAME on the `cat >` line, so renaming the profile inside the file left
-    # this check green while Codex resolved nothing. A check that passes on the wrong content is
-    # the one failure mode a claims gate cannot have.
-    { grep -q "\.codex/agents/$prof\.toml" lib/harness/codex.sh 2>/dev/null \
-      && grep -q "^name = \"$prof\"" lib/harness/codex.sh 2>/dev/null; } \
-      && ok "delegation profile $prof resolves on codex" \
-      || bad "delegation profile $prof resolves on codex" "lib/harness/codex.sh writes no agent file named $prof"
 done
 
 # ...and the Claude Code half has to SHIP. `agents/` is auto-discovered from the plugin root, so no
@@ -425,22 +390,6 @@ for prof in $profiles; do
     git ls-files --error-unmatch "agents/$prof.md" >/dev/null 2>&1 \
       && ok "agents/$prof.md is tracked, so it ships" \
       || bad "agents/$prof.md is tracked, so it ships" "untracked, and the export publishes tracked files only"
-done
-
-# 9. A plugin instruction that only applies to one harness says so WHERE IT IS GIVEN.
-#
-# ADR-0004: a guarantee is a property of (repository, harness), and an instruction is a guarantee in
-# the imperative. `security-guidance`, `/security-review` and `skill-creator` are Claude Code
-# mechanisms with no established Codex counterpart, so an unqualified "recommend it if absent" reads
-# on Codex as a step the reader cannot take and has no way to know is not for them. The other
-# eighteen skills already carry an inline fallback beside every plugin call; these two did not.
-#
-# The check is deliberately coarse: it asks whether the harness is NAMED in the body, not whether
-# the sentence is well written. A regex cannot judge the second, and tests/test-doc-claims.sh:1-16
-# rejects prose regexes for exactly that. What it can do honestly is notice the absence.
-for f in skills/security-audit/SKILL.md skills/create-skill/SKILL.md; do
-    grep -qi 'claude code' "$f" && ok "$f qualifies its plugin instruction" \
-      || bad "$f qualifies its plugin instruction" "names a plugin with no harness"
 done
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"

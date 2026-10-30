@@ -175,7 +175,7 @@ run "an em dash in an agent file is rejected" 1 m_agent_em_dash
 # The model value is the one field a dispatching skill cannot override, so a typo here routes every
 # dispatch naming this profile to nothing. The vendor set is allowed HERE and rejected in a skill
 # body: an agent file is where a harness resolves a profile to a model, which is the indirection
-# lib/harness/codex.sh:86-88 relies on to map keel-fanout to a Codex model.
+# `lib/harness/codex.sh` (deleted after v0.26.0) relied on to map keel-fanout to a Codex model.
 m_agent_bad_model() {
     mkdir -p "$1/agents"
     printf -- '---\nname: a\ndescription: Use when testing.\nmodel: gpt-4o\n---\n\nBody.\n' \

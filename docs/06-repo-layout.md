@@ -275,9 +275,8 @@ keel/
 ## The manifests, of which there are now three
 
 One marketplace manifest and two plugin manifests. See
-[`.claude-plugin/marketplace.json`](../.claude-plugin/marketplace.json),
-[`.claude-plugin/plugin.json`](../.claude-plugin/plugin.json) and
-[`.codex-plugin/plugin.json`](../.codex-plugin/plugin.json) for the live files rather than a copy
+[`.claude-plugin/marketplace.json`](../.claude-plugin/marketplace.json) and
+[`.claude-plugin/plugin.json`](../.claude-plugin/plugin.json) for the live files rather than a copy
 that can drift.
 
 **There is one marketplace manifest and not two, and that is a fact rather than a convenience.**

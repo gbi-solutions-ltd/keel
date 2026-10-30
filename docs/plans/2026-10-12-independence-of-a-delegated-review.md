@@ -233,7 +233,7 @@ run "an em dash in an agent file is rejected" 1 m_agent_em_dash
 # The model value is the one field a dispatching skill cannot override, so a typo here routes every
 # dispatch naming this profile to nothing. The vendor set is allowed HERE and rejected in a skill
 # body: an agent file is where a harness resolves a profile to a model, which is the indirection
-# lib/harness/codex.sh:86-88 relies on to map keel-fanout to a Codex model.
+# `lib/harness/codex.sh` (deleted after v0.26.0) relies on to map keel-fanout to a Codex model.
 m_agent_bad_model() {
     mkdir -p "$1/agents"
     printf -- '---\nname: a\ndescription: Use when testing.\nmodel: gpt-4o\n---\n\nBody.\n' \
@@ -312,10 +312,10 @@ resolves it.
 #
 # THE VENDOR SET IS ALLOWED HERE AND REJECTED IN A SKILL BODY, deliberately. The check above exists
 # so a skill names a profile rather than a model; this file is the one place the profile becomes a
-# model, which is the indirection lib/harness/codex.sh:86-88 relies on to map keel-fanout to a Codex
-# model. Forbidding the alias here would leave the mapping nowhere to live. The set is what the
-# harness accepts, not what this tree uses: nothing here names fable, and a set narrowed to current
-# usage would reject a correct file the day somebody needs one.
+# model, which is the indirection `lib/harness/codex.sh` (deleted after v0.26.0) relies on to map
+# keel-fanout to a Codex model. Forbidding the alias here would leave the mapping nowhere to live.
+# The set is what the harness accepts, not what this tree uses: nothing here names fable, and a set
+# narrowed to current usage would reject a correct file the day somebody needs one.
 #
 # THE DESCRIPTION IS CHECKED FOR PRESENCE AND NOT FOR LENGTH. The 216 character ceiling that bounds
 # a skill description is deliberately not applied: agents/keel-fanout.md's own description is 242

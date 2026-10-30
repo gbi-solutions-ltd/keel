@@ -292,7 +292,6 @@ response, which will compete with our router.
 
 **Recommendation: keep it until Phase 3 lands, then uninstall.** Running both costs two
 <!-- keel:claim gate=session-start harness=claude -->
-<!-- keel:claim gate=session-start harness=codex -->
 session-start injections and produces two answers to "which methodology applies".
 
 The alternative is to build keel as a thin layer on top of superpowers: we ship only
@@ -358,7 +357,6 @@ descriptions are 1,066 tokens in every request, measured 2026-08-16, up from rou
 real budget line and it scales linearly. The original argument against 30+ skills was routing
 precision and a map nobody can hold in their head; both still stand, and the mechanical checks added
 <!-- keel:claim gate=session-start harness=claude -->
-<!-- keel:claim gate=session-start harness=codex -->
 at 0.5.0 (every route present in the cheatsheet and in the session-start injection) exist because
 that map had already drifted at 22. **Revisit before 30, not after**, and revisit it as "which of
 these should merge", not "how short can a description be".
@@ -483,7 +481,6 @@ developer who wants the default style back does not have to edit a shared file.
 **RESOLVED, the part that mattered.** Terse by default was instructed on 2026-08-16 and ships, but
 not through `outputStyle`. `keel init` writes `conventions.response_style: "terse"` into
 <!-- keel:claim gate=session-start harness=claude -->
-<!-- keel:claim gate=session-start harness=codex -->
 `.keel/profile.json` and `hooks/session-start` injects the rule unless it reads `verbose`. That is
 the mechanism `claude-plugins-official/explanatory-output-style` uses for the same problem, and it
 needs no style name.
@@ -503,7 +500,6 @@ it, so there is no pressure to guess.
 
 **The gap.** Nothing in `execute-plan`, `skills/write-plan/references/plan-template.md`, or
 <!-- keel:claim gate=done-guard harness=claude -->
-<!-- keel:claim gate=done-guard harness=codex -->
 `hooks/done-guard` says what to do with a checkbox whose step somebody else already performed. The
 shipped rules cover ticking without running the command. They are silent on ticking a step done in
 an earlier session, which is every resumed plan, and it is the ordinary way a plan accumulates ticks
@@ -542,7 +538,6 @@ the references, which are unbudgeted:
   sees only what is sent.
 
 <!-- keel:claim gate=done-guard harness=claude -->
-<!-- keel:claim gate=done-guard harness=codex -->
 **`hooks/done-guard` is deliberately not part of this.** It reads a turn's tool calls and cannot
 know who performed a step in an earlier session. Extending it here would mean inferring intent from
 a transcript, which is the English-matching mistake its header already refuses.
@@ -667,6 +662,6 @@ any of those reached through `sh -c` or `xargs`. **This is defence in depth and 
 machine that must not talk to the internet needs a sandbox or a firewall, not a rule list.
 
 **It changes what `doctor` says on every project initialised before it.** Missing guardrails are a
-`fail` rather than a warning (`lib/harness/claude.sh:556-560`), by design, since these rules are what make the
+`fail` rather than a warning (`lib/harness/claude.sh:554-558`), by design, since these rules are what make the
 bypass default defensible. So an older project reports three missing rules until `keel init` is
 re-run, which merges and leaves existing rules and settings alone.

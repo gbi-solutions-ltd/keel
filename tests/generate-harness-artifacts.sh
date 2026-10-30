@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Generate a harness's hook manifest and the support page from lib/harness/capabilities, and the
+# Generate Claude Code's hook manifest and the support page from lib/harness/capabilities, and the
 # plugin settings.json (the subagent status line) from lib/subagent_statusline.py.
 #
-# Generated rather than written because four things have to agree about which gates a harness gets,
-# and a hand-maintained copy is the fourth one that goes stale. A stale file is a failing build here,
-# the same bargain tests/generate-profile-keys.sh makes for docs/profile-keys.md.
+# Generated rather than written because three things have to agree about which gates Claude Code
+# gets, and a hand-maintained copy is the third one that goes stale. A stale file is a failing build
+# here, the same bargain tests/generate-profile-keys.sh makes for docs/profile-keys.md.
 #
 # THE CLAUDE CODE MANIFEST IS THE SPECIFICATION, not an output to be inspected. hooks/hooks.json is
 # committed and installed today, and R-01 says no Claude Code behaviour changes, so
@@ -14,7 +14,6 @@
 # Deterministic by construction: no date, no path, no counter, nothing from the environment.
 #
 # Usage: tests/generate-harness-artifacts.sh claude > hooks/hooks.json
-#        tests/generate-harness-artifacts.sh codex  > hooks/hooks.codex.json
 #        tests/generate-harness-artifacts.sh support-page > docs/harness-support.md
 #        tests/generate-harness-artifacts.sh subagent-settings > settings.json
 set -euo pipefail
@@ -27,8 +26,8 @@ CAP="$ROOT/lib/harness/capabilities"
 
 # ---- the support page ------------------------------------------------------
 #
-# Generated for the same reason the hook manifests are: it is the page a reader is sent to when they
-# ask what keel does on their harness, and a hand-maintained answer to that question is the one that
+# Generated for the same reason the hook manifest is: it is the page a reader is sent to when they
+# ask what keel does on Claude Code, and a hand-maintained answer to that question is the one that
 # drifts from lib/harness/capabilities without anything going red.
 #
 # EVERY LINE NAMING A GATE CARRIES ITS OWN CLAIM TAG, and that is not decoration. This file lands in
@@ -73,20 +72,6 @@ support_page() {
         printf "| %s | %s | %s | %s | %s <!-- keel:claim property=%s harness=%s --> |\n", \
                $2, $3, $4, $5, $6, $3, $2
     }' "$CAP"
-    printf '\n'
-
-    # Wrapped so that both mentions of hard_block_paths land within three lines of the tag, which is
-    # as far back as the scan looks. Same words as the plan gives, different line breaks.
-    cat <<'PARA'
-## What Tier B cannot claim
-
-<!-- keel:claim gate=sensitive-guard harness=claude -->
-Codex CLI does not provide a way for a hook to put a command to a human. keel's hard block on
-`hard_block_paths` is therefore absent on Codex, not degraded, and `keel init` registers nothing for it
-there. A repository that declares `hard_block_paths` and serves Codex is protected for its Claude Code
-users and not for its Codex users. This page says it for every harness; `keel doctor` says it for the
-one in front of you, and reports a gate its hooks are not trusted to run as dark rather than active.
-PARA
 }
 
 # ---- the subagent status line registration ---------------------------------
@@ -116,21 +101,24 @@ print(json.dumps({"subagentStatusLine": {"type": "command", "command": cmd}}, in
 PY
 }
 
+usage() { printf 'usage: %s <claude|support-page|subagent-settings>\n' "$0" >&2; exit 1; }
 harness="${1:-}"
-[ -n "$harness" ] || { printf 'usage: %s <harness|support-page|subagent-settings>\n' "$0" >&2; exit 1; }
-if [ "$harness" = support-page ]; then support_page; exit 0; fi
-if [ "$harness" = subagent-settings ]; then subagent_settings; exit 0; fi
-harness_known "$harness" || { printf 'unknown harness: %s\n' "$harness" >&2; exit 1; }
+case "$harness" in
+    claude) ;;
+    support-page) support_page; exit 0 ;;
+    subagent-settings) subagent_settings; exit 0 ;;
+    '') usage ;;
+    *) printf 'unknown harness: %s\n' "$harness" >&2; usage ;;
+esac
 
 active="$(harness_active_gates "$harness")"
 is_active() { grep -qx -e "$1" <<< "$active"; }
 
 # One entry, at the indentation hooks/hooks.json already uses. `async` is false on every entry and
 # is not a parameter: a hook that cannot apply control effects is advisory, and an advisory
-# sensitive-guard or done-guard is the failure this whole design exists to prevent. Codex needs a
-# synchronous hook for both the exit-2 control path and the Stop decision
-# (codex-rs/hooks/src/engine/mod.rs:141-156), and the suite counts entries against synchronous ones
-# so that a silent flip is a red build rather than three gates quietly becoming advice.
+# sensitive-guard or done-guard is the failure this whole design exists to prevent. The suite counts
+# entries against synchronous ones so that a silent flip is a red build rather than five gates
+# quietly becoming advice.
 entry() {
     local hook="$1" timeout="$2"
     cat <<ENTRY
@@ -145,8 +133,8 @@ ENTRY
 }
 
 # A matcher group, or nothing at all when the manifest withholds its gate. Printing nothing rather
-# than an empty group is what lets the caller drop the whole event: sensitive-guard is inactive on
-# Codex and its group simply does not exist there, with no conditional anybody has to remember.
+# than an empty group is what lets the caller drop the whole event: a gate the ledger withholds
+# simply has no group, with no conditional anybody has to remember.
 group() {   # group <gate> <hook> <timeout> [matcher]
     is_active "$1" || return 0
     printf '      {\n'
@@ -173,8 +161,8 @@ join_groups() {
 }
 
 # An event whose every group is inactive is DROPPED, not emitted as an empty array. hooks/hooks.json
-# contains no empty array and a harness holding none of an event's gates has nothing to register
-# there; emitting `"PreCompact": []` would be a claim about a gate that does not exist. Buffering
+# contains no empty array, and an event none of whose gates the ledger grants has nothing to
+# register; emitting `"PreCompact": []` would be a claim about a gate that does not exist. Buffering
 # the document is what makes that decidable, since an event's emptiness is only known after all its
 # groups have run.
 events=""

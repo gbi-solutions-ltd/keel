@@ -25,7 +25,7 @@ the one promise `hard_block_paths` makes, on any commit where the guard does not
   hook doesn't block the tool call ... so don't count on a stalled hook to act as a gate."
   `hooks/hooks.json:47-50` gives `sensitive-guard` a 10 second timeout and no `onFailure`. **No
   timeout is on record**, so this half rests on the documented gap and not on an incident.
-- **Decision 10 has waited on one observation since 2026-08.** `docs/07-open-decisions.md:495`
+- **Decision 10 has waited on one observation since 2026-08.** `docs/07-open-decisions.md:492`
   leaves writing `outputStyle` open until someone sees how a plugin style is named. On
   2026-10-29, `claude -p "/output-style"` on 2.1.312 listed `keel:keel terse` among the styles.
 
@@ -87,7 +87,7 @@ ADR-0004 it adds another guarantee held at two strengths, and Codex users get no
 | `maxTurns` on `keel-fanout` was dropped on purpose, not missed | `docs/plans/2026-10-13-harness-held-dispatch-guarantees.md:95`: "a turn cap ends a read silently" | The 2026-10-29 assessment listed it as a gap. It is not one, and it is not an item here |
 | `AGENTS.md` is not read twice beside `CLAUDE.md` | Memory docs: by default Claude reads `AGENTS.md` "only when you have no `CLAUDE.md` in your working directory or above it" | The dual write ADR-0004 describes costs no context on Claude Code. Nothing to change |
 | Every skill uses only `name`, `description` and `allowed-tools` | `skills/*/SKILL.md` frontmatter | `allowed-tools` pre-approves tools and does not restrict them, per the skills docs. No skill text was found relying on it as a restriction |
-| The Claude capability rows stop at 2.1.302 | `lib/harness/capabilities:99-113` | Items 1 and 2 each add a row, and the version column is where a minimum would first show |
+| The Claude capability rows stop at 2.1.302 | `lib/harness/capabilities:76-90` | Items 1 and 2 each add a row, and the version column is where a minimum would first show |
 | The guard's wiring has no failure policy | `hooks/hooks.json:42-53` | Item 1 is one key on one entry |
 
 ## Open questions

@@ -533,7 +533,7 @@ task.
    (`:502-503`) and `repo-snapshot`'s Step 6 (`:627-630`). Example: `git diff` shows no line above
    the closing `---` of `skills/security-audit/SKILL.md` changing. The schema markers
    `gates.security_audit` and "never by reading one profile", and the plugin name
-   `security-guidance`, stay in the body. `tests/test-harness-claims.sh:441` needs the body to keep
+   `security-guidance`, stay in the body. `tests/test-harness-claims.sh` item 9 (deleted after v0.26.0) needs the body to keep
    naming "Claude Code"; the sentence that does stays.
 9. If behaviours 3 to 5 together cannot bring the body under 700, the task stops: the body is left
    as it stands, uncommitted in this task's worktree, and the report gives the count, the shortfall
@@ -1390,7 +1390,7 @@ text again`.
      where the floor argument now points at ADR-0011, with the fenced example report at lines
      410-418 left as an example; `docs/architecture/tiered-multi-harness-support.md` line 40's
      constraint row, with line 948's open question left as a record;
-- the comment at `lib/harness/capabilities:75-82`. The `validated_word_ceiling` row itself is task
+- the comment at `lib/harness/capabilities:60-67`. The `validated_word_ceiling` row itself is task
      15's, because its evidence is the arms. Dated history in those files, such as
      `docs/standards.md`'s `write-plan` relocation of 2026-08-20, stays as written.
 6. `tests/test-harness-claims.sh`'s `VOCAB` drops `900-word` and adds no new term; `word ceiling`
