@@ -1223,7 +1223,7 @@ so and leave it unstaged.
 **Done when:** `tests/test-eval-harness.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 9.1: Build it test first**
+- [x] **Step 9.1: Build it test first** Note: built by the implementer; red reproduced by the spec reviewer against HEAD (113 passed, 2 failed)
 
 Follow `keel:tdd` for each behaviour: write its test from the example, run it, and watch it fail
 for the reason the behaviour names, then write the minimal implementation and watch it pass.
@@ -1235,7 +1235,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 A red in either validator is this task's. This is the one boundary run the task schedules.
 
-- [ ] **Step 9.2: Hand over**
+- [x] **Step 9.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES
 
 ```bash
 git add tests/evals/stage.sh tests/evals/README.md tests/evals/gate-scenarios tests/test-eval-harness.sh
@@ -1337,6 +1337,8 @@ into your report; if it lists anything this task did not touch, say so and leave
     which ran" fits a plugin that watches edits as well as a command that runs; and
     `skills/context-budget/SKILL.md`'s managed-block row says it is part of the `CLAUDE.md` row and
     is not added to the total. Each changed skill body stays under 700 words.
+17. `tests/test-eval-harness.sh`'s 41c comment reads "The recipe closes the arm's stdin and says",
+    not "say". (From task 9's review.)
 
 **Done when:** `tests/test-doc-claims.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
@@ -1366,7 +1368,8 @@ git add README.md CHANGELOG.md docs/01-architecture.md docs/02-skill-catalog.md 
         docs/ideas/claude-code-features-assessed-2026-10-29.md docs/architecture/claude-code-only.md \
         templates/project-claude-md-block.md lib/merge-claude-md.sh templates/profile.schema.json \
         docs/profile-keys.md docs/ideas/concise-responses.md tests/validate-skills.sh \
-        agents/keel-reviewer.md skills/security-audit/SKILL.md skills/context-budget/SKILL.md
+        agents/keel-reviewer.md skills/security-audit/SKILL.md skills/context-budget/SKILL.md \
+        tests/test-eval-harness.sh
 git status --porcelain
 ```
 
