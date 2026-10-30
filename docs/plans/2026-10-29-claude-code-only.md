@@ -1020,7 +1020,7 @@ ledger makes the minimum empty and doctor print "meets keel's minimum, " with no
 **Done when:** `tests/test-keel-4.sh` and `tests/test-harness-resolve.sh` pass, and
 `tests/validate-citations.sh` and `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 7b.1: Build it test first**
+- [x] **Step 7b.1: Build it test first** Note: built by the implementer; reds reproduced by the spec reviewer against HEAD (119 passed, 9 failed); first post-staging suite run failed the 30-second bound at load average about 43, rerun green
 
 Follow `keel:tdd` for each behaviour: write its test from the example, run it, and watch it fail
 for the reason the behaviour names, then write the minimal implementation and watch it pass.
@@ -1033,7 +1033,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 A red in either validator is this task's. This is the one boundary run the task schedules.
 
-- [ ] **Step 7b.2: Hand over**
+- [x] **Step 7b.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES; the wall-clock hang tests flake under load and cannot tell a kill from a stub that finished, task 7c replaces them
 
 ```bash
 git add bin/keel tests/test-keel-4.sh tests/test-harness-resolve.sh
@@ -1045,6 +1045,68 @@ Stage those paths, and each file whose broken citation this task repaired, by na
 `git commit -s -m "fix(doctor): the version check never hangs and never passes on nothing"`.
 Paste the `git status --porcelain` output into your report; if it lists anything this task did not
 touch, say so and leave it unstaged.
+
+### Task 7c: the version check's hang tests prove the kill without timing it
+
+Added by the coordinator on 2026-10-30 from task 7b's review. Task 7b's hang cases assert doctor ends
+within 30 seconds; a loaded machine took 109 seconds once, and the reviewer showed that neither a
+time bound nor "the warning printed and no stub is left" can tell a kill from a stub that finished
+its own sleep: against the old TERM-then-wait code both passed after 62 seconds.
+
+**Story:** G2, ADR-0014
+**Files:**
+- Test: `tests/test-keel-4.sh`
+
+**Interfaces:**
+- Consumes: task 7b's doctor block
+- Produces: nothing new
+
+**Depends on:** task 7b
+
+**Behaviours:**
+
+1. The hang cases prove the kill with a marker, not a clock. Example: the stub is a shell, not
+   replaced by `exec`, that ignores TERM for behaviour 1's case, starts `sleep 60` in the background,
+   waits for it, and only then writes an `ended` file. Each case asserts the "stopped after 5 seconds"
+   warning, that `ended` does not exist, and that the stub's shell pid is gone; no case asserts a
+   wall-clock bound. The orphaned `sleep` is killed by the test's cleanup.
+2. The marker cases fail against task 7's code. Example: with `bin/keel`'s `kill -KILL` put back to
+   a plain `kill` followed by `wait`, the behaviour 1 case fails because `ended` exists.
+3. The pid check reads only this case's stub. Example: the pid file is emptied before each case, so
+   a reaped pid from the case before cannot be checked again.
+4. The test's cleanup chains to the library's `EXIT` trap rather than copying it, and removes every
+   directory the version cases create.
+5. The spelling cases check parsing, not today's minimum. Example: `v2.1.312`,
+   `2.1.303-beta.1 (Claude Code)` and the second-line version each appear as the parsed version in
+   either the `ok` line or the "older than" line, so a ledger row at 2.1.304 does not turn them red.
+
+**Done when:** `tests/test-keel-4.sh` passes.
+
+- [ ] **Step 7c.1: Build it test first**
+
+Follow `keel:tdd`. For behaviours 1 and 2, write the marker cases, run them against a scratch copy of
+`bin/keel` with the plain `kill` and `wait` put back, and watch them fail because `ended` exists;
+then run them against the real `bin/keel` and watch them pass. Quote both runs. Behaviours 3 to 5
+are test changes; show each still passes and, for 5, that it passes with a scratch ledger whose
+highest required row is 2.1.304.
+Run: `tests/test-keel-4.sh`
+Expected before (on the scratch copy): FAIL, `ended` exists. Expected after: PASS.
+
+Run: `tests/run-tests.sh`.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+This is the one boundary run the task schedules.
+
+- [ ] **Step 7c.2: Hand over**
+
+```bash
+git add tests/test-keel-4.sh
+git status --porcelain
+```
+
+Stage that path and stop. **Do not commit.** The coordinator commits after the review pass, with
+`git commit -s -m "test(doctor): prove the version check's kill with a marker, not a clock"`. Paste
+the `git status --porcelain` output into your report; if it lists anything this task did not touch,
+say so and leave it unstaged.
 
 ### Task 8: skills and agents stop hedging for another harness
 
