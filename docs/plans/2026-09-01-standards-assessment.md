@@ -1541,7 +1541,7 @@ it is sent, so a placeholder left in place means the rules were not sent at all.
   task here waits on it. It closes when a second repository is assessed, which is not this plan.
 - **The SessionStart roster.** No task changes `hooks/session-start`. The roster names skills and
   `coding-standards` is already in it at `:30`. Measured with the validator's own probe
-  (`tests/validate-skills.sh:340-356`), the worst case across all four `response_style` and
+  (`tests/validate-skills.sh:341-357`), the worst case across all four `response_style` and
   `explain_level` combinations is 1,266 characters and 351 tokens against the 356 token rule at
   `:364-366`, leaving 19 characters. A mode needs none of them.
 - **The skill count claim** at `README.md:6`, enforced by `tests/test-doc-claims.sh:45-47`. A mode is

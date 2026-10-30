@@ -109,7 +109,7 @@ run `sync`; they are why its output has to be a path that resolves.
 
 | ID | Constraint | Imposed by |
 |---|---|---|
-| CON-01 | No new writer may be built. `profile_set` refuses a dotted path not already in the file, `bin/keel:941-950`, and all six `artifacts.*` keys are seeded by `write_profile` at `bin/keel:445-448`, so all six are settable today. | The existing code. This is a wiring change, not a feature |
+| CON-01 | No new writer may be built. `profile_set` refuses a dotted path not already in the file, `bin/keel:941-950`, and all six `artifacts.*` keys are seeded by `write_profile` at `bin/keel:389-392`, so all six are settable today. | The existing code. This is a wiring change, not a feature |
 | CON-02 | `keel doctor` must not edit the profile. | Decided in the idea record, 2026-08-29. Doctor is a diagnostic; users run it to find out what is wrong, not to have a tracked file rewritten under them |
 | CON-03 | No skill body may gain a word for this. | ADR-0001 and measurement. `write-plan` is 897 words against a 900 ceiling, so the per-skill variant fails `tests/validate-skills.sh` outright. This constraint is the entire reason the command was chosen |
 | CON-04 | No `PostToolUse` hook. | Decided in the idea record. keel holds its hook budget to 400 tokens, `tests/validate-skills.sh:362-366`, and this event happens a few times per repository |

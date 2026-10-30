@@ -1885,7 +1885,7 @@ A further independent read against the tree, after the first pass's fixes were i
 blocked; both are folded in above.
 
 - **Blocking, fixed:** task 3's test could never fail-then-pass. `keel init` writes
-  `gates.commit_guard` as `"off"` (`bin/keel:555`, confirmed by running init on a fixture), and the
+  `gates.commit_guard` as `"off"` (`bin/keel:374`, confirmed by running init on a fixture), and the
   test's "baseline, gate required" commit never set it to `required`, so old and new were both `off`
   and the refusal was unobservable. The test now sets `required` before the baseline commit.
 - **Blocking, fixed:** `tests/validate-skills.sh` was already red on this branch, 4 problems, all em

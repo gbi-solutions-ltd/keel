@@ -211,15 +211,17 @@ sv="$(grep -oE '^SCHEMA_VERSION=[0-9]+' bin/keel | head -1 | cut -d= -f2)"
 # task 5 declared conventions.no_attribution_footers, the key the message hook now honours.
 # 6 since 2026-10-16, when docs/plans/2026-10-16-manage-test-speed.md task 1 declared
 # verify.test_affected and gates.suite_warn_seconds.
-if [ "$sv" = "6" ]; then
-    ok "SCHEMA_VERSION is where the test-speed task left it ($sv)"
+# 7 since 2026-10-30, when docs/plans/2026-10-29-claude-code-only.md task 4 retired
+# profile.harnesses.
+if [ "$sv" = "7" ]; then
+    ok "SCHEMA_VERSION is where the Claude Code only task left it ($sv)"
 else
-    sv_msg="bin/keel is at $sv, expected 6. docs/plans/2026-10-16-manage-test-speed.md was the last"
-    sv_msg="$sv_msg plan to move it, by declaring verify.test_affected and"
-    sv_msg="$sv_msg gates.suite_warn_seconds. A further bump is either a change riding along or one"
+    sv_msg="bin/keel is at $sv, expected 7. docs/plans/2026-10-29-claude-code-only.md was the last"
+    sv_msg="$sv_msg plan to move it, by retiring profile.harnesses."
+    sv_msg="$sv_msg A further bump is either a change riding along or one"
     sv_msg="$sv_msg that needs its own story,"
     sv_msg="$sv_msg its own schema row and its own fingerprint line in tests/validate-skills.sh"
-    bad "SCHEMA_VERSION is where the test-speed task left it" "$sv_msg"
+    bad "SCHEMA_VERSION is where the Claude Code only task left it" "$sv_msg"
 fi
 
 # Plan 0 left these two changes of its own untested. Both are literal strings in a file that exists

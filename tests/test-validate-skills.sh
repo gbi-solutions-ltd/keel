@@ -785,6 +785,23 @@ JSON
 run_out "a register that agrees with the schema says nothing" 1 \
     m_retired_key_absent "retired" no
 
+# A row written as a printf argument rather than a heredoc line, which bin/keel does for the row
+# that carries a trailing comment, is read as a row too.
+m_retired_printf_still_declared() {
+    mkdir -p "$1/templates" "$1/bin"
+    cat > "$1/bin/keel" <<'KEEL'
+SCHEMA_VERSION=1
+retired_keys() {
+    printf '%s\n' 'harnesses|7|it does nothing now.' # a trailing comment
+}
+KEEL
+    cat > "$1/templates/profile.schema.json" <<'JSON'
+{ "properties": { "harnesses": { "type": "array" } } }
+JSON
+}
+run_out "a printf row in the register that the schema still declares is rejected" 1 \
+    m_retired_printf_still_declared "retired" yes
+
 # Every key the example template sets is declared in the schema, or a project that copies the
 # example sets a key that does nothing. conventions.branch_prefix was exactly this, pre-existing
 # and undetected: in the example, in neither schema revision, read by nothing.

@@ -104,7 +104,7 @@ prevent, found against a real 2.4MB transcript holding 401,247 tokens.
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
 | NFR-01 | The floor computation must add no filesystem or network reads to `window_for`. | inferred | It already receives `configured` and `observed` as arguments (`lib/context_watch.py:120`). The hook runs on every prompt and every tool call |
-| NFR-02 | This change must add zero tokens to what `hooks/session-start` injects. | confirmed | Piece three is out of scope. The hook measured 356 estimated tokens against a 400 ceiling on 2026-08-18 (`tests/validate-skills.sh:283-284`) |
+| NFR-02 | This change must add zero tokens to what `hooks/session-start` injects. | confirmed | Piece three is out of scope. The hook measured 356 estimated tokens against a 400 ceiling on 2026-08-18 (`tests/validate-skills.sh:284-285`) |
 | NFR-03 | The watchdog must continue to do nothing when `python3` is absent, rather than reporting an error. | inferred | `hooks/context-watch:14-16, 22` |
 | NFR-04 | Every existing assertion in `tests/test-context-watch.sh` must still pass unmodified after FR-01. | inferred | Verified 2026-08-18: every configured value in that file (500000 at `:86`, 1000000 at `:91`) exceeds the observed occupancy in its fixture, so the floor rule yields the same result |
 

@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 # Everything keel writes and reads that belongs to Claude Code, and nothing that does not.
 #
-# THE CONTRACT. Six functions, and lib/harness/codex.sh implements the same six. bin/keel calls
-# these and never a writer by name, so adding a harness is a file here rather than a branch there:
+# WHAT bin/keel CALLS. These functions, and never a writer by name, so what keel writes for Claude
+# Code lives here and bin/keel stays free of its file names:
 #
-#   harness_write_config <root>        write this harness's committed configuration
+#   harness_write_config <root>        write Claude Code's committed configuration
 #   harness_write_local_config <root>  write its uncommitted, per-developer configuration
 #   harness_permission_rules           print `deny|<rule>` and `ask|<rule>` lines, one per rule
-#   harness_recommend_plugins          print the plugin ids this harness should have, one per line
-#   harness_config_paths               print the paths this harness owns, one per line
+#   harness_recommend_plugins          print the plugin ids Claude Code should have, one per line
+#   harness_config_paths               print the paths Claude Code configuration owns, one per line
 #   harness_doctor_findings            print `level|message` lines for cmd_doctor, zero or more
 #
-# THE SIXTH EXISTS BECAUSE OF WHAT cmd_doctor DOES. settings_report_load, plugin_report and
-# boundary_report are Claude Code readers, and cmd_doctor stays in the neutral file. Under a
-# five-function contract cmd_doctor would call functions that exist for one harness only, which
-# breaks the moment codex.sh is the loaded one. harness_doctor_findings is the only thing it calls;
-# this file implements it over the three readers, and a harness with nothing to report implements
-# it as a no-op.
+# THE LAST EXISTS BECAUSE OF WHAT cmd_doctor DOES. settings_report_load, plugin_report and
+# boundary_report are Claude Code readers, and cmd_doctor keeps the ordering, the formatting and the
+# counters while this file keeps the knowledge. harness_doctor_findings is the only one of them
+# cmd_doctor calls, so a reader added here reaches the report without cmd_doctor learning its name;
+# this file implements it over the three readers, and a phase with nothing to report prints
+# nothing.
 #
 # THE BODIES BELOW WERE MOVED, NOT REWRITTEN. Every byte of what `keel init` writes on Claude Code
 # is asserted against the pre-refactor commit by tests/test-keel-4.sh, which builds the baseline
@@ -460,8 +460,8 @@ harness_config_dirs() {
 # INTERLEAVED with neutral ones: the plugin set, then the context watchdog, then the guardrails,
 # then the handoff, then the editor. Emitting every harness finding at one call point would group
 # them together and reorder a report people read top to bottom, which R-01 forbids as surely as
-# changing what init writes. The phases are doctor's own sections and mean nothing harness-specific;
-# a harness with nothing to say in one returns nothing, which is what codex.sh does for all of them.
+# changing what init writes. The phases are doctor's own sections, and a phase this file has
+# nothing to say in returns nothing.
 harness_doctor_findings() {
     case "${1:-}" in
         prime)        settings_report_load ;;

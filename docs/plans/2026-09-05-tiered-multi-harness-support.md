@@ -2137,7 +2137,7 @@ codex"
 
 Parse `--harness <list>` in `cmd_init`'s flag loop (`:909`) alongside `-y`, `--team` and `--force`.
 
-**Invalidate the JSON cache before re-reading.** `bin/keel:126-132` caches a flattened profile per
+**Invalidate the JSON cache before re-reading.** `bin/keel:127-135` caches a flattened profile per
 process keyed on filename, and `cmd_init` rewrites `.keel/profile.json` during the run. Anything
 reading the profile after the write, `harness_set_for_repo` included when `init` is re-run in a
 session, must clear `JSON_CACHE_FILE` first or it reads the pre-write copy.
@@ -3582,7 +3582,7 @@ and `/security-review` instruction: both are Claude Code mechanisms with no esta
 counterpart, and the paragraph already carries an inline fallback, the pattern eighteen skills use.
 Do the same for `skill-creator` at `skills/create-skill/SKILL.md:74-75`.
 
-Keep the plugin name in the body. `tests/validate-skills.sh:390-463` requires a plugin delegation
+Keep the plugin name in the body. `tests/validate-skills.sh:391-464` requires a plugin delegation
 claimed in `docs/04-plugin-strategy.md` or `docs/02-skill-catalog.md` to be named in the delegating
 skill's **body**, so removing it there fails the build. Update the two documents in the same task, so
 body and document move together.

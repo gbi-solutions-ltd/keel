@@ -44,7 +44,7 @@ must still obey these.
 - **No em dashes anywhere**, including in the code comments these tasks add.
 - **CON-01: no new writer.** `profile_set` at `bin/keel:973-1017` is the writer. It refuses a
   dotted path not already in the file (`:990-998`), and all six `artifacts.*` keys are seeded by
-  `write_profile` at `bin/keel:445-448`, so all six are settable today. It is silent on success and
+  `write_profile` at `bin/keel:389-392`, so all six are settable today. It is silent on success and
   clears the JSON cache before returning, carrying its exit status over the clear by hand.
 - **CON-02: doctor must not edit the profile.** Task 6 warns and names the command. It writes
   nothing.

@@ -31,17 +31,16 @@ case "$out" in
   *) bad "keel-fleet" "output does not name $repo_a: $out" ;;
 esac
 
-# the header names every column, harnesses included, in the order the rows carry them
+# the header names every column, in the order the rows carry them, and the harness set is not one
 head1="$(printf '%s\n' "$out" | head -1)"
-[ "$head1" = "$(printf 'repo\tkeel_version\tschema_version\tharnesses\tverify_test_null\tproblems\twarnings')" ] \
-  && ok "fleet header carries the harnesses column" \
-  || bad "keel-fleet" "unexpected header: $head1"
+[ "$head1" = "$(printf 'repo\tkeel_version\tschema_version\tverify_test_null\tproblems\twarnings')" ] \
+  && ok "fleet header carries no harnesses column" \
+  || bad "fleet header carries no harnesses column" "unexpected header: $head1"
 
-# the harnesses cell is the profile's list, comma-joined
-want="$(python3 -c "import json; print(','.join(json.load(open('$repo_a/.keel/profile.json')).get('harnesses', [])))")"
-got="$(printf '%s\n' "$out" | awk -F'\t' -v r="$repo_a" '$1 == r { print $4 }')"
-[ "$got" = "$want" ] && ok "fleet harnesses cell matches the profile ($got)" \
-  || bad "keel-fleet" "harnesses cell is '$got', profile says '$want'"
+# a row has one cell per header column
+ncell="$(printf '%s\n' "$out" | awk -F'\t' -v r="$repo_a" '$1 == r { print NF }')"
+[ "$ncell" = 6 ] && ok "fleet row has no harnesses cell" \
+  || bad "fleet row has no harnesses cell" "row has $ncell cells"
 
 # --file: a path-list file whose last line has no trailing newline must still report every repo
 # (regression test for the read loop silently dropping the final path)
@@ -81,7 +80,7 @@ header="$(printf '%s\n' "$out" | head -1)"
 row="$(printf '%s\n' "$out" | awk -F'\t' -v r="$repo_a" '$1 == r')"
 cols="$(printf '%s' "$row" | awk -F'\t' '{ print NF }')"
 want_cols="$(printf '%s' "$header" | awk -F'\t' '{ print NF }')"
-[ "$row" = "$(printf '%s\t(unreadable)\t\t\t\t\t' "$repo_a")" ] \
+[ "$row" = "$(printf '%s\t(unreadable)\t\t\t\t' "$repo_a")" ] \
   && ok "fleet prints the (unreadable) row for malformed doctor output" \
   || bad "keel-fleet" "expected an (unreadable) row for $repo_a, got: $row"
 [ "$cols" = "$want_cols" ] && ok "malformed-output row has the full column count" \

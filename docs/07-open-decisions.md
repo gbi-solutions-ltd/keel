@@ -580,7 +580,7 @@ score that case as a partial so it is visible if it persists.
 
 Raised because the posture every engineer gets had never been recorded as a decision. `keel init`
 writes `permissions.defaultMode: bypassPermissions` into `.claude/settings.local.json`
-(`bin/keel:709-732`), and `init` runs on every machine, so a per-machine file written by a shared
+(`lib/harness/claude.sh:383-406`), and `init` runs on every machine, so a per-machine file written by a shared
 tool is a team default by another name.
 
 **One correction to the framing this was raised under.** The argument is not confined to a code
@@ -610,7 +610,7 @@ decision, that init disables keel's own guardrails, does not hold.
 
 ### What the rules do not reach, which is the actual residual
 
-The guardrails are 13 deny and 10 ask rules (`bin/keel:569-608`), wider than a summary of ".env,
+The guardrails are 13 deny and 10 ask rules (`lib/harness/claude.sh:233-291`), wider than a summary of ".env,
 secrets, pem, id_rsa" suggests, because they also close the common Bash shapes. The residual is
 still large, and it is a **machine-level** residual rather than a repository-level one:
 

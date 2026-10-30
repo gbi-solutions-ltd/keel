@@ -221,13 +221,10 @@ nfindings="$(printf '%s' "$out" | python3 -c "import json,sys; print(len(json.lo
 [ "$nfindings" -gt 0 ] && ok "doctor --json reports at least one finding" \
   || bad "doctor --json" "findings array is empty"
 
-# harnesses is the profile's list, verbatim. init on a fixture writes at least one entry.
-hs="$(printf '%s' "$out" | python3 -c "import json,sys; d=json.load(sys.stdin); h=d['harnesses']; print(','.join(h) if isinstance(h, list) else 'NOT-A-LIST')")"
-[ -n "$hs" ] && [ "$hs" != "NOT-A-LIST" ] && ok "doctor --json reports harnesses as a list ($hs)" \
-  || bad "doctor --json" "harnesses missing, empty, or not a list: $hs"
-pf="$(python3 -c "import json; print(','.join(json.load(open('$dj/.keel/profile.json')).get('harnesses', [])))")"
-[ "$hs" = "$pf" ] && ok "doctor --json harnesses matches the profile verbatim" \
-  || bad "doctor --json" "harnesses differs from the profile: json=$hs profile=$pf"
+# The harness set is retired in schema 7, and doctor --json no longer reports one.
+has_h="$(printf '%s' "$out" | python3 -c "import json,sys; print('harnesses' in json.load(sys.stdin))")"
+[ "$has_h" = False ] && ok "doctor --json has no harnesses key" \
+  || bad "doctor --json has no harnesses key" "harnesses is still reported"
 
 # --fast without --json still behaves exactly as before
 ( cd "$dj" && "$KEEL" doctor --fast >/dev/null 2>&1 )

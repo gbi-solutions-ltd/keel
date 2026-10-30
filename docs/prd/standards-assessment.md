@@ -305,7 +305,7 @@ Every routing and documentation surface, measured in this repository at `13d90d9
 | Skill count claim | `README.md:6`, "25 skills built", enforced by `tests/test-doc-claims.sh:45-47` | **No change.** A mode is not a skill | Zero |
 
 **The SessionStart roster, measured rather than inherited.** Reproducing the validator's own probe
-(`tests/validate-skills.sh:340-356`, which measures the whole hook stdout with `wc -c` and estimates
+(`tests/validate-skills.sh:341-357`, which measures the whole hook stdout with `wc -c` and estimates
 tokens as `chars * 10 / 36`) across all four `response_style` and `explain_level` combinations gives
 a worst case of **1,266 characters, 351 tokens**, against the 356 token rule at `:364-366`. That
 confirms the record's figure (`docs/ideas/standards-that-bind.md:425-427`).

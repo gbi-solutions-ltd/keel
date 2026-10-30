@@ -22,14 +22,14 @@ fi
 [ "${#paths[@]}" -gt 0 ] || { printf 'usage: keel-fleet <repo-path>...\n       keel-fleet --file <path-list-file>\n' >&2; exit 1; }
 
 status=0
-printf 'repo\tkeel_version\tschema_version\tharnesses\tverify_test_null\tproblems\twarnings\n'
+printf 'repo\tkeel_version\tschema_version\tverify_test_null\tproblems\twarnings\n'
 for p in "${paths[@]}"; do
     # Not `! out="$(...)"`: that tests the subshell's exit status, which is `doctor`'s own exit
     # code, non-zero on any problem by design and not a sign the output could not be produced.
     # Empty output is the only thing that means unreadable here; a parse failure is caught below.
     out="$(cd "$p" 2>/dev/null && "$KEEL_BIN" doctor --json --fast 2>/dev/null)"
     if [ -z "$out" ]; then
-        printf '%s\t(unreadable)\t\t\t\t\t\n' "$p"
+        printf '%s\t(unreadable)\t\t\t\t\n' "$p"
         status=1
         continue
     fi
@@ -39,13 +39,12 @@ import json, sys
 repo = sys.argv[1]
 try:
     d = json.load(sys.stdin)
-    cells = [str(d.get(k)) for k in ('keel_version', 'schema_version')]
-    cells.append(','.join(d.get('harnesses') or []))
-    cells += [str(d.get(k)) for k in ('verify_test_null', 'problems', 'warnings')]
+    cells = [str(d.get(k)) for k in ('keel_version', 'schema_version', 'verify_test_null',
+                                     'problems', 'warnings')]
     print(repo + '\t' + '\t'.join(cells))
     sys.exit(0 if d.get('problems') == 0 else 1)
 except Exception:
-    print(repo + '\t(unreadable)\t\t\t\t\t')
+    print(repo + '\t(unreadable)\t\t\t\t')
     sys.exit(1)
 " "$p"; then
         status=1

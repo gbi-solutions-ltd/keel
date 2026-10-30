@@ -135,7 +135,7 @@ and it is the one keel spent a decision on avoiding.
 
 | Option | What it costs | Why not this |
 |---|---|---|
-| Do nothing | Zero | This is the recommendation. keel already dual-writes `AGENTS.md` (`bin/keel:927-928`), so Codex users get Layer 2 today. It is honest, already shipped, and already documented as a deliberate stop (`docs/03-install-and-distribution.md#and nothing else, which is the tier below.`) |
+| Do nothing | Zero | This is the recommendation. keel already dual-writes `AGENTS.md` (`bin/keel:648-649`), so Codex users get Layer 2 today. It is honest, already shipped, and already documented as a deliberate stop (`docs/03-install-and-distribution.md#and nothing else, which is the tier below.`) |
 | Do it manually | A Codex user clones keel and copies `skills/` into `.agents/skills/` themselves | Actually works, and is worth documenting as an unsupported recipe. It is not "first-class" and makes no guarantee, which is the point: it does not pretend |
 | Buy it | Nothing to buy | No product ports an SOP's enforcement layer between agent harnesses. Not an option |
 | Build something smaller | Ship Layers 2 and 3 on Codex (skills, `AGENTS.md`, the session router, `done-guard`, `context-watch`) and document `sensitive-guard` as absent | **This is the tempting one and it is what the constraint forbids.** keel with three of four gates is not keel at the same level of guarantee; it is keel with the security gate quietly missing on one of its two supported harnesses |
@@ -213,7 +213,7 @@ Classified (a) already harness-neutral, (b) portable with an adapter, (c) Claude
 | Mechanism | `file:line` | Class | Why | What an adapter does |
 |---|---|---|---|---|
 | `lib/merge-claude-md.sh` | whole file, 42 lines | **(a)** | Nothing in it names `.claude`, `CLAUDE.md` or `AGENTS.md`; both functions take the target as a parameter. The filename lies about the file | Nothing |
-| `bin/keel:927-928` dual-write | `merge_block CLAUDE.md "$block"` / `merge_block AGENTS.md "$block"` | **(a)** | Same rendered `$block` into both. **Refinement to the starting facts:** "identically" is true of the managed block, not of the whole files, since each merges against its own pre-existing content | Nothing |
+| `bin/keel:648-649` dual-write | `merge_block CLAUDE.md "$block"` / `merge_block AGENTS.md "$block"` | **(a)** | Same rendered `$block` into both. **Refinement to the starting facts:** "identically" is true of the managed block, not of the whole files, since each merges against its own pre-existing content | Nothing |
 | `lib/detect-stack.sh` stack detection | bulk of 940 lines | **(a)** | Pure detection, no harness reference | Nothing |
 | `lib/detect-stack.sh` `lang_lsp` / `detect_plugins` | `890-940` | **(b)** | Returns Claude-marketplace plugin names | A Codex plugin list, or drop the recommendation |
 | `hooks/hooks.json` | whole file, 95 lines | **(b), and cheaper than expected** | Codex plugins bundle lifecycle hooks at `"hooks": "./hooks/hooks.json"` in the **same** `{event: [{matcher, hooks:[{type:"command", command}]}]}` shape, with the same event names, and **Codex sets `CLAUDE_PLUGIN_ROOT` and `CLAUDE_PLUGIN_DATA` for compatibility**, which is exactly what `hooks/hooks.json:9` interpolates | Close to nothing. `SubagentStop` and `PreCompact` both exist on Codex too |

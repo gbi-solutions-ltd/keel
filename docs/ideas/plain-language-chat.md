@@ -68,7 +68,7 @@ relays. This fixes the relay and not the source, and nothing has changed since t
 
 **Fourth argument: the always-loaded budget is nearly spent.** Measured on 2026-08-18,
 `hooks/session-start` injects 1,284 characters, about 356 tokens by the validator's own estimate,
-against a 250 target and a 400 hard ceiling enforced at `tests/validate-skills.sh:283-284`. The
+against a 250 target and a 400 hard ceiling enforced at `tests/validate-skills.sh:284-285`. The
 existing brevity paragraph is 240 characters, about 66 tokens. There are 44 tokens of headroom, so a
 comparable rule **added** to the hook fails the build. This is the same wall `concise-responses.md`
 hit, and it has 44 tokens less room than it did then.
@@ -88,7 +88,7 @@ hit, and it has 44 tokens less room than it did then.
 |---|---|
 | A separate `conventions.explain_level` key that **swaps** the injected paragraph | Recommended, and chosen by the requester. The hook already selects one of two forms with a `case`; selecting from four costs nothing extra because each form replaces rather than appends, which is the only shape that fits in 44 tokens. Travels with the profile, so a project is configured once |
 | A third value in the `response_style` enum | Rejected by the requester on 2026-08-18, and correctly: length and vocabulary are independent, so one enum cannot express both. `response_style` keeps its current two values |
-| A new rule **added** to `hooks/session-start` | Rejected on measurement. 66 tokens against 44 of headroom fails `tests/validate-skills.sh:283-284` |
+| A new rule **added** to `hooks/session-start` | Rejected on measurement. 66 tokens against 44 of headroom fails `tests/validate-skills.sh:284-285` |
 | A second output style, `output-styles/keel-plain.md` | Zero always-loaded cost and it is the shape `concise-responses.md` recommended for terse. Rejected as the primary: output styles are chosen one at a time in `/config`, so it would have to duplicate all of terse to avoid replacing it, and two files stating the same doctrine drift |
 | A glossary reference under `skills/keel/references/` | Cheap and unbudgeted, and it pairs well with any of the above. On its own it changes nothing, because nothing would cite it on the turn that matters |
 | Define each term on first use, keep the term | Recommended as the **wording**, not as a variant. It keeps the reply accurate and the reader able to follow the artifact, which is what the strongest objection above is about |
@@ -108,7 +108,7 @@ hit, and it has 44 tokens less room than it did then.
 
 | Finding | Evidence | What it means for the idea |
 |---|---|---|
-| The always-loaded hook is at 356 of a 400 ceiling | Measured 2026-08-18; rule at `tests/validate-skills.sh:283-284`, budget in `docs/05-token-and-memory-design.md` | 44 tokens of headroom. The rule must swap, not add |
+| The always-loaded hook is at 356 of a 400 ceiling | Measured 2026-08-18; rule at `tests/validate-skills.sh:284-285`, budget in `docs/05-token-and-memory-design.md` | 44 tokens of headroom. The rule must swap, not add |
 | The hook is deliberately bounded to a fixed set of forms | `hooks/session-start:9-14`, and it forbids anything volatile for prompt-cache reasons | A third form is allowed by that doctrine. A rule that varied per reply is not |
 | `response_style` is an enum of exactly two, and stays that way | `templates/profile.schema.json:335-342` | Untouched by the chosen design. A **new sibling key** is still a schema change, so `SCHEMA_VERSION` moves and `keel doctor` reports drift on existing profiles |
 | Two independent keys give four combinations, not four paragraphs' worth of tokens | The hook picks one paragraph; the set it picks from may grow without the injected size growing | The 44-token headroom survives the separate-key design. Only a rule that **appends** breaks it |

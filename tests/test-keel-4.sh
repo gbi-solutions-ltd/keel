@@ -980,7 +980,11 @@ if git -C "$ROOT" worktree add -q --detach "$base/repo" "$BASELINE_REF" 2>/dev/n
     # above, so filtering a section out of the comparison and leaving its contribution in the total
     # would fail on arithmetic that is correct. That total has its own case, "doctor's summary
     # counts its warnings", which counts the WARN lines and compares.
-    HSECTION='^(ok    running under |WARN  cannot determine which harness is running|ok    [a-z]+ gates active:|WARN  [a-z]+ will run none of keel|WARN  [a-z]+ gates the manifest grants:|WARN  [a-z]+ does not get |WARN  this repository declares hard_block_paths|WARN  codex is installed on this machine|keel doctor: )'
+    #
+    # The first three alternatives name lines this doctor no longer prints and a baseline from
+    # before schema 7 still does, so they stay while such a baseline can be compared against. Each
+    # has its assertion below: "doctor names no running harness".
+    HSECTION='^(ok    running under |WARN  cannot determine which harness is running|WARN  codex is installed on this machine|ok    claude gates active:|WARN  claude does not get |WARN  this repository declares hard_block_paths|keel doctor: )'
     ( cd "$base" && "$base/repo/bin/keel" doctor 2>&1 \
         | sed -E 's/schema version [0-9]+/schema version N/g' | grep -vE "$HSECTION" > "$base/doctor.txt" )
     ( cd "$after" && "$ROOT/bin/keel" doctor 2>&1 \
@@ -1007,98 +1011,123 @@ leak="$(grep -nE '\.claude|CLAUDE\.md|enabledPlugins|known_marketplaces' "$KEEL"
 [ -z "$leak" ] && ok "bin/keel names no harness outside lib/harness/ and its comments" \
   || bad "bin/keel names no harness outside lib/harness/ and its comments" "$leak"
 
-# The contract is complete, and it is checked by name rather than by whether init happened to work.
-# A harness file missing one function fails at the call site, in a message about an undefined
-# command, on somebody's machine. Here it is a red build with the function's name in it.
-for fn in harness_write_config harness_write_local_config harness_permission_rules \
-          harness_recommend_plugins harness_config_paths harness_doctor_findings; do
-    grep -qE "^${fn}\(\)" "$ROOT/lib/harness/claude.sh" 2>/dev/null \
-      && ok "claude.sh implements $fn" || bad "claude.sh implements $fn" "not defined"
+# ---- one harness, and profile.harnesses retired in schema 7 ------------------
+#
+# init ignores a flag it does not know, so a --harness accepted and then dropped would leave the
+# person believing it took effect. It is refused, before anything is written.
+for flag in "--harness codex" "--harness=codex"; do
+    w="$(mktemp -d)"
+    # $flag is deliberately split: "--harness codex" is two arguments.
+    # shellcheck disable=SC2086
+    out="$( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init $flag -y 2>&1 )"; rc=$?
+    written="$(cd "$w" && find . -path ./.git -prune -o -type f -print | head -3)"
+    case "$rc|$out" in
+      1\|*--harness*"Claude Code only"*v0.26.0*) ok "init refuses $flag, naming Claude Code only and v0.26.0" ;;
+      *) bad "init refuses $flag, naming Claude Code only and v0.26.0" "rc=$rc out=${out:0:160}" ;;
+    esac
+    [ -z "$written" ] && ok "a refused $flag writes nothing" \
+      || bad "a refused $flag writes nothing" "$written"
+    rm -rf "$w"
 done
 
-# ---- which harnesses a repository serves ------------------------------------
+# A tracked .codex/config.toml is the repository's own file and no longer a signal of anything.
+w="$(mktemp -d)"
+( cd "$w" && git init -q -b main . && git config user.email t@t.t && git config user.name t \
+  && mkdir -p .codex && echo 'model = "x"' > .codex/config.toml \
+  && git add -A && git commit -qm x && "$ROOT/bin/keel" init -y >/dev/null 2>&1 )
+got="$(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(d.get("schema_version"), "harnesses" in d)' "$w/.keel/profile.json" 2>&1)"
+[ "$got" = "7 False" ] && ok "init writes schema 7 and no harnesses key" \
+  || bad "init writes schema 7 and no harnesses key" "got $got"
+codex_files="$(cd "$w" && find .codex -type f | sort | tr '\n' ' ')"
+[ -f "$w/.keel/profile.json" ] && [ "$codex_files" = ".codex/config.toml " ] && ok "init creates no file under .codex/" \
+  || bad "init creates no file under .codex/" "found: $codex_files"
+rm -rf "$w"
 
-h_case() {  # h_case <setup command> <init flag> <expected harnesses json>
-    local setup="$1" flag="$2" want="$3" w got
-    # $flag is deliberately split: it is empty in most cases and "--harness codex" in others.
-    # Quoting it would pass one empty argument or one two-word one, and both break init.
-    w="$(mktemp -d)"
-    # A repository-local git identity, because two of the setups below commit. Without one, a
-    # machine with no global user.name fails the commit, the `&&` chain aborts before `keel init`
-    # runs, and the case reports an empty `got` for a profile that was never written. That is how
-    # CI went red on 2026-09-07 on cases every laptop passed: the blank value was a missing file,
-    # not a wrong answer. tests/run-tests.sh removes the ambient identity so this cannot recur
-    # unseen.
-    # shellcheck disable=SC2086
-    ( cd "$w" && git init -q -b main . && git config user.email t@t.t && git config user.name t \
-        && eval "$setup" \
-        && "$ROOT/bin/keel" init $flag -y >/dev/null 2>&1 )
-    got="$(python3 -c 'import json,sys;print(json.dumps(json.load(open(sys.argv[1])).get("harnesses")))' "$w/.keel/profile.json" 2>/dev/null)"
-    [ "$got" = "$want" ] && ok "harnesses $want ($setup $flag)" \
-      || bad "harnesses $want ($setup $flag)" "got $got"
-    rm -rf "$w"
-}
-
-h_case "true"                                             ""                       '["claude"]'
-h_case "true"                                             "--harness codex"        '["codex"]'
-h_case "true"                                             "--harness claude,codex" '["claude", "codex"]'
-h_case "mkdir -p .codex && echo x > .codex/config.toml && git add -A && git commit -qm x" "" '["claude", "codex"]'
-h_case "mkdir -p .codex && echo x > .codex/config.toml"    ""                      '["claude"]'
-h_case "echo x > AGENTS.md && git add -A && git commit -qm x" ""                   '["claude"]'
-
-# Upgrading an existing schema 2 profile must not infer a harness from anything. An installed base
-# that has been dual writing AGENTS.md since long before Codex was supported would otherwise be
-# marked Codex-serving in one upgrade, and every one of those repositories would start claiming a
-# tier nobody chose for it.
+# A schema 6 profile that lists harnesses still loads, and doctor names the key as retired beside
+# the schema warning it already gave.
 w="$(mktemp -d)"
 ( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init -y >/dev/null 2>&1 )
-python3 - "$w/.keel/profile.json" <<'DOWNGRADE'
+python3 - "$w/.keel/profile.json" <<'SIX'
 import json,sys
-p=sys.argv[1]; d=json.load(open(p)); d["schema_version"]=2; d.pop("harnesses",None)
+p=sys.argv[1]; d=json.load(open(p)); d["schema_version"]=6; d["harnesses"]=["claude","codex"]
 json.dump(d, open(p,"w"), indent=2)
-DOWNGRADE
-( cd "$w" && "$ROOT/bin/keel" init -y >/dev/null 2>&1 )
-got="$(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(d.get("schema_version"), json.dumps(d.get("harnesses")))' "$w/.keel/profile.json")"
-# The schema number is read from bin/keel and not typed. This case tests which harnesses an upgrade
-# infers, not what the schema version is, and a literal here made every schema bump edit a case
-# that has nothing to do with it (it said 5 until docs/plans/2026-10-16-manage-test-speed.md moved
-# the version to 6). "init writes schema version" above is where the number is pinned.
-sv_now="$(sed -n 's/^SCHEMA_VERSION=\([0-9][0-9]*\)$/\1/p' "$ROOT/bin/keel")"
-[ "$got" = "$sv_now"' ["claude"]' ] && ok "a schema 2 profile upgrades to claude only" \
-  || bad "a schema 2 profile upgrades to claude only" "got $got, want $sv_now"
+SIX
+out="$( cd "$w" && "$ROOT/bin/keel" doctor 2>&1 )"
+printf '%s\n' "$out" | grep -E '^WARN .*harnesses, retired in schema 7\..*v0\.26\.0' >/dev/null \
+  && ok "doctor reports harnesses as retired in schema 7, naming v0.26.0" \
+  || bad "doctor reports harnesses as retired in schema 7, naming v0.26.0" "$(printf '%s\n' "$out" | grep -i harness | head -2)"
+printf '%s\n' "$out" | grep -q '^WARN .*profile is at schema version 6' \
+  && ok "the schema 6 warning still prints beside the retired key" \
+  || bad "the schema 6 warning still prints beside the retired key" "no schema version 6 warning"
 rm -rf "$w"
 
-# An explicit --harness must win on a repository that ALREADY has a profile, and until this was
-# found in review it silently lost. merge_profile defends every human value in the profile, which is
-# right for a set somebody edited by hand and wrong for the flag that exists to change it: the only
-# ways to move the set were --force, which discards every human value in the file, and hand-editing.
+# The agent files keel wrote for Codex are left in place and named once as no longer managed. A
+# repository's own .codex/config.toml is not keel's and gets no line.
 w="$(mktemp -d)"
-( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init -y >/dev/null 2>&1 \
-    && "$ROOT/bin/keel" init --harness codex -y >/dev/null 2>&1 )
-got="$(python3 -c 'import json,sys;print(json.dumps(json.load(open(sys.argv[1])).get("harnesses")))' "$w/.keel/profile.json" 2>/dev/null)"
-[ "$got" = '["codex"]' ] && ok "--harness wins over an existing profile" \
-  || bad "--harness wins over an existing profile" "got $got"
-
-# ...and a plain re-init does NOT re-infer it, which is the behaviour the merge is there to protect.
-( cd "$w" && "$ROOT/bin/keel" init -y >/dev/null 2>&1 )
-got="$(python3 -c 'import json,sys;print(json.dumps(json.load(open(sys.argv[1])).get("harnesses")))' "$w/.keel/profile.json" 2>/dev/null)"
-[ "$got" = '["codex"]' ] && ok "a plain re-init leaves the harness set alone" \
-  || bad "a plain re-init leaves the harness set alone" "got $got"
+( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init -y >/dev/null 2>&1 )
+mkdir -p "$w/.codex/agents"
+for agent in keel-fanout keel-implementer; do
+    rm -f "$w/.codex/agents/"*.toml
+    echo 'x = 1' > "$w/.codex/agents/$agent.toml"
+    n="$( cd "$w" && "$ROOT/bin/keel" doctor 2>&1 | grep -c '^WARN .*no longer manages.*v0\.26\.0' )"
+    [ "$n" = 1 ] && ok "doctor names .codex/agents/$agent.toml as no longer managed" \
+      || bad "doctor names .codex/agents/$agent.toml as no longer managed" "$n matching lines"
+done
+echo 'x = 1' > "$w/.codex/agents/keel-fanout.toml"
+n="$( cd "$w" && "$ROOT/bin/keel" doctor 2>&1 | grep -c 'no longer manages' )"
+[ "$n" = 1 ] && ok "both agent files are one warning" || bad "both agent files are one warning" "$n lines"
+rm -rf "$w/.codex/agents"; echo 'model = "x"' > "$w/.codex/config.toml"
+n="$( cd "$w" && "$ROOT/bin/keel" doctor 2>&1 | grep -c 'no longer manages' )"
+[ "$n" = 0 ] && ok "a repository's own .codex/config.toml gets no such line" \
+  || bad "a repository's own .codex/config.toml gets no such line" "$n lines"
 rm -rf "$w"
 
-# --harness takes a value, and an unvalidated one ate the next flag: the profile recorded a harness
-# called "--team", --team never ran, nothing was staged, and init reported success.
-w="$(mktemp -d)"
-( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init --harness --team -y >/dev/null 2>&1 )
-[ -f "$w/.keel/profile.json" ] && bad "--harness refuses to swallow the next flag" "init wrote a profile" \
-  || ok "--harness refuses to swallow the next flag"
-rm -rf "$w"
+# Doctor no longer asks which harness is running. With every Codex signal set it prints what it
+# prints without them, on both context window messages, and neither names a running harness.
+w="$(mktemp -d)"; ch="$(mktemp -d)"
+printf '[plugins."keel@gbi"]\nenabled = true\n\n[hooks.state."keel"]\nenabled = true\ntrusted_hash = "9f2c"\n' > "$ch/config.toml"
+( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init -y >/dev/null 2>&1 )
+for cw in absent 50000; do
+    python3 - "$w/.keel/profile.json" "$cw" <<'CW'
+import json,sys
+p=sys.argv[1]; d=json.load(open(p)); g=d.setdefault("gates",{})
+if sys.argv[2] == "absent": g.pop("context_window", None)
+else: g["context_window"] = int(sys.argv[2])
+json.dump(d, open(p,"w"), indent=2)
+CW
+    with="$( cd "$w" && CODEX_VERSION=0.153.4 CODEX_HOME="$ch" "$ROOT/bin/keel" doctor 2>&1 )"
+    without="$( cd "$w" && env -u CODEX_VERSION -u CODEX_HOME "$ROOT/bin/keel" doctor 2>&1 )"
+    [ "$with" = "$without" ] && ok "doctor prints the same lines with and without Codex signals (context_window $cw)" \
+      || bad "doctor prints the same lines with and without Codex signals (context_window $cw)" \
+           "$(diff <(printf '%s\n' "$without") <(printf '%s\n' "$with") | head -4 | tr '\n' ' ')"
+    printf '%s\n' "$with" | grep -qE 'running under |cannot determine which harness' \
+      && bad "doctor names no running harness (context_window $cw)" "$(printf '%s\n' "$with" | grep -E 'running under |cannot determine' | head -1)" \
+      || ok "doctor names no running harness (context_window $cw)"
+done
+# The Claude Code sentences are the ones left.
+printf '%s\n' "$with" | grep -q 'below the 200000 default' && ok "the context window floor sentence is the Claude Code one" \
+  || bad "the context window floor sentence is the Claude Code one" "not printed"
+rm -rf "$w" "$ch"
 
-w="$(mktemp -d)"
-( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init --harness bogus -y >/dev/null 2>&1 )
-[ -f "$w/.keel/profile.json" ] && bad "an unknown harness id is refused" "init wrote a profile" \
-  || ok "an unknown harness id is refused"
-rm -rf "$w"
+# The multi-harness plumbing is gone, and the only lines naming Codex are the v0.26.0 notices.
+left="$(grep -nE 'harness_each|HARNESS_SET|harness_set_for_repo|harness_hooks_trusted|HARNESS_FLAG|harness_running' "$KEEL")"
+[ -z "$left" ] && ok "bin/keel carries none of the multi-harness plumbing" \
+  || bad "bin/keel carries none of the multi-harness plumbing" "$(printf '%s' "$left" | head -2 | tr '\n' ' ')"
+codex_lines="$(grep -ni codex "$KEEL")"
+n_codex="$(printf '%s\n' "$codex_lines" | grep -c .)"
+n_noted="$(printf '%s\n' "$codex_lines" | grep -c '# names Codex: the v0.26.0 notice$')"
+[ "$n_codex" = 3 ] && [ "$n_noted" = 3 ] && ok "bin/keel names Codex only in the three v0.26.0 notices" \
+  || bad "bin/keel names Codex only in the three v0.26.0 notices" "$n_codex lines, $n_noted carrying the comment: $(printf '%s\n' "$codex_lines" | grep -v '# names Codex: the v0.26.0 notice$' | head -2 | tr '\n' ' ')"
+
+# claude.sh keeps its writers and drops the contract it shared with another harness.
+n="$(grep -ic codex "$ROOT/lib/harness/claude.sh")"
+[ "$n" = 0 ] && ok "lib/harness/claude.sh names no Codex" || bad "lib/harness/claude.sh names no Codex" "$n lines"
+
+# The schema moves to 7 with no harnesses property and no Codex text.
+got="$(python3 -c 'import json,sys;print("harnesses" in json.load(open(sys.argv[1]))["properties"])' "$ROOT/templates/profile.schema.json")"
+[ "$got" = False ] && ok "the schema declares no harnesses key" || bad "the schema declares no harnesses key" "still declared"
+n="$(grep -ic codex "$ROOT/templates/profile.schema.json")"
+[ "$n" = 0 ] && ok "the schema names no Codex" || bad "the schema names no Codex" "$n lines"
 
 # R-01: init still prompts for nothing.
 w="$(mktemp -d)"
@@ -1108,319 +1137,6 @@ else
     bad "init completes with no tty and no prompt" "non-zero exit"
 fi
 rm -rf "$w"
-
-# ---- a repository that serves Codex -----------------------------------------
-
-w="$(mktemp -d)"; ( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init --harness codex -y >"$w/init.txt" 2>&1 )
-
-[ -f "$w/.codex/config.toml" ] && ok "codex config written" || bad "codex config written" "absent"
-[ -f "$w/.claude/settings.json" ] && bad "no Claude settings for a codex-only repo" "written" \
-  || ok "no Claude settings for a codex-only repo"
-grep -q 'keel:start' "$w/AGENTS.md" 2>/dev/null && ok "AGENTS.md carries the managed block" \
-  || bad "AGENTS.md carries the managed block" "absent"
-[ -f "$w/CLAUDE.md" ] && bad "no CLAUDE.md for a codex-only repo" "written" \
-  || ok "no CLAUDE.md for a codex-only repo"
-
-# The five path denies port and get stronger. A path deny also stops `cat`.
-n="$(grep -c 'deny' "$w/.codex/config.toml" 2>/dev/null || echo 0)"
-[ "$n" -ge 5 ] && ok "path denies written ($n)" || bad "path denies written" "got $n, wanted at least 5"
-
-# Codex has no command-pattern rule syntax and no ask. Neither may be faked. A rule that looks like
-# a prompt and is not one is the failure this whole design exists to prevent.
-grep -qE 'Bash\(|"ask"|prompt' "$w/.codex/config.toml" 2>/dev/null \
-  && bad "no command-pattern or ask rule is faked" "$(grep -nE 'Bash\(|"ask"|prompt' "$w/.codex/config.toml" | head -1)" \
-  || ok "no command-pattern or ask rule is faked"
-
-# Open question 6 of the architecture. Codex runs no hook until its source is trusted and says
-# nothing when it skips one, so an install that says nothing leaves every gate silently dark. keel
-# cannot grant that trust: it lives in the user's own config, not in this repository. What it can do
-# is say so, and a message nothing pins is a message the next refactor deletes.
-grep -qi 'trust' "$w/init.txt" 2>/dev/null && ok "init tells a Codex user about the hook trust step" \
-  || bad "init tells a Codex user about the hook trust step" "no mention of trust in the init output"
-grep -q 'dangerously-bypass-hook-trust' "$w/init.txt" 2>/dev/null \
-  && bad "the bypass flag is not offered to a user" "init output names it" \
-  || ok "the bypass flag is not offered to a user"
-rm -rf "$w"
-
-# A repository serving BOTH gets both, and this is the case a "last harness sourced wins" design
-# passes for one harness and silently fails for the other.
-w="$(mktemp -d)"; ( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init --harness claude,codex -y >/dev/null 2>&1 )
-if [ -f "$w/.codex/config.toml" ] && [ -f "$w/.claude/settings.json" ] \
-   && [ -f "$w/CLAUDE.md" ] && [ -f "$w/AGENTS.md" ]; then
-    ok "a repository serving both harnesses gets both configurations"
-else
-    bad "a repository serving both harnesses gets both configurations" \
-      "codex=$([ -f "$w/.codex/config.toml" ] && echo y || echo n) claude=$([ -f "$w/.claude/settings.json" ] && echo y || echo n) CLAUDE.md=$([ -f "$w/CLAUDE.md" ] && echo y || echo n)"
-fi
-rm -rf "$w"
-
-
-# --- The harness section in `keel doctor` ------------------------------------------------------
-#
-# ADR-0004: a guarantee is a property of (repository, harness). Doctor is the one place somebody
-# asks what THEY get, so it answers for the harness in front of them and names what the others do
-# not get.
-#
-# THE MANIFEST ANSWERS WHAT A HARNESS CAN DO. DOCTOR ANSWERS WHAT THIS INSTALLATION DOES. The two
-# differ on Codex, which runs no hook until its source is trusted and says nothing when it skips
-# one, so `harness_active_gates codex` is a true statement about Codex and a false one about a user
-# whose hooks are untrusted. Doctor reporting the manifest's answer there would be keel agreeing
-# with itself, which is the fault this plan has been bitten by twice.
-#
-# CODEX_HOME is set on every case below, and that is not tidiness. Unset, the trust reader falls
-# back to the developer's own ~/.codex/config.toml and the verdict becomes a property of whoever is
-# running the suite.
-trust_home() {   # trust_home <state>; prints a CODEX_HOME holding a config in that state
-    local state="$1" d; d="$(mktemp -d)"
-    case "$state" in
-        # What the 2026-09-06 probe actually wrote: the plugin enabled, and no trust entry of any
-        # kind. The absence of trusted_hash is the whole signal.
-        untrusted) printf '[plugins."keel@gbi"]\nenabled = true\n' > "$d/config.toml" ;;
-        trusted)   printf '[plugins."keel@gbi"]\nenabled = true\n\n[hooks.state."keel@gbi"]\nenabled = true\ntrusted_hash = "9f2c"\n' > "$d/config.toml" ;;
-        disabled)  printf '[plugins."keel@gbi"]\nenabled = true\n\n[hooks.state."keel@gbi"]\nenabled = false\ntrusted_hash = "9f2c"\n' > "$d/config.toml" ;;
-        # A config that exists and says nothing about keel. Not proof of anything: what that machine
-        # needs is the plugin installed, not the hooks trusted, so it must not read as dark. It
-        # carries a trusted_hash in an UNRELATED table on purpose. `enabled` and `trusted_hash` are
-        # ordinary field names, and a reader that grepped for either without asking which table it
-        # sat in would call this machine trusted.
-        stranger)  printf '[projects."/tmp/x"]\ntrust_level = "trusted"\ntrusted_hash = "9f2c"\n' > "$d/config.toml" ;;
-        # keel installed and NOT trusted, beside a different plugin the user did trust. This is the
-        # fail-open direction: read across every table rather than keel's own, a stranger's
-        # trusted_hash answers for keel and doctor calls three gates active on a machine where none
-        # of them will ever run. Found in review, not by the sweep, because every fixture above
-        # holds exactly one plugin.
-        foreign_trusted) printf '[plugins."keel@gbi"]\nenabled = true\n\n[hooks.state."other@market"]\nenabled = true\ntrusted_hash = "deadbeef"\n' > "$d/config.toml" ;;
-        # And the other direction, which only cries wolf: keel trusted beside a plugin the user
-        # turned off.
-        foreign_disabled) printf '[plugins."keel@gbi"]\nenabled = true\n\n[hooks.state."keel@gbi"]\nenabled = true\ntrusted_hash = "9f2c"\n\n[plugins."other@market"]\nenabled = false\n' > "$d/config.toml" ;;
-        absent)    : ;;
-    esac
-    printf '%s' "$d"
-}
-
-w="$(mktemp -d)"; ( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init --harness claude,codex -y >/dev/null 2>&1 \
-  && python3 - .keel/profile.json <<'PY'
-import json,sys
-p=sys.argv[1]; d=json.load(open(p)); d["hard_block_paths"]=["src/auth/**"]
-json.dump(d, open(p,"w"), indent=2)
-PY
-)
-
-th_trusted="$(trust_home trusted)"
-out="$( cd "$w" && CODEX_VERSION=0.153.4 CODEX_HOME="$th_trusted" "$ROOT/bin/keel" doctor 2>&1 )"
-# The plan's text greps for `codex` anywhere in the output, which the gate list and the
-# installed-here warning both satisfy whatever the detector answered. Pin the sentence instead.
-printf '%s' "$out" | grep -q 'running under codex' && ok "doctor names the running harness" \
-  || bad "doctor names the running harness" "no 'running under codex' line"
-printf '%s' "$out" | grep -qi 'sensitive-guard' && ok "doctor reports the missing gate" \
-  || bad "doctor reports the missing gate" "no mention of sensitive-guard"
-printf '%s' "$out" | grep -qi 'hard_block_paths' && ok "doctor warns on an unenforceable hard block" \
-  || bad "doctor warns on an unenforceable hard block" "no warning"
-
-# Both signals unset. CLAUDECODE=1 is exported by Claude Code, and this repository is developed
-# inside it, so `env -u CODEX_VERSION` alone would leave the detector confidently answering
-# "claude" locally and "unknown" in CI. Verified set in the development environment before writing
-# this case.
-out="$( cd "$w" && env -u CODEX_VERSION -u CLAUDECODE CODEX_HOME="$th_trusted" "$ROOT/bin/keel" doctor 2>&1 )"
-printf '%s' "$out" | grep -qi 'cannot determine' && ok "doctor says when it cannot tell" \
-  || bad "doctor says when it cannot tell" "no such line"
-
-# The acceptance case the plan names: the manifest grants the gate, the trust state withholds it,
-# and doctor says dark. Without this case the whole trust reader is a comment.
-#
-# The failure it describes is not "nothing works". The same probe found the 25 skills load without
-# trust and the hooks do not, so an untrusted install looks like most of keel working. That is why
-# doctor must not also print the manifest's "gates active" line here: two lines, one saying the
-# gates are live and one saying they are dark, is worse than either alone.
-th_untrusted="$(trust_home untrusted)"
-out="$( cd "$w" && CODEX_VERSION=0.153.4 CODEX_HOME="$th_untrusted" "$ROOT/bin/keel" doctor 2>&1 )"
-printf '%s' "$out" | grep -qi 'dark' && ok "doctor reports an untrusted hook as a dark gate" \
-  || bad "doctor reports an untrusted hook as a dark gate" "no dark line for an untrusted install"
-printf '%s' "$out" | grep -qi 'codex gates active' \
-  && bad "doctor does not also call the dark gates active" "both lines printed" \
-  || ok "doctor does not also call the dark gates active"
-
-# Trusted and disabled are different states with the same consequence, and only the first is safe
-# to report as live.
-th_disabled="$(trust_home disabled)"
-out="$( cd "$w" && CODEX_VERSION=0.153.4 CODEX_HOME="$th_disabled" "$ROOT/bin/keel" doctor 2>&1 )"
-printf '%s' "$out" | grep -qi 'dark' && ok "doctor reports a disabled hook as a dark gate" \
-  || bad "doctor reports a disabled hook as a dark gate" "a disabled hook was reported as live"
-
-out="$( cd "$w" && CODEX_VERSION=0.153.4 CODEX_HOME="$th_trusted" "$ROOT/bin/keel" doctor 2>&1 )"
-printf '%s' "$out" | grep -qi 'codex gates active' && ok "doctor reports a trusted install's gates as active" \
-  || bad "doctor reports a trusted install's gates as active" "no gates active line"
-printf '%s' "$out" | grep -qi 'dark' \
-  && bad "doctor does not cry dark on a trusted install" "$(printf '%s' "$out" | grep -i dark | head -1)" \
-  || ok "doctor does not cry dark on a trusted install"
-
-# Absent or unreadable Codex config is not proof of anything. The manifest fails closed on missing
-# evidence because a wrong `provides` row is unsafe; a doctor line that cries wolf on every machine
-# gets ignored, which costs more than it saves.
-th_absent="$(trust_home absent)"
-out="$( cd "$w" && CODEX_VERSION=0.153.4 CODEX_HOME="$th_absent" "$ROOT/bin/keel" doctor 2>&1 )"
-printf '%s' "$out" | grep -qi 'cannot tell' && ok "doctor says trust could not be determined" \
-  || bad "doctor says trust could not be determined" "no such line"
-printf '%s' "$out" | grep -qi 'dark' \
-  && bad "an unreadable Codex config is not reported as dark" "$(printf '%s' "$out" | grep -i dark | head -1)" \
-  || ok "an unreadable Codex config is not reported as dark"
-
-th_stranger="$(trust_home stranger)"
-out="$( cd "$w" && CODEX_VERSION=0.153.4 CODEX_HOME="$th_stranger" "$ROOT/bin/keel" doctor 2>&1 )"
-printf '%s' "$out" | grep -qi 'dark' \
-  && bad "a Codex config that never mentions keel is not reported as dark" "$(printf '%s' "$out" | grep -i dark | head -1)" \
-  || ok "a Codex config that never mentions keel is not reported as dark"
-printf '%s' "$out" | grep -qi 'codex gates active' \
-  && bad "a trusted_hash in an unrelated table does not grant trust" "the gates were reported active" \
-  || ok "a trusted_hash in an unrelated table does not grant trust"
-
-th_foreign_t="$(trust_home foreign_trusted)"
-out="$( cd "$w" && CODEX_VERSION=0.153.4 CODEX_HOME="$th_foreign_t" "$ROOT/bin/keel" doctor 2>&1 )"
-printf '%s' "$out" | grep -qi 'dark' && ok "another plugin's trust does not make keel's hooks trusted" \
-  || bad "another plugin's trust does not make keel's hooks trusted" "keel read as trusted on a stranger's trusted_hash"
-
-th_foreign_d="$(trust_home foreign_disabled)"
-out="$( cd "$w" && CODEX_VERSION=0.153.4 CODEX_HOME="$th_foreign_d" "$ROOT/bin/keel" doctor 2>&1 )"
-printf '%s' "$out" | grep -qi 'codex gates active' && ok "another plugin being disabled does not darken keel's gates" \
-  || bad "another plugin being disabled does not darken keel's gates" "keel read as untrusted because a stranger was disabled"
-
-# HOME unset, which a container or a cron shell does. bin/keel runs under `set -u`, and the trust
-# reader is called inside a command substitution: a bare `$HOME` there kills the SUBSHELL, leaves
-# the verdict empty, and doctor falls through to "gates active" on a machine whose config it never
-# read. That is silent and it fails open, so the case asserts the answer and not merely survival.
-out="$( cd "$w" && env -u HOME -u CODEX_HOME CODEX_VERSION=0.153.4 "$ROOT/bin/keel" doctor 2>&1 )"
-printf '%s' "$out" | grep -qi 'cannot tell' && ok "an unset HOME reads as unknown, not as trusted" \
-  || bad "an unset HOME reads as unknown, not as trusted" "${out:0:120}"
-
-# A harness installed on this machine that the repository does not list. A machine fact, so it
-# belongs in doctor and never in init, which writes a committed team fact.
-v="$(mktemp -d)"; ( cd "$v" && git init -q -b main . && "$ROOT/bin/keel" init --harness claude -y >/dev/null 2>&1 )
-bindir="$(mktemp -d)"; printf '#!/bin/sh\nexit 0\n' > "$bindir/codex"; chmod +x "$bindir/codex"
-out="$( cd "$v" && env -u CODEX_VERSION -u CLAUDECODE PATH="$bindir:$PATH" CODEX_HOME="$th_trusted" "$ROOT/bin/keel" doctor 2>&1 )"
-printf '%s' "$out" | grep -qi 'installed on this machine' && ok "doctor names a harness installed here that the repository omits" \
-  || bad "doctor names a harness installed here that the repository omits" "no such line"
-# The same stub, a repository that lists codex: no warning.
-v2="$(mktemp -d)"; ( cd "$v2" && git init -q -b main . && "$ROOT/bin/keel" init --harness claude,codex -y >/dev/null 2>&1 )
-out="$( cd "$v2" && env -u CODEX_VERSION -u CLAUDECODE PATH="$bindir:$PATH" CODEX_HOME="$th_trusted" "$ROOT/bin/keel" doctor 2>&1 )"
-printf '%s' "$out" | grep -qi 'installed on this machine' \
-  && bad "doctor stays quiet about a harness the repository lists" "${out:0:120}" \
-  || ok "doctor stays quiet about a harness the repository lists"
-rm -rf "$v2"
-rm -rf "$bindir"
-
-# The two context window messages were Claude Code numbers. A Codex rollout states its own window,
-# `model_context_window`, 258400 on the probed session, so on Codex "assuming 200000" and "below the
-# 200000 default" both name a baseline that is not the one in force.
-python3 - "$v" <<'PY5'
-import json,sys,pathlib
-p=pathlib.Path(sys.argv[1])/".keel/profile.json"; d=json.loads(p.read_text())
-del d["gates"]["context_window"]
-p.write_text(json.dumps(d,indent=2)+"\n")
-PY5
-out="$( cd "$v" && CODEX_VERSION=0.153.4 CODEX_HOME="$th_trusted" "$ROOT/bin/keel" doctor 2>&1 )"
-printf '%s' "$out" | grep -q 'model_context_window' && ok "doctor names the window Codex states, not one it assumes" \
-  || bad "doctor names the window Codex states, not one it assumes" "no mention of model_context_window"
-printf '%s' "$out" | grep -q 'window assumed 200000' \
-  && bad "doctor does not tell a Codex user the window is assumed 200000" "the Claude Code sentence is still printed" \
-  || ok "doctor does not tell a Codex user the window is assumed 200000"
-
-# R-01: the Claude Code sentence is unchanged. Nothing about this task may alter what a Claude Code
-# user reads, and the branch above is the one place it could have.
-out="$( cd "$v" && env -u CODEX_VERSION CLAUDECODE=1 CODEX_HOME="$th_trusted" "$ROOT/bin/keel" doctor 2>&1 )"
-printf '%s' "$out" | grep -q 'window assumed 200000' && ok "the Claude Code window sentence is unchanged" \
-  || bad "the Claude Code window sentence is unchanged" "the 200000 sentence stopped being printed under Claude Code"
-
-# The floor message, the second of the two. A value below the floor never takes effect on either
-# harness; naming 200000 as the baseline it is below is what is wrong on Codex.
-python3 - "$v" <<'PY6'
-import json,sys,pathlib
-p=pathlib.Path(sys.argv[1])/".keel/profile.json"; d=json.loads(p.read_text())
-d.setdefault("gates",{})["context_window"]=50000
-p.write_text(json.dumps(d,indent=2)+"\n")
-PY6
-out="$( cd "$v" && CODEX_VERSION=0.153.4 CODEX_HOME="$th_trusted" "$ROOT/bin/keel" doctor 2>&1 )"
-printf '%s' "$out" | grep -q 'below the 200000 default' \
-  && bad "doctor does not name 200000 as the Codex baseline" "the Claude Code floor sentence is still printed" \
-  || ok "doctor does not name 200000 as the Codex baseline"
-printf '%s' "$out" | grep -q '50000' && ok "doctor still names the floor a Codex user set" \
-  || bad "doctor still names the floor a Codex user set" "the configured 50000 went unmentioned"
-out="$( cd "$v" && env -u CODEX_VERSION CLAUDECODE=1 CODEX_HOME="$th_trusted" "$ROOT/bin/keel" doctor 2>&1 )"
-printf '%s' "$out" | grep -q 'below the 200000 default' && ok "the Claude Code floor sentence is unchanged" \
-  || bad "the Claude Code floor sentence is unchanged" "the floor sentence stopped being printed under Claude Code"
-
-rm -rf "$w" "$v" "$th_trusted" "$th_untrusted" "$th_disabled" "$th_absent" "$th_stranger" \
-       "$th_foreign_t" "$th_foreign_d"
-
-
-# --- init must not destroy a Codex configuration it did not write --------------------------------
-#
-# `keel init` is documented as re-runnable and cmd_new calls the same path. The Claude writer
-# branches on an existing settings.json and merges into it; the Codex writer truncated. Worse, a
-# TRACKED .codex/config.toml is the only signal harness_set_for_repo uses to decide a repository
-# serves Codex, so the file that opts a team in was the file the next init destroyed, taking their
-# model choice, MCP servers and their own permission profiles with it.
-w="$(mktemp -d)"
-# The identity is load bearing here, not boilerplate: the commit below is what makes
-# .codex/config.toml a TRACKED file, which is the only signal harness_set_for_repo reads. On a
-# machine with no global user.name the commit fails, init never runs, and this reads as keel
-# dropping its own table from a config it never saw.
-( cd "$w" && git init -q -b main . && git config user.email t@t.t && git config user.name t \
-  && mkdir -p .codex && cat > .codex/config.toml <<'TOML'
-model = "gpt-5-codex"
-
-[mcp_servers.internal]
-command = "node"
-
-[permissions.team.filesystem.":workspace_roots"]
-"vendor/**" = "read"
-TOML
-git add -A && git commit -qm x && "$ROOT/bin/keel" init --harness claude,codex -y >/dev/null 2>&1 )
-
-for keep in 'model = "gpt-5-codex"' '[mcp_servers.internal]' '[permissions.team.filesystem' '"vendor/**" = "read"'; do
-    grep -qF "$keep" "$w/.codex/config.toml" \
-      && ok "init preserves an existing codex config: $keep" \
-      || bad "init preserves an existing codex config: $keep" "gone after init"
-done
-grep -qF '"**/.env" = "deny"' "$w/.codex/config.toml" \
-  && ok "init still adds keel's denies to an existing codex config" \
-  || bad "init still adds keel's denies to an existing codex config" "keel's own table is missing"
-
-# Idempotent. Re-running must not append a second copy of keel's table, which is how a managed
-# block turns into a file that grows by one block per init.
-( cd "$w" && "$ROOT/bin/keel" init --harness claude,codex -y >/dev/null 2>&1 )
-n="$(grep -c '\[permissions.keel.filesystem' "$w/.codex/config.toml")"
-[ "$n" = 1 ] && ok "re-running init leaves one keel table, not two" \
-  || bad "re-running init leaves one keel table, not two" "found $n"
-n="$(grep -c 'model = "gpt-5-codex"' "$w/.codex/config.toml")"
-[ "$n" = 1 ] && ok "re-running init does not duplicate the team's own keys" \
-  || bad "re-running init does not duplicate the team's own keys" "found $n"
-
-# A rule keel drops has to leave, or the managed region only ever grows. The whole region is
-# replaced rather than merged into, which is what makes that true.
-python3 - "$w/.codex/config.toml" <<'PY'
-import sys
-p = sys.argv[1]
-t = open(p).read().replace('"**/.env" = "deny"', '"**/gone-from-keel" = "deny"')
-open(p, "w").write(t)
-PY
-( cd "$w" && "$ROOT/bin/keel" init --harness claude,codex -y >/dev/null 2>&1 )
-grep -qF '"**/gone-from-keel" = "deny"' "$w/.codex/config.toml" \
-  && bad "a rule keel no longer writes is removed from its own table" "the stale rule survived" \
-  || ok "a rule keel no longer writes is removed from its own table"
-rm -rf "$w"
-
-# --- every harness's context file, not whichever was sourced last --------------------------------
-#
-# The rule this file states at `bin/keel#makes the loaded harness whichever ran last` is that nothing outside a harness_each call may assume
-# which harness is loaded. referenced_docs_findings called harness_context_file bare, so it scanned
-# whatever happened to be loaded last. Benign only while codex.sh returns nothing; a harness that
-# returns a context file would have had its links silently unchecked.
-grep -n 'harness_context_file' "$ROOT/bin/keel" | grep -v 'harness_each harness_context_file' \
-  | sed 's/^[0-9]*://' | grep -vE '^[[:space:]]*#' | grep -q 'harness_context_file' \
-  && bad "every harness_context_file call goes through harness_each" \
-       "$(grep -n 'harness_context_file' "$ROOT/bin/keel" | grep -v 'harness_each harness_context_file' | grep -vE ':[[:space:]]*#' | head -1)" \
-  || ok "every harness_context_file call goes through harness_each"
-
 
 # --- the six keys nothing could honour -----------------------------------------------------------
 #
@@ -1449,12 +1165,11 @@ PY
   || bad "init writes none of the six retired keys" "still written: $left"
 
 sv="$(python3 -c "import json;print(json.load(open('$wr/.keel/profile.json'))['schema_version'])")"
-# 6 since 2026-10-16: docs/plans/2026-10-16-manage-test-speed.md task 1 declared
-# verify.test_affected and gates.suite_warn_seconds. A literal stays here on purpose, unlike the
-# harness case above: this is the tripwire that makes a schema bump a deliberate act with a reason
-# in the commit.
-[ "$sv" = "6" ] && ok "init writes schema version 6" \
-  || bad "init writes schema version 6" "got $sv"
+# 7 since 2026-10-30: docs/plans/2026-10-29-claude-code-only.md task 4 retired profile.harnesses.
+# A literal stays here on purpose: this is the tripwire that makes a schema bump a deliberate act
+# with a reason in the commit.
+[ "$sv" = "7" ] && ok "init writes schema version 7" \
+  || bad "init writes schema version 7" "got $sv"
 
 # The floor for the first case. What it covers is a profile that parses but carries a gates object
 # missing keys: that would satisfy "none of the six are present" while breaking every gate that

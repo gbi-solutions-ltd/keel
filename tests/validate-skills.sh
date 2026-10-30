@@ -87,6 +87,7 @@ schema_fingerprint_for() {
         4) printf 'd5159ecbff0b' ;;
         5) printf 'ebcd5f8fba88' ;;
         6) printf '23588273f3d2' ;;
+        7) printf 'e00a285c2923' ;;
     esac
 }
 errors=0
@@ -795,9 +796,9 @@ block = re.search(r"^retired_keys\(\) \{(.*?)^\}", src, re.S | re.M)
 registered = []
 if block:
     for line in block.group(1).splitlines():
-        line = line.strip()
-        if line.count("|") >= 2:
-            registered.append(line.split("|")[0])
+        m = re.match(r"^\s*(?:printf \x27%s\\n\x27 \x27)?([A-Za-z0-9_.]+)\|[0-9]+\|", line)
+        if m:
+            registered.append(m.group(1))
 
 d = json.load(open("templates/profile.schema.json"))
 declared = set()

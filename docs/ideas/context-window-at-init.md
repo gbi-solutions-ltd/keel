@@ -72,7 +72,7 @@ deliberate edit. "A handoff exists" versus "it does not" is two forms. The hando
 unbounded and would be a new class of thing entirely.
 
 **Fourth argument: the always-loaded budget is nearly gone.** Measured 2026-08-18, the hook injects
-about 356 tokens against a 250 target and a 400 ceiling enforced at `tests/validate-skills.sh:283-284`.
+about 356 tokens against a 250 target and a 400 ceiling enforced at `tests/validate-skills.sh:284-285`.
 A pointer is perhaps 15 tokens and fits. It does not fit twice, and
 `docs/ideas/plain-language-chat.md` is competing for the same 44 tokens. The two ideas must be
 costed together or the second one to land fails the build.
@@ -124,7 +124,7 @@ costed together or the second one to land fails the build.
 | `hooks/session-start` never reads the handoff | No `handoff` match anywhere in the file | This is the actual gap, and it is small |
 | The hook forbids reading volatile files, with one bounded exception | `hooks/session-start:4-14` | A pointer is permissible under the stated bound; the contents are not |
 | The handoff is roughly 1,300 tokens | `lib/context_watch.py:200-235`: 5 prompts at 300 chars, 30 paths | Far too large for the cached prefix |
-| The hook is at 356 of a 400 ceiling | Measured 2026-08-18; `tests/validate-skills.sh:283-284` | ~44 tokens for this and `plain-language-chat.md` combined |
+| The hook is at 356 of a 400 ceiling | Measured 2026-08-18; `tests/validate-skills.sh:284-285` | ~44 tokens for this and `plain-language-chat.md` combined |
 | Write, Edit and Read stay allowed at the stop | `lib/context_watch.py:260-263` | The session can always write its handoff. No deadlock to design around |
 | The handoff is git-ignored and doctor enforces it | `bin/keel#if repo_ignores .keel/handoff.md; then` | Nothing here risks committing session state |
 

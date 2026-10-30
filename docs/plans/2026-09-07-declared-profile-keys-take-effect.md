@@ -47,7 +47,7 @@ Twenty-two keys, one verdict each. `harnesses` is stated for every `gates.*` key
 | 10 | `notes` | **human-read** | n/a | n/a | It was written for a skill to read and no skill can afford to: `hooks/session-start` has 4 characters of headroom against the 1,285 limit at `tests/validate-skills.sh:522`. The corrected description says plainly that no skill reads it |
 | 11 | `project.name` | **human-read** | n/a | n/a | Written by `bin/keel:505`, read by nothing. "used in generated documents and reports" is the false half |
 | 12 | `project.description` | **human-read** | n/a | n/a | "Skills quote it at the top of a snapshot or a PRD" is false; no skill names it. The rest of the description, "Left empty by init because only a human knows the answer", is already the human-read case |
-| 13 | `stack.package_manager` | **already wired, description corrected** | `bin/keel:853-856` | n/a | The census was wrong: init branches on empty against set to decide whether to print its note. "Skills prefix commands with it" is the false half |
+| 13 | `stack.package_manager` | **already wired, description corrected** | `bin/keel:693-696` | n/a | The census was wrong: init branches on empty against set to decide whether to print its note. "Skills prefix commands with it" is the false half |
 | 14 | `stack.datastores` | **human-read** | n/a | n/a | Detected by `lib/detect-stack.sh` and written by `bin/keel:508`; no skill reads it back. "Skills use it to know which failure modes are worth asking about" is false |
 | 15 | `verify.e2e` | **wire** | `cmd_doctor` reports it without running it | all, harness-neutral | Class C: written into every profile by `bin/keel:516` and read nowhere, so the evidence of wiring is in the user's own file. Cheapest real win in the list |
 | 16 | `verify.test_integration` | **already wired. No change** | `skills/tdd/SKILL.md:31` and `:67` | both, advisory | The census was wrong. "Where a behaviour touches persistence, test against a running database. Use `verify.test_integration` from the profile" is a real branch. Its description is accurate |
@@ -154,7 +154,7 @@ must still obey them.
   `schema_fingerprint_for` in `tests/validate-skills.sh:82-88`, in the same commit.** Never edit an
   existing line: `tests/validate-skills.sh:699` says why, and it is a released version's record.
   A **description** change is not a field-set change: the fingerprint at
-  `tests/validate-skills.sh:760-770` hashes property paths only, so tasks 1 to 5 move nothing.
+  `tests/validate-skills.sh:761-771` hashes property paths only, so tasks 1 to 5 move nothing.
 - `docs/profile-keys.md` is in scope for the unregistered-harness-claim scan
   (`tests/test-harness-claims.sh:139-147` puts depth-1 `docs/*.md` in scope). **A description
   containing `done-guard`, `sensitive-guard`, `context-watch`, `session-start`, `900-word`,
@@ -425,7 +425,7 @@ fails rather than passes.
 `unread:` is what stops this becoming a rubber stamp. A key may be dead, but only with a citation to
 the decision that left it dead, so adding a speculative key means writing down where the intent
 lives. `x-` prefixed members are ignored by JSON Schema validators, and the fingerprint at
-`tests/validate-skills.sh:760-770` walks `properties` only, so this adds no path and moves no
+`tests/validate-skills.sh:761-771` walks `properties` only, so this adds no path and moves no
 version.
 
 - [x] **Step 1: Write the failing test**
@@ -783,7 +783,7 @@ say so rather than adding a sentence back to the schema by hand.
 | `code:bin/keel:1536` | `keel_version` |
 | `code:bin/keel#echo service` | `project.kind` |
 | `advisory:skills/keel/references/tool-choices.md:21` | `stack.language` |
-| `code:bin/keel:853` | `stack.package_manager` |
+| `code:bin/keel:693` | `stack.package_manager` |
 | `code:bin/keel:1652`, `advisory:skills/coding-standards/references/house-defaults.md:30` | `stack.has_ui` |
 | `advisory:skills/coding-standards/references/house-defaults.md:30` | `stack.framework` |
 | `advisory:skills/keel/references/tool-choices.md:22` | `stack.also` |
@@ -2244,7 +2244,7 @@ In `bin/keel:37`, `SCHEMA_VERSION=4`.
 **`write_profile` writes two of the retired keys and both lines change.** `bin/keel:531` is the last
 line of a comment; the two `printf` lines are `:532` and `:533`. Checked on 2026-09-07.
 
-`bin/keel:532`, the gates line, becomes:
+`bin/keel:374`, the gates line, becomes:
 
 ```bash
       printf '  "gates": { "coding_standards": "warn", "security_audit": "required", "commit_guard": "off", "done_verified": "warn", "context_window": 200000 },\n'
