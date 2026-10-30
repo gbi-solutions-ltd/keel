@@ -1162,7 +1162,7 @@ say so and leave it unstaged.
 **Done when:** `tests/test-validate-skills.sh` passes, and `tests/validate-skills.sh` and
 `tests/validate-citations.sh` report OK.
 
-- [ ] **Step 8.1: Build it test first**
+- [x] **Step 8.1: Build it test first** Note: built by the implementer; reds reproduced by the spec reviewer against HEAD (130 passed, 3 failed; five Codex lines, exit 1)
 
 Follow `keel:tdd`. Write behaviour 1's rule and its case first, run it, and watch the rule fail on
 the current files, listing the Codex lines in `create-skill/SKILL.md`, `security-audit/SKILL.md` and
@@ -1175,7 +1175,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 A red in either validator is this task's. This is the one boundary run the task schedules.
 
-- [ ] **Step 8.2: Hand over**
+- [x] **Step 8.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES; four wording points moved to task 10
 
 ```bash
 git add skills/create-skill/SKILL.md skills/security-audit/SKILL.md \
@@ -1330,6 +1330,13 @@ into your report; if it lists anything this task did not touch, say so and leave
     description edit, it is updated in the same commit. `docs/ideas/concise-responses.md`'s citation of
     `docs/05-token-and-memory-design.md:278` for "634 against 450" points at the figure or loses its
     line number. (From task 6's quality review.)
+16. Four wording points from task 8's review read true: `agents/keel-reviewer.md`'s "Where the hook
+    is absent, in a session without the plugin" drops the narrowing clause, since the hook can be
+    absent for other reasons; `tests/validate-skills.sh`'s "Of the five aliases Claude Code accepts, a
+    skill may name one" says a skill may name only `inherit`; `skills/security-audit/SKILL.md`'s "Say
+    which ran" fits a plugin that watches edits as well as a command that runs; and
+    `skills/context-budget/SKILL.md`'s managed-block row says it is part of the `CLAUDE.md` row and
+    is not added to the total. Each changed skill body stays under 700 words.
 
 **Done when:** `tests/test-doc-claims.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
@@ -1358,7 +1365,8 @@ git add README.md CHANGELOG.md docs/01-architecture.md docs/02-skill-catalog.md 
         docs/ideas/keel-on-codex.md docs/stories/tiered-multi-harness-support.md \
         docs/ideas/claude-code-features-assessed-2026-10-29.md docs/architecture/claude-code-only.md \
         templates/project-claude-md-block.md lib/merge-claude-md.sh templates/profile.schema.json \
-        docs/profile-keys.md docs/ideas/concise-responses.md tests/validate-skills.sh
+        docs/profile-keys.md docs/ideas/concise-responses.md tests/validate-skills.sh \
+        agents/keel-reviewer.md skills/security-audit/SKILL.md skills/context-budget/SKILL.md
 git status --porcelain
 ```
 
