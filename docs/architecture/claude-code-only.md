@@ -230,6 +230,27 @@ Its `config.toml` then held `source = "https://github.com/gbi-solutions-ltd/keel
 `.codex-plugin/` present. `shasum ~/.codex/config.toml` gave `54458c6846a1` before and after both
 probes, and both throwaway directories were deleted.
 
+### Probe: what a Codex hook receives
+
+Measured 2026-10-30 on `codex-cli 0.153.4` with the hooks probe above, against commit `6b06802`.
+The copy's `hooks/hooks.json` carried three extra hooks, a `PreToolUse` with matcher `Bash`, a
+`PreToolUse` with no matcher and a `SessionStart`, each writing the names of its environment
+variables and its stdin payload to files. All 11 hooks were trusted through `hooks/list`, and one
+`codex exec` ran with the prompt "Use your shell tool to run the command: echo hi".
+
+```
+Codex hook environment has CODEX_VERSION: no
+Codex hook payload has turn_id: not measured
+```
+
+The evidence for the first line is the `SessionStart` hook: it ran with no `CODEX_VERSION` in its
+environment, and its payload's keys were `cwd`, `hook_event_name`, `model`, `permission_mode`,
+`session_id`, `source` and `transcript_path`. For the second, `PreToolUse` never fired: the
+`codex exec` failed authentication (`refresh_token_reused`) before the model asked for a tool, so
+`turn_id` was not observed. Bernard chose on 2026-10-30 to detect both signals rather than probe
+again, so `hooks/sensitive-guard` refuses on either. `shasum ~/.codex/config.toml` gave
+`54458c6846a1` before and after, and the throwaway directory was deleted.
+
 ## 8. Security architecture
 
 The trust boundaries do not change: the hooks still run with the developer's permissions, and the

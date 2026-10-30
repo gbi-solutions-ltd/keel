@@ -31,7 +31,7 @@
 # permission deny rules in `lib/harness/claude.sh#harness_permission_rules() {` already warn. This raises the cost of a careless commit; it
 # is not a boundary against a determined one. The boundary is review.
 
-set -uo pipefail; unset CDPATH  # a cd that finds its directory through CDPATH prints it
+set -uo pipefail
 
 ask() {
     printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"keel: %s"}}' "$1"
@@ -87,7 +87,7 @@ if [[ "$profile_text" =~ $empty_paths ]]; then exit 0; fi
 # reads hooks/hooks.json, the file Claude Code reads, as the probe recorded at
 # `docs/architecture/claude-code-only.md#Codex loads keel's hooks without .codex-plugin: yes`.
 # Exiting 0 there would leave a repository that declared sensitive paths believing it had a gate, so
-# the hook refuses the commit and names the release Codex users stay on.
+# the hook refuses the commit and names the last keel release that supports Codex.
 #
 # PLACEMENT. It sits after the cheap gate, the commit filter and the empty-list check, so only a
 # command that looks like a commit in a repository declaring a non-empty hard_block_paths reaches
@@ -99,8 +99,20 @@ if [[ "$profile_text" =~ $empty_paths ]]; then exit 0; fi
 # "hook exited with code N" and the tool call proceeds. Exit 2 takes a different arm entirely, which
 # sets should_block and surfaces stderr as the block reason. So exit 1 here would be quieter than
 # doing nothing, and exit 2 both stops the command and says why.
-if [ -n "${CODEX_VERSION:-}" ]; then
-    printf 'keel sensitive-guard: Codex discards the ask decision this gate depends on, so it cannot put this commit to a human. keel supports Codex up to v0.26.0, and Codex users stay on v0.26.0. Blocking rather than pretending.\n' >&2
+#
+# EITHER SIGNAL MEANS CODEX. A Codex hook's payload carries a `turn_id` key and Codex sets
+# CODEX_VERSION for the commands its shell tool runs; Claude Code does neither. Codex's SessionStart
+# hook ran without CODEX_VERSION, and turn_id on PreToolUse was never observed, as recorded at
+# `docs/architecture/claude-code-only.md#Codex hook payload has turn_id: not measured`, so neither
+# alone is trusted to catch it. The key is matched with its quotes, in the style of the commit
+# filter: a commit message naming turn_id arrives JSON-escaped, as \"turn_id\", and does not match.
+codex=""
+[ -n "${CODEX_VERSION:-}" ] && codex=1
+case "$event" in
+    *'"turn_id"'*) codex=1 ;;
+esac
+if [ -n "$codex" ]; then
+    printf 'keel sensitive-guard: Codex discards the ask decision this gate depends on, so it cannot put this commit to a human. keel v0.26.0 is the last keel release that supports Codex; install it with: codex plugin marketplace add gbi-solutions-ltd/keel --ref v0.26.0 && codex plugin add keel@gbi. Blocking rather than pretending.\n' >&2
     exit 2
 fi
 
