@@ -1884,7 +1884,7 @@ touch, say so and leave it unstaged.
 >    tagging this check's own header says destroys it, so lines inside a fence are skipped and a
 >    fixture pins that a fenced line is skipped where an unfenced one is not. **`docs/06` needed no
 >    edit at all** once the scan stopped being wrong about it.
-> 4. **`README.md:233` was a false positive and was reworded, not tagged.** It is a credit table
+> 4. **`README.md:236` was a false positive and was reworded, not tagged.** It is a credit table
 >    line reading "session-start hook pattern", crediting a pattern borrowed from another project.
 >    Tagging it would assert a gate claim the sentence is not making.
 > 5. **`tests/validate-skills.sh` needed the same treatment `tests/supply-chain-scan.sh` needed in
@@ -2564,7 +2564,7 @@ passes, with `git commit -m "feat(harness): ship the Codex plugin manifest"`.
 > `provides` row is unsafe; a doctor line that cries wolf on every machine gets ignored, which
 > costs more than it saves.
 >
-> **2. The two context window messages at `bin/keel:1546` and `:1552` are Claude Code numbers.**
+> **2. The two context window messages at `bin/keel:1592` and `:1552` are Claude Code numbers.**
 > They say the watchdog is "assuming 200000" and that a value below "the $cwdef default" has no
 > effect. Since 2026-09-06 a Codex rollout states its own window, `model_context_window`, 258400 on
 > the probed session, so on Codex both sentences name the wrong baseline. This was left to this task
@@ -3980,7 +3980,7 @@ correct.** Fixed in place:
 | Task 4 step 2 mutated a tracked file while `MAX_JOBS=4` jobs read it | `tests/run-tests.sh#capped at 4 concurrent` | task 4 |
 | A one-line tag lookback fails any claim that wraps | the support page's own paragraph | task 5 |
 | Task 7's committed baseline contradicts the suite's stated policy | `tests/keel-test-lib.sh#Fixtures are generated per` | task 7 |
-| `cmd_doctor` would call functions that exist for one harness only | `bin/keel:1323` | task 7, sixth contract function |
+| `cmd_doctor` would call functions that exist for one harness only | `bin/keel:1369` | task 7, sixth contract function |
 
 ### Not fixed, with reasons
 

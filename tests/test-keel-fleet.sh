@@ -15,6 +15,15 @@ fail=0
 ok()  { printf '  PASS  %s\n' "$1"; pass=$((pass+1)); return 0; }
 bad() { printf '  FAIL  %s: %s\n' "$1" "$2"; fail=$((fail+1)); return 0; }
 
+# keel-fleet runs keel doctor, which asks the installed Claude Code for its version through
+# KEEL_CLAUDE. The same stub tests/keel-test-lib.sh exports, so these rows do not depend on whether
+# this machine has claude.
+KEEL_CLAUDE="$(mktemp -d)/claude"
+printf '#!/bin/sh\necho "%s (Claude Code)"\n' \
+  "$(bash -c ". '$ROOT/lib/harness/resolve.sh'; harness_min_version")" > "$KEEL_CLAUDE"
+chmod +x "$KEEL_CLAUDE"
+export KEEL_CLAUDE
+
 a="$(mktemp -d)"; ( cd "$a" && "$KEEL" new proj --stack minimal >/dev/null 2>&1 )
 repo_a="$a/proj"
 b="$(mktemp -d)"; ( cd "$b" && "$KEEL" new proj --stack minimal >/dev/null 2>&1 )
@@ -130,6 +139,6 @@ got="$(printf '%s\n' "$out" | awk -F'\t' -v r="$repo_a" '$1 == r { print $2 }')"
 [ "$got" = "$(cat "$ROOT/VERSION")" ] && ok "run by a relative path with CDPATH set, fleet still finds its own keel" \
   || bad "keel-fleet" "with CDPATH set the row was: $out"
 
-rm -rf "$a" "$b"
+rm -rf "$a" "$b" "$(dirname "$KEEL_CLAUDE")"
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

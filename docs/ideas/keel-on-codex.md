@@ -311,7 +311,7 @@ In runs, not adjectives:
 
 **Cost 2: the claims audit.** Under "same guarantees or not supported", **18 sentences become
 false**, 7 need an asterisk, and 3 stay true while misleading. The false ones cluster:
-`README.md:16` ("That is the whole install"), `README.md:82-84` (the output style in `/config`),
+`README.md:16` ("That is the whole install"), `README.md:85-87` (the output style in `/config`),
 `README.md`'s "Bypassing prompts is bounded" paragraph (deny and ask rules surviving
 `bypassPermissions`, the headline safety claim);
 `docs/01-architecture.md` and `:152` and `:156-159` (Layer 1 as "enforced by the runtime not

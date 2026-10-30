@@ -73,7 +73,7 @@ Copied from `.keel/profile.json` and `docs/standards.md`. Every task inherits th
   impossible before raising the cap.
 - **Live citations into `bin/keel`.** An insertion moves every `bin/keel:NNN` citation below it.
   `tests/validate-citations.sh` must pass, and the live ones past the doctor loop
-  (`docs/stories/profile-sync.md` and `docs/prd/profile-sync.md` cite `bin/keel:2174`) are checked
+  (`docs/stories/profile-sync.md` and `docs/prd/profile-sync.md` cite `bin/keel:2220`) are checked
   and repointed to a phrase if they moved. Records under `docs/plans/`, `docs/audits/`,
   `docs/ideas/` and `tests/evals/results.md` are history and stay as written.
 

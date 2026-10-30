@@ -1,4 +1,4 @@
-# What each harness provides and what each gate requires. The single source of truth.
+# What Claude Code provides and what each gate requires. The single source of truth.
 #
 # Read by lib/harness/resolve.sh in pure bash, because hooks/sensitive-guard reads it and must work
 # on a machine with no python3. That is why this is pipe-delimited text and not JSON.
@@ -15,10 +15,10 @@
 # <version> is THE HARNESS's version, never keel's. keel doctor prints it beside the version of the
 # harness it is running, and that comparison means nothing if this column holds 0.18.0.
 #
-# THE RULE THIS FILE EXISTS TO EXPRESS, which lives nowhere else in the tree: a gate is active on a
-# harness IF AND ONLY IF that harness provides EVERY primitive the gate requires. So a `requires`
-# row is not documentation. It is an instruction that silently disables that gate on every harness
-# lacking the primitive, and adding one is the most consequential edit anybody makes here.
+# THE RULE THIS FILE EXISTS TO EXPRESS, which lives nowhere else in the tree: a gate is active IF
+# AND ONLY IF Claude Code provides EVERY primitive the gate requires. So a `requires` row is not
+# documentation. It is an instruction that silently disables that gate when Claude Code lacks the
+# primitive, and adding one is the most consequential edit anybody makes here.
 #
 # A gate may carry more than one `requires` row, and `done-guard` does. A new gate needs both a file
 # under hooks/ and at least one `requires` row; the test checks both directions and a missing half

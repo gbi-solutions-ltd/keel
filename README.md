@@ -18,6 +18,9 @@ arrive with the plugin: a plugin's `bin/` directory is added to the PATH that Cl
 tool uses, so after restarting the session `keel version` in a Claude Code shell prints the VERSION
 file.
 
+keel needs Claude Code <!-- keel:min-claude-code -->2.1.302<!-- /keel:min-claude-code --> or
+later, the highest version a gate's primitive was verified on. `keel doctor` checks yours.
+
 **Codex CLI is supported too, and it is not the same install or the same guarantee.** keel is Tier
 A on Claude Code and Tier B on Codex: the skills, `AGENTS.md` and the CLI are the same, and the set
 of gates that actually fire is smaller. `docs/harness-support.md` is generated from the capability

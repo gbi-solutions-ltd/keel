@@ -41,7 +41,7 @@ Twenty-two keys, one verdict each. `harnesses` is stated for every `gates.*` key
 | 4 | `gates.observability` | **retire** | n/a | n/a | No mechanism is proposed anywhere in the tree, and the census found no reader, no named reader and no idea record |
 | 5 | `gates.docs_updated` | **retire** | n/a | n/a | Same as `gates.review`. `skills/ship/SKILL.md` step 6 is unconditional |
 | 6 | `plugins.excluded` | **wire** | `plugin_report` in `lib/harness/claude.sh` | **claude only** | `plugins.recommended` is read at `lib/harness/claude.sh:63` and there is no Codex counterpart of that report. ADR-0004: the description must say so, and task 4 writes it |
-| 7 | `conventions.working_branch` | **retire** | n/a | n/a | The brief's proposed home does not work: the push guard at `bin/keel:2483-2487` protects `default_branch` and already permits a push to any other branch, so reading `working_branch` there would change nothing |
+| 7 | `conventions.working_branch` | **retire** | n/a | n/a | The brief's proposed home does not work: the push guard at `bin/keel:2529-2533` protects `default_branch` and already permits a push to any other branch, so reading `working_branch` there would change nothing |
 | 8 | `deploy.target` | **human-read** | n/a | n/a | See the deploy set, below |
 | 9 | `observability.log_shipping` | **retire** | n/a | n/a | `observability.backend` already makes the distinction: `none` in the table at `skills/coding-standards/references/observability.md:19-24` is "Structured logs to stdout only". The key appears only inside that file's JSON example at `:11-17` and nothing branches on it |
 | 10 | `notes` | **human-read** | n/a | n/a | It was written for a skill to read and no skill can afford to: `hooks/session-start` has 4 characters of headroom against the 1,285 limit at `tests/validate-skills.sh:522`. The corrected description says plainly that no skill reads it |
@@ -399,7 +399,7 @@ hard problem. The rule was prototyped against the tree on 2026-09-07 and does no
 direction. It flags 25 of 61 leaves, and 7 of the 25 are genuinely read: `artifacts.stories`,
 `.architecture`, `.decisions` and `.plans` through the map iteration at
 `bin/keel#.get('artifacts',{})`, `gates.context_warn_pct` and `.context_stop_pct` through
-`lib/context_watch.py:367-378`, and `conventions.default_branch` through the sed at `bin/keel:2483`.
+`lib/context_watch.py:367-378`, and `conventions.default_branch` through the sed at `bin/keel:2529`.
 That is 28% false positives, against `docs/standards.md:79` calling the too-strict failure the
 unrecoverable one and `tests/validate-citations.sh:20-25` recording a rule thrown away at 70%. It
 also under-reports: `gates.done_verified`'s real read is
@@ -470,9 +470,9 @@ check_reports "a key declared human-read is not reported" no \
 
 # THE MUST-NOT-REJECT CASE, and it needs its own fixture rather than reusing readby_fixture.
 #
-# 10 of the 61 real keys ride on a parent-map read: all six artifacts.* on bin/keel:1346, which is
+# 10 of the 61 real keys ride on a parent-map read: all six artifacts.* on bin/keel:1392, which is
 # `d=json.load(...).get('artifacts',{})`, plus verify.lint, verify.typecheck and verify.build on
-# bin/keel:1387 and verify.format on bin/keel:1767, which are `json_get ... "verify.$k"`. Not one of
+# bin/keel:1433 and verify.format on bin/keel:1813, which are `json_get ... "verify.$k"`. Not one of
 # those cited lines contains the leaf name. The regression this pin exists to catch is somebody
 # hardening the rule to demand the leaf name on the cited line, which is the dotted-path matcher
 # creeping back in after it was measured at 28% false positives and thrown away.
@@ -590,8 +590,8 @@ to `:716` is that summary and the two `exit` lines.
 # WHY A DECLARED READER AND NOT A GREP. A dotted-path matcher was written and measured against this
 # tree before this rule was chosen. It flagged 25 of 61 keys and 7 of the 25 are genuinely read:
 # artifacts.stories, .architecture, .decisions and .plans through the map iteration at
-# bin/keel:1341-1350, gates.context_warn_pct and .context_stop_pct through
-# lib/context_watch.py:367-378, and conventions.default_branch through the sed at bin/keel:1640.
+# bin/keel:1387-1396, gates.context_warn_pct and .context_stop_pct through
+# lib/context_watch.py:367-378, and conventions.default_branch through the sed at bin/keel:1686.
 # 28% false positives, against docs/standards.md's rule that a check is never stricter than correct
 # output. It under-reports too: gates.done_verified is read as (prof.get("gates") or
 # {}).get("done_verified") at hooks/done-guard:114 and the dotted string appears in that file only
@@ -778,13 +778,13 @@ say so rather than adding a sentence back to the schema by hand.
 
 | Value | Keys |
 |---|---|
-| `code:bin/keel:1707` | `harnesses` |
-| `code:bin/keel:1522` | `schema_version` |
-| `code:bin/keel:1536` | `keel_version` |
+| `code:bin/keel:1753` | `harnesses` |
+| `code:bin/keel:1568` | `schema_version` |
+| `code:bin/keel:1582` | `keel_version` |
 | `code:bin/keel#echo service` | `project.kind` |
 | `advisory:skills/keel/references/tool-choices.md:21` | `stack.language` |
 | `code:bin/keel:693` | `stack.package_manager` |
-| `code:bin/keel:1652`, `advisory:skills/coding-standards/references/house-defaults.md:30` | `stack.has_ui` |
+| `code:bin/keel:1698`, `advisory:skills/coding-standards/references/house-defaults.md:30` | `stack.has_ui` |
 | `advisory:skills/coding-standards/references/house-defaults.md:30` | `stack.framework` |
 | `advisory:skills/keel/references/tool-choices.md:22` | `stack.also` |
 | `code:bin/keel#t0="$(json_get .keel/profile.json verify.test`, `code:hooks/done-guard:118` | `verify.test` |
@@ -813,8 +813,8 @@ say so rather than adding a sentence back to the schema by hand.
 | `code:lib/context_watch.py:378` | `gates.context_stop_pct` |
 | `code:hooks/sensitive-guard#get("hard_block_paths") or []` | `hard_block_paths` |
 | `advisory:skills/ship/SKILL.md#profile.conventions.commit_style` | `conventions.commit_style` |
-| `code:bin/keel:2483` | `conventions.default_branch` |
-| `code:bin/keel:1817` | `conventions.protect_default_branch` |
+| `code:bin/keel:2529` | `conventions.default_branch` |
+| `code:bin/keel:1863` | `conventions.protect_default_branch` |
 | `code:hooks/session-start:111` | `conventions.response_style` |
 | `code:hooks/session-start:116` | `conventions.explain_level` |
 | `advisory:skills/coding-standards/references/observability.md:19` | `observability.backend` |
@@ -872,7 +872,7 @@ row = re.compile("^\\| \x60([^\x60]+)\x60 \\| [^|]* \\| [^|]* \\| [^|]* \\| (.*)
 ```
 
 **Add three `CLAIMS` entries in `tests/generate-profile-keys.sh#print("# Profile keys")`.** The new column prints
-citations, and three of them name gate vocabulary that `tests/test-harness-claims.sh:211` scans for
+citations, and three of them name gate vocabulary that `tests/test-harness-claims.sh:214` scans for
 in any depth-1 `docs/*.md`, which `docs/profile-keys.md` is. `gates.done_verified` and
 `hard_block_paths` are already safe because their rows carry a tag and `untagged_claims` skips a
 line that has one (`:226`). These three are not:
@@ -1167,7 +1167,7 @@ In `templates/profile.schema.json`, replace the interim sentences task 1 wrote:
 
 - `verify.e2e`: "Read by `keel doctor`, which names it and deliberately does not run it: it needs
   a running system that doctor has no way to provide."
-  `x-keel-read-by` becomes `code:bin/keel:1411`.
+  `x-keel-read-by` becomes `code:bin/keel:1457`.
 
 **The second clause was cut on 2026-09-08, after review, and the cut is the point.** It read "and
 a check nobody can afford to run before a commit is one they stop running". `keel doctor` is not a
@@ -1181,7 +1181,7 @@ and sufficient reason on its own.
 - `verify.security`: "null where the project has none, and `keel init` never detects one, so null
   is the ordinary value rather than a gap. Read by `keel doctor`, which names it and does not run
   it: it reaches the network. security-audit does its own reading either way."
-  `x-keel-read-by` becomes `code:bin/keel:1411`.
+  `x-keel-read-by` becomes `code:bin/keel:1457`.
 
 **Two corrections to this bullet, made 2026-09-08 after review, each with its reason.** The clause
 "null where the project has none" is restored: task 1 wrote it, an earlier draft of this task
@@ -2121,7 +2121,7 @@ whose real file list is discovered by running the suite, not by reading the task
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: `SCHEMA_VERSION=4`, consumed by `cmd_doctor`'s comparison at `bin/keel:1609-1614` and
+- Produces: `SCHEMA_VERSION=4`, consumed by `cmd_doctor`'s comparison at `bin/keel:1655-1660` and
   by the fingerprint rule at `tests/validate-skills.sh#schema_got="$(python3`.
 
 **Added 2026-09-08 after a review returned DEVIATES.** `tests/test-doc-claims.sh` pins
@@ -2762,7 +2762,7 @@ None blocks execution. Five are recorded because a decision made silently gets r
 `SCHEMA_VERSION` moves in task 6 and only there, as the retirement requires. `keel_version` is not
 touched: this repository's own `.keel/profile.json` says `0.15.0` against a `VERSION` of `0.18.0`
 and `schema_version 2` against `SCHEMA_VERSION=3`, and both are staleness in a hand-written
-dogfood file that `bin/keel:1554`'s doctor warning already reports. `bin/keel` is authoritative for
+dogfood file that `bin/keel:1600`'s doctor warning already reports. `bin/keel` is authoritative for
 the schema, which `tests/validate-skills.sh#schema_got="$(python3` proves by passing today against
 the line for 3 at `:86`. Fixing the repository's own profile is one `keel init` and its own task;
 landing it inside this change is how a released version's record gets rewritten.

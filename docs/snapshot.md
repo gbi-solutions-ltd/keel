@@ -20,7 +20,7 @@ The remediation plan built from section 10 is
 
 keel is a Claude Code plugin plus a per-project bootstrap that makes a house delivery process the
 default (README.md:1-3). It ships 25 skills, a bash CLI, and six hook scripts, and supports Codex
-CLI at a lower tier (README.md:21-26).
+CLI at a lower tier (README.md:24-29).
 
 | | |
 |---|---|
@@ -220,7 +220,7 @@ from an npm or pnpm lockfile or a yarn 2+ `yarn.lock`, and full `doctor` runs it
 not (2e0cb58, task 6). Every other stack still gets none.
 
 - On Codex, hard-blocked paths are unprotected, by design and documented
-  (docs/harness-support.md:12).
+  (docs/harness-support.md:14).
 
 ### Enforcement gaps against the stated purpose
 

@@ -72,16 +72,17 @@ unkinded="$(awk -F'|' '$1=="provides" && $4 !~ /^(vendor|probe):/ {print $2"/"$3
 [ -z "$unkinded" ] && ok "every source is marked vendor: or probe:" \
   || bad "every source is marked vendor: or probe:" "$unkinded"
 
-# A one-character typo in a requires row would disable a gate on every harness, including the one
-# where it works. Fail closed is right; a typo indistinguishable from a deliberate absence is not.
+# A one-character typo in a requires row would silently disable that gate, though Claude Code
+# provides what it needs. Fail closed is right; a typo indistinguishable from a deliberate absence
+# is not.
 # Keyed on gate AND primitive. Keyed on the gate alone, a second requires row overwrites the first
 # and only the last is ever checked, which is precisely the shape done-guard now has.
 orphan="$(awk -F'|' '$1=="provides"{p[$3]=1} $1=="requires"{r[$2 SUBSEP $3]=1} END{for(k in r){split(k,a,SUBSEP); if(!(a[2] in p)) print a[1]"->"a[2]}}' "$CAP")"
-[ -z "$orphan" ] && ok "every required primitive is provided by some harness" \
-  || bad "every required primitive is provided by some harness" "$orphan"
+[ -z "$orphan" ] && ok "every required primitive has a provides row" \
+  || bad "every required primitive has a provides row" "$orphan"
 
-# The gate list comes from the tree, not from this file. A fifth gate added under hooks/ with no
-# requires row would otherwise pass unnoticed, and resolve.sh would report it active everywhere.
+# The gate list comes from the tree, not from this file. A gate added under hooks/ with no requires
+# row would otherwise pass unnoticed, and resolve.sh would report it inactive, so it never runs.
 for h in "$ROOT"/hooks/*; do
     [ -f "$h" ] || continue
     g="$(basename "$h")"
@@ -189,7 +190,8 @@ if command -v harness_active_gates >/dev/null 2>&1; then
     # harness_active_gates alone, its own harness_known call would hide the other three.
     harness_known claude >/dev/null
     for call in "harness_provides claude pretooluse_ask" "harness_known claude" \
-                "harness_gate_active claude done-guard" "harness_active_gates claude"; do
+                "harness_gate_active claude done-guard" "harness_active_gates claude" \
+                "harness_gate_version done-guard" "harness_min_version"; do
         # shellcheck disable=SC2086
         # Word splitting is the point: each entry is a function and its arguments.
         KEEL_CAPABILITIES="" $call >/dev/null \
@@ -236,8 +238,8 @@ if command -v harness_active_gates >/dev/null 2>&1; then
       || bad "a final row with no trailing newline is still read" "reported active"
 
     # A gate with no requires row at all must be inactive. `found=1` is the only thing making that
-    # true, and flipping it to 0 resolves every unknown gate ACTIVE on every harness, which is
-    # the failure the hooks-directory loop above warns about. Nothing pinned it until now.
+    # true, and flipping it to 0 resolves every unknown gate ACTIVE with nothing it requires
+    # checked. Nothing pinned it until now.
     harness_gate_active claude no-such-gate \
       && bad "a gate with no requires row is inactive" "reported active" \
       || ok "a gate with no requires row is inactive"
@@ -350,6 +352,12 @@ if command -v harness_active_gates >/dev/null 2>&1; then
     [ "$out" = "context-watch done-guard review-guard sensitive-guard session-start " ] \
       && ok "resolves with no python3 on PATH" \
       || bad "resolves with no python3 on PATH" "got: $out"
+    # The minimum too, and with no external command at all: the stub PATH holds only dirname,
+    # which sourcing the file needs, so a version split through sed or sort would come back empty.
+    out="$(PATH="$stub" /bin/bash -c ". '$ROOT/lib/harness/resolve.sh'; harness_min_version" 2>&1)"
+    [ "$out" = 2.1.302 ] \
+      && ok "the minimum resolves with no python3 and no external command" \
+      || bad "the minimum resolves with no python3 and no external command" "got: $out"
     rm -rf "$stub"
 
     # Sourced by a relative path, then a cd. The manifest path used to be worked out from
@@ -387,10 +395,10 @@ else
     bad "resolve.sh defines harness_active_gates" "function not found after sourcing"
 fi
 
-# A primitive names a capability, never one harness's wire format. A name carrying a schema word
-# cannot be satisfied by a second harness however much evidence that harness has, so it does not
-# fail closed, it fails permanently. Tier B lost two gates by construction this way on 2026-09-05
-# before the rename, which is the scar this assertion exists to keep.
+# A primitive names a capability, and <source> is where Claude Code's wire format belongs. A name
+# that only one wire format can earn does not fail closed when the format moves, it fails
+# permanently. Until 2026-09-05 two primitives were named after Claude Code's own transcript format,
+# which is the scar this assertion exists to keep.
 schemaish="$(awk -F'|' '($1=="provides"||$1=="requires") && $3 ~ /jsonl|_json|message|content/ {print $3}' "$CAP" | sort -u | tr '\n' ' ')"
 [ -z "$schemaish" ] && ok "no primitive name encodes a harness wire format" \
   || bad "no primitive name encodes a harness wire format" "$schemaish"
@@ -400,6 +408,64 @@ schemaish="$(awk -F'|' '($1=="provides"||$1=="requires") && $3 ~ /jsonl|_json|me
 [ "$(harness_active_gates claude | sort | tr '\n' ' ')" = "context-watch done-guard review-guard sensitive-guard session-start " ] \
   && ok "the rename left claude at five gates" \
   || bad "the rename left claude at five gates" "$(harness_active_gates claude | sort | tr '\n' ' ')"
+
+# ---- keel's minimum Claude Code version ------------------------------------
+#
+# Derived from the ledger, never written beside it: the highest version a gate's primitive was
+# verified on. A number kept by hand is the one that stays put when a row moves.
+
+harness_version_ge 2.1.302 2.1.99 \
+  && ok "versions compare numerically: 2.1.302 is at or above 2.1.99" \
+  || bad "versions compare numerically: 2.1.302 is at or above 2.1.99" "returned non-zero"
+harness_version_ge 2.1.99 2.1.302 \
+  && bad "versions compare numerically: 2.1.99 is below 2.1.302" "returned zero" \
+  || ok "versions compare numerically: 2.1.99 is below 2.1.302"
+harness_version_ge 2.1.302 2.1.302 \
+  && ok "versions compare numerically: 2.1.302 is at or above itself" \
+  || bad "versions compare numerically: 2.1.302 is at or above itself" "returned non-zero"
+
+# The regression pin, like the five gates above: a row that raises it is a row that changed what
+# keel needs, and this is where that shows. validated_word_ceiling is at 2.1.302 too and has no
+# requires row, so it is pretooluse_agent_type, which review-guard requires, that sets it.
+got="$(harness_min_version)"
+[ "$got" = 2.1.302 ] \
+  && ok "the minimum is derived from the ledger: 2.1.302 with today's rows" \
+  || bad "the minimum is derived from the ledger: 2.1.302 with today's rows" "got: ${got:-<empty>}"
+
+min_of() {   # min_of <printf-escaped manifest>; echoes harness_min_version against it
+    local f
+    f="$(mktemp)"
+    printf '%b' "$1" > "$f"
+    KEEL_CAPABILITIES="$f" harness_min_version
+    rm -f "$f"
+}
+# p1 sits at 2.1.99 so that a string comparison, which puts 2.1.99 above 2.1.296, gets it wrong.
+mv_base='provides|claude|p1|src|2.1.99|2026-01-01\nprovides|claude|p2|src|2.1.296|2026-01-01\nrequires|g1|p1\nrequires|g2|p2\n'
+got="$(min_of "$mv_base")"
+[ "$got" = 2.1.296 ] \
+  && ok "the minimum is derived from the ledger: the highest required row, 2.1.296" \
+  || bad "the minimum is derived from the ledger: the highest required row, 2.1.296" "got: ${got:-<empty>}"
+got="$(min_of "${mv_base}provides|claude|p3|src|2.1.310|2026-01-01\n")"
+[ "$got" = 2.1.296 ] \
+  && ok "the minimum is derived from the ledger: a 2.1.310 row nothing requires leaves it at 2.1.296" \
+  || bad "the minimum is derived from the ledger: a 2.1.310 row nothing requires leaves it at 2.1.296" "got: ${got:-<empty>}"
+got="$(min_of 'provides|claude|p1|src|2.1.99|2026-01-01\nprovides|claude|p2|src| |2026-01-01\nrequires|g1|p1\nrequires|g2|p2\n')"
+[ "$got" = 2.1.99 ] \
+  && ok "the minimum is derived from the ledger: a required row with a blank version is ignored" \
+  || bad "the minimum is derived from the ledger: a required row with a blank version is ignored" "got: ${got:-<empty>}"
+got="$(min_of "${mv_base}provides|ghost|p2|src|2.1.400|2026-01-01\n")"
+[ "$got" = 2.1.296 ] \
+  && ok "the minimum is derived from the ledger: only claude rows count" \
+  || bad "the minimum is derived from the ledger: only claude rows count" "got: ${got:-<empty>}"
+
+got="$(harness_gate_version review-guard)"
+[ "$got" = 2.1.302 ] \
+  && ok "a gate's version is its highest required primitive's: review-guard at 2.1.302" \
+  || bad "a gate's version is its highest required primitive's: review-guard at 2.1.302" "got: ${got:-<empty>}"
+got="$(harness_gate_version no-such-gate)"; rc=$?
+[ "$rc" != 0 ] && [ -z "$got" ] \
+  && ok "a gate with no requires row has no version" \
+  || bad "a gate with no requires row has no version" "rc=$rc got: ${got:-<empty>}"
 
 # ---- the generated hook manifest -------------------------------------------
 #
@@ -428,11 +494,6 @@ if [ -x "$GEN" ]; then
     [ "$rc" != 0 ] && printf '%s' "$err" | grep -q '^usage: ' \
       && ok "the generator refuses codex with its usage message" \
       || bad "the generator refuses codex with its usage message" "rc=$rc err=${err:-<empty>}"
-
-    for f in hooks/hooks.codex.json .codex-plugin lib/harness/codex.sh; do
-        [ -e "$ROOT/$f" ] && bad "no Codex artifact remains: $f" "present" \
-          || ok "no Codex artifact remains: $f"
-    done
 
     # A silent flip to async makes every gate advisory: the hook still runs, and nothing it
     # decides is applied.
@@ -474,6 +535,12 @@ sys.exit(1) if any(not v for v in d["hooks"].values()) else sys.exit(0)' 2>/dev/
 else
     bad "tests/generate-harness-artifacts.sh is executable" "not found or not executable"
 fi
+
+# Whether or not the generator is there to refuse codex, nothing Codex-specific is left to install.
+for f in hooks/hooks.codex.json .codex-plugin lib/harness/codex.sh; do
+    [ -e "$ROOT/$f" ] && bad "no Codex artifact remains: $f" "present" \
+      || ok "no Codex artifact remains: $f"
+done
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

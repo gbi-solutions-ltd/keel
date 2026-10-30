@@ -188,19 +188,22 @@ fi
 [ -z "${codex_tagged// /}" ] && ok "no current document carries a harness=codex claim marker" \
   || bad "no current document carries a harness=codex claim marker" "$codex_tagged"
 
-# ...and it fires, on the three shapes it has to catch. Without this the case above passes against a
+# ...and it fires, on the four shapes it has to catch. Without this the case above passes against a
 # predicate that never reports anything, and every document in the tree could claim whatever it
 # liked. The withheld gate is one with no requires row, and the unvalidated property is one the
-# ledger holds no claude row for: a claim either way that nothing in the ledger grants.
+# ledger holds no claude row for: a claim either way that nothing in the ledger grants. The ghost
+# harness tags a gate claude does get, so only the harness can refuse it, and a registry that read
+# the gate name alone would pass it.
 cf="$(mktemp -d)"
 printf '<!-- keel:claim gate=no-such-gate harness=claude -->\n' > "$cf/gate.md"
-printf '<!-- keel:claim property=no_such_primitive harness=claude -->\n' > "$cf/ceiling.md"
+printf '<!-- keel:claim property=no_such_primitive harness=claude -->\n' > "$cf/property.md"
+printf '<!-- keel:claim gate=session-start harness=ghost -->\n' > "$cf/harness.md"
 printf '<!-- keel:claim harness=claude -->\n' > "$cf/malformed.md"
 printf '<!-- keel:claim gate=session-start harness=claude -->\n' > "$cf/good.md"
-got="$(claim_gaps "$cf/gate.md" "$cf/ceiling.md" "$cf/malformed.md" "$cf/good.md" | sed "s|$cf/||" | tr '\n' ' ')"
-[ "$got" = "gate.md:claude/no-such-gate ceiling.md:claude/no_such_primitive malformed.md:malformed " ] \
-  && ok "the claim registry fires on a withheld gate, an unvalidated property and a malformed tag" \
-  || bad "the claim registry fires on a withheld gate, an unvalidated property and a malformed tag" "got: $got"
+got="$(claim_gaps "$cf/gate.md" "$cf/property.md" "$cf/harness.md" "$cf/malformed.md" "$cf/good.md" | sed "s|$cf/||" | tr '\n' ' ')"
+[ "$got" = "gate.md:claude/no-such-gate property.md:claude/no_such_primitive harness.md:ghost/session-start malformed.md:malformed " ] \
+  && ok "the claim registry fires on a withheld gate, an unvalidated property, an unknown harness and a malformed tag" \
+  || bad "the claim registry fires on a withheld gate, an unvalidated property, an unknown harness and a malformed tag" "got: $got"
 rm -rf "$cf"
 
 # 5. A sentence using gate or ceiling vocabulary with no claim tag is an unregistered claim.
@@ -315,6 +318,36 @@ grep -q '^| codex |' docs/harness-support.md 2>/dev/null \
 grep -qF 'What Tier B cannot claim' docs/harness-support.md 2>/dev/null \
   && bad "the support page has no Tier B section" "the section is present" \
   || ok "the support page has no Tier B section"
+
+# 7b. keel's minimum Claude Code version, which lib/harness/resolve.sh derives from the ledger. The
+# support page states it, and README carries it between two markers, where a hand-kept copy is the
+# one that stays put when a row moves. So README has to agree with the ledger, and a disagreement
+# names both numbers: the fix is whichever of the two is wrong, and only a reader can tell which.
+min_line="Minimum Claude Code version: $(harness_min_version), the highest version a gate's primitive was verified on."
+grep -qxF "$min_line" docs/harness-support.md 2>/dev/null \
+  && ok "the support page states the minimum Claude Code version" \
+  || bad "the support page states the minimum Claude Code version" "no line: $min_line"
+
+min_version_gap() {   # min_version_gap <readme>; says so when its minimum is not the ledger's
+    local said want
+    want="$(harness_min_version)"
+    said="$(sed -n 's/.*<!-- keel:min-claude-code -->\(.*\)<!-- \/keel:min-claude-code -->.*/\1/p' "$1")"
+    [ "$said" = "$want" ] \
+      || printf 'README says the minimum Claude Code version is %s, the ledger says %s\n' "${said:-nothing}" "$want"
+}
+gap="$(min_version_gap README.md)"
+[ -z "$gap" ] && ok "README's minimum Claude Code version is the ledger's" \
+  || bad "README's minimum Claude Code version is the ledger's" "$gap"
+
+# ...and it fires, naming both values, on a copy: tests/run-tests.sh runs this file beside others.
+mv_readme="$(mktemp)"
+sed 's/\(<!-- keel:min-claude-code -->\)[^<]*/\12.1.300/' README.md > "$mv_readme"
+gap="$(min_version_gap "$mv_readme")"
+case "$gap" in
+  *2.1.300*"$(harness_min_version)"*) ok "a README minimum that is not the ledger's is reported with both values" ;;
+  *) bad "a README minimum that is not the ledger's is reported with both values" "got: ${gap:-<empty>}" ;;
+esac
+rm -f "$mv_readme"
 
 # 8. One skills directory, and what ships is what git tracks.
 dupes="$(git ls-files 'skills/*/SKILL.md' | sed 's#.*/\([^/]*\)/SKILL.md#\1#' | sort | uniq -d)"

@@ -996,7 +996,12 @@ if git -C "$ROOT" worktree add -q --detach "$base/repo" "$BASELINE_REF" 2>/dev/n
     # The AGENTS.md marker line is the same kind: doctor stopped checking AGENTS.md, and a baseline
     # from before that change still prints it. Its absence is asserted in tests/test-keel.sh:
     # "doctor no longer checks AGENTS.md: no line names it".
-    HSECTION='^(ok    running under |WARN  cannot determine which harness is running|WARN  codex is installed on this machine|ok    claude gates active:|WARN  claude does not get |WARN  this repository declares hard_block_paths|ok    AGENTS\.md markers intact$|keel doctor: )'
+    #
+    # The installed Claude Code's version against keel's minimum is the other kind: a line doctor
+    # did not print before, which is in the harness section's place. With tests/keel-test-lib.sh's
+    # stub it is always the ok line, and the cases under "keel's minimum Claude Code version" below
+    # assert it and its two warnings.
+    HSECTION='^(ok    running under |WARN  cannot determine which harness is running|WARN  codex is installed on this machine|ok    claude gates active:|WARN  claude does not get |WARN  this repository declares hard_block_paths|ok    AGENTS\.md markers intact$|ok    Claude Code [0-9.]+ meets keel|keel doctor: )'
     ( cd "$base" && "$base/repo/bin/keel" doctor 2>&1 \
         | sed -E 's/schema version [0-9]+/schema version N/g' | grep -vE "$HSECTION" > "$base/doctor.txt" )
     ( cd "$after" && "$ROOT/bin/keel" doctor 2>&1 \
@@ -1221,6 +1226,92 @@ PY
 [ -z "$kept" ] && ok "init still writes the five gates that survive" \
   || bad "init still writes the five gates that survive" "missing: $kept"
 rm -rf "$wr"
+
+# ---- keel's minimum Claude Code version, checked by doctor -----------------
+#
+# Doctor runs "$KEEL_CLAUDE" --version and compares it with the minimum lib/harness/resolve.sh
+# derives from the ledger. Every case names its own stub, so none depends on the claude this machine
+# has, and each runs --fast, which is what keel-fleet runs.
+cv_fx="$(fixture node-ts)"
+( cd "$cv_fx" && "$KEEL" init -y >/dev/null 2>&1 )
+cv_min="$(bash -c ". '$ROOT/lib/harness/resolve.sh'; harness_min_version")"
+cv_stub="$(mktemp -d)"
+cv_doctor() {   # cv_doctor <stub body>; doctor --fast's output with KEEL_CLAUDE running that body
+    printf '#!/bin/sh\n%s\n' "$1" > "$cv_stub/claude"
+    chmod +x "$cv_stub/claude"
+    ( cd "$cv_fx" && KEEL_CLAUDE="$cv_stub/claude" "$KEEL" doctor --fast 2>&1 )
+}
+# Doctor's line about the installed version: the one ok or WARN line naming Claude Code's version
+# or saying it cannot tell. Its gates line names Claude Code too, so it is left out by its prefix.
+cv_line() { printf '%s\n' "$1" | grep -E '^(ok|WARN) +(Claude Code [0-9]|cannot tell whether this Claude Code)'; }
+
+out="$(cv_doctor "echo '2.1.312 (Claude Code)'")"
+line="$(cv_line "$out")"
+case "$line" in
+  "ok    "*2.1.312*"$cv_min"*) ok "doctor compares Claude Code with the minimum: 2.1.312 is a good line naming both" ;;
+  *) bad "doctor compares Claude Code with the minimum: 2.1.312 is a good line naming both" "line: ${line:-<none>}" ;;
+esac
+
+# The gates this version is too old for, worked out from the ledger the way doctor must.
+# shellcheck source=lib/harness/resolve.sh
+cv_late="$( . "$ROOT/lib/harness/resolve.sh"
+    while IFS='|' read -r k g _; do
+        [ "$k" = requires ] || continue
+        v="$(harness_gate_version "$g")" || continue
+        harness_version_ge 2.1.280 "$v" && echo "ok:$g" || echo "late:$g"
+    done < "$(harness_capabilities_path)" | sort -u )"
+out="$(cv_doctor "echo '2.1.280 (Claude Code)'")"
+line="$(cv_line "$out")"
+miss=""
+case "$line" in "WARN  "*2.1.280*"$cv_min"*) ;; *) miss="$miss level-or-versions" ;; esac
+for g in $(printf '%s\n' "$cv_late" | sed -n 's/^late://p'); do
+    case "$line" in *"$g"*) ;; *) miss="$miss missing:$g" ;; esac
+done
+for g in $(printf '%s\n' "$cv_late" | sed -n 's/^ok://p'); do
+    case "$line" in *"$g"*) miss="$miss extra:$g" ;; esac
+done
+[ -n "$(printf '%s\n' "$cv_late" | sed -n 's/^late://p')" ] || miss="$miss no-late-gate-so-this-proves-nothing"
+[ -z "$miss" ] \
+  && ok "doctor compares Claude Code with the minimum: 2.1.280 warns, naming each gate verified only later" \
+  || bad "doctor compares Claude Code with the minimum: 2.1.280 warns, naming each gate verified only later" "$miss; line: ${line:-<none>}"
+
+cannot_tell() {   # cannot_tell <case name> <doctor output>; the warning, and no good line beside it
+    local line; line="$(cv_line "$2")"
+    case "$line" in
+      "WARN  cannot tell whether this Claude Code runs keel's gates"*)
+        if printf '%s\n' "$2" | grep -qE '^ok    Claude Code [0-9]'; then
+            bad "$1" "a good line as well: $line"
+        else
+            ok "$1"
+        fi ;;
+      *) bad "$1" "line: ${line:-<none>}" ;;
+    esac
+}
+out="$( cd "$cv_fx" && KEEL_CLAUDE="$cv_stub/no-such-claude" "$KEEL" doctor --fast 2>&1 )"
+cannot_tell "doctor compares Claude Code with the minimum: a command that does not exist cannot tell" "$out"
+out="$(cv_doctor "echo garbage")"
+cannot_tell "doctor compares Claude Code with the minimum: output with no version cannot tell" "$out"
+
+# A claude that hangs, on a login or an update prompt, must not hang doctor. exec, so the kill
+# reaches the sleep itself rather than a shell that would leave it running.
+TIMEFORMAT=%R
+cv_secs="$( { time cv_doctor "exec sleep 10" > "$cv_stub/out"; } 2>&1 )"
+unset TIMEFORMAT
+cannot_tell "doctor compares Claude Code with the minimum: one that hangs is killed and cannot tell" "$(cat "$cv_stub/out")"
+[ "${cv_secs%.*}" -ge 5 ] 2>/dev/null && [ "${cv_secs%.*}" -lt 7 ] \
+  && ok "doctor compares Claude Code with the minimum: one that hangs is killed after 5 seconds, and doctor ends inside 7 ($cv_secs)" \
+  || bad "doctor compares Claude Code with the minimum: one that hangs is killed after 5 seconds, and doctor ends inside 7" "took ${cv_secs:-?} seconds"
+
+# The suite's own doctor runs: tests/keel-test-lib.sh exports a KEEL_CLAUDE that prints the
+# current minimum, so the roughly 140 of them print the same line on a machine with claude on PATH
+# and on CI without it. Run here with this machine's PATH and with one that holds no claude.
+line="$(cv_line "$( cd "$cv_fx" && "$KEEL" doctor --fast 2>&1 )")"
+noclaude="$(printf '%s' "$PATH" | tr ':' '\n' | while IFS= read -r p; do [ -x "$p/claude" ] || printf '%s:' "$p"; done)"
+line2="$(cv_line "$( cd "$cv_fx" && PATH="${noclaude%:}" "$KEEL" doctor --fast 2>&1 )")"
+[ "$line" = "$line2" ] && case "$line" in "ok    "*"$cv_min"*"$cv_min"*) true ;; *) false ;; esac \
+  && ok "the suite's doctor runs do not depend on the machine's Claude Code" \
+  || bad "the suite's doctor runs do not depend on the machine's Claude Code" "with PATH: ${line:-<none>}; without claude: ${line2:-<none>}"
+rm -rf "$cv_fx" "$cv_stub"
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

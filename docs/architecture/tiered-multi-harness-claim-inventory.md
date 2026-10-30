@@ -24,7 +24,7 @@ Remedy classes:
 | # | Location | The claim | Class |
 |---|---|---|---|
 | 1 | `README.md:16` | "That is the whole install." Describes Claude Code's plugin and PATH mechanism as the install | **N** + W |
-| 2 | `README.md:82-84` | The `keel terse` output style, "selectable in `/config`". No Codex counterpart was found; `bin/keel` never references `output-styles/` | **W** |
+| 2 | `README.md:85-87` | The `keel terse` output style, "selectable in `/config`". No Codex counterpart was found; `bin/keel` never references `output-styles/` | **W** |
 | 3 | `README.md`, the paragraph opening "Bypassing prompts is bounded" | The headline safety claim: `deny` and `ask` rules in `.claude/settings.json` "both kinds still apply under `bypassPermissions`" | **W**, highest value in the list |
 | 4 | `docs/01-architecture.md:22-23` | Layer 1 as "hooks in `.claude/settings.json`" | **W**, done this turn |
 | 5 | `docs/01-architecture.md:165` | "Where a rule is genuinely non-negotiable, we put it in a hook" | **W**, done this turn |
