@@ -950,7 +950,7 @@ say so and leave it unstaged.
 `tests/test-keel-4.sh` pass, and `tests/validate-citations.sh` and `tests/validate-skills.sh` report
 OK.
 
-- [ ] **Step 7.1: Build it test first**
+- [x] **Step 7.1: Build it test first** Note: built by the implementer; reds reproduced by the spec reviewer against HEAD (68/9, claims 2, keel-4 7)
 
 Follow `keel:tdd` for each behaviour: write its test from the example, run it, and watch it fail
 for the reason the behaviour names, then write the minimal implementation and watch it pass.
@@ -963,7 +963,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 A red in either validator is this task's. This is the one boundary run the task schedules.
 
-- [ ] **Step 7.2: Hand over**
+- [x] **Step 7.2: Hand over** Note: rounds: 1; routing: inherit; loop: full; spec COMPLIES; quality: no blocking as ranked, but a TERM-ignoring claude hangs doctor and an empty minimum reads as a pass; both fixed in task 7b
 
 ```bash
 git add lib/harness/resolve.sh tests/generate-harness-artifacts.sh docs/harness-support.md bin/keel \
@@ -975,6 +975,74 @@ git status --porcelain
 Stage those paths, and each file whose broken citation this task repaired or that now sets
 `KEEL_CLAUDE`, by name, and stop. **Do not commit.** The coordinator commits after both review
 passes, with `git commit -s -m "feat(doctor): derive and check keel's minimum Claude Code version"`.
+Paste the `git status --porcelain` output into your report; if it lists anything this task did not
+touch, say so and leave it unstaged.
+
+### Task 7b: the version check never hangs and never passes on nothing
+
+Added by the coordinator on 2026-10-30 from task 7's quality review: a `claude` that ignores SIGTERM
+makes doctor wait without limit, which breaks task 7's "gives up within 5 seconds"; an unreadable
+ledger makes the minimum empty and doctor print "meets keel's minimum, " with nothing after it.
+
+**Story:** G2, ADR-0014
+**Files:**
+- Modify: `bin/keel`
+- Test: `tests/test-keel-4.sh`, `tests/test-harness-resolve.sh`
+- Plus each file whose citation into `bin/keel` this task's edits break
+
+**Interfaces:**
+- Consumes: task 7's doctor block, `harness_min_version` and `harness_gate_version`
+- Produces: nothing new
+
+**Depends on:** task 7
+
+**Behaviours:**
+
+1. A `claude` that ignores SIGTERM is still stopped. Example: a stub that runs `trap '' TERM; exec
+   sleep 60` makes doctor print the timed-out warning and return within 30 seconds; no stub process
+   is left running afterwards.
+2. The hang test does not depend on doctor's own speed. Example: the existing "killed after 5
+   seconds" case uses a stub sleeping 60 seconds and asserts doctor ends within 30, so it passes on
+   a loaded machine.
+3. The warning names its cause. Examples: `KEEL_CLAUDE` naming a missing command says it was not
+   found; a stub that sleeps past the limit says it was stopped after 5 seconds; a stub printing
+   `garbage` says its output named no version. None prints a `good` line.
+4. Common version spellings parse. Examples: `v2.1.312`, `2.1.303-beta.1 (Claude Code)` and a
+   version on the second line after a warning line each give the `good` line naming 2.1.312, 2.1.303
+   or the version printed.
+5. An empty minimum never reads as a pass. Example: with `KEEL_CAPABILITIES` pointing at an empty
+   file, doctor prints a warning that it cannot read keel's minimum and no `good` line about Claude
+   Code.
+6. A malformed ledger version is caught by the ledger test, not by doctor's arithmetic. Example: a
+   case in `tests/test-harness-resolve.sh` asserts every `provides` row's version matches
+   `^[0-9]+(\.[0-9]+)+$`, and a fixture with `2.1.x` fails it.
+
+**Done when:** `tests/test-keel-4.sh` and `tests/test-harness-resolve.sh` pass, and
+`tests/validate-citations.sh` and `tests/validate-skills.sh` report OK.
+
+- [ ] **Step 7b.1: Build it test first**
+
+Follow `keel:tdd` for each behaviour: write its test from the example, run it, and watch it fail
+for the reason the behaviour names, then write the minimal implementation and watch it pass.
+Run: `tests/test-keel-4.sh`
+Expected before the implementation: FAIL, the case for behaviour 1 fails because doctor waits on
+the stub past 30 seconds, and the case for behaviour 5 fails because doctor prints the `good` line.
+Expected after: PASS. Quote the failing output in your report.
+
+Run: `tests/run-tests.sh`.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+A red in either validator is this task's. This is the one boundary run the task schedules.
+
+- [ ] **Step 7b.2: Hand over**
+
+```bash
+git add bin/keel tests/test-keel-4.sh tests/test-harness-resolve.sh
+git status --porcelain
+```
+
+Stage those paths, and each file whose broken citation this task repaired, by name, and stop.
+**Do not commit.** The coordinator commits after both review passes, with
+`git commit -s -m "fix(doctor): the version check never hangs and never passes on nothing"`.
 Paste the `git status --porcelain` output into your report; if it lists anything this task did not
 touch, say so and leave it unstaged.
 
@@ -1296,5 +1364,9 @@ touch, say so and leave it unstaged.
   `hooks/hooks.*.json` is now reported as an orphan hook and nothing pins that; the support page
   generator still loops over harnesses; the ledger and `resolve.sh` cite ADR-0003 for the evidence
   rule where ADR-0014 supersedes it.
+  From task 7's quality review: when `claude` is a shell wrapper, the kill reaches only the shell
+  and its child keeps running (doctor is not blocked); keel-fleet repeats the machine-wide version
+  check per repository; a second ledger row for an already-verified primitive would raise the
+  minimum.
 - **Not in this plan.** `keel-cursor`'s generator reads the archived `keel-internal` checkout; that
   is the port's to fix. The idea record's items are the next plan.
