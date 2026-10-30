@@ -185,6 +185,51 @@ cannot translate is that port's decision.
 | A Codex user installs from `main` after this change | No `.codex-plugin/` exists, so Codex finds no plugin | Fails **closed**: nothing loads rather than a half-working gate | Install from the `v0.26.0` tag until `keel-codex` ships |
 | `sensitive-guard` exits 2 for a reason other than the removed Codex block | The `EXIT` trap from PR #7 | With the deliberate exit 2 gone, the trap can map 2 to `ask` as well | The plan decides whether the trap's `0|2` becomes `0` |
 
+### Probe: Codex without `.codex-plugin/`
+
+Measured 2026-10-30 on `codex-cli 0.153.4`, against commit `a85e3e5` exported with `git archive`
+and its `.codex-plugin/` removed, with `CODEX_HOME` set to a throwaway directory for every command.
+The copy's `hooks/hooks.json` carried one extra `SessionStart` hook, with no matcher, running
+`touch <probe>/marker`.
+
+```
+Codex loads keel's hooks without .codex-plugin: yes
+Codex install at v0.26.0: codex plugin marketplace add gbi-solutions-ltd/keel --ref v0.26.0 && codex plugin add keel@gbi
+```
+
+The hooks probe, where `hooks/list` is a JSON-RPC request to `codex app-server` over stdio:
+
+```bash
+export CODEX_HOME=<throwaway>
+codex plugin marketplace add <copy> --json   # "marketplaceName": "gbi"
+codex plugin add keel@gbi --json             # "pluginId": "keel@gbi", "version": "0.26.0"
+codex app-server                             # hooks/list: 9 hooks, all "trustStatus": "untrusted"
+# config.toml, once per listed hook: [hooks.state."<key>"] trusted_hash = "<currentHash>"
+codex app-server                             # hooks/list: the same 9 hooks, all "trusted"
+cp ~/.codex/auth.json "$CODEX_HOME/"         # exec needs a login, and nothing else is copied
+codex exec -C <work> --skip-git-repo-check -s read-only "echo hi"
+```
+
+Codex installs keel from `.claude-plugin/` alone and reads `hooks/hooks.json`, the file Claude Code
+reads, with `${CLAUDE_PLUGIN_ROOT}` expanded to its plugin cache. The `exec` run printed
+`hook: SessionStart Completed`, then `PreToolUse` and `Stop`, and the marker file existed after it.
+That is the full Claude Code set, `sensitive-guard` and `review-guard` included, which
+`hooks/hooks.codex.json` leaves out: the tag install below lists 6 hooks, all from that file. Trust
+is per hook, keyed `keel@gbi:hooks/hooks.json:<event>:<group>:<handler>`, and `codex plugin` has no
+command that writes it.
+
+The install probe, in a second throwaway `CODEX_HOME`:
+
+```bash
+codex plugin marketplace add gbi-solutions-ltd/keel --ref v0.26.0 --json  # "marketplaceName": "gbi"
+codex plugin add keel@gbi --json  # "pluginId": "keel@gbi", "version": "0.26.0"
+```
+
+Its `config.toml` then held `source = "https://github.com/gbi-solutions-ltd/keel.git"` and
+`ref = "v0.26.0"`, and the marketplace checkout sat at `a21b3eb`, the tag's commit, with
+`.codex-plugin/` present. `shasum ~/.codex/config.toml` gave `54458c6846a1` before and after both
+probes, and both throwaway directories were deleted.
+
 ## 8. Security architecture
 
 The trust boundaries do not change: the hooks still run with the developer's permissions, and the
