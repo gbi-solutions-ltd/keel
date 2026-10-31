@@ -1777,30 +1777,50 @@ The same review found that two of task 12's cases cannot fail, and one global op
    failure before or inside the walk into the exit trap's ask, which Codex discards. Any outcome of
    the Python other than "no commit" (exit 0) or a decision ends in the refusal on Codex: a crash,
    a `python3` that exits non-zero without running (a pyenv shim with no version installed exits
-   127), and an event that is not JSON. Claude Code keeps its current outcomes for each. Examples,
-   each with `CODEX_VERSION` set, `CLAUDE_PROJECT_DIR` unset, and a committed profile listing
-   `src/auth`: an event whose `tool_input` is a string, with a command text holding `git commit`,
-   exits 2 with `v0.26.0` on stderr; a `PATH` whose `python3` is a script that exits 127 exits 2
-   with `v0.26.0`. Before the change both print the ask and exit 0. Added 2026-10-31: the first
-   attempt at this task did exactly that, and its quality review found it (HEAD refused both).
+   127), and an event that is not JSON. Claude Code keeps its current outcomes for each, and this
+   behaviour wins over behaviour 1 for an event that is not JSON: there is no command for the walk
+   to read, so the guard cannot answer, and on Claude Code such an event still reaches the
+   staged-profile and unreadable-profile asks as it does at HEAD. Examples, each with
+   `CODEX_VERSION` set, `CLAUDE_PROJECT_DIR` unset, and a committed profile listing `src/auth`: an
+   event whose `tool_input` is a string, with a command text holding `git commit`, exits 2 with
+   `v0.26.0` on stderr; a `PATH` whose `python3` is a script that exits 127 exits 2 with `v0.26.0`.
+   Before the change both print the ask and exit 0. On Claude Code, an event that is not JSON but
+   holds `git commit`, in a repository with only `.keel/profile.json` staged, asks naming the
+   profile, as at HEAD. Added 2026-10-31: the first attempt at this task let both Codex cases
+   through, and its quality review found it (HEAD refused both); the second dropped HEAD's Claude
+   Code ask on a non-JSON event, and its spec review found it.
 6. The walk reads a commit that sits behind a shell operator or a path to git. Shell operators
    (`&&`, `||`, `;`, `|`, `&`, `(`, `)`) are their own tokens even when written without spaces,
    and a token whose last path component is `git` is git. Examples, each with `src/auth/t.go`
    staged, asking on Claude Code and exiting 2 on Codex: `/usr/bin/git commit -m x`, `(git commit
    -m x)`, `git add -A&&git commit -m x`, `true;git commit -m x` and `echo x|git commit -F -`.
    `git --no-pager log --grep commit` and `echo commit;git status` still get no decision on either
-   harness. Before the change the five commits print nothing on either harness. Added 2026-10-31,
-   Bernard's decision, from the same review: task 12's walk let these through, and before task 12c
-   Codex refused them only because it refused anything the bash filter matched.
+   harness. Before the change the five commits print nothing on Claude Code; on Codex HEAD refuses
+   them only because it refuses anything the bash filter matches, so those cases pass on arrival.
+   Added 2026-10-31, Bernard's decision, from the same review.
+7. Splitting operators out must not shorten what a commit's arguments are read as. Every
+   `git ... commit` in the command is read, each with its own flags and pathspecs, so a later
+   commit's `-a` still widens the check; a redirection operator (`>`, `>>`, `<`) skips itself and
+   its one target and the arguments after it are still read; `(` and `)` are never pathspecs.
+   Examples, each in a repository with a `HEAD`, a committed profile listing `src/auth`, an
+   unstaged change to the tracked `src/auth/t.go` and only `src/ui/button.tsx` staged: `git commit
+   -m x ; git commit -a -m y` and `git commit -m x && git commit -am y` each ask naming
+   `src/auth/t.go` (exit 2 with `v0.26.0` on Codex); `git commit -m x > /dev/null src/auth/t.go`
+   asks naming it; `(git commit -m x)` prints nothing. Before the change HEAD reaches the first
+   three only by reading the whole tail as one commit's arguments, and treats `)` as a pathspec.
+   Added 2026-10-31 from the second attempt's spec review, which found that ending a commit's
+   arguments at the first operator let the first three through in silence.
 
 **Done when:** `tests/test-sensitive-guard.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
 
 - [ ] **Step 12c.1: Build it test first**
 
-Follow `keel:tdd` for behaviours 1, 4, 5 and 6: write each case from its examples and watch it fail
-for the reason named, then implement. Behaviours 2 and 3 are `verify`: their red comes from the
-scratch-copy mutations they name.
+Follow `keel:tdd` for behaviours 1, 4, 5, 6 and 7: write each case from its examples and watch it
+fail for the reason named, then implement. Behaviours 2 and 3 are `verify`: their red comes from
+the scratch-copy mutations they name. Behaviour 7's first three cases and behaviour 5's Claude Code
+case pass on HEAD's hook; prove they bite on a scratch copy of the finished hook whose arguments
+stop at the first operator, and one that exits 0 on a non-JSON event, and watch them fail.
 Run: `tests/test-sensitive-guard.sh`
 Expected before: FAIL, behaviour 1's Codex `git --no-pager log --grep commit` case exits 2 where it
 should exit 0, its Claude Code cases ask, behaviour 4's case gets no output, and behaviour 6's
