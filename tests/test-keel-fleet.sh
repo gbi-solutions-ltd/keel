@@ -122,9 +122,13 @@ case "$row" in
   *"(unreadable)"*) bad "keel-fleet" "a repo with a real doctor problem (not a read failure) reported unreadable: $row" ;;
   *) ok "fleet reports a real row for a repo doctor found problems in, not (unreadable)" ;;
 esac
-problems_col="$(printf '%s' "$row" | awk -F'\t' '{ print $6 }')"
-[ "${problems_col:-0}" -gt 0 ] 2>/dev/null && ok "fleet's problems column reflects the real count ($problems_col)" \
-  || bad "keel-fleet" "expected a positive problems count, row: $row"
+# problems is the fifth column; the count doctor itself reports is what it must equal.
+problems_col="$(printf '%s' "$row" | awk -F'\t' '{ print $5 }')"
+want="$(cd "$repo_c" && "$KEEL" doctor --json --fast 2>/dev/null \
+  | python3 -c 'import json, sys; print(json.load(sys.stdin)["problems"])')"
+[ "${want:-0}" -gt 0 ] 2>/dev/null && [ "$problems_col" = "$want" ] \
+  && ok "fleet's problems column reflects the real count ($problems_col)" \
+  || bad "keel-fleet" "expected a problems count of ${want:-<none>}, row: $row"
 [ "$rc" -ne 0 ] && ok "fleet still exits nonzero when a repo has real problems" \
   || bad "keel-fleet" "expected nonzero exit for a repo with real problems, got 0"
 rm -rf "$c"

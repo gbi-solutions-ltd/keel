@@ -254,7 +254,7 @@ who owns each one and what happens when two harnesses want the same repository.
 | File | Owner | Written when | Harness | On a dual-harness repo |
 |---|---|---|---|---|
 | `.keel/profile.json` | keel, merged with the project's values | `init`, `profile set` | Neither, shared | One file. Gains `harnesses: ["claude","codex"]`, bumping `schema_version` to 3 |
-| `CLAUDE.md` managed block | keel, between markers | `init` | Claude | Written. Already dual-written today (`bin/keel:648-649`) |
+| `CLAUDE.md` managed block | keel, between markers | `init` | Claude | Written. Already dual-written today (`bin/keel` at v0.26.0) |
 | `AGENTS.md` managed block | keel, between markers | `init` | Codex | Written. Same block, merged against its own file |
 | `.claude/settings.json` | keel writes, team commits | `init` | Claude | Written only when `claude` is in the set |
 | `.claude/settings.local.json` | per developer, git-ignored | `init` | Claude | Same |
@@ -589,7 +589,7 @@ untracked `.codex/` is one developer's local state and must not silently change 
 claims for everybody.
 
 **`AGENTS.md` is deliberately not a signal, and this is the trap worth naming.** keel has dual
-written it since long before Codex was supported (`bin/keel:648-649`), so every existing keel
+written it since long before Codex was supported (`bin/keel` at v0.26.0), so every existing keel
 repository has one; Cursor, Copilot CLI and Gemini CLI read it too. Treating it as evidence of Codex
 would mark the entire installed base as Codex-serving in a single upgrade, and would then warn every
 one of them that their `hard_block_paths` is unenforced. It is the single most available signal and
@@ -609,7 +609,7 @@ there is no migration step: the default and the upgrade path are one rule.
 It must be a set because the case that decides it is real: a team where some people use Claude Code
 and some use Codex, on one repository. A switch would make that repository's configuration a running
 argument between two developers' last `init`. The precedent is already in the tree, since `keel
-init` dual-writes `CLAUDE.md` and `AGENTS.md` today (`bin/keel:648-649`) for exactly this reason.
+init` dual-writes `CLAUDE.md` and `AGENTS.md` today (`bin/keel` at v0.26.0) for exactly this reason.
 
 The consequence is the hard part, and it is carried in 6.1, 7 and 8: **a guarantee is a property of
 `(repository, harness)`, never of a repository alone.** Every place keel currently states a

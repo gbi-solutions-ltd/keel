@@ -441,6 +441,15 @@ harness_version_ge 2.1.302 2.1.302 \
   && ok "versions compare numerically: 2.1.302 is at or above itself" \
   || bad "versions compare numerically: 2.1.302 is at or above itself" "returned non-zero"
 
+# A field with a leading zero is a decimal number. Read as octal, 09 and 08 are arithmetic errors,
+# which return 1 with bash's message on stderr, and 010 is 8, so each goes wrong without the 10#.
+for pair in "2.1.10 2.1.09" "2.1.08 2.1.7" "2.1.010 2.1.9"; do
+    out="$(harness_version_ge "${pair% *}" "${pair#* }" 2>&1)"; rc=$?
+    [ "$rc" -eq 0 ] && [ -z "$out" ] \
+      && ok "a leading zero is decimal: $pair compares at or above, silently" \
+      || bad "a leading zero is decimal: $pair compares at or above, silently" "rc=$rc out: $out"
+done
+
 # The regression pin, like the five gates above: a row that raises it is a row that changed what
 # keel needs, and this is where that shows. validated_word_ceiling is at 2.1.302 too and has no
 # requires row, so it is pretooluse_agent_type, which review-guard requires, that sets it.
@@ -470,6 +479,11 @@ got="$(min_of 'provides|claude|p1|src|2.1.99|2026-01-01\nprovides|claude|p2|src|
 [ "$got" = 2.1.99 ] \
   && ok "the minimum is derived from the ledger: a required row with a blank version is ignored" \
   || bad "the minimum is derived from the ledger: a required row with a blank version is ignored" "got: ${got:-<empty>}"
+# A seven-field row is malformed, and malformed is absent evidence: it sets no minimum.
+got="$(min_of "${mv_base}provides|claude|p2|src|2.1.500|2026-01-01|extra\n")"
+[ "$got" = 2.1.296 ] \
+  && ok "the minimum is derived from the ledger: a seven-field row is ignored" \
+  || bad "the minimum is derived from the ledger: a seven-field row is ignored" "got: ${got:-<empty>}"
 got="$(min_of "${mv_base}provides|ghost|p2|src|2.1.400|2026-01-01\n")"
 [ "$got" = 2.1.296 ] \
   && ok "the minimum is derived from the ledger: only claude rows count" \

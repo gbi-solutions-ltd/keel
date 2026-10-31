@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | accepted |
+| Status | accepted, amended by ADR-0015 (proposed) |
 | Date | 2026-10-29 |
 | Deciders | Bernard Tebandeke, accepted 2026-10-29 |
 | Requirements | None written. Driver is the request recorded in [`docs/architecture/claude-code-only.md`](../architecture/claude-code-only.md) |

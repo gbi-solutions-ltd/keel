@@ -15,6 +15,8 @@ pass=0
 fail=0
 
 # A repository with a profile, one sensitive path declared, and git configured enough to commit.
+# The profile is committed, because a commit staging it asks for that reason alone, which would
+# hide whatever a case stages after it.
 fixture() {
     local root="$1" paths="$2"
     mkdir -p "$root/.keel" "$root/src/auth" "$root/src/ui"
@@ -23,6 +25,7 @@ fixture() {
     git -C "$root" config user.name Test
     printf '{\n  "project": {"name": "t"},\n  "hard_block_paths": [%s]\n}\n' "$paths" \
       > "$root/.keel/profile.json"
+    git -C "$root" add .keel/profile.json; git -C "$root" commit -qm profile
 }
 
 # A PreToolUse event for a Bash call, the shape Claude Code sends. The command is JSON-escaped:
@@ -120,6 +123,27 @@ else printf '  FAIL  a cd the hook runs is guarded against CDPATH (%s cd, no CDP
 r="$(mktemp -d)"; fixture "$r" ''
 : > "$r/src/auth/token.go"; git -C "$r" add -A
 check "no hard_block_paths means no interference" "" "$r" "git commit -m x"
+rm -rf "$r"
+
+# Only the top-level list counts. A regex over the whole profile text read an empty list nested in
+# `_notes` as the repository declaring nothing, so one note turned the guard off (audit M-01).
+nested='{"project":{"name":"t"},"hard_block_paths":["auth"],"_notes":{"hard_block_paths":[]}}'
+r="$(mktemp -d)"; fixture "$r" ''
+printf '%s\n' "$nested" > "$r/.keel/profile.json"; git -C "$r" commit -qam nested
+mkdir -p "$r/auth"; : > "$r/auth/x"; git -C "$r" add -A
+check "an empty list nested under another key does not turn the guard off" ask "$r" "git commit -m x"
+rm -rf "$r"
+
+# A commit that changes the profile can change the list that judges it, so it asks, and says why.
+r="$(mktemp -d)"; fixture "$r" '"auth"'
+: > "$r/src/ui/button.tsx"; git -C "$r" add -A; git -C "$r" commit -qm init
+printf '{"project": {"name": "t2"}, "hard_block_paths": ["auth"]}\n' > "$r/.keel/profile.json"
+git -C "$r" add .keel/profile.json
+out="$(event "git commit -m x" "$r" | ( cd "$r" && "$GUARD" ) 2>/dev/null)"
+if printf '%s' "$out" | grep -q '"permissionDecision": *"ask"' \
+   && printf '%s' "$out" | grep -q '\.keel/profile\.json'; then
+    printf '  PASS  a commit staging the profile asks, naming it\n'; pass=$((pass+1))
+else printf '  FAIL  a commit staging the profile asks, naming it (got: %s)\n' "${out:0:120}"; fail=$((fail+1)); fi
 rm -rf "$r"
 
 # The guard only concerns itself with committing. Blocking every edit to auth code would make the
@@ -354,6 +378,16 @@ if [ "$rc" -eq 0 ] && [ -z "$out" ]; then printf '  PASS  silent on codex when t
 else printf '  FAIL  silent on codex when the repo declares nothing (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
 rm -rf "$q"
 
+# And the same judgement on Codex: an empty list nested under another key is not the repository
+# declaring nothing, so the refusal still stands.
+q="$(mktemp -d)"; fixture "$q" ''
+printf '%s\n' "$nested" > "$q/.keel/profile.json"
+out="$(printf '%s' "$(event "git commit -m x" "$q")" | ( cd "$q" && env -u CLAUDE_PROJECT_DIR CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1 >/dev/null)"; rc=$?
+if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'keel v0\.26\.0'; then
+    printf '  PASS  on codex a nested empty list does not lift the refusal\n'; pass=$((pass+1))
+else printf '  FAIL  on codex a nested empty list does not lift the refusal (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
+rm -rf "$q"
+
 # PLACEMENT, from the other side. The refusal sits after the `git commit` filter because the
 # fail-closed python3 branch must not become a prompt on every Read and Grep, and the same argument
 # applies to a hard block: a Codex session running a command that is not a commit, in a repository
@@ -373,6 +407,16 @@ out="$(event "git commit -m x" "$r" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u 
 if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q '"permissionDecision": *"ask"'; then
     printf '  PASS  a Claude Code event with neither signal still gets the ask and exit 0\n'; pass=$((pass+1))
 else printf '  FAIL  a Claude Code event with neither signal still gets the ask and exit 0 (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
+
+# On Codex with no python3 the list cannot be parsed, and an unparsed declaration counts as
+# declared. The ask the Claude Code path gives here is one Codex discards, so it must refuse.
+# The shim carries bash and nothing else, as in the python3-absent case above.
+shim="$(mktemp -d)"; ln -s "$(command -v bash)" "$shim/bash"
+out="$(printf '%s' "$ev" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR CODEX_VERSION=0.153.4 PATH="$shim" "$GUARD" ) 2>&1 >/dev/null)"; rc=$?
+if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'keel v0\.26\.0'; then
+    printf '  PASS  on codex with python3 absent the commit is refused, not asked\n'; pass=$((pass+1))
+else printf '  FAIL  on codex with python3 absent the commit is refused, not asked (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
+rm -rf "$shim"
 rm -rf "$r"
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
