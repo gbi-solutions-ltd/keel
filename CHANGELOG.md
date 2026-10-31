@@ -92,8 +92,11 @@ Entries are terse by design; the narrative for each release is in this file's gi
   backslash, tab, newline or other escaped character and the key appears once, so a
   `git -C . diff` whose description names a commit then exits in silence. Otherwise the whole event
   is matched, description included, and a non-commit it lets past, such as that diff with a quoted
-  argument, is asked on Claude Code only when the staged-profile or unreadable-profile ask fires,
-  and refused on Codex.
+  argument, is asked on Claude Code wherever a commit would be for a reason other than its paths:
+  python3 absent; a profile the hook cannot use (unreadable, unparseable, not a JSON object, or with
+  a `hard_block_paths` that is not a list of strings); git that cannot run or a failing `git diff`;
+  and a staged profile. On Codex the refusal stands in for each, and also fires on any
+  `hard_block_paths` that is not empty.
 - `hooks/done-guard` warns on a transcript whose rows parse and none has a Claude Code shape,
   saying the turn was not checked. It read such a transcript as a clean turn and said nothing.
 

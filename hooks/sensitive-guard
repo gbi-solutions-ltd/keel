@@ -64,8 +64,11 @@ event="$(</dev/stdin)"
 # key is matched with its quotes and colon, as the cwd is below, so a description naming it does not
 # match. What the pattern still lets past is a command with a git global option and, later in the
 # same command text, the word `commit`, such as `git -c x=y log --grep commit`. The token walk below
-# reads that as no commit, but the staged-profile ask, the unreadable-profile ask and the Codex
-# refusal do not wait for the walk, so they fire on it.
+# reads that as no commit, but every ask that does not depend on the walk finding a commit fires on
+# it as it would on a commit: python3 absent; a profile the guard cannot use (unreadable,
+# unparseable, not a JSON object, or with a `hard_block_paths` that is not a list of strings); git
+# that cannot run or a failing `git diff`; and a staged profile. On Codex the refusal stands in for
+# each of them, and also fires on any `hard_block_paths` that is not empty.
 cmd_re='"command"[[:space:]]*:[[:space:]]*"([^"\]*)"'
 twice_re='"command"[[:space:]]*:.*"command"[[:space:]]*:'
 text="$event"

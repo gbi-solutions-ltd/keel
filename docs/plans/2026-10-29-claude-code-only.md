@@ -2407,7 +2407,7 @@ off the `while :; do` loop it held. No shipped logic changes.
 **Done when:** `tests/test-sensitive-guard.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 17c.1: Make the change**
+- [x] **Step 17c.1: Make the change**
 
 No test: behaviour 1 is prose checked by the reviewer against the code, and behaviour 2 is a
 citation checked by content. Edit comment lines only in the hook; lines 1 to 36 do not change.
@@ -2417,7 +2417,7 @@ Expected: PASS, OK, OK.
 Run: `tests/run-tests.sh`.
 Expected: PASS. This is the one boundary run the task schedules.
 
-- [ ] **Step 17c.2: Hand over**
+- [x] **Step 17c.2: Hand over** Note: rounds: 3; routing: inherit; loop: full; spec DEVIATES on one missing clause (a profile that is not a JSON object), fixed on top as prose rather than discarded; quality review found the comment's scope clause false both ways, and a wording pass fixed it and regrouped both lists, checked against the code
 
 ```bash
 git add hooks/sensitive-guard CHANGELOG.md docs/ideas/keel-on-codex.md
