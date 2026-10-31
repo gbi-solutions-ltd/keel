@@ -1828,6 +1828,33 @@ The same review found that two of task 12's cases cannot fail, and one global op
    546bd41 asked on them), the fifth and sixth print nothing on Codex (HEAD refused them), and `cat
    docs/git commit` asks. Added 2026-10-31 from the third attempt's quality review; Bernard chose
    that the walk fails toward asking, and that this behaviour is fixed on top of that attempt.
+9. What the walk cannot read between `git` and `commit` fails toward asking too, and the git and
+   value rules of behaviour 8 are made consistent. Among git's global options, a token the walk
+   cannot read (one holding `$` or a backtick, or a `(` from a substitution) does not end the
+   skip: the walk scans on within the same command, stopping at an operator holding `;`, `|` or
+   `&`, and if it meets a bare `commit` it reads the command as a commit and widens the check. So
+   `git -C $(pwd) log --grep commit` asks, an over-ask this behaviour accepts. A token is git when
+   it is `git`, or when it ends in `/git` and stands first in its command (at the start or after
+   an operator), so a relative or home path to git is git and a path to git given to another
+   command is not. The value of a known value option never widens, whether written separately or
+   attached (`--author="$NAME"` as `--author "$NAME"`); a token holding `$` or a backtick that is
+   not an option's value is read as a pathspec, which widens as any pathspec does; the CHANGELOG
+   entry and the hook's comments say exactly that. The comment above the exit trap states what is
+   true: the trap asks, and on Codex the Python's failures are refused further down, while a
+   failure in the bash part still reaches the trap's ask. `CHANGELOG.md:35`'s "any other
+   unexpected exit asks" says "on Claude Code", reworded within its line. Examples, with
+   `src/auth/t.go` staged, asking on Claude Code and exiting 2 with `v0.26.0` on Codex: `git -c
+   core.hooksPath=$(mktemp -d) commit -m x`, `git -C $(pwd) commit -m x`, `git
+   --git-dir=$(pwd)/.git commit -m x`, `git -C <(true) commit -m x`, `~/bin/git commit -m x` and
+   `./git commit -m x`. With `src/auth/t.go` staged, `cat docs/git commit` and `cat /usr/bin/git
+   commit` print nothing on Claude Code and exit 0 on Codex. In the fixture of behaviour 7, `git
+   commit --author="$NAME" -m x` prints nothing and `git commit -m x $FILES` asks naming
+   `src/auth/t.go`. Before the change the first six print nothing on both harnesses (HEAD at
+   546bd41 asked on Claude Code and refused on Codex for the first five), `cat /usr/bin/git commit`
+   asks, and `--author="$NAME"` asks. Added 2026-10-31 from the quality review after behaviour 8's
+   fix pass. Bernard chose one more fix pass on top, and that if the next quality review still
+   finds a blocking item this task is dropped, its staged work discarded and its findings recorded
+   as follow-ups.
 
 **Done when:** `tests/test-sensitive-guard.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
@@ -2084,7 +2111,10 @@ commit.** The coordinator commits after both review passes, with
   review found a blocking regression in code (an unquoted substitution ended the walk), which the
   full loop would discard. After three rejections of hand-written shell parsing, Bernard chose to
   keep the attempt, change the rule so the walk fails toward asking (behaviour 8), and run both
-  review passes again. This is a one-off, not the standing citation rule below.
+  review passes again. This is a one-off, not the standing citation rule below. The review after
+  that fix found another blocking item (a substitution among git's global options); Bernard chose
+  a second fix pass on top (behaviour 9), and that a blocking item in the review after it drops
+  task 12c.
 - **A deviation that is only about citation repair is fixed on top, not discarded.** Bernard
   decided on 2026-10-31, after tasks 12 and 13 each returned DEVIATES on citations alone while
   their code and tests complied, that for the rest of this run such an attempt is kept, a fix pass
