@@ -2206,6 +2206,107 @@ Stage those paths and each file whose citation this task repaired, by name, and 
 commit.** The coordinator commits after both review passes, with
 `git commit -s -m "fix(doctor): write the shared version file only when it is doctor's own"`.
 
+### Task 17: close what the final review found
+
+Added by the coordinator on 2026-10-31, Bernard's decision, from `review-code` over
+`c93081c..7caedf1`: its rubric pass and the `/code-review` plugin. Bernard chose to fix all three
+blocking and all three should-fix findings before shipping. Behaviours 1, 3, 5 and 6 add tests and
+change no shipped logic; behaviour 2 changes doctor; behaviour 4 narrows `sensitive-guard`'s bash
+prefilter and corrects its comment, and changes nothing in the Python walk.
+
+**Story:** G1, G2, ADR-0013, ADR-0014, ADR-0015
+**Files:**
+- Modify: `bin/keel`
+- Modify: `hooks/sensitive-guard`
+- Modify: `CHANGELOG.md` (the Unreleased lines on the version check and on `hooks/sensitive-guard`)
+- Test: `tests/test-done-guard.sh`, `tests/test-keel-4.sh`, `tests/test-sensitive-guard.sh`,
+  `tests/test-harness-resolve.sh`
+
+**Interfaces:**
+- Consumes: task 13's shape rule in `hooks/done-guard`, task 16b's read of
+  `KEEL_CLAUDE_VERSION_FILE`, task 12's start directory and prefilter in `hooks/sensitive-guard`,
+  and `harness_provides` in `lib/harness/resolve.sh`
+- Produces: nothing new. `matches` in the hook is unchanged, because `tests/test-plan.sh` cuts it
+  out of the hook.
+
+**Depends on:** task 16b
+
+**Behaviours:**
+
+1. `done-guard`'s shape rule is tested on each of its sides. A row is Claude Code's when its
+   `message` is an object or its `type` is `user`, `assistant` or `summary`, either alone.
+   Examples, each under `gates.done_verified` `required` with `verify.test` set: a transcript of
+   `{"type":"event"}` then `{"type":"summary","summary":"x"}` prints nothing and exits 0; a
+   transcript of `{"type":"event"}` then `{"message":{"role":"user","content":"x"}}` prints nothing
+   and exits 0. These hold today and pass on arrival; prove they bite on a scratch copy whose rule
+   joins the two sides with `and`, and watch both warn.
+2. Doctor uses a line from the version file only when the line holds a `|`. A line with no `|` is
+   not doctor's own, so it is left as it was and doctor asks Claude Code, as task 16b's behaviour 1
+   says of any other shape. Example: a file holding keel's minimum with no `|`, `KEEL_CLAUDE` a
+   stub printing keel's minimum and counting its calls: one ask, the file byte-for-byte unchanged,
+   the ok line, exit 0. A file holding `0.26.0` asks once and gives no `WARN` naming `0.26.0`.
+   Before the change both ask nothing and use the line.
+3. `sensitive-guard`'s start directory and its two git calls are tested where a wrong directory
+   gives a different answer, not a "`git diff` failed" ask. Two repositories: A, whose committed
+   profile lists `src/auth` with `src/auth/t.go` staged, and B, with no profile and nothing staged.
+   Examples, the hook run from inside B: an event whose `cwd` is A asks naming `src/auth/t.go`; an
+   event whose `cwd` is A, with `CLAUDE_PROJECT_DIR` set to B, asks naming it; and with A's
+   working-tree profile deleted so only the profile committed at `HEAD` declares the path, an event
+   whose `cwd` is A asks naming it. These hold today; prove they bite on three scratch copies of the
+   hook, one each: `CLAUDE_PROJECT_DIR` read before the event's `cwd`, `git -C "$dir" show` written
+   `git show`, and the `git diff` call without its `cwd=`. Each fails at least one case.
+4. The bash prefilter reads the command, not the whole event. The commit pattern is matched against
+   the event's `"command"` value; where no `"command"` value can be read from the event, it is
+   matched against the whole event, as today, so a malformed event still fails toward the walk. The
+   comment above the pattern states what the pattern still lets past: a command with a git global
+   option and, later in the same command text, the word `commit`, on which the staged-profile ask,
+   the unreadable-profile ask and the Codex refusal fire. Examples, in a repository with
+   `.keel/profile.json` staged: the command `git -C . diff --cached --stat` with the description
+   `Show the staged diff before commit` prints nothing on Claude Code and exits 0 on Codex
+   (`CODEX_VERSION` set, `CLAUDE_PROJECT_DIR` unset); `git -C . commit -m x` with the same
+   description still asks naming the profile, and exits 2 with `v0.26.0` on Codex. Before the
+   change the first asks, and exits 2 on Codex.
+5. The `hard_block_paths` shape cases assert their reason. The three Claude Code cases of task 12's
+   behaviour 5 (`"src/auth"`, `{"src/auth": true}`, `["src/auth", 1]`) check that the ask's reason
+   says `not a list of strings`, not only that an ask was printed. Prove it bites on a scratch copy
+   without the `all(isinstance(p, str) ...)` clause: the `["src/auth", 1]` case then gets the
+   crash trap's ask and fails.
+6. The evidence rule is tested on a `claude` row. `harness_provides` on a manifest whose only row
+   is `provides|claude|p|<source>|<version>|<date>` with any one of source, version and date blank
+   grants nothing, one case for each blank field. Prove it bites on a scratch copy of
+   `lib/harness/resolve.sh` with `[ "$f2" = claude ] && return 0` before the evidence checks in
+   `harness_provides`.
+
+**Done when:** `tests/test-done-guard.sh`, `tests/test-keel-4.sh`, `tests/test-sensitive-guard.sh`
+and `tests/test-harness-resolve.sh` pass, and `tests/validate-citations.sh` and
+`tests/validate-skills.sh` report OK.
+
+- [ ] **Step 17.1: Build it test first**
+
+Follow `keel:tdd` for behaviours 2 and 4: write each case from its examples and watch it fail for
+the reason named, then implement. Behaviours 1, 3, 5 and 6 hold today: write their cases and prove
+each bites on the scratch copies they name.
+Run: `tests/test-keel-4.sh`, then `tests/test-sensitive-guard.sh`, `tests/test-done-guard.sh` and
+`tests/test-harness-resolve.sh`
+Expected before: FAIL, behaviour 2's line with no `|` asks nothing, and behaviour 4's description
+case asks. Expected after: PASS. Quote the failing output in your report.
+
+Run: `tests/run-tests.sh`.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+This is the one boundary run the task schedules.
+
+- [ ] **Step 17.2: Hand over**
+
+```bash
+git add bin/keel hooks/sensitive-guard CHANGELOG.md tests/test-done-guard.sh \
+        tests/test-keel-4.sh tests/test-sensitive-guard.sh tests/test-harness-resolve.sh
+git status --porcelain
+```
+
+Stage those paths and each file whose citation this task repaired, by name, and stop. **Do not
+commit.** The coordinator commits after both review passes, with
+`git commit -s -m "fix(review): close the final review's findings on doctor and the guards"`.
+
 ## Notes for the coordinator
 
 - **The minimum is 2.1.302, not 2.1.295.** The idea record proposed 2.1.295 because `onFailure`
