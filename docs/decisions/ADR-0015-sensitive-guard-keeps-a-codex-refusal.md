@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| Status | proposed |
+| Status | accepted |
 | Date | 2026-10-30 |
-| Deciders | Bernard Tebandeke, decisions of 2026-10-30; this record awaits acceptance |
+| Deciders | Bernard Tebandeke, decisions of 2026-10-30, accepted 2026-10-31 |
 | Requirements | None written. Driver is [`docs/architecture/claude-code-only.md`](../architecture/claude-code-only.md), section 7 |
 | Amends | [ADR-0013](ADR-0013-claude-code-is-the-only-harness.md) |
 
