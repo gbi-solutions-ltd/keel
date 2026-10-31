@@ -146,6 +146,59 @@ if printf '%s' "$out" | grep -q '"permissionDecision": *"ask"' \
 else printf '  FAIL  a commit staging the profile asks, naming it (got: %s)\n' "${out:0:120}"; fail=$((fail+1)); fi
 rm -rf "$r"
 
+# A commit that empties, removes or breaks the list is asked, whatever the working-tree profile now
+# says. Judged by that profile alone, each of these exited in silence, and the next commit to a
+# sensitive path went unguarded.
+for body in '{"project": {"name": "t"}, "hard_block_paths": []}' '{"project": {"name": "t"}}' \
+            '{"project": {"name": "t"},}' '{"hard_block_paths": [],}'; do
+    r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+    printf '%s\n' "$body" > "$r/.keel/profile.json"; git -C "$r" add .keel/profile.json
+    out="$(event "git commit -m x" "$r" | ( cd "$r" && "$GUARD" ) 2>/dev/null)"
+    if printf '%s' "$out" | grep -q '"permissionDecision": *"ask"' \
+       && printf '%s' "$out" | grep -q '\.keel/profile\.json'; then
+        printf '  PASS  staging %s asks, naming the profile\n' "$body"; pass=$((pass+1))
+    else printf '  FAIL  staging %s asks, naming the profile (got: %s)\n' "$body" "${out:0:120}"; fail=$((fail+1)); fi
+    rm -rf "$r"
+done
+
+# The list a commit is judged by includes the committed one, so emptying it in the working tree
+# without staging it does not lift the gate.
+r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+printf '{"project": {"name": "t"}, "hard_block_paths": []}\n' > "$r/.keel/profile.json"
+: > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+check "the committed list still judges a commit when the working tree empties it" ask "$r" "git commit -m x"
+rm -rf "$r"
+
+# With no working-tree profile left, the committed one still judges. Staging its deletion is staging
+# the profile, and deleting it without staging that does not lift the gate either.
+r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+git -C "$r" rm -q .keel/profile.json
+out="$(event "git commit -m x" "$r" | ( cd "$r" && "$GUARD" ) 2>/dev/null)"
+if printf '%s' "$out" | grep -q '"permissionDecision": *"ask"' \
+   && printf '%s' "$out" | grep -q '\.keel/profile\.json'; then
+    printf '  PASS  staging the profile deletion asks, naming the profile\n'; pass=$((pass+1))
+else printf '  FAIL  staging the profile deletion asks, naming the profile (got: %s)\n' "${out:0:120}"; fail=$((fail+1)); fi
+rm -rf "$r"
+
+r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+rm "$r/.keel/profile.json"; : > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+check "the committed list still judges a commit when the working-tree profile is deleted" ask "$r" "git commit -m x"
+rm -rf "$r"
+
+# A repository that declares nothing anywhere, neither at HEAD nor in the working tree, is never
+# asked, including when the commit changes its profile.
+r="$(mktemp -d)"; fixture "$r" ''
+printf '{"project": {"name": "t"}}\n' > "$r/.keel/profile.json"; git -C "$r" commit -qam none
+: > "$r/src/auth/token.go"; git -C "$r" add src/auth/token.go
+ev="$(event "git commit -m x" "$r")"
+out="$( cd "$r" && "$GUARD" <<<"$ev" 2>&1 )"; rc=$?     # no pipe, so rc is the hook's own
+if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+    printf '  PASS  a repository declaring nothing anywhere is not asked\n'; pass=$((pass+1))
+else printf '  FAIL  a repository declaring nothing anywhere is not asked (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
+printf '{"project": {"name": "t2"}}\n' > "$r/.keel/profile.json"; git -C "$r" add .keel/profile.json
+check "a profile change in a repository declaring nothing anywhere is not asked" "" "$r" "git commit -m x"
+rm -rf "$r"
+
 # The guard only concerns itself with committing. Blocking every edit to auth code would make the
 # gate the thing people remove.
 r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'

@@ -13,8 +13,8 @@
 # bypassPermissions, which `lib/harness/claude.sh#Verified against a live session rather than taken from the documentation` records as verified against a live session, and which is
 # what makes it worth anything at all.
 #
-# SILENT UNLESS THE REPOSITORY ASKS FOR IT. A profile with no `hard_block_paths` costs one builtin
-# string match and produces no output, which is almost every repository.
+# SILENT UNLESS THE REPOSITORY ASKS FOR IT. A command that is not a commit costs one builtin match,
+# and a commit where neither profile at HEAD nor in the tree declares a path produces no output.
 #
 # IT ASKS WHENEVER IT CANNOT ANSWER. An unreadable profile, an unparseable one, an absent python3, a
 # git that will not run: each of those used to exit 0 in silence, which is the one outcome a gate
@@ -43,6 +43,17 @@ ask() {
 # further down; any other unexpected exit asks.
 trap 'case $? in 0|2) ;; *) ask "the guard failed unexpectedly, so it cannot tell whether this commit touches a sensitive path. Approving is a human decision." ;; esac' EXIT
 
+event="$(</dev/stdin)"
+
+# This filter runs before anything can fail closed, and before any external command. Without it, a
+# machine with no python3 would get a permission prompt on every Bash command, which is how a gate
+# gets deleted. There is no tool_name check here: the "Bash" matcher on this hook in hooks.json
+# already guarantees that.
+case "$event" in
+    *'git commit'*) ;;
+    *) exit 0 ;;
+esac
+
 # Walk up for the profile, the way git looks for .git. A session started in a subdirectory is
 # ordinary, and looking only in the current directory meant the guard silently did not exist there.
 PROFILE=""
@@ -52,24 +63,22 @@ while [ -n "$d" ]; do
     [ "$d" = "/" ] && break
     d="$(dirname "$d")"
 done
-[ -n "$PROFILE" ] || exit 0
 
-# The cheap gate, deliberately with no external command. `grep ... || exit 0` cannot tell "no match"
-# from "grep is not on PATH", so it fails open in exactly the situation where a guard must not.
-# Builtins cannot go missing.
-profile_text="$(<"$PROFILE")"
-case "$profile_text" in
+# The committed profile judges the commit beside the working-tree one. Judged by the working tree
+# alone, a commit that emptied or removed the list was judged by the list it removed, so it went
+# through in silence and the next commit to a sensitive path was unguarded. That holds with no
+# working-tree profile at all: a deleted one, staged or not, is still judged by the list at HEAD.
+# `HEAD:path` is root-relative from any subdirectory, so no root lookup is needed. A first commit
+# has no HEAD, and a failed `git show` reads the same way: nothing committed to add.
+profile_text=""
+[ -n "$PROFILE" ] && profile_text="$(<"$PROFILE")"
+head_text="$(git show HEAD:.keel/profile.json 2>/dev/null)"
+
+# The cheap gate, a builtin match. `grep ... || exit 0` cannot tell "no match" from "grep is not on
+# PATH", so it fails open in exactly the situation where a guard must not. Builtins cannot go
+# missing.
+case "$profile_text$head_text" in
     *'"hard_block_paths"'*) ;;
-    *) exit 0 ;;
-esac
-
-event="$(</dev/stdin)"
-
-# This filter runs before anything can fail closed. Without it, a machine with no python3 would get
-# a permission prompt on every Bash command, which is how a gate gets deleted. There is no tool_name
-# check here: the "Bash" matcher on this hook in hooks.json already guarantees that.
-case "$event" in
-    *'git commit'*) ;;
     *) exit 0 ;;
 esac
 
@@ -79,9 +88,10 @@ esac
 # Exiting 0 there would leave a repository that declared sensitive paths believing it had a gate, so
 # the hook refuses the commit and names the last keel release that supports Codex.
 #
-# PLACEMENT. It sits after the cheap gate and the commit filter, and refuses only when the parsed
-# profile's top-level hard_block_paths is non-empty, the profile will not parse, or python3 is
-# absent to parse it, so a repository declaring nothing is never blocked on a machine with python3.
+# PLACEMENT. It sits after the commit filter and the cheap gate, and refuses only when the top-level
+# hard_block_paths of the committed or the working-tree profile is non-empty, either will not parse,
+# or python3 is absent to parse them, so a repository declaring nothing is never blocked on a
+# machine with python3.
 # Any earlier and it would block Bash calls in repositories that asked for nothing, which breaks
 # the header's rule: silent unless the repository asks for it. The
 # judgement is a parse and not a regex over the text, because a regex matched an empty list nested
@@ -126,13 +136,14 @@ if ! command -v python3 >/dev/null 2>&1; then
     ask "this repository declares hard_block_paths and python3 is absent, so the guard cannot tell whether this commit touches one. Approving is a human decision."
 fi
 
-if [ -n "$codex" ] && ! KEEL_PROFILE_TEXT="$profile_text" python3 -c '
+if [ -n "$codex" ] && ! KEEL_PROFILE_TEXT="$profile_text" KEEL_HEAD_PROFILE_TEXT="$head_text" python3 -c '
 import json, os, sys
-sys.exit(1 if json.loads(os.environ["KEEL_PROFILE_TEXT"]).get("hard_block_paths") else 0)' 2>/dev/null; then
+texts = [os.environ[k] for k in ("KEEL_PROFILE_TEXT", "KEEL_HEAD_PROFILE_TEXT") if os.environ[k]]
+sys.exit(1 if any(json.loads(t).get("hard_block_paths") for t in texts) else 0)' 2>/dev/null; then
     refuse
 fi
 
-KEEL_EVENT="$event" KEEL_PROFILE_TEXT="$profile_text" python3 - <<'PY'
+KEEL_EVENT="$event" KEEL_PROFILE_TEXT="$profile_text" KEEL_HEAD_PROFILE_TEXT="$head_text" python3 - <<'PY'
 import json, os, shlex, subprocess, sys
 from fnmatch import fnmatch
 
@@ -144,23 +155,29 @@ def emit(reason):
     }}))
     sys.exit(0)
 
+# The list is the union of the working-tree and the committed profile, which bash already read for
+# the cheap gate and passes in so neither is read twice. A profile said hard_block_paths, so one
+# that will not parse is a declared gate with no enforcement behind it, which is the case this hook
+# exists to prevent: it asks, below, once a staged profile has had the chance to be named. An empty
+# union is a repository declaring nothing anywhere, which is never asked.
+patterns, unreadable = [], False
+for text in (os.environ.get("KEEL_PROFILE_TEXT"), os.environ.get("KEEL_HEAD_PROFILE_TEXT")):
+    if not text:
+        continue
+    try:
+        patterns += json.loads(text).get("hard_block_paths") or []
+    except ValueError:
+        unreadable = True
+if not patterns and not unreadable:
+    sys.exit(0)
+
+# An event that is not JSON leaves no command to read flags from, but the bash filter said it looks
+# like a commit, so the profile check below still runs.
 try:
     ev = json.loads(os.environ.get("KEEL_EVENT") or "{}")
 except ValueError:
-    sys.exit(0)          # not our event shape; the bash filters already said this looks like a commit
+    ev = {}
 cmd = ((ev.get("tool_input") or {}).get("command") or "")
-
-# The profile said hard_block_paths, so a profile that will not parse is a declared gate with no
-# enforcement behind it. That is the case this hook exists to prevent, so it asks. The text was
-# already read once in bash to run the cheap gate above; KEEL_PROFILE_TEXT carries it here so this
-# does not open the file a second time for the same read.
-try:
-    patterns = json.loads(os.environ.get("KEEL_PROFILE_TEXT") or "").get("hard_block_paths") or []
-except ValueError:
-    emit("this repository declares hard_block_paths but its profile could not be read. The guard "
-         "cannot tell whether this commit touches a sensitive path. Approving is a human decision.")
-if not patterns:
-    sys.exit(0)
 
 # shlex, not a regex, so a message cannot look like a flag. `git commit -m "fix the -a flag"` must
 # not widen the check, and `git commit -am"msg"` must.
@@ -181,15 +198,14 @@ for i, t in enumerate(tokens):
             break
     if start is not None:
         break
-if start is None:
-    sys.exit(0)
 
 # Options that swallow the next token, so their value is never mistaken for a pathspec.
 VALUE_OPTS = {"-m", "--message", "-F", "--file", "-C", "--reuse-message", "-c", "--reedit-message",
               "--author", "--date", "-S", "--gpg-sign", "--cleanup", "-t", "--template",
               "--fixup", "--squash", "--trailer"}
 
-rest, pathspecs, widen, i = tokens[start:], [], False, 0
+# No `git commit` among the tokens leaves no flags and no pathspec, and no path check below.
+rest, pathspecs, widen, i = (tokens[start:] if start is not None else []), [], False, 0
 while i < len(rest):
     t = rest[i]
     if t == "--":
@@ -237,7 +253,7 @@ def matches(f, p):
     p = p.rstrip("/")
     return fnmatch(f, p) or fnmatch(f, p + "/*")
 
-hit = sorted({f for f in changed for p in patterns if matches(f, p)})
+hit = sorted({f for f in changed for p in patterns if matches(f, p)}) if start is not None else []
 if hit:
     shown = ", ".join(hit[:5]) + (" and %d more" % (len(hit) - 5) if len(hit) > 5 else "")
     emit("this commit includes %d file(s) under hard_block_paths: %s. Decision 3 makes this the one "
@@ -246,8 +262,12 @@ if hit:
          % (len(hit), shown))
 
 # The profile holds the list that judges this commit, so a commit changing it could change what
-# the gate covers without touching a declared path. Root-relative, as the patterns are.
+# the gate covers without touching a declared path. Root-relative, as the patterns are. It runs
+# before the unreadable ask, so a staged profile that will not parse is named as the profile.
 if ".keel/profile.json" in changed:
     emit("this commit changes .keel/profile.json, which holds the hard_block_paths list this gate "
          "judges commits by. Approving is a human decision.")
+if unreadable:
+    emit("this repository declares hard_block_paths but its profile could not be read. The guard "
+         "cannot tell whether this commit touches a sensitive path. Approving is a human decision.")
 PY
