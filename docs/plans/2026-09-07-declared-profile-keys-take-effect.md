@@ -872,10 +872,10 @@ row = re.compile("^\\| \x60([^\x60]+)\x60 \\| [^|]* \\| [^|]* \\| [^|]* \\| (.*)
 ```
 
 **Add three `CLAIMS` entries in `tests/generate-profile-keys.sh#print("# Profile keys")`.** The new column prints
-citations, and three of them name gate vocabulary that `tests/test-harness-claims.sh:214` scans for
+citations, and three of them name gate vocabulary that `tests/test-harness-claims.sh:232` scans for
 in any depth-1 `docs/*.md`, which `docs/profile-keys.md` is. `gates.done_verified` and
 `hard_block_paths` are already safe because their rows carry a tag and `untagged_claims` skips a
-line that has one (`:226`). These three are not:
+line that has one (`:244`). These three are not:
 
 ```python
     "conventions.response_style": ["gate=session-start harness=claude", "gate=session-start harness=codex"],

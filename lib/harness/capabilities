@@ -75,7 +75,7 @@
 # and leaves it out for the main session. hooks/review-guard cannot tell a keel reviewer from the
 # author without it, so it requires it.
 #
-# ADR-0003: a primitive with no source, version and date is treated as not provided. Absent
+# ADR-0014: a primitive with no source, version and date is treated as not provided. Absent
 # evidence fails, never passes. Do not add a row you have not checked.
 
 provides|claude|session_context_injection|vendor:code.claude.com/docs/en/hooks SessionStart additionalContext|2.1.261|2026-09-05

@@ -201,6 +201,19 @@ run "an invisible bidirectional character is rejected" 1 m_invisible
 m_orphan()   { printf '#!/bin/sh\necho hi\n' > "$1/hooks/extra-hook"; chmod +x "$1/hooks/extra-hook"; }
 run "a hook not registered in any manifest is rejected" 1 m_orphan
 
+# A second manifest beside hooks/hooks.json, such as one for Codex, which keel does not serve, is a
+# file the manifest does not name like any other. Skipping every hooks.*.json would let it back in
+# unseen, so the case checks the rule and the path in the output, not only the exit code.
+so_root="$(fixture)"
+printf '{}\n' > "$so_root/hooks/hooks.codex.json"
+so_out="$( cd "$so_root" && git add -A >/dev/null 2>&1; "$SCANNER" 2>&1 )"; so_rc=$?
+case "$so_rc:$so_out" in
+  1:*'hooks/hooks.codex.json [structural-orphan-hook]'*)
+    ok "a stray hooks/hooks.codex.json is reported as an orphan hook" ;;
+  *) bad "a stray hooks/hooks.codex.json is reported as an orphan hook" "exit $so_rc: $so_out" ;;
+esac
+rm -rf "$so_root"
+
 # ---- must NOT be rejected --------------------------------------------------
 #
 # Every one of these existed in the real tree when the scanner was written. A check stricter than

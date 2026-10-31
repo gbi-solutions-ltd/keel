@@ -181,12 +181,30 @@ fi
 # keel serves Claude Code alone (ADR-0013), so a claim marker naming another harness in a current
 # document claims something about a plugin that does not exist. The registry above refuses it once
 # the ledger holds no row for that harness; this names the leftover directly.
+codex_claims() {   # codex_claims <file>...
+    grep -l '<!-- keel:claim [^>]*harness=codex' "$@" 2>/dev/null
+}
+
 codex_tagged=""
 if [ "${#scoped[@]}" -gt 0 ]; then
-    codex_tagged="$(grep -l 'harness=codex' "${scoped[@]}" 2>/dev/null | tr '\n' ' ')"
+    codex_tagged="$(codex_claims "${scoped[@]}" | tr '\n' ' ')"
 fi
 [ -z "${codex_tagged// /}" ] && ok "no current document carries a harness=codex claim marker" \
   || bad "no current document carries a harness=codex claim marker" "$codex_tagged"
+
+# ...and it fires on a marker and on nothing else. Without the first case the check above passes
+# against a grep that matches nothing; without the second, prose that names the old marker reads as
+# a claim, and a check stricter than correct output teaches people to ignore it.
+xf="$(mktemp -d)"
+printf '<!-- keel:claim gate=session-start harness=codex -->\n' > "$xf/marker.md"
+printf 'the old marker said harness=codex\n' > "$xf/prose.md"
+[ -n "$(codex_claims "$xf/marker.md")" ] \
+  && ok "a harness=codex claim marker is reported" \
+  || bad "a harness=codex claim marker is reported" "not reported"
+[ -z "$(codex_claims "$xf/prose.md")" ] \
+  && ok "prose naming harness=codex is not reported as a claim marker" \
+  || bad "prose naming harness=codex is not reported as a claim marker" "reported"
+rm -rf "$xf"
 
 # ...and it fires, on the four shapes it has to catch. Without this the case above passes against a
 # predicate that never reports anything, and every document in the tree could claim whatever it

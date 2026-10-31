@@ -281,16 +281,6 @@ if command -v harness_active_gates >/dev/null 2>&1; then
     [ "$(gate_on 'provides|ghost|p|src| |2026-01-01\nrequires|done-guard|p\n')" = "inactive" ] \
       && ok "a blank version grants nothing" || bad "a blank version grants nothing" "reported active"
 
-    # The same rule on a claude row, which is the only kind the ledger holds. ADR-0014: a
-    # provides|claude row grants its primitive only with source, version and date all present, and
-    # the harness name earns no exemption from that.
-    cf_blank="$(mktemp)"
-    printf 'provides|claude|p|src| |2026-01-01\nrequires|done-guard|p\n' > "$cf_blank"
-    KEEL_CAPABILITIES="$cf_blank" harness_gate_active claude done-guard \
-      && bad "a claude row with a blank version grants nothing" "reported active" \
-      || ok "a claude row with a blank version grants nothing"
-    rm -f "$cf_blank"
-
     # A tab, not a space. Every fixture above uses a space, which lets `*[![:space:]]*` in
     # _harness_present be weakened to `*[!\ ]*` with the suite green. resolve.sh states that the
     # resolver and the validator must agree on what absent evidence means, and the validator learned

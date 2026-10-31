@@ -4,7 +4,7 @@
 # Pure bash on purpose. hooks/sensitive-guard sources this to decide whether it can do its job, and
 # a gate that needs python3 to know whether it is a gate has the dependency in the wrong place.
 #
-# ADR-0003: a provides row grants its primitive only when source, version and date are all present.
+# ADR-0014: a provides row grants its primitive only when source, version and date are all present.
 # Absent evidence fails, never passes. Three ways a row can be absent evidence while looking
 # populated, all of which resolved a gate ACTIVE in the first version of this file:
 #   - a field holding only spaces is blank, not empty, and [ -n ] accepts it

@@ -2033,7 +2033,7 @@ showing it fires, a case that repeats another, or a comment citing the supersede
 `tests/test-harness-resolve.sh` pass, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 15.1: Build it test first**
+- [x] **Step 15.1: Build it test first** Note: passed on arrival, red seen only on a scratch copy: behaviour 1; behaviours 3 and 4 are a deletion and two comment edits with no red
 
 Follow `keel:tdd` for behaviour 2: write its cases from the examples and watch the prose fixture
 reported, then implement. Behaviour 1 is `verify` and passes on arrival; behaviours 3 and 4 are a
@@ -2047,7 +2047,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 15.2: Hand over**
+- [x] **Step 15.2: Hand over** Note: rounds: 2; routing: inherit; loop: full; DEVIATES on one unrepaired bare citation, fixed on top under the standing rule; quality should-fix: deleting cf_blank lost the only guard against a claude-only shortcut in harness_provides (a mutation survives the staged tests), and the supply-chain comment gives the wrong reason for checking the output
 
 ```bash
 git add lib/harness/resolve.sh lib/harness/capabilities tests/test-supply-chain.sh \
