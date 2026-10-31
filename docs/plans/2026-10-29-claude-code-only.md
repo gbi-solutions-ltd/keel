@@ -2428,6 +2428,152 @@ Stage those paths and each file whose citation this task repaired, by name, and 
 commit.** The coordinator commits after both review passes, with
 `git commit -s -m "docs(sensitive-guard): name every ask that does not wait for the walk"`.
 
+### Task 18: close the small known gaps in doctor, the resolver and the records
+
+Added by the coordinator on 2026-10-31, Bernard's decision, from the known gaps PR #8's body lists.
+Each is small and none touches a hook.
+
+**Story:** G2, ADR-0014
+**Files:**
+- Modify: `bin/keel`
+- Modify: `lib/harness/resolve.sh`
+- Modify: `CHANGELOG.md` (the Unreleased line on the version check)
+- Modify: `docs/ideas/keel-on-codex.md` (the `hooks/sensitive-guard` row only)
+- Test: `tests/test-keel-4.sh`, `tests/test-harness-resolve.sh`, `tests/test-harness-claims.sh`
+
+**Interfaces:**
+- Consumes: task 16b's write of `KEEL_CLAUDE_VERSION_FILE`, `cc_kept` and `harness_version_ge`
+- Produces: nothing new
+
+**Depends on:** task 17c
+
+**Behaviours:**
+
+1. Doctor writes the version file by writing a temporary file in the same directory and renaming
+   it onto the path, after task 16b's checks, so a symlink planted at the path between the check
+   and the write is replaced rather than written through. If the temporary file cannot be made,
+   nothing is written. Every task 16 and 16b case still passes. Example: after doctor writes the
+   answer to an empty file, that file holds keel's minimum followed by `|`, is a regular file, and
+   the directory holds no other file. The race itself cannot be staged in a test, so the rename is
+   also checked by the reviewer reading the write.
+2. A version field longer than nine digits is not a version. `cc_kept` refuses it, so doctor asks
+   Claude Code, and `harness_version_ge` returns 1 on it without comparing. Examples:
+   `harness_version_ge 99999999999999999999.0 2` returns 1; `harness_version_ge 2
+   18446744073709551617` returns 1; `harness_version_ge 2.1.302 2.1.99` returns 0, as today; a
+   version file holding `18446744073709551617.0|` asks once. Before the change the first returns 0,
+   because the field wraps.
+3. The test comments that state the evidence rule cite ADR-0014, which holds it now, as
+   `lib/harness/resolve.sh` and `lib/harness/capabilities` do. Example: the comments at
+   `tests/test-harness-resolve.sh:41`, `:51`, `:60`, `:161` and `tests/test-harness-claims.sh:52`,
+   `:69` cite ADR-0014 for the rule, keeping ADR-0003 only where they mean that record itself.
+   Comment edits only, no line moved. This behaviour has no test.
+4. The `hooks/sensitive-guard` row of `docs/ideas/keel-on-codex.md` points at what emits. Its
+   `:37` and `:98-99` become phrase citations of the `ask()` function and the Python `emit`
+   function, which cannot drift, and its line count is marked as the hook's length when the record
+   was written. `tests/validate-citations.sh` reports OK. This behaviour has no test.
+
+**Done when:** `tests/test-keel-4.sh`, `tests/test-harness-resolve.sh` and
+`tests/test-harness-claims.sh` pass, and `tests/validate-citations.sh` and
+`tests/validate-skills.sh` report OK.
+
+- [ ] **Step 18.1: Build it test first**
+
+Follow `keel:tdd` for behaviour 2: write its cases and watch the first fail for the reason named,
+then implement. Behaviour 1's case passes on arrival; prove it bites on a scratch copy whose write
+leaves the temporary file behind. Behaviours 3 and 4 are prose.
+Run: `tests/test-harness-resolve.sh`, then `tests/test-keel-4.sh` and
+`tests/test-harness-claims.sh`
+Expected before: FAIL, behaviour 2's long field returns 0. Expected after: PASS. Quote the failing
+output in your report.
+
+Run: `tests/run-tests.sh`.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+This is the one boundary run the task schedules.
+
+- [ ] **Step 18.2: Hand over**
+
+```bash
+git add bin/keel lib/harness/resolve.sh CHANGELOG.md docs/ideas/keel-on-codex.md \
+        tests/test-keel-4.sh tests/test-harness-resolve.sh tests/test-harness-claims.sh
+git status --porcelain
+```
+
+Stage those paths and each file whose citation this task repaired, by name, and stop. **Do not
+commit.** The coordinator commits after both review passes, with
+`git commit -s -m "fix(doctor): rename the version file into place, and refuse an overlong version"`.
+
+### Task 19: the commit guard checks unstaged changes when a command stages before it commits
+
+Added by the coordinator on 2026-10-31, Bernard's decision, from the known gaps PR #8's body lists.
+`sensitive-guard` reads the staged set when the hook runs, before the command does. So in
+`git add -A && git commit -m x`, the usual way an agent commits, the files the `add` stages are not
+yet staged and the commit passes in silence. The same holds for `git commit -p` and
+`git commit --pathspec-from-file`, which commit what the guard cannot list. Each is handled the way
+`-a` already is: the check widens to every change against `HEAD`. No new shell parsing: the token
+walk already splits the command as it does today, and it fails toward asking. The other silent
+cases (`sh -c`, `eval`, `$(...)`, a commit in another repository) stay for a later plan.
+
+**Story:** G1, ADR-0015
+**Files:**
+- Modify: `hooks/sensitive-guard`
+- Modify: `CHANGELOG.md` (the Unreleased `hooks/sensitive-guard` entry)
+- Test: `tests/test-sensitive-guard.sh`
+
+**Interfaces:**
+- Consumes: the token walk's `widen` in `hooks/sensitive-guard`
+- Produces: nothing new. `matches` is unchanged, because `tests/test-plan.sh` cuts it out of the
+  hook.
+
+**Depends on:** task 18
+
+**Behaviours:**
+
+1. A command that also runs `git add`, `git rm` or `git mv` widens the check of the commit it holds,
+   wherever in the command that subcommand stands, because each stages changes the guard reads
+   before they are staged. A subcommand is found the way the walk finds `commit`: a `git` token,
+   then any global options, then the word. Examples, in a repository with a `HEAD`, a committed
+   profile listing `src/auth`, an unstaged change to the tracked `src/auth/t.go` and only
+   `src/ui/button.tsx` staged, each asking on Claude Code naming `src/auth/t.go`: `git add -A &&
+   git commit -m x`, `git add src/auth/t.go; git commit -m x`, `git rm src/auth/t.go && git commit
+   -m x`. `git add src/ui/button.tsx && git commit -m x` asks too, an over-ask this behaviour accepts
+   because the guard does not read which paths an `add` names. `git commit -m x` in the same
+   fixture prints nothing, as today. Before the change the first three print nothing.
+2. `-p` or `--patch`, and `--pathspec-from-file` (as `--pathspec-from-file=<f>` or with its value
+   separate), widen the check as `-a` does. A short flag group holding `p` widens, as one holding
+   `a` does; `--pathspec-from-file` takes the next token as its value when written separately.
+   Examples in the fixture of behaviour 1, each asking naming `src/auth/t.go`: `git commit -p -m
+   x`, `git commit --patch -m x`, `git commit --pathspec-from-file=list -m x`, `git commit
+   --pathspec-from-file list -m x`. Before the change each prints nothing.
+3. On Codex nothing changes: with a declared list the refusal already fires on each of these, as
+   the existing cases assert. Example: `git add -A && git commit -m x` with `CODEX_VERSION` set and
+   `CLAUDE_PROJECT_DIR` unset exits 2 with `v0.26.0`. This holds today and passes on arrival.
+
+**Done when:** `tests/test-sensitive-guard.sh` and `tests/test-plan.sh` pass, and
+`tests/validate-citations.sh` and `tests/validate-skills.sh` report OK.
+
+- [ ] **Step 19.1: Build it test first**
+
+Follow `keel:tdd` for behaviours 1 and 2: write each case from its examples and watch it fail for
+the reason named, then implement. Behaviour 3 is `verify`.
+Run: `tests/test-sensitive-guard.sh`, then `tests/test-plan.sh`
+Expected before: FAIL, behaviour 1's first three cases and behaviour 2's four cases print nothing
+where they should ask. Expected after: PASS. Quote the failing output in your report.
+
+Run: `tests/run-tests.sh`.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+This is the one boundary run the task schedules.
+
+- [ ] **Step 19.2: Hand over**
+
+```bash
+git add hooks/sensitive-guard CHANGELOG.md tests/test-sensitive-guard.sh
+git status --porcelain
+```
+
+Stage those paths and each file whose citation this task repaired, by name, and stop. **Do not
+commit.** The coordinator commits after both review passes, with
+`git commit -s -m "fix(sensitive-guard): check unstaged changes when a command stages before it commits"`.
+
 ## Notes for the coordinator
 
 - **The minimum is 2.1.302, not 2.1.295.** The idea record proposed 2.1.295 because `onFailure`
