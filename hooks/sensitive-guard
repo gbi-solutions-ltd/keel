@@ -55,8 +55,11 @@ event="$(</dev/stdin)"
 # or after a global option and whatever follows it, because `git -c core.hooksPath=/dev/null commit`
 # and `git -C . commit` are commits too and a value can hold anything, quotes included. Matched
 # against the whole event, a global option in the command and the word commit in its description
-# read as a commit. The value is read only when it holds no escape and the key appears once; any
-# other event, a malformed one included, is matched whole, so it fails toward the walk below.
+# read as a commit. The value alone is read only when it holds no quote, backslash, tab or newline,
+# nothing the event carries escaped, and the key appears once. Any other event, a malformed one
+# included, is matched whole, description included, so it fails toward the walk below, and a
+# `git -C . diff` whose command holds a quote still reads as a commit when its description says
+# commit.
 # Whitespace includes a tab or a newline, which the whole event carries escaped as \t or \n. The
 # key is matched with its quotes and colon, as the cwd is below, so a description naming it does not
 # match. What the pattern still lets past is a command with a git global option and, later in the

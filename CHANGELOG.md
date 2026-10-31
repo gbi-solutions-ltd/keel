@@ -88,9 +88,12 @@ Entries are terse by design; the narrative for each release is in this file's gi
   declare nothing. It walks up for the profile, and runs git, from the event's `cwd`, then
   `CLAUDE_PROJECT_DIR`, then `$PWD`, without calling `dirname`. A commit in another repository
   (`git -C ../other commit`) is judged by the session's repository, and the hook says so.
-  It looks for `commit` in the event's `command` value, not the whole event, so a `git -C . diff`
-  whose description names a commit is no longer asked, or refused on Codex; an event whose command
-  it cannot read is matched whole.
+  It looks for `commit` in the event's `command` value alone only when that value holds no quote,
+  backslash, tab, newline or other escaped character and the key appears once, so a
+  `git -C . diff` whose description names a commit then exits in silence. Otherwise the whole event
+  is matched, description included, and a non-commit it lets past, such as that diff with a quoted
+  argument, is asked on Claude Code only when the staged-profile or unreadable-profile ask fires,
+  and refused on Codex.
 - `hooks/done-guard` warns on a transcript whose rows parse and none has a Claude Code shape,
   saying the turn was not checked. It read such a transcript as a clean turn and said nothing.
 

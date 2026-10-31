@@ -391,6 +391,22 @@ out="$(devent 'git -C . commit -m x' "$r" "$desc" | ( cd "$r" && codex_guard ) 2
 verdict "the prefilter reads the command: on codex a commit with that description refuses" $? "rc $rc: $out"
 rm -rf "$r"
 
+# A repeated "command" key makes the prefilter read the whole event. Reading the first value alone,
+# a nested "command" key ahead of the tool's own was the one matched, and the commit went silent.
+r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+: > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+tev="$(CWD="$r" python3 -c '
+import json, os
+print(json.dumps({"cwd": os.environ["CWD"], "x": {"command": "ls"},
+                  "tool_input": {"command": "git commit -m x"}}, separators=(",", ":")))')"
+out="$(printf '%s' "$tev" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
+asks "$out"
+verdict "a repeated command key reads the whole event: a commit after a nested one asks" $? "$out"
+out="$(printf '%s' "$tev" | ( cd "$r" && codex_guard ) 2>&1 >/dev/null)"; rc=$?
+[ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'v0\.26\.0'
+verdict "a repeated command key reads the whole event: on codex that commit refuses" $? "rc $rc: $out"
+rm -rf "$r"
+
 # A profile that exists and cannot be read asks on a commit. With no profile at HEAD the committed
 # list cannot stand in for it, and reading it as absent let the commit through in silence. Codex
 # discards the ask, so there it is the refusal. Root reads a mode 000 file, so as root the case

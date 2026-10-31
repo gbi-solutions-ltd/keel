@@ -2345,7 +2345,7 @@ the first; it is fixed in its own reviewed change, as `ship` requires. No shippe
 **Done when:** `tests/test-sensitive-guard.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 17b.1: Build it test first**
+- [x] **Step 17b.1: Build it test first** Note: passed on arrival, red seen only on a scratch copy without twice_re: behaviour 1; behaviour 2 is prose, checked by both reviews and by a fix pass that ran each claim on both harnesses
 
 Behaviour 1 is `verify`: write its case and watch it fail on the scratch copy it names. Behaviour 2
 is prose, checked by the reviewer.
@@ -2356,7 +2356,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 17b.2: Hand over**
+- [x] **Step 17b.2: Hand over** Note: rounds: 2; routing: inherit; loop: full; quality review found the new CHANGELOG wording too strong (a quoted diff is asked on Claude Code only with the profile staged or unreadable); a wording fix pass corrected it from measured outcomes and reverted an unneeded citation repoint
 
 ```bash
 git add hooks/sensitive-guard CHANGELOG.md tests/test-sensitive-guard.sh
