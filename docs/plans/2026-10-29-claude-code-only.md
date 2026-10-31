@@ -1503,13 +1503,13 @@ That defeats the fix audit M-01 asked for.
 **Done when:** `tests/test-sensitive-guard.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 11b.1: Build it test first**
+- [x] **Step 11b.1: Build it test first** Note: built by the implementer; reds quoted (42/5, then 47/2 for the deleted profile) and reproduced by the reviewer for the first round
 
 Follow `keel:tdd`: write each behaviour's tests from its examples, watch behaviours 1 and 2 fail on
 task 11's hook (no output), then implement and watch them pass.
 Run: `tests/test-sensitive-guard.sh`, then `tests/run-tests.sh` once at the boundary.
 
-- [ ] **Step 11b.2: Hand over**
+- [x] **Step 11b.2: Hand over** Note: rounds: 2; routing: inherit; loop: full; combined review blocking on a deleted profile, fixed and re-reviewed
 
 ```bash
 git add hooks/sensitive-guard tests/test-sensitive-guard.sh
