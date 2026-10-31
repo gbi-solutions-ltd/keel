@@ -1555,12 +1555,18 @@ repository that declared sensitive paths, or a test that checks the wrong thing.
    --git-dir=.git commit -m x` each print the `ask` decision. `git -c commit.gpgsign=false log -1`
    with the same staging prints nothing. The header's limit paragraph and its copy in
    `docs/07-open-decisions.md` stop naming `git -C dir commit` as a way past the hook, and keep `sh
-   -c`, an alias and a here-doc.
+   -c`, an alias and a here-doc. Both also name a commit in another repository
+   (`git -C ../other commit`, `cd ../other && git commit`) as passing in silence, because the hook
+   judges the repository the session is in, not the one `-C`, `--git-dir` or `--work-tree` names.
+   Added 2026-10-31: the first attempt dropped that clause as this behaviour then said, and its
+   quality review found the commit still silent with nothing stating it.
 2. A profile that exists and cannot be read asks on a commit. Example: a repository with no profile
    at `HEAD` (so the committed list cannot stand in for it), a working-tree profile listing
    `src/auth` at mode 000 and `src/ui/button.tsx` staged: `git commit -m x` prints the `ask`
    decision, its reason saying the profile could not be read. `ls` in the same repository still
-   prints nothing, as the existing case asserts. Root reads a mode 000 file, so where the test runs
+   prints nothing, as the existing case asserts. With `CODEX_VERSION` set and `CLAUDE_PROJECT_DIR`
+   unset, the same commit exits 2 with `v0.26.0` on stderr, since Codex discards an ask (added
+   2026-10-31 from the same review). Root reads a mode 000 file, so where the test runs
    as root (`id -u` prints 0) the case is skipped and prints a line saying so, rather than passing
    for a reason it does not test.
 3. The profile walk calls no external command. It steps up with parameter expansion
@@ -1579,7 +1585,10 @@ repository that declared sensitive paths, or a test that checks the wrong thing.
    repository asks; an event whose `cwd` names a directory that does not exist, with the hook run
    from inside the repository, asks. A repository path holding a space reads correctly. The
    sentence in `docs/03-install-and-distribution.md` that says the hook walks up "from the directory
-   it runs in" names the event's `cwd` instead.
+   it runs in" names the order instead: the event's `cwd`, then `CLAUDE_PROJECT_DIR`, then `$PWD`.
+   The nearby sentence saying keel walks by the logical `$PWD` "as the hook does" stops claiming the
+   hook starts at `$PWD`. A comment comparing the hook with `keel plan risk` on `null` says that
+   `plan risk` is stricter there (it reads `null` as an unreadable list, `bin/keel` near line 3837).
 5. A `hard_block_paths` that is present and not a list of strings is read as an unparseable
    profile: the ask on Claude Code, the refusal on Codex. Examples, each the committed profile, with
    `src/ui/button.tsx` staged: `"hard_block_paths": "src/auth"`, `"hard_block_paths": {"src/auth":
