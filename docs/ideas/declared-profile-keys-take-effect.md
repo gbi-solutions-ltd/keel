@@ -80,9 +80,9 @@ rule behind it has a measured half-life in this repository.
 
 | Finding | Evidence | What it means for the idea |
 |---|---|---|
-| A dotted-path matcher flags 25 of 61 leaves, and 7 of the 25 are genuinely read | Prototyped against the tree 2026-09-07. The 7: `artifacts.stories`, `.architecture`, `.decisions`, `.plans` (`bin/keel#.get('artifacts',{})` iterates the map), `gates.context_warn_pct`, `.context_stop_pct` (`lib/context_watch.py:374-385`), `conventions.default_branch` (`bin/keel:2567`) | 28% false positives. `docs/standards.md:87` calls the too-strict failure the unrecoverable one, and `tests/validate-citations.sh:20-25` records a rule discarded at 70%. The matcher cannot ship |
+| A dotted-path matcher flags 25 of 61 leaves, and 7 of the 25 are genuinely read | Prototyped against the tree 2026-09-07. The 7: `artifacts.stories`, `.architecture`, `.decisions`, `.plans` (`bin/keel#.get('artifacts',{})` iterates the map), `gates.context_warn_pct`, `.context_stop_pct` (`lib/context_watch.py:374-385`), `conventions.default_branch` (`bin/keel:2577`) | 28% false positives. `docs/standards.md:87` calls the too-strict failure the unrecoverable one, and `tests/validate-citations.sh:20-25` records a rule discarded at 70%. The matcher cannot ship |
 | The bare-leaf rescue passes everything | Hit counts across `bin/keel`, `lib/`, `hooks/`, `skills/`: `name` 337, `test` 484, `build` 178, `review` 146, `security` 52, `target` 49, `tdd` 25 | Every one of the 22 dead keys would pass. This is the "reads nothing, passes everything" failure the tree has already hit twice |
-| Presence of a dotted path and being read are independent facts | `hooks/done-guard:114` reads the gate as `(prof.get("gates") or {}).get("done_verified")`; the dotted string appears in that file only in comments and refusal text at `:25`, `:72`, `:111`. `conventions.protect_default_branch`'s only dotted occurrence is a refusal message at `bin/keel:1757` | Both directions of the matcher are wrong. A syntactic rule is not available at any threshold |
+| Presence of a dotted path and being read are independent facts | `hooks/done-guard:114` reads the gate as `(prof.get("gates") or {}).get("done_verified")`; the dotted string appears in that file only in comments and refusal text at `:25`, `:72`, `:111`. `conventions.protect_default_branch`'s only dotted occurrence is a refusal message at `bin/keel:1767` | Both directions of the matcher are wrong. A syntactic rule is not available at any threshold |
 | Six parent-map read sites exist in code, and they are the whole set | `lib/context_watch.py:375`, `:447`, `:468`, `:603`; `hooks/done-guard:114`, `:118` | Small and enumerable, which is what makes a declared reader with a checked citation affordable |
 | No `gates.*` schema key is a capability-manifest gate | `lib/harness/capabilities` carries four `requires` rows, for `session-start`, `done-guard`, `context-watch` and `sensitive-guard` | ADR-0003 binds only if a `gates.*` key becomes a hook. A `cmd_doctor` read is a CLI read and harness-neutral; a skill-prose read loads identically on both harnesses and is advisory, not a guarantee, per ADR-0004 |
 | `pretooluse_ask` is Claude Code only | `lib/harness/codex.sh` (deleted after v0.26.0), citing `codex-rs/protocol/src/permissions.rs:105` | Only a gate escalated to a human-decision hook splits by harness. None of the four wirings recommended here does |
@@ -102,7 +102,7 @@ rule behind it has a measured half-life in this repository.
 against `schema_fingerprint_for`, which carries a line for 3 at `:86`, and the suite is green, so
 the schema and the constant agree. The repository's own profile is hand-written, says so at its own
 `_note` ("keel dogfoods itself. Written by hand until `keel init` exists"), and is exactly what
-`bin/keel:1638`'s doctor warning exists to catch. `keel_version 0.15.0` against `VERSION` `0.18.0`
+`bin/keel:1648`'s doctor warning exists to catch. `keel_version 0.15.0` against `VERSION` `0.18.0`
 is the same staleness in the same file.
 
 Neither is fixed by this work. Both are one command, `keel init`, and a version bump landing inside

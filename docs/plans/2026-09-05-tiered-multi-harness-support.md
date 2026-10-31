@@ -1928,7 +1928,7 @@ touch, say so and leave it unstaged.
   for Codex.
 
 **The sixth exists because of what `cmd_doctor` does.** `settings_report_load`, `plugin_report` and
-`boundary_report` (`bin/keel:167,242,268`) are read by `cmd_doctor` (`:1337`), which stays in the
+`boundary_report` (`bin/keel:167,242,268`) are read by `cmd_doctor` (`:1346`), which stays in the
 neutral file. Moving them into `lib/harness/claude.sh` under a five-function contract would leave
 `cmd_doctor` calling functions that exist for one harness only, which breaks the moment `codex.sh`
 is the loaded one. `harness_doctor_findings` prints zero or more `level|message` lines and is the
@@ -2564,7 +2564,7 @@ passes, with `git commit -m "feat(harness): ship the Codex plugin manifest"`.
 > `provides` row is unsafe; a doctor line that cries wolf on every machine gets ignored, which
 > costs more than it saves.
 >
-> **2. The two context window messages at `bin/keel:1630` and `:1574` are Claude Code numbers.**
+> **2. The two context window messages at `bin/keel:1640` and `:1584` are Claude Code numbers.**
 > They say the watchdog is "assuming 200000" and that a value below "the $cwdef default" has no
 > effect. Since 2026-09-06 a Codex rollout states its own window, `model_context_window`, 258400 on
 > the probed session, so on Codex both sentences name the wrong baseline. This was left to this task
@@ -3980,7 +3980,7 @@ correct.** Fixed in place:
 | Task 4 step 2 mutated a tracked file while `MAX_JOBS=4` jobs read it | `tests/run-tests.sh#capped at 4 concurrent` | task 4 |
 | A one-line tag lookback fails any claim that wraps | the support page's own paragraph | task 5 |
 | Task 7's committed baseline contradicts the suite's stated policy | `tests/keel-test-lib.sh#Fixtures are generated per` | task 7 |
-| `cmd_doctor` would call functions that exist for one harness only | `bin/keel:1407` | task 7, sixth contract function |
+| `cmd_doctor` would call functions that exist for one harness only | `bin/keel:1417` | task 7, sixth contract function |
 
 ### Not fixed, with reasons
 

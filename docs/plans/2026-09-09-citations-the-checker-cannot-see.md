@@ -443,12 +443,12 @@ form, where the first draft of its task 6a listed four broken citations and prod
 failures.
 
 ```
-docs/architecture/tiered-multi-harness-support.md:41                   bin/keel:2083            past the end, bin/keel is 1944 lines
+docs/architecture/tiered-multi-harness-support.md:41                   bin/keel:2093            past the end, bin/keel is 1944 lines
 docs/ideas/keel-on-codex.md:234                                        bin/keel:576-590         first line blank
-docs/ideas/leon-van-zyl-skill-collection.md:262                        bin/keel:2030            past the end
+docs/ideas/leon-van-zyl-skill-collection.md:262                        bin/keel:2040            past the end
 docs/ideas/profile-schema-drift.md:70                                  bin/keel:1207            blank
 docs/ideas/profile-schema-drift.md:102                                 bin/keel:1207            blank
-docs/plans/2026-08-17-release-readiness.md:78                          bin/keel:1713-1715       blank
+docs/plans/2026-08-17-release-readiness.md:78                          bin/keel:1723-1725       blank
 docs/plans/2026-08-17-schema-version-and-snapshot-handoff.md:236       bin/keel:1207            blank
 docs/plans/2026-08-18-context-window-at-init.md:615                    bin/keel:290             blank
 docs/plans/2026-08-18-plsql-stack-detection.md:422                     bin/keel:327             blank
@@ -459,9 +459,9 @@ docs/plans/2026-08-30-profile-sync.md:151                              bin/keel:
 docs/plans/2026-08-30-profile-sync.md:533                              bin/keel:1019-1020       blank
 docs/plans/2026-09-05-tiered-multi-harness-support.md:36               bin/keel:464-478         blank
 docs/plans/2026-09-05-tiered-multi-harness-support.md:931              bin/keel:464-478         blank
-docs/plans/2026-09-07-declared-profile-keys-take-effect.md:791         bin/keel:1851            blank
-docs/plans/2026-09-07-declared-profile-keys-take-effect.md:792         bin/keel:1872            blank
-docs/plans/2026-09-07-declared-profile-keys-take-effect.md:1128        bin/keel:1459            blank
+docs/plans/2026-09-07-declared-profile-keys-take-effect.md:791         bin/keel:1861            blank
+docs/plans/2026-09-07-declared-profile-keys-take-effect.md:792         bin/keel:1882            blank
+docs/plans/2026-09-07-declared-profile-keys-take-effect.md:1128        bin/keel:1469            blank
 docs/prd/context-window-at-init.md:92                                  bin/keel:290             blank
 docs/prd/context-window-at-init.md:93                                  bin/keel:385-389         blank
 docs/prd/context-window-at-init.md:173                                 bin/keel:290             blank
@@ -471,7 +471,7 @@ docs/prd/profile-sync.md:96                                            bin/keel:
 docs/prd/usable-profile.md:115                                         bin/keel:290             blank
 docs/stories/context-window-at-init.md:288                             bin/keel:290             blank
 docs/stories/profile-sync.md:260                                       bin/keel:1019-1020       blank
-docs/stories/tiered-multi-harness-support.md:155                       bin/keel:2083            past the end
+docs/stories/tiered-multi-harness-support.md:155                       bin/keel:2093            past the end
 docs/stories/usable-profile.md:453                                     bin/keel:290             blank
 ```
 
@@ -837,12 +837,12 @@ claims, and these name lines that are about to move.
 ```
 hooks/sensitive-guard:13                             bin/keel:581                           merge_profile .keel/profile.json.new .keel/profile.json
 hooks/sensitive-guard:31                             bin/keel:598                           # A null command is omitted rather than rendered as the word "null".
-skills/execute-plan/references/preconditions.md:44   bin/keel:1430-1432                     the managed block size comment
+skills/execute-plan/references/preconditions.md:44   bin/keel:1440-1442                     the managed block size comment
 tests/test-cache-install.sh:28                       bin/keel:35                            the `SCHEMA_VERSION` comment, "field is added, removed, renamed or moved"
 tests/test-harness-resolve.sh:5                      tests/test-keel.sh:10                  # shellcheck disable=SC2015
 tests/test-keel.sh:1850                              bin/keel:78                            # shellcheck source=lib/merge-claude-md.sh
-tests/test-keel.sh:1867                              bin/keel:1442                          fi
-tests/test-keel.sh:2054                              bin/keel:1497                          the `--fast` verify line
+tests/test-keel.sh:1867                              bin/keel:1452                          fi
+tests/test-keel.sh:2054                              bin/keel:1507                          the `--fast` verify line
 tests/test-keel.sh:4551                              bin/keel:100-101                       the harness_each rule comment
 tests/test-keel.sh:4567                              tests/validate-skills.sh:656-662       a comment block
 tests/test-keel.sh:4571                              bin/keel:556                           the observability `printf

@@ -1304,9 +1304,14 @@ PY
     # is written there. keel-fleet sets it, so a fleet asks once per run rather than once per
     # repository, where each ask can take the five seconds above. Its version side counts only when
     # the parser would keep it, because harness_version_ge does arithmetic on it. Any other line,
-    # one with both sides empty, or a file doctor cannot read, is read as an empty file.
+    # one with both sides empty, or a file doctor cannot read, is no answer, and doctor asks. The
+    # answer is written back only to a file that is doctor's own, empty, absent or holding a line
+    # with a `|`, and never through a symlink: a path set by hand to the wrong file, or a symlink
+    # another local user planted in a shared directory, must not have its target overwritten. The
+    # read and the write print no shell error, since doctor asks instead and a bash error naming a
+    # line of this script tells the reader nothing about their Claude Code.
     local cc_cmd="${KEEL_CLAUDE-claude}" cc_min cc_out cc_pid cc_n=0 cc_ver="" cc_why="" cc_w
-    local cc_late="" cc_gv cc_vf="${KEEL_CLAUDE_VERSION_FILE-}" cc_vl=""
+    local cc_late="" cc_gv cc_vf="${KEEL_CLAUDE_VERSION_FILE-}" cc_vl="" cc_l="" cc_own=""
     # cc_kept WORD: 0 when WORD is a version the parser keeps, digits and dots holding a dot, with
     # none at either end and no two together. The file's version goes through it too.
     cc_kept() {
@@ -1316,12 +1321,16 @@ PY
         warn "cannot read keel's minimum Claude Code version from the capability ledger, so this Claude Code is not checked against it"
     else
         if [ -n "$cc_vf" ] && [ -s "$cc_vf" ]; then
-            IFS='|' read -r cc_ver cc_why < "$cc_vf"
+            { IFS= read -r cc_l < "$cc_vf"; } 2>/dev/null
+            cc_ver="${cc_l%%|*}"
+            case "$cc_l" in *'|'*) cc_why="${cc_l#*|}"; cc_own=1 ;; esac
             if cc_kept "$cc_ver" || { [ -z "$cc_ver" ] && [ -n "$cc_why" ]; }; then
                 cc_vl=1
             else
                 cc_ver=""; cc_why=""
             fi
+        elif [ -n "$cc_vf" ] && { [ -f "$cc_vf" ] || [ ! -e "$cc_vf" ]; }; then
+            cc_own=1
         fi
         if [ -n "$cc_vl" ]; then
             :
@@ -1349,7 +1358,8 @@ PY
             wait "$cc_pid" 2>/dev/null
             rm -f "$cc_out"
         fi
-        [ -n "$cc_vf" ] && [ -z "$cc_vl" ] && printf '%s|%s\n' "$cc_ver" "$cc_why" > "$cc_vf"
+        [ -n "$cc_own" ] && [ ! -L "$cc_vf" ] && [ -z "$cc_vl" ] \
+          && { printf '%s|%s\n' "$cc_ver" "$cc_why" > "$cc_vf"; } 2>/dev/null
         if [ -z "$cc_ver" ]; then
             warn "cannot tell whether this Claude Code runs keel's gates: $cc_why. keel needs Claude Code $cc_min or later."
         elif harness_version_ge "$cc_ver" "$cc_min"; then

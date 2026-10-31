@@ -347,7 +347,7 @@ Scenario: the fast path still reports it
 
 **Notes:** FR-11 is the second scenario and it is the one worth guarding. A warning naming a remedy
 that FR-04 forbids would send people to a command that deliberately does nothing for them. Shape
-follows the `stack.has_ui` warning at `bin/keel:1718`, which is a warning and never a failure for
+follows the `stack.has_ui` warning at `bin/keel:1728`, which is a warning and never a failure for
 the same reason: nothing is broken.
 
 ### S-09 `keel --help` lists sync

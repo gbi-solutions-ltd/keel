@@ -1421,28 +1421,46 @@ vf_fx="$(fixture node-ts)"
 seed_standards "$vf_fx"
 printf '#!/bin/sh\necho x >> "%s"\necho "%s (Claude Code)"\n' "$cv_stub/count" "$cv_min" > "$cv_stub/counted"
 chmod +x "$cv_stub/counted"
-vf_doctor() {   # vf_doctor <file line> [doctor args]; stdout to out, stderr to err, exit in vf_rc
-    local l="$1"; shift
-    printf '%s\n' "$l" > "$cv_stub/vf"; : > "$cv_stub/count"
-    ( cd "$vf_fx" && KEEL_CLAUDE="$cv_stub/counted" KEEL_CLAUDE_VERSION_FILE="$cv_stub/vf" \
+vf_run() {   # vf_run <path> [doctor args]; the file at path, stdout to out, stderr to err, vf_rc
+    local f="$1"; shift
+    : > "$cv_stub/count"
+    ( cd "$vf_fx" && KEEL_CLAUDE="$cv_stub/counted" KEEL_CLAUDE_VERSION_FILE="$f" \
         "$KEEL" doctor --fast "$@" ) > "$cv_stub/out" 2> "$cv_stub/err"
     vf_rc=$?
 }
-vf_asked() {   # vf_asked <case name>; one ask, its answer in the file, the good line alone, exit 0
+vf_doctor() {   # vf_doctor <file line> [doctor args]; vf_run on a file holding that line
+    local l="$1"; shift
+    printf '%s\n' "$l" > "$cv_stub/vf"
+    vf_run "$cv_stub/vf" "$@"
+}
+vf_once() {   # vf_once; why not, unless doctor asked once, exited 0 and printed the good line
     local n line
     n="$(grep -c . "$cv_stub/count")"; line="$(cv_line "$(cat "$cv_stub/out")")"
     if [ "$n" != 1 ]; then
-        bad "$1" "$n asks"
-    elif [ "$(cat "$cv_stub/vf")" != "$cv_min|" ]; then
-        bad "$1" "the file holds: $(cat "$cv_stub/vf")"
+        echo "$n asks"
     elif [ "$vf_rc" -ne 0 ]; then
-        bad "$1" "exit $vf_rc"
-    else
-        case "$line" in
-          "ok    Claude Code $cv_min meets keel's minimum, $cv_min") ok "$1" ;;
-          *) bad "$1" "line: ${line:-<none>}" ;;
-        esac
+        echo "exit $vf_rc"
+    elif [ "$line" != "ok    Claude Code $cv_min meets keel's minimum, $cv_min" ]; then
+        echo "line: ${line:-<none>}"
     fi
+}
+vf_asked() {   # vf_asked <case name>; one ask, its answer in the file, the good line alone, exit 0
+    local why
+    why="$(vf_once)"
+    [ -z "$why" ] && [ "$(cat "$cv_stub/vf")" != "$cv_min|" ] && why="the file holds: $(cat "$cv_stub/vf")"
+    [ -z "$why" ] && ok "$1" || bad "$1" "$why"
+}
+vf_kept() {   # vf_kept <case name> <file> <copy>; vf_asked, with the file byte for byte its copy
+    local why
+    why="$(vf_once)"
+    [ -z "$why" ] && ! cmp -s "$2" "$3" && why="$2 changed, and holds: $(cat "$2")"
+    [ -z "$why" ] && ok "$1" || bad "$1" "$why"
+}
+vf_quiet() {   # vf_quiet <case name>; one ask, the good line alone, exit 0, no shell error
+    local why
+    why="$(vf_once)"
+    grep -q 'bin/keel: line [0-9]' "$cv_stub/err" && why="stderr: $(cat "$cv_stub/err")"
+    [ -z "$why" ] && ok "$1" || bad "$1" "$why"
 }
 rm -f "$vf_fx/p"
 vf_doctor "1+a[\$(touch p)]|"
@@ -1471,6 +1489,51 @@ n="$(grep -c . "$cv_stub/count")"; line="$(cv_line "$(cat "$cv_stub/out")")"
 [ "$n" = 0 ] && [ "$line" = "ok    Claude Code $cv_min meets keel's minimum, $cv_min" ] \
   && ok "doctor uses a version from the file only when its parser would keep it: the minimum is used and nothing is asked" \
   || bad "doctor uses a version from the file only when its parser would keep it: the minimum is used and nothing is asked" "$n asks, line: ${line:-<none>}"
+
+# Doctor writes the file only when it is doctor's own: empty, absent, or holding a line with a `|`,
+# and never through a symlink. A path set by hand to the wrong file, or a symlink another local
+# user planted in a shared directory, must not have its target overwritten. Each file is reset
+# before its case, so one case's write cannot decide the next.
+printf 'hello\nworld\n' > "$cv_stub/hw.copy"
+cp "$cv_stub/hw.copy" "$cv_stub/hw"
+vf_run "$cv_stub/hw"
+vf_kept "doctor writes the version file only when it is its own: two lines with no | ask once and stay as they were" "$cv_stub/hw" "$cv_stub/hw.copy"
+cp "$cv_stub/hw.copy" "$cv_stub/hw"; ln -s "$cv_stub/hw" "$cv_stub/hw.link"
+vf_run "$cv_stub/hw.link"
+vf_kept "doctor writes the version file only when it is its own: a symlink to such a file asks once and leaves its target as it was" "$cv_stub/hw" "$cv_stub/hw.copy"
+rm -f "$cv_stub/nowhere"; ln -s "$cv_stub/nowhere" "$cv_stub/dangling"
+vf_run "$cv_stub/dangling"
+why="$(vf_once)"
+[ -z "$why" ] && [ -e "$cv_stub/nowhere" ] && why="its target was created, holding: $(cat "$cv_stub/nowhere")"
+[ -z "$why" ] \
+  && ok "doctor writes the version file only when it is its own: a dangling symlink asks once and creates nothing at its target" \
+  || bad "doctor writes the version file only when it is its own: a dangling symlink asks once and creates nothing at its target" "$why"
+rm -f "$cv_stub/vf"
+vf_run "$cv_stub/vf"
+vf_asked "doctor writes the version file only when it is its own: a path that does not exist is created holding the answer"
+
+# A line with only a reason is an answer, the one keel-fleet's first doctor writes when it cannot
+# tell: the doctors after it warn with that reason rather than each asking again.
+vf_doctor "|some reason"
+n="$(grep -c . "$cv_stub/count")"; line="$(grep 'some reason' "$cv_stub/out")"
+[ "$n" = 0 ] && [ "$(cat "$cv_stub/vf")" = "|some reason" ] && case "$line" in WARN*) [ "$(printf '%s\n' "$line" | grep -c .)" = 1 ] ;; *) false ;; esac \
+  && ok "a reason-only line in the version file is the answer: one WARN line names the reason, nothing is asked, the file is unchanged" \
+  || bad "a reason-only line in the version file is the answer: one WARN line names the reason, nothing is asked, the file is unchanged" "$n asks, lines naming it: ${line:-<none>}, the file holds: $(cat "$cv_stub/vf")"
+
+# A file doctor cannot read is no answer, so doctor asks, and is not doctor's own, so it is not
+# written, and neither step prints a shell error. Root reads a mode 000 file, so as root that case
+# would pass without testing an unreadable file at all, and it says so instead.
+if [ "$(id -u)" = 0 ]; then
+    printf '  SKIP  a version file doctor cannot read prints no shell error: mode 000 (running as root, which reads mode 000)\n'
+else
+    printf '%s|\n' "$cv_min" > "$cv_stub/locked"; chmod 000 "$cv_stub/locked"
+    vf_run "$cv_stub/locked"
+    vf_quiet "a version file doctor cannot read prints no shell error: a file at mode 000 asks once"
+    chmod 600 "$cv_stub/locked"
+fi
+mkdir "$cv_stub/vfdir"
+vf_run "$cv_stub/vfdir"
+vf_quiet "a version file doctor cannot read prints no shell error: a path naming a directory asks once"
 rm -rf "$vf_fx"
 rm -rf "$cv_fx" "$cv_stub"
 
