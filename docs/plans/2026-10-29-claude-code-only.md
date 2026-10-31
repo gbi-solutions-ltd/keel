@@ -1810,6 +1810,24 @@ The same review found that two of task 12's cases cannot fail, and one global op
    three only by reading the whole tail as one commit's arguments, and treats `)` as a pathspec.
    Added 2026-10-31 from the second attempt's spec review, which found that ending a commit's
    arguments at the first operator let the first three through in silence.
+8. What the walk cannot read after `commit` widens the check rather than ending it. A token among a
+   commit's arguments that the walk cannot read as a flag, a value or a pathspec (one holding `$`
+   or a backtick, a `(` from a command, process or arithmetic substitution) sets the widening
+   that `-a` sets, and the walk reads on past it; so does a command shlex cannot split, whose
+   fallback split also separates the operators of behaviour 6. A token is git only when it is
+   `git` or an absolute path ending in `/git`. `--shallow-file <path>` is a global option that
+   takes a value. Examples, each in the fixture of behaviour 7 (a `HEAD`, the profile listing
+   `src/auth`, an unstaged change to the tracked `src/auth/t.go`, only `src/ui/button.tsx`
+   staged), asking naming `src/auth/t.go` on Claude Code and exiting 2 on Codex: `git commit -m
+   $(cat msg) -a`, `git commit --date=$(date +%s) -a`, `git commit -m x <(true) -a`, `git commit
+   --author $(whoami) src/auth/t.go`, `git --shallow-file /dev/null commit -a -m x`, and the
+   four-line command `cat > n.md <<EOF` / `don't forget` / `EOF` / `true&&git commit -a -m x`.
+   With `src/auth/t.go` staged, `cat docs/git commit` prints nothing, and `/usr/bin/git commit -m
+   x` still asks. The comment above the exit trap says that an unexpected exit asks on Claude Code
+   and refuses on Codex. Before the change the first four print nothing on Claude Code (HEAD at
+   546bd41 asked on them), the fifth and sixth print nothing on Codex (HEAD refused them), and `cat
+   docs/git commit` asks. Added 2026-10-31 from the third attempt's quality review; Bernard chose
+   that the walk fails toward asking, and that this behaviour is fixed on top of that attempt.
 
 **Done when:** `tests/test-sensitive-guard.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
@@ -2062,6 +2080,11 @@ commit.** The coordinator commits after both review passes, with
   task 6's quality review is task 15. Task 13 decides `transcript_kind` on a 64-row prefix rather
   than on the first parsed row, because real transcripts open with metadata rows (its prose gives
   the measurement).
+- **Task 12c's third attempt is fixed on top, by Bernard's decision of 2026-10-31.** Its quality
+  review found a blocking regression in code (an unquoted substitution ended the walk), which the
+  full loop would discard. After three rejections of hand-written shell parsing, Bernard chose to
+  keep the attempt, change the rule so the walk fails toward asking (behaviour 8), and run both
+  review passes again. This is a one-off, not the standing citation rule below.
 - **A deviation that is only about citation repair is fixed on top, not discarded.** Bernard
   decided on 2026-10-31, after tasks 12 and 13 each returned DEVIATES on citations alone while
   their code and tests complied, that for the rest of this run such an attempt is kept, a fix pass
