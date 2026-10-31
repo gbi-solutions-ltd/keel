@@ -1470,6 +1470,56 @@ Stage those paths, `lib/harness/resolve.sh` if changed, and each file whose cita
 repaired, by name, and stop. **Do not commit.** The coordinator commits after both review passes,
 with `git commit -s -m "fix(sensitive-guard): judge only the top-level list, and ask when the profile changes"`.
 
+### Task 11b: a commit that changes the profile is asked before any early exit
+
+Added by the coordinator on 2026-10-31 from the automated security review of task 11 and task 11's
+quality review: the profile-staged ask runs after the early exits, so a commit that empties or
+removes `hard_block_paths` exits silently and the next commit to a sensitive path is unguarded.
+That defeats the fix audit M-01 asked for.
+
+**Story:** G1, ADR-0013
+**Files:**
+- Modify: `hooks/sensitive-guard`
+- Test: `tests/test-sensitive-guard.sh`
+
+**Interfaces:**
+- Consumes: task 11's hook
+- Produces: nothing new
+
+**Depends on:** task 11
+
+**Behaviours:**
+
+1. A commit staging `.keel/profile.json` asks, whatever the working-tree profile says. Examples, each
+   in a repository whose committed profile lists `src/auth`: staging a profile with `"hard_block_paths":
+   []`, staging one with the key removed, and staging one that does not parse each make `git commit -m
+   x` print the `ask` decision naming the profile.
+2. The list a commit is judged by includes the committed one. Example: with the committed profile
+   listing `src/auth`, a working-tree profile (unstaged) listing nothing, and `src/auth/t.go` staged,
+   `git commit -m x` asks.
+3. A repository that declares nothing anywhere is still never asked. Example: no `hard_block_paths` at
+   HEAD or in the working tree, a non-profile file staged: no output, exit 0.
+
+**Done when:** `tests/test-sensitive-guard.sh` passes, and `tests/validate-citations.sh` and
+`tests/validate-skills.sh` report OK.
+
+- [ ] **Step 11b.1: Build it test first**
+
+Follow `keel:tdd`: write each behaviour's tests from its examples, watch behaviours 1 and 2 fail on
+task 11's hook (no output), then implement and watch them pass.
+Run: `tests/test-sensitive-guard.sh`, then `tests/run-tests.sh` once at the boundary.
+
+- [ ] **Step 11b.2: Hand over**
+
+```bash
+git add hooks/sensitive-guard tests/test-sensitive-guard.sh
+git status --porcelain
+```
+
+Stage those paths and each file whose citation this task repaired, by name, and stop. **Do not
+commit.** The coordinator commits with
+`git commit -s -m "fix(sensitive-guard): ask on a profile change before any early exit"`.
+
 ## Notes for the coordinator
 
 - **The minimum is 2.1.302, not 2.1.295.** The idea record proposed 2.1.295 because `onFailure`
@@ -1532,8 +1582,8 @@ with `git commit -s -m "fix(sensitive-guard): judge only the top-level list, and
   and its child keeps running (doctor is not blocked); keel-fleet repeats the machine-wide version
   check per repository; a second ledger row for an already-verified primitive would raise the
   minimum.
-- **From task 11's review, pre-existing:** a commit that removes or empties `hard_block_paths` is
-  not asked about, because the guard judges by the working-tree profile; a string value for
+- **From task 11's review, pre-existing:** (the commit that empties `hard_block_paths` is task 11b) a
+  string value for
   `hard_block_paths` fails open on Claude Code (Python iterates its characters).
 - **Not in this plan.** `keel-cursor`'s generator reads the archived `keel-internal` checkout; that
   is the port's to fix. The idea record's items are the next plan.
