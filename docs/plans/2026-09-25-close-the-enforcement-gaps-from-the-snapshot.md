@@ -192,11 +192,12 @@ Stage exactly those paths and stop. **Do not commit.** The coordinator commits w
 > nearest line that exists because no current line says what their sentence claims:
 > `docs/ideas/concise-responses.md` (`bin/keel#harness_section context-block`; the 450 and 700 token
 > thresholds live in `lib/harness/claude.sh`) and `docs/ideas/keel-on-codex.md`
-> (`docs/03-install-and-distribution.md#and nothing else, which is the tier below.`; the "skills
-> stay Claude-only" sentence it once cited is gone). The quality review also found that the two
-> lines this task adds to `docs/03-install-and-distribution.md` shift four citations of its line 475
-> onto the wrong line, which the validator cannot see; a follow-up dispatch repaired them in the
-> same commit, citing `docs/03-install-and-distribution.md#The skills are no longer Claude-only.`
+> (`docs/03-install-and-distribution.md` at v0.26.0, "and nothing else, which is the tier below.";
+> the "skills stay Claude-only" sentence it once cited is gone). The quality review also found that
+> the two lines this task adds to `docs/03-install-and-distribution.md` shift four citations of its
+> line 475 onto the wrong line, which the validator cannot see; a follow-up dispatch repaired them
+> in the same commit, citing `docs/03-install-and-distribution.md` at v0.26.0 ("The skills are no
+> longer Claude-only.").
 > The sentences around those four still quote "The skills themselves stay Claude-only for now",
 > which `docs/03-install-and-distribution.md` no longer says; their wording was left alone, so they
 > stand as unresolved too. Its other findings, left for the report: `null` passes on gate keys and

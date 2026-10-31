@@ -1,6 +1,6 @@
 <!--
-This file is the template for the block `keel init` merges into a project's CLAUDE.md
-and AGENTS.md. Content between the markers is owned by keel and replaced on upgrade.
+This file is the template for the block `keel init` merges into a project's CLAUDE.md.
+Content between the markers is owned by keel and replaced on upgrade.
 Content outside the markers belongs to the project and is never touched.
 
 Placeholders in {{BRACES}} are filled from .keel/profile.json at init time:

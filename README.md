@@ -18,12 +18,15 @@ arrive with the plugin: a plugin's `bin/` directory is added to the PATH that Cl
 tool uses, so after restarting the session `keel version` in a Claude Code shell prints the VERSION
 file.
 
-**Codex CLI is supported too, and it is not the same install or the same guarantee.** keel is Tier
-A on Claude Code and Tier B on Codex: the skills, `AGENTS.md` and the CLI are the same, and the set
-of gates that actually fire is smaller. `docs/harness-support.md` is generated from the capability
-manifest and is the only place that answers which, so it is the page to read before relying on a
-gate. Codex also requires a step Claude Code does not: it runs no hook until you have trusted the
-plugin's hooks, and it says nothing when it skips one.
+keel needs Claude Code <!-- keel:min-claude-code -->2.1.302<!-- /keel:min-claude-code --> or
+later, the highest version a gate's primitive was verified on. `keel doctor` checks yours.
+
+keel serves Claude Code only. **v0.26.0 is the last keel release with Codex support.** A separate
+keel plugin for Codex is planned; until it ships, a Codex user installs the v0.26.0 tag:
+
+```bash
+codex plugin marketplace add gbi-solutions-ltd/keel --ref v0.26.0 && codex plugin add keel@gbi
+```
 
 The marketplace is cloned over HTTPS, so nothing needs configuring and `gh` is not required.
 
@@ -120,8 +123,8 @@ writes it or you do, is listed in [docs/profile-keys.md](docs/profile-keys.md).
 `deny` and `ask` rules into the committed `.claude/settings.json` that still apply under bypass;
 `keel doctor` fails if either goes missing. Bounded, not safe: the residual is decision 12 of
 [doc 07](docs/07-open-decisions.md). The VS Code extension needs two extra user settings for the
-mode to take effect at all, `keel doctor` warns when it does not see them, and the full story,
-including what does and does not carry to Codex, is in
+mode to take effect at all, `keel doctor` warns when it does not see them, and the full story is
+in
 [`docs/03-install-and-distribution.md`](docs/03-install-and-distribution.md#permissions-bypass-the-prompts-keep-the-guardrails).
 
 ## What problem this solves

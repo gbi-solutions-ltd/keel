@@ -137,8 +137,8 @@ re-litigated: task 0's `Done when` holds, so the task proceeds as done.
 **Idea:** `docs/ideas/write-ci-does-not-match-ship.md`
 
 **Files:**
-- Modify: `bin/keel` (`write_ci` at `bin/keel:1144-1162`; its call site in `cmd_new` at
-  `bin/keel:1206`; a new call site in `cmd_init` after `bin/keel:842`)
+- Modify: `bin/keel` (`write_ci` at `bin/keel:987-1046`; its call site in `cmd_new` at
+  `bin/keel:1206`; a new call site in `cmd_init` after `bin/keel:611`)
 - Test: `tests/test-keel.sh`
 
 **Interfaces:**
@@ -222,7 +222,7 @@ writes the file at all; they exist to stay green once step 3 lands.
 
 - [x] **Step 3: Write the minimal implementation** (not witnessed this session; see provenance note above)
 
-Replace `write_ci` (`bin/keel:1144-1162`):
+Replace `write_ci` (`bin/keel:987-1046`):
 
 ```bash
 write_ci() {
@@ -272,7 +272,7 @@ Add a new call in `cmd_init`, immediately after `ignore_local_state` (`bin/keel:
     [ -n "$(json_get .keel/profile.json deploy.ci || true)" ] || write_ci
 ```
 
-`write_profile` ran earlier in `cmd_init` (`bin/keel:828`, the same ordering `cmd_new` has at
+`write_profile` ran earlier in `cmd_init` (`bin/keel:619`, the same ordering `cmd_new` has at
 `bin/keel:1213`), so `deploy.ci` reflects the tree as it was before this call: a workflow this call
 writes is not what it reads. On a later `keel init` in the same project, `deploy.ci` then detects
 `github-actions` from the file keel wrote, which is true and keeps the file from being rewritten.
@@ -321,7 +321,7 @@ call, not assumed here):
   written, which contradicts the guard's own comment. Untested by this task's fixtures (only the
   single-marker case is covered).
 - The verify-key list `test_integration lint format typecheck build e2e security` in `write_ci`'s
-  loop hand-repeats keys `write_profile` (`bin/keel:539`) already enumerates, which
+  loop hand-repeats keys `write_profile` (`bin/keel:315`) already enumerates, which
   `docs/standards.md:254` ("One definition per verify command") names as exactly the drift pattern
   to avoid.
 
@@ -355,7 +355,7 @@ locating that same content at its new position, not by guessing an offset. One d
 surfaced in the second round: `docs/harness-support.md` is generated from
 `tests/generate-harness-artifacts.sh support-page`, itself reading `lib/harness/capabilities` as
 its source of truth; the first citation-fix round had hand-corrected the *generated* doc (the stale
-`bin/keel` line number it named, to the content's real location, `lib/harness/claude.sh:240-247`) without fixing
+`bin/keel` line number it named, to the content's real location, `lib/harness/claude.sh:243-250`) without fixing
 the source line in `lib/harness/capabilities`, which `tests/test-harness-claims.sh` caught as
 doc-generator drift. Fixed at the source and regenerated; `diff` against a fresh generator run is
 now empty. `tests/validate-citations.sh` reports 0 stale citations and `tests/run-tests.sh` is
@@ -387,7 +387,7 @@ task can make.
 
 **Interfaces:**
 - Consumes: nothing new. Reads `.keel/profile.json`'s `keel_version` field with `sed`, the same
-  technique the pre-push hook already uses for `default_branch` (`bin/keel:1883`), because this
+  technique the pre-push hook already uses for `default_branch` (`bin/keel:1977`), because this
   hook needs exactly one scalar field and the pre-commit hook's own comment explains why `python3`
   is reserved for cases needing more than one. Writes the trailer with `git interpret-trailers
   --in-place` (git 2.13 and later), which is what `git commit --trailer` itself uses: it puts the
@@ -517,7 +517,7 @@ Expected: PASS.
 
 - [x] **Step 5: Update the two documents that describe `keel guard install` by name**
 
-`README.md:192` says `keel guard install    # pre-push and pre-commit hooks, repo-local, opt-in`.
+`README.md:195` says `keel guard install    # pre-push and pre-commit hooks, repo-local, opt-in`.
 Change to `keel guard install    # pre-push, pre-commit, and prepare-commit-msg hooks, repo-local,
 opt-in`.
 
@@ -617,7 +617,7 @@ session is the check that would falsify this conclusion if wrong.
 
 **Interfaces:**
 - Consumes: nothing new. `guard_hook_body` already receives old-sha/new-sha pairs on stdin per ref
-  and previously discarded both (`bin/keel:1729`, `_lsha`, `_rsha`).
+  and previously discarded both (`bin/keel:2604-2607`, `_lsha`, `_rsha`).
 - Produces: a second refusal path in the generated `.githooks/pre-push`, alongside the existing
   default-branch refusal, sharing the same single stdin read.
 
@@ -920,7 +920,7 @@ value this plan cannot source from the tree. See open question 5.
 **Idea:** `docs/ideas/fleet-view-for-doctor.md`
 
 **Files:**
-- Modify: `bin/keel` (`cmd_doctor` at `bin/keel:1268-1701`, renamed to `cmd_doctor_text` with a
+- Modify: `bin/keel` (`cmd_doctor` at `bin/keel:1268-1779`, renamed to `cmd_doctor_text` with a
   thin `cmd_doctor` wrapper in front of it; the two usage lines at `bin/keel:8` and
   `bin/keel#say "  doctor [--fast] [--json]`)
 - Modify: `README.md` (the `keel doctor --fast` usage line, near line 41)
@@ -1076,7 +1076,7 @@ Expected: PASS.
 
 - [x] **Step 5: Update the README usage block**
 
-`README.md:40-41` lists `keel doctor` and `keel doctor --fast` in the project-commands usage block.
+`README.md:43-44` lists `keel doctor` and `keel doctor --fast` in the project-commands usage block.
 Add a third line directly after them: `keel doctor --json --fast         # machine-readable, for a
 fleet script to consume`.
 
@@ -1885,7 +1885,7 @@ A further independent read against the tree, after the first pass's fixes were i
 blocked; both are folded in above.
 
 - **Blocking, fixed:** task 3's test could never fail-then-pass. `keel init` writes
-  `gates.commit_guard` as `"off"` (`bin/keel:555`, confirmed by running init on a fixture), and the
+  `gates.commit_guard` as `"off"` (`bin/keel:352`, confirmed by running init on a fixture), and the
   test's "baseline, gate required" commit never set it to `required`, so old and new were both `off`
   and the refusal was unobservable. The test now sets `required` before the baseline commit.
 - **Blocking, fixed:** `tests/validate-skills.sh` was already red on this branch, 4 problems, all em

@@ -80,34 +80,6 @@ three.
   tool calls a rubric may turn on.
 - `--bare` looks right and is not: it requires `ANTHROPIC_API_KEY` and refuses OAuth.
 
-**On Codex the flags are different, and two of the differences are not obvious.**
-`tests/evals/stage.sh --harness codex <scenario>` prints the recipe; the staged tree is byte for
-byte the same either way, because `run.sh` pastes each injected `SKILL.md` into the prompt as plain
-text rather than relying on a plugin install. Proven 2026-09-05 and recorded in `results.md`.
-
-| Claude Code | Codex | |
-|---|---|---|
-| `claude -p "$(cat ../prompt.md)"` | `codex exec "$(cat ../prompt.md)"` | |
-| `--setting-sources ""`, `--disable-slash-commands` | `--ignore-user-config`, `--ignore-rules` | **partial**, see below |
-| `--permission-mode bypassPermissions` | `--dangerously-bypass-approvals-and-sandbox` | eval only, never in a user document |
-| `--output-format json` | `--json` | |
-| nothing | `--skip-git-repo-check` | **required**, see below |
-
-- **`--skip-git-repo-check` is required, not optional.** The staged fixture is not a git repository
-  and Codex refuses to run outside one. The Claude recipe needs no equivalent, so this is the one
-  flag a reader would not think to look for.
-- **`--ignore-user-config` is only a partial counterpart to `--setting-sources ""`.** It suppresses
-  `$CODEX_HOME/config.toml`. It is **not established** that it suppresses skill discovery from
-  `$HOME/.agents/skills` or `AGENTS.md` loading, both of which Codex reads from outside the working
-  directory. `-c project_doc_max_bytes=0` is the candidate for the second. Until that is checked, a
-  Codex baseline arm is only trustworthy on a machine with neither present, which is a property of
-  the machine rather than of the harness and so cannot be asserted by a test here. Check it before
-  relying on a Codex baseline, and record the result in this section.
-- **`--dangerously-bypass-approvals-and-sandbox` is eval only.** It disables the sandbox, and it is
-  safe only where `bypassPermissions` is: where nothing else is within reach.
-  `tests/test-eval-harness.sh` fails the build if it appears in any document a user reads as
-  instructions.
-
 **To check which model a dispatch actually ran on, swap in `--output-format stream-json --verbose`.**
 It emits every assistant message, `tool_use` blocks and their inputs included, so an `Agent` call's
 `model` parameter is read rather than inferred. This is the standing method for any question about
@@ -116,25 +88,21 @@ dispatched and ignored its model looks identical to one that never dispatched. P
 run whose model is set explicitly, so absence means something. Worked out 2026-08-20, which is also
 where the 2026-08-19 note that the tool calls "cannot be read back" was closed; see `results.md`.
 
-### Reading the tool calls, on either harness
+### Reading the tool calls
 
 **This is the method every scenario rubric points at**, rather than each one naming a flag. A rubric
 asks whether the arm *did* something, and the reply's prose is never evidence that it did; the tool
-calls are. The mechanism differs by harness and the rubrics do not, which is why it is written once
-here.
+calls are. The mechanism is a dispatch flag and the rubrics name none, which is why it is written
+once here.
 
-| | Dispatch with | What you get |
-|---|---|---|
-| Claude Code | `--output-format stream-json --verbose` | every assistant message, `tool_use` blocks and their inputs included |
-| Codex | `--json` | a JSONL event stream; the tool calls are `custom_tool_call` records, with the command in the call's own `input` |
-
-`--output-format json` on Claude Code and no flag at all on Codex give you the reply and the cost
+Dispatch with `--output-format stream-json --verbose` and you get every assistant message,
+`tool_use` blocks and their inputs included. `--output-format json` gives you the reply and the cost
 and nothing about what the arm actually did, which is the state that made the 2026-08-19 note say
 the tool calls could not be read back at all.
 
-`hooks/done-guard` parses both shapes already, in `codex_turn_tool_calls` and the Claude reader
-beside it, so a scorer who wants the extraction rather than the raw stream has a worked example of
-each in the tree.
+`hooks/done-guard` reads the `tool_use` blocks out of a Claude Code transcript in
+`turn_tool_calls`, so a scorer who wants the extraction rather than the raw stream has a worked
+example in the tree.
 
 For a **baseline arm**, replace the staged prompt with the pressure prompt alone, since `run.sh`
 injects the skills:

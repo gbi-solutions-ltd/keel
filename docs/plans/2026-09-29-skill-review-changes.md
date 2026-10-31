@@ -637,7 +637,7 @@ Cite it by that phrase, which no insertion moves, before adding the changelog li
 citation repair. In `docs/ideas/keel-on-codex.md`, in the bullet on the measured cost:
 
 ```text
-(2026-09-04 gate, `CHANGELOG.md:12`)
+(2026-09-04 gate, `CHANGELOG.md:41`)
 ```
 
 becomes:
@@ -2778,7 +2778,7 @@ proves.
 The second review found nothing blocking. Its four should-fix items and five considers were acted
 on, and three notes are recorded without a change.
 
-- **Should-fix 1**, `CHANGELOG.md:12` in `docs/ideas/keel-on-codex.md`, already wrong and moved by
+- **Should-fix 1**, `CHANGELOG.md:41` in `docs/ideas/keel-on-codex.md`, already wrong and moved by
   every task: task 1, step 1.3 cites the 2026-09-04 gate entry by the phrase "Release gate
   2026-09-04 against", which passes `tests/validate-citations.sh` in simulation and fails it when
   misspelt; Files and `git add` name the file.

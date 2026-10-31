@@ -9,6 +9,35 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- **Codex support is removed, and v0.26.0 is the last keel release with Codex support** (ADR-0013).
+  A Codex user installs that tag with `codex plugin marketplace add gbi-solutions-ltd/keel --ref
+  v0.26.0 && codex plugin add keel@gbi`, and a separate keel plugin for Codex is planned.
+  `.codex-plugin/plugin.json`, `hooks/hooks.codex.json` and `lib/harness/codex.sh` are deleted, and
+  the capability ledger holds Claude Code rows only (ADR-0014). `done-guard` and the context watch
+  read Claude Code transcripts only. Skills and agents name no other harness, and
+  `tests/validate-skills.sh` fails one that names Codex.
+- `keel init` refuses `--harness`, and `keel init` and `keel new` write the managed block to
+  `CLAUDE.md` only: no `AGENTS.md` and no `.codex/` files. An existing `AGENTS.md` is left byte for
+  byte and unstaged, and `keel doctor` no longer reads it. `profile.harnesses` is retired in schema
+  7: a schema 6 profile still loads, and doctor's retired-key warning names the key. The register of
+  retired keys is `lib/retired-keys.sh`, which `bin/keel` and both checks source. Doctor no longer
+  detects a harness, so outside Claude Code it reports one fewer warning: "cannot determine which
+  harness is running" is gone. `keel doctor --json` and `keel-fleet` drop the harness set.
+- `keel doctor` checks the installed Claude Code against keel's minimum, the highest version among
+  the evidenced Claude Code rows a gate requires in the capability ledger: 2.1.302 today, stated in
+  `README.md`. Each warning names its cause: `claude` not found, older than the minimum, no version
+  in its output, or stopped after 5 seconds, when doctor kills it. An unreadable minimum is a
+  warning, never a pass. `keel-fleet` asks once per run, and every doctor it runs reads that answer
+  through `KEEL_CLAUDE_VERSION_FILE`, where a line with no `|`, or whose version is not digits and
+  dots, is no answer, so doctor asks Claude Code itself. Doctor writes its answer there only when
+  the file is empty, absent or holds a line with a `|`, never through a symlink, and a file it
+  cannot read prints no shell error. The ledger holds one row per primitive, and re-verifying one
+  on a later Claude Code leaves its row as it is, so the minimum does not rise.
+- `hooks/sensitive-guard` no longer reads the capability ledger, and keeps one Codex refusal. On a
+  commit in a repository declaring a non-empty `hard_block_paths`, with `CLAUDE_PROJECT_DIR` empty
+  and either `CODEX_VERSION` set or a `"turn_id":` key in the event, it exits 2 with a message
+  naming v0.26.0 and its Codex install line. Claude Code sets `CLAUDE_PROJECT_DIR` for every hook,
+  so there the guard asks as before, and any other unexpected exit asks.
 - Development moved into the public repository. Work lands through short-lived branches and
   pull requests into `main`, and a release is a version-bump pull request followed by an annotated
   tag and a GitHub release in the same repository (`docs/runbooks/cutting-a-release.md`).
@@ -25,6 +54,10 @@ Entries are terse by design; the narrative for each release is in this file's gi
   `gbi-solutions-ltd/keel-internal` was archived read-only on 2026-10-24. The first pull request
   (#3) was merged by its author on 2026-10-24, before `main` was protected, so it went in without
   a review.
+- `keel doctor` warns about what keel v0.26.0 left under `.codex/`: the
+  `.codex/agents/keel-fanout.toml` and `.codex/agents/keel-implementer.toml` files, and a managed
+  block in `.codex/config.toml` from its `# keel:start v1` line to its `# keel:end` line. Both
+  warnings say Codex support ended at v0.26.0 and the leftovers can be deleted.
 - `tests/test-keel.sh` is split at its section headers into five parts (`tests/test-keel.sh` and
   `tests/test-keel-2.sh` to `tests/test-keel-5.sh`) sharing `tests/keel-test-lib.sh`, so
   `tests/run-tests.sh` runs them in parallel. It ran 771 cases serially in 501s and set the suite's
@@ -39,15 +72,33 @@ Entries are terse by design; the narrative for each release is in this file's gi
   read it or rewrites each field to test it for blanks: `keel doctor --fast` 1.08s to 0.95s, best
   of six. Sourcing it by a relative path and then changing directory, sourcing it through a symlink,
   or sourcing it with `CDPATH` set no longer turns every gate dark. `bin/keel`, `bin/keel-fleet` and
-  the session-start, context-watch and sensitive-guard hooks unset `CDPATH`, so run by a relative
-  path with it set they no longer report an incomplete install, fall back to another `keel`, go
-  silent or ask on a commit they should let through. The eval scripts under `tests/evals/` and the
-  `dispatch.sh` that `gate.sh` writes unset it too.
+  the session-start and context-watch hooks unset `CDPATH`, so run by a relative path with it set
+  they no longer report an incomplete install, fall back to another `keel` or go silent. The eval
+  scripts under `tests/evals/` and the `dispatch.sh` that `gate.sh` writes unset it too.
 - `hooks/sensitive-guard` asks when it fails unexpectedly. Claude Code lets a tool call proceed on
   any hook exit but 0 and 2, so a crash in the guard, such as the embedded Python raising on an
   event whose `tool_input` is a string rather than an object, let a commit touching
   `hard_block_paths` through without asking. An `EXIT` trap now answers `ask` on any exit but 0
-  and 2. An event that is not JSON at all still exits 0 without asking.
+  and 2. An event that is not JSON at all still exits 0 without asking. It sees a commit behind a
+  global git option (`git -c core.hooksPath=/dev/null commit`, `git -C . commit`, `--git-dir`,
+  `--work-tree`, `--namespace`, `--config-env`), which went through in silence. It asks on a
+  profile that exists and cannot be read, one that is not a JSON object, and a `hard_block_paths`
+  that is present and not a list of strings, where a string was read character by character and
+  guarded nothing; on Codex each of these is the refusal. An absent key, `null` and `[]` still
+  declare nothing. It walks up for the profile, and runs git, from the event's `cwd`, then
+  `CLAUDE_PROJECT_DIR`, then `$PWD`, without calling `dirname`. A commit in another repository
+  (`git -C ../other commit`) is judged by the session's repository, and the hook says so.
+  It looks for `commit` in the event's `command` value alone only when that value holds no quote,
+  backslash, tab, newline or other escaped character and the key appears once, so a
+  `git -C . diff` whose description names a commit then exits in silence. Otherwise the whole event
+  is matched, description included, and a non-commit it lets past, such as that diff with a quoted
+  argument, is asked on Claude Code wherever a commit would be for a reason other than its paths:
+  python3 absent; a profile the hook cannot use (unreadable, unparseable, not a JSON object, or with
+  a `hard_block_paths` that is not a list of strings); git that cannot run or a failing `git diff`;
+  and a staged profile. On Codex the refusal stands in for each, and also fires on any
+  `hard_block_paths` that is not empty.
+- `hooks/done-guard` warns on a transcript whose rows parse and none has a Claude Code shape,
+  saying the turn was not checked. It read such a transcript as a clean turn and said nothing.
 
 ## 0.26.0 - 2026-10-22
 
@@ -1824,7 +1875,7 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 - **`curl`, `wget` and `nc` are `ask` rules, closing the network egress gap decision 12 recorded.** Under `bypassPermissions` whatever a session can read it could post, and nothing prompted; the vendor's own hardening guidance names denying these as the fix. `ask` rather than `deny`, because fetching a page is ordinary work and a prompt is enough to make it a decision. **This is defence in depth and not an egress boundary**, and `bin/keel` now says what it misses: a remote shell or file copy over ssh, a push to a remote nobody looked at, a one-liner opening a socket, and any of those through `sh -c` or `xargs`.
 
-- **Upgrade note: `keel doctor` reports three missing guardrails on every project initialised before this.** Missing rules are a `fail` rather than a warning by design (`bin/keel:1506-1527`), since these rules are what make the bypass default defensible. Re-run `keel init` to add them; it merges and leaves existing rules and settings alone.
+- **Upgrade note: `keel doctor` reports three missing guardrails on every project initialised before this.** Missing rules are a `fail` rather than a warning by design (`lib/harness/claude.sh:554-558`), since these rules are what make the bypass default defensible. Re-run `keel init` to add them; it merges and leaves existing rules and settings alone.
 
 - The three egress rules are emitted with `printf` rather than written into the `keel_ask_rules` heredoc, because a heredoc line cannot carry a `supply-chain-scan` suppression: its text *is* the rule, so a trailing comment would land inside the rule string. The scanner reads `bin/keel` as an executable and its `net-in-script` rule cannot tell a command named in a permission rule from one being run, which is the same false positive `tests/test-profile-keys.sh:82` already suppresses. The check was not weakened to accommodate the change.
 

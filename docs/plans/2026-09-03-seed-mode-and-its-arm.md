@@ -1060,9 +1060,9 @@ That file is never staged.
 
 Then the three scenario counts, all in this same edit:
 
-- `README.md:185`, `11 scenarios exist` to `12 scenarios exist`.
+- `README.md:188`, `11 scenarios exist` to `12 scenarios exist`.
 - `tests/evals/README.md`, `Eleven scenarios exist` to `Twelve scenarios exist`.
-- `docs/06-repo-layout.md:177`, `# 11 scenarios, 11 fixtures` to `# 12 scenarios, 12 fixtures`.
+- `docs/06-repo-layout.md:174`, `# 11 scenarios, 11 fixtures` to `# 12 scenarios, 12 fixtures`.
 
 The first and third are asserted by `tests/test-doc-claims.sh` and recompute from the tree. The
 second carries no digit and is asserted by nothing, which is why it is named here.

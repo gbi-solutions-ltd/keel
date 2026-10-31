@@ -15,6 +15,15 @@ fail=0
 ok()  { printf '  PASS  %s\n' "$1"; pass=$((pass+1)); return 0; }
 bad() { printf '  FAIL  %s: %s\n' "$1" "$2"; fail=$((fail+1)); return 0; }
 
+# keel-fleet runs keel doctor, which asks the installed Claude Code for its version through
+# KEEL_CLAUDE. The same stub tests/keel-test-lib.sh exports, so these rows do not depend on whether
+# this machine has claude.
+KEEL_CLAUDE="$(mktemp -d)/claude"
+printf '#!/bin/sh\necho "%s (Claude Code)"\n' \
+  "$(bash -c ". '$ROOT/lib/harness/resolve.sh'; harness_min_version")" > "$KEEL_CLAUDE"
+chmod +x "$KEEL_CLAUDE"
+export KEEL_CLAUDE
+
 a="$(mktemp -d)"; ( cd "$a" && "$KEEL" new proj --stack minimal >/dev/null 2>&1 )
 repo_a="$a/proj"
 b="$(mktemp -d)"; ( cd "$b" && "$KEEL" new proj --stack minimal >/dev/null 2>&1 )
@@ -31,17 +40,16 @@ case "$out" in
   *) bad "keel-fleet" "output does not name $repo_a: $out" ;;
 esac
 
-# the header names every column, harnesses included, in the order the rows carry them
+# the header names every column, in the order the rows carry them, and the harness set is not one
 head1="$(printf '%s\n' "$out" | head -1)"
-[ "$head1" = "$(printf 'repo\tkeel_version\tschema_version\tharnesses\tverify_test_null\tproblems\twarnings')" ] \
-  && ok "fleet header carries the harnesses column" \
-  || bad "keel-fleet" "unexpected header: $head1"
+[ "$head1" = "$(printf 'repo\tkeel_version\tschema_version\tverify_test_null\tproblems\twarnings')" ] \
+  && ok "fleet header carries no harnesses column" \
+  || bad "fleet header carries no harnesses column" "unexpected header: $head1"
 
-# the harnesses cell is the profile's list, comma-joined
-want="$(python3 -c "import json; print(','.join(json.load(open('$repo_a/.keel/profile.json')).get('harnesses', [])))")"
-got="$(printf '%s\n' "$out" | awk -F'\t' -v r="$repo_a" '$1 == r { print $4 }')"
-[ "$got" = "$want" ] && ok "fleet harnesses cell matches the profile ($got)" \
-  || bad "keel-fleet" "harnesses cell is '$got', profile says '$want'"
+# a row has one cell per header column
+ncell="$(printf '%s\n' "$out" | awk -F'\t' -v r="$repo_a" '$1 == r { print NF }')"
+[ "$ncell" = 6 ] && ok "fleet row has no harnesses cell" \
+  || bad "fleet row has no harnesses cell" "row has $ncell cells"
 
 # --file: a path-list file whose last line has no trailing newline must still report every repo
 # (regression test for the read loop silently dropping the final path)
@@ -81,7 +89,7 @@ header="$(printf '%s\n' "$out" | head -1)"
 row="$(printf '%s\n' "$out" | awk -F'\t' -v r="$repo_a" '$1 == r')"
 cols="$(printf '%s' "$row" | awk -F'\t' '{ print NF }')"
 want_cols="$(printf '%s' "$header" | awk -F'\t' '{ print NF }')"
-[ "$row" = "$(printf '%s\t(unreadable)\t\t\t\t\t' "$repo_a")" ] \
+[ "$row" = "$(printf '%s\t(unreadable)\t\t\t\t' "$repo_a")" ] \
   && ok "fleet prints the (unreadable) row for malformed doctor output" \
   || bad "keel-fleet" "expected an (unreadable) row for $repo_a, got: $row"
 [ "$cols" = "$want_cols" ] && ok "malformed-output row has the full column count" \
@@ -114,9 +122,13 @@ case "$row" in
   *"(unreadable)"*) bad "keel-fleet" "a repo with a real doctor problem (not a read failure) reported unreadable: $row" ;;
   *) ok "fleet reports a real row for a repo doctor found problems in, not (unreadable)" ;;
 esac
-problems_col="$(printf '%s' "$row" | awk -F'\t' '{ print $6 }')"
-[ "${problems_col:-0}" -gt 0 ] 2>/dev/null && ok "fleet's problems column reflects the real count ($problems_col)" \
-  || bad "keel-fleet" "expected a positive problems count, row: $row"
+# problems is the fifth column; the count doctor itself reports is what it must equal.
+problems_col="$(printf '%s' "$row" | awk -F'\t' '{ print $5 }')"
+want="$(cd "$repo_c" && "$KEEL" doctor --json --fast 2>/dev/null \
+  | python3 -c 'import json, sys; print(json.load(sys.stdin)["problems"])')"
+[ "${want:-0}" -gt 0 ] 2>/dev/null && [ "$problems_col" = "$want" ] \
+  && ok "fleet's problems column reflects the real count ($problems_col)" \
+  || bad "keel-fleet" "expected a problems count of ${want:-<none>}, row: $row"
 [ "$rc" -ne 0 ] && ok "fleet still exits nonzero when a repo has real problems" \
   || bad "keel-fleet" "expected nonzero exit for a repo with real problems, got 0"
 rm -rf "$c"
@@ -131,6 +143,35 @@ got="$(printf '%s\n' "$out" | awk -F'\t' -v r="$repo_a" '$1 == r { print $2 }')"
 [ "$got" = "$(cat "$ROOT/VERSION")" ] && ok "run by a relative path with CDPATH set, fleet still finds its own keel" \
   || bad "keel-fleet" "with CDPATH set the row was: $out"
 
-rm -rf "$a" "$b"
+# keel-fleet asks Claude Code for its version once per run: each ask can take five seconds when
+# claude hangs, so a fleet of forty repositories asked forty times. The stub counts its runs.
+counter="$(mktemp)"
+printf '#!/bin/sh\necho x >> "%s"\necho "%s (Claude Code)"\n' "$counter" \
+  "$(bash -c ". '$ROOT/lib/harness/resolve.sh'; harness_min_version")" > "$(dirname "$KEEL_CLAUDE")/counted"
+chmod +x "$(dirname "$KEEL_CLAUDE")/counted"
+out="$(KEEL_CLAUDE="$(dirname "$KEEL_CLAUDE")/counted" "$FLEET" "$repo_a" "$repo_b" 2>&1)"
+n="$(grep -c . "$counter")"
+[ "$n" = 1 ] && ok "keel-fleet asks Claude Code for its version once per run: two repositories, one ask" \
+  || bad "keel-fleet asks Claude Code for its version once per run: two repositories, one ask" "$n asks"
+w_a="$(printf '%s\n' "$out" | awk -F'\t' -v r="$repo_a" '$1 == r { print $6 }')"
+w_b="$(printf '%s\n' "$out" | awk -F'\t' -v r="$repo_b" '$1 == r { print $6 }')"
+[ -n "$w_a" ] && [ "$w_a" = "$w_b" ] \
+  && ok "keel-fleet asks Claude Code for its version once per run: both rows show the same warnings count" \
+  || bad "keel-fleet asks Claude Code for its version once per run: both rows show the same warnings count" "$out"
+KEEL_CLAUDE="$(dirname "$KEEL_CLAUDE")/counted" "$FLEET" "$repo_a" >/dev/null 2>&1
+n="$(grep -c . "$counter")"
+[ "$n" = 2 ] && ok "keel-fleet asks Claude Code for its version once per run: a second run asks again" \
+  || bad "keel-fleet asks Claude Code for its version once per run: a second run asks again" "$n asks after two runs"
+: > "$counter"
+for _ in 1 2; do
+    ( cd "$repo_a" && env -u KEEL_CLAUDE_VERSION_FILE KEEL_CLAUDE="$(dirname "$KEEL_CLAUDE")/counted" \
+        "$KEEL" doctor --fast >/dev/null 2>&1 )
+done
+n="$(grep -c . "$counter")"
+[ "$n" = 2 ] && ok "keel-fleet asks Claude Code for its version once per run: two doctor runs with the variable unset ask twice" \
+  || bad "keel-fleet asks Claude Code for its version once per run: two doctor runs with the variable unset ask twice" "$n asks"
+rm -f "$counter"
+
+rm -rf "$a" "$b" "$(dirname "$KEEL_CLAUDE")"
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

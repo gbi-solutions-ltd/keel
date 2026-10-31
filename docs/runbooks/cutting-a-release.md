@@ -99,19 +99,15 @@ Do the bump on a branch `release/X.Y.Z` from `main`, never on `main` itself:
 git fetch origin && git switch -c release/0.17.0 origin/main
 ```
 
-**Four places, one commit, because `tests/test-keel.sh` pins them to each other:**
+**Three places, one commit, because `tests/test-keel.sh` pins them to each other:**
 
 1. `VERSION`, which drives the CLI and every project's profile
 2. `.claude-plugin/plugin.json`, which keys the installed plugin cache on Claude Code
-3. `.codex-plugin/plugin.json`, which keys it on Codex. Added 2026-09-06 with Tier B, and the
-   version check globs `.*-plugin/plugin.json` rather than naming them, so a third manifest is
-   covered on the day it is added rather than the day it drifts
-4. `CHANGELOG.md`'s newest `## ` heading, which is what a human reads
+3. `CHANGELOG.md`'s newest `## ` heading, which is what a human reads
 
 ```bash
 printf '0.17.0\n' > VERSION
 # edit .claude-plugin/plugin.json "version"
-# edit .codex-plugin/plugin.json "version"
 # change `## Unreleased` to `## 0.17.0 - YYYY-MM-DD`, and add the gate result to that entry
 ```
 
@@ -138,7 +134,7 @@ only difference, are expected; anything else is not. The second was first seen a
 
 ```bash
 tests/run-tests.sh          # expect the two failures above
-git add VERSION .claude-plugin/plugin.json .codex-plugin/plugin.json CHANGELOG.md
+git add VERSION .claude-plugin/plugin.json CHANGELOG.md
 git commit -s -m "release: 0.17.0"
 tests/run-tests.sh          # expect: All test files passed
 ```
@@ -187,13 +183,6 @@ other than its author.
    ```
 
 ## 4. Sweep, tag and release
-
-**First Tier B release only: the CHANGELOG entry must carry the CCA warning in plain words.** Not a
-link to the design, and not a sentence about capability manifests. The text to paste is in
-`docs/architecture/tiered-multi-harness-support.md` section 9, and it says that on Codex two of the
-three gates stop blocking if an upstream change lands, that nothing in keel will go red when it
-does, and what to check. A person reading only the CHANGELOG has to learn this; it is the one risk
-in Tier B that a keel user cannot detect for themselves.
 
 Nothing in this section is reversible. A tag and a release are public the moment they are pushed,
 and making a repository private again does not recall clones or forks.
@@ -277,7 +266,7 @@ built. The API shows what people can read.
 | A validator reports a broken citation into `docs/audits/` on the owner's machine | The private clone is behind, or missing a file | Pull it |
 | The sweep prints `OK` with "generic patterns only" | The deny list is absent on this machine | Do not push. Restore `~/.config/keel/internal-deny-list.txt` and re-sweep |
 | Push protection rejects a push | A test fixture shaped like a credential | Fix at the cause, not the unblock link. Sweep per provider: the first sweep missed a Stripe key by searching the OpenAI shape. *Recorded* |
-| A skill fix reaches nobody after a release | a `plugin.json` disagrees with `VERSION` | The cache is keyed on `plugin.json`, and there are two of them since Tier B. Bump all four. *Recorded* |
+| A skill fix reaches nobody after a release | a `plugin.json` disagrees with `VERSION` | The cache is keyed on `plugin.json`. Bump all three. *Recorded* |
 | A `main...release/X.Y.Z` range gives obviously wrong counts | Local `main` is behind `origin/main` | `git fetch` first. It has produced a wrong artifact before |
 | The release commit passes CI on the PR and fails the same checks on `main` | A `producer \| grep -q` under `pipefail`, not the tree. grep leaves at the first match and the producer's 141 fails the pipeline | Read the failures for a common shape before re-running. Fix the pipeline, not the thing it accused |
 

@@ -20,9 +20,15 @@ grep -q '^provides|claude|pretooluse_ask|' "$CAP" 2>/dev/null \
   && ok "claude provides pretooluse_ask" \
   || bad "claude provides pretooluse_ask" "row absent"
 
-grep -q '^provides|codex|pretooluse_ask|' "$CAP" 2>/dev/null \
-  && bad "codex does not provide pretooluse_ask" "row present and must not be" \
-  || ok "codex does not provide pretooluse_ask"
+# The ledger holds Claude Code rows and the gate rules, and nothing about another harness: keel
+# serves Claude Code alone (ADR-0013), so a row or a paragraph naming a second one describes a
+# plugin that does not exist. Case-insensitive, because prose counts as much as a row does.
+n="$(grep -ic codex "$CAP")"
+[ "$n" = 0 ] && ok "the ledger has no Codex rows and no Codex commentary" \
+  || bad "the ledger has no Codex rows and no Codex commentary" "$n lines name Codex"
+others="$(awk -F'|' '$1=="provides" && $2!="claude" {print $2}' "$CAP" | sort -u | tr '\n' ' ')"
+[ -z "$others" ] && ok "every provides row is a claude row" \
+  || bad "every provides row is a claude row" "harnesses: $others"
 
 # Every requires row names a gate that exists as a file under hooks/. Both directions, because a
 # requires row for a gate nobody ships is as wrong as a gate with no requires row.
@@ -61,21 +67,56 @@ got="$(provenance_gaps "$fx" | sort | tr '\n' ' ')"
   || bad "the provenance check fires on empty, blank and wrong-arity rows" "got: $got"
 rm -f "$fx"
 
+# Every version is dotted numbers. harness_version_ge returns 1 for a field that is not a number,
+# so a 2.1.x would reach keel doctor as a wrong minimum rather than as a ledger row to fix; caught
+# here, it names the row.
+version_gaps() {   # version_gaps <file>
+    awk -F'|' '$1=="provides" && $5 !~ /^[0-9]+(\.[0-9]+)+$/ {print $2"/"$3}' "$1"
+}
+odd="$(version_gaps "$CAP")"
+[ -z "$odd" ] && ok "a malformed ledger version is caught by the ledger test: every provides row's version is dotted numbers" \
+  || bad "a malformed ledger version is caught by the ledger test: every provides row's version is dotted numbers" "$odd"
+fx="$(mktemp)"
+printf 'provides|ghost|a|src|2.1.302|2026-01-01\nprovides|ghost|b|src|2.1.x|2026-01-01\nprovides|ghost|c|src|2|2026-01-01\n' > "$fx"
+got="$(version_gaps "$fx" | tr '\n' ' ')"
+[ "$got" = "ghost/b ghost/c " ] \
+  && ok "a malformed ledger version is caught by the ledger test: a fixture with 2.1.x fails it" \
+  || bad "a malformed ledger version is caught by the ledger test: a fixture with 2.1.x fails it" "got: ${got:-<none>}"
+rm -f "$fx"
+
+# A primitive has one provides row. Two rows are two claims about one fact, and the minimum is the
+# highest version a gate's primitives were evidenced on, so a second row at a later version raises
+# keel's minimum, and which version doctor's late-gate warning names would depend on row order.
+duplicate_primitives() {   # duplicate_primitives <file>
+    awk -F'|' '$1=="provides" { n[$2"/"$3]++ } END { for (k in n) if (n[k] > 1) print k }' "$1"
+}
+dup="$(duplicate_primitives "$CAP" | tr '\n' ' ')"
+[ -z "$dup" ] && ok "a second ledger row for a primitive is refused: the ledger holds one row per primitive" \
+  || bad "a second ledger row for a primitive is refused: the ledger holds one row per primitive" "$dup"
+fx="$(mktemp)"
+printf 'provides|claude|p1|src|2.1.296|2026-01-01\nprovides|claude|p2|src|2.1.296|2026-01-01\nprovides|claude|p2|src|2.1.400|2026-02-01\n' > "$fx"
+got="$(duplicate_primitives "$fx" | tr '\n' ' ')"
+[ "$got" = "claude/p2 " ] \
+  && ok "a second ledger row for a primitive is refused: a fixture with two p2 rows names claude/p2" \
+  || bad "a second ledger row for a primitive is refused: a fixture with two p2 rows names claude/p2" "got: ${got:-<none>}"
+rm -f "$fx"
+
 # Every source says which kind of evidence it is. A keel file is neither kind.
 unkinded="$(awk -F'|' '$1=="provides" && $4 !~ /^(vendor|probe):/ {print $2"/"$3}' "$CAP")"
 [ -z "$unkinded" ] && ok "every source is marked vendor: or probe:" \
   || bad "every source is marked vendor: or probe:" "$unkinded"
 
-# A one-character typo in a requires row would disable a gate on every harness, including the one
-# where it works. Fail closed is right; a typo indistinguishable from a deliberate absence is not.
+# A one-character typo in a requires row would silently disable that gate, though Claude Code
+# provides what it needs. Fail closed is right; a typo indistinguishable from a deliberate absence
+# is not.
 # Keyed on gate AND primitive. Keyed on the gate alone, a second requires row overwrites the first
 # and only the last is ever checked, which is precisely the shape done-guard now has.
 orphan="$(awk -F'|' '$1=="provides"{p[$3]=1} $1=="requires"{r[$2 SUBSEP $3]=1} END{for(k in r){split(k,a,SUBSEP); if(!(a[2] in p)) print a[1]"->"a[2]}}' "$CAP")"
-[ -z "$orphan" ] && ok "every required primitive is provided by some harness" \
-  || bad "every required primitive is provided by some harness" "$orphan"
+[ -z "$orphan" ] && ok "every required primitive has a provides row" \
+  || bad "every required primitive has a provides row" "$orphan"
 
-# The gate list comes from the tree, not from this file. A fifth gate added under hooks/ with no
-# requires row would otherwise pass unnoticed, and resolve.sh would report it active everywhere.
+# The gate list comes from the tree, not from this file. A gate added under hooks/ with no requires
+# row would otherwise pass unnoticed, and resolve.sh would report it inactive, so it never runs.
 for h in "$ROOT"/hooks/*; do
     [ -f "$h" ] || continue
     g="$(basename "$h")"
@@ -87,9 +128,9 @@ done
 # Every line is a comment, a blank, or a well-formed record of the right arity. Without this, an
 # indented or misspelled requires row is invisible to resolve.sh AND to every other check in this
 # file, because all of them key on $1=="requires" or $1=="provides". One leading space turns a
-# requirement into a no-op and its gate resolves ACTIVE on a harness that does not meet it: adding
-# a single space to the done-guard row makes done-guard active on Codex, which provides neither
-# transcript schema row. That is this design's dominant failure reachable by one keystroke, and the
+# requirement into a no-op and its gate resolves ACTIVE on a harness that does not meet it: a
+# single space before a requires row drops that requirement from the gate without a word. That is
+# this design's dominant failure reachable by one keystroke, and the
 # direction is the dangerous one, because a malformed provides row fails closed and gets noticed
 # while a malformed requires row fails open and does not. Leading whitespace is never legal here,
 # comments included, which is why an indented comment and a whitespace-only line are both flagged.
@@ -154,28 +195,6 @@ if command -v harness_active_gates >/dev/null 2>&1; then
     [ "$got" = "context-watch done-guard review-guard sensitive-guard session-start " ] \
       && ok "claude resolves five gates" || bad "claude resolves five gates" "got: $got"
 
-    # Three gates, and this is where a human sees Tier B change size. It was session-start alone
-    # until 2026-09-06: task 1's manifest had split the transcript primitives along Claude Code's
-    # own schema, so no evidence could ever have earned the other two. Task 2A renamed them and
-    # task 14 earned them, with parsers that read a captured rollout and probe rows citing it.
-    # sensitive-guard stays inactive, because pretooluse_ask is genuinely absent rather than
-    # unnameable. ADR-0003: absent evidence fails, never passes.
-    got="$(harness_active_gates codex | sort | tr '\n' ' ')"
-    [ "$got" = "context-watch done-guard session-start " ] \
-      && ok "codex resolves three gates" \
-      || bad "codex resolves three gates" "got: $got"
-
-    harness_gate_active codex sensitive-guard \
-      && bad "sensitive-guard inactive on codex" "reported active" \
-      || ok "sensitive-guard inactive on codex"
-
-    # review-guard is dark on Codex: whether a Codex hook's input names the dispatched agent is
-    # unrecorded, so it cannot tell a reviewer from the author, and pretooluse_deny alone is not
-    # enough to make it a gate there.
-    harness_gate_active codex review-guard \
-      && bad "review-guard inactive on codex" "reported active" \
-      || ok "review-guard inactive on codex"
-
     harness_active_gates cursor >/dev/null 2>&1 \
       && bad "an unknown harness is refused" "exit status was zero" \
       || ok "an unknown harness is refused"
@@ -205,7 +224,8 @@ if command -v harness_active_gates >/dev/null 2>&1; then
     # harness_active_gates alone, its own harness_known call would hide the other three.
     harness_known claude >/dev/null
     for call in "harness_provides claude pretooluse_ask" "harness_known claude" \
-                "harness_gate_active claude done-guard" "harness_active_gates claude"; do
+                "harness_gate_active claude done-guard" "harness_active_gates claude" \
+                "harness_gate_version done-guard" "harness_min_version"; do
         # shellcheck disable=SC2086
         # Word splitting is the point: each entry is a function and its arguments.
         KEEL_CAPABILITIES="" $call >/dev/null \
@@ -252,8 +272,8 @@ if command -v harness_active_gates >/dev/null 2>&1; then
       || bad "a final row with no trailing newline is still read" "reported active"
 
     # A gate with no requires row at all must be inactive. `found=1` is the only thing making that
-    # true, and flipping it to 0 resolves every unknown gate ACTIVE on every harness, which is
-    # the failure the hooks-directory loop above warns about. Nothing pinned it until now.
+    # true, and flipping it to 0 resolves every unknown gate ACTIVE with nothing it requires
+    # checked. Nothing pinned it until now.
     harness_gate_active claude no-such-gate \
       && bad "a gate with no requires row is inactive" "reported active" \
       || ok "a gate with no requires row is inactive"
@@ -267,6 +287,29 @@ if command -v harness_active_gates >/dev/null 2>&1; then
     # about tabs first, so without this the two drift apart in the direction that grants.
     [ "$(gate_on 'provides|ghost|p|src|\t|2026-01-01\nrequires|done-guard|p\n')" = "inactive" ] \
       && ok "a tab-only version grants nothing" || bad "a tab-only version grants nothing" "reported active"
+
+    # The same rule on a claude row, read by harness_provides itself. Every fixture above is a ghost
+    # row, so a resolver that trusted claude rows without their evidence passed them all.
+    claude_grants() {   # claude_grants <printf-escaped manifest>; echoes granted or nothing
+        local f rc
+        f="$(mktemp)"
+        printf '%b' "$1" > "$f"
+        KEEL_CAPABILITIES="$f" harness_provides claude p; rc=$?
+        rm -f "$f"
+        [ "$rc" -eq 0 ] && printf 'granted' || printf 'nothing'
+    }
+    [ "$(claude_grants 'provides|claude|p|src|1|2026-01-01\n')" = "granted" ] \
+      && ok "a complete claude row grants its primitive" \
+      || bad "a complete claude row grants its primitive" "the three cases below would prove nothing"
+    [ "$(claude_grants 'provides|claude|p| |1|2026-01-01\n')" = "nothing" ] \
+      && ok "a claude row with a blank source grants nothing" \
+      || bad "a claude row with a blank source grants nothing" "granted"
+    [ "$(claude_grants 'provides|claude|p|src| |2026-01-01\n')" = "nothing" ] \
+      && ok "a claude row with a blank version grants nothing" \
+      || bad "a claude row with a blank version grants nothing" "granted"
+    [ "$(claude_grants 'provides|claude|p|src|1| \n')" = "nothing" ] \
+      && ok "a claude row with a blank date grants nothing" \
+      || bad "a claude row with a blank date grants nothing" "granted"
 
     # The no-trailing-newline guard is on four separate loops and the gate_on fixture above pins
     # only harness_gate_active's. These two reach the other three: A ends on an unterminated
@@ -351,14 +394,17 @@ if command -v harness_active_gates >/dev/null 2>&1; then
     PATH="$stub" command -v python3 >/dev/null 2>&1 \
       && bad "the stub PATH has no python3" "found one, so the next assertion proves nothing" \
       || ok "the stub PATH has no python3"
-    # Resolve claude here, not codex. Nothing about this assertion is related to Codex, and pinning
-    # it to Codex's gate list means task 14, which adds Codex probe rows, turns it red for a reason
-    # that reads as unrelated to the change. Claude's list is the R-01 no-regression set and does
-    # not move when a second harness gains a primitive.
+    # Claude's list is the R-01 no-regression set: it does not move unless a row does.
     out="$(PATH="$stub" /bin/bash -c ". '$ROOT/lib/harness/resolve.sh'; harness_active_gates claude" 2>&1 | sort | tr '\n' ' ')"
     [ "$out" = "context-watch done-guard review-guard sensitive-guard session-start " ] \
       && ok "resolves with no python3 on PATH" \
       || bad "resolves with no python3 on PATH" "got: $out"
+    # The minimum too, and with no external command at all: the stub PATH holds only dirname,
+    # which sourcing the file needs, so a version split through sed or sort would come back empty.
+    out="$(PATH="$stub" /bin/bash -c ". '$ROOT/lib/harness/resolve.sh'; harness_min_version" 2>&1)"
+    [ "$out" = 2.1.302 ] \
+      && ok "the minimum resolves with no python3 and no external command" \
+      || bad "the minimum resolves with no python3 and no external command" "got: $out"
     rm -rf "$stub"
 
     # Sourced by a relative path, then a cd. The manifest path used to be worked out from
@@ -396,32 +442,115 @@ else
     bad "resolve.sh defines harness_active_gates" "function not found after sourcing"
 fi
 
-# A primitive names a capability, never one harness's wire format. A name carrying a schema word
-# cannot be satisfied by a second harness however much evidence that harness has, so it does not
-# fail closed, it fails permanently. Tier B lost two gates by construction this way on 2026-09-05
-# before the rename, which is the scar this assertion exists to keep.
+# A primitive names a capability, and <source> is where Claude Code's wire format belongs. A name
+# that only one wire format can earn does not fail closed when the format moves, it fails
+# permanently. Until 2026-09-05 two primitives were named after Claude Code's own transcript format,
+# which is the scar this assertion exists to keep.
 schemaish="$(awk -F'|' '($1=="provides"||$1=="requires") && $3 ~ /jsonl|_json|message|content/ {print $3}' "$CAP" | sort -u | tr '\n' ' ')"
 [ -z "$schemaish" ] && ok "no primitive name encodes a harness wire format" \
   || bad "no primitive name encodes a harness wire format" "$schemaish"
 
-# Two repeat assertions, made earlier in this file on purpose: they are the regression guard, and a
-# rename that changes either of them is a rename that dropped a requires row. Task 2A's rename moved
-# neither, which was the point of it. What moved codex from one gate to three afterwards was task
-# 14's evidence, not a rename, and that is the distinction these two keep visible: the claude line
-# has never moved at all, and the codex line moves only when a probe row is added or removed.
+# A repeat assertion, made earlier in this file on purpose: it is the regression guard, and a
+# rename that changes it is a rename that dropped a requires row.
 [ "$(harness_active_gates claude | sort | tr '\n' ' ')" = "context-watch done-guard review-guard sensitive-guard session-start " ] \
   && ok "the rename left claude at five gates" \
   || bad "the rename left claude at five gates" "$(harness_active_gates claude | sort | tr '\n' ' ')"
-[ "$(harness_active_gates codex | sort | tr '\n' ' ')" = "context-watch done-guard session-start " ] \
-  && ok "the rename left codex holding every primitive it has evidence for" \
-  || bad "the rename left codex holding every primitive it has evidence for" "$(harness_active_gates codex | sort | tr '\n' ' ')"
 
-# ---- the generated per-harness hook manifests -------------------------------
+# ---- keel's minimum Claude Code version ------------------------------------
 #
-# Four things have to agree about which gates a harness gets: this manifest, hooks/hooks.json,
-# hooks/hooks.codex.json and the support page. A hand-maintained copy is the one that goes stale,
-# so the hook manifests are generated and a stale file is a failing build. Same bargain
-# tests/generate-profile-keys.sh makes for docs/profile-keys.md.
+# Derived from the ledger, never written beside it: the highest version a gate's primitive was
+# verified on. A number kept by hand is the one that stays put when a row moves.
+
+harness_version_ge 2.1.302 2.1.99 \
+  && ok "versions compare numerically: 2.1.302 is at or above 2.1.99" \
+  || bad "versions compare numerically: 2.1.302 is at or above 2.1.99" "returned non-zero"
+harness_version_ge 2.1.99 2.1.302 \
+  && bad "versions compare numerically: 2.1.99 is below 2.1.302" "returned zero" \
+  || ok "versions compare numerically: 2.1.99 is below 2.1.302"
+harness_version_ge 2.1.302 2.1.302 \
+  && ok "versions compare numerically: 2.1.302 is at or above itself" \
+  || bad "versions compare numerically: 2.1.302 is at or above itself" "returned non-zero"
+
+# A field with a leading zero is a decimal number. Read as octal, 09 and 08 are arithmetic errors,
+# which return 1 with bash's message on stderr, and 010 is 8, so each goes wrong without the 10#.
+for pair in "2.1.10 2.1.09" "2.1.08 2.1.7" "2.1.010 2.1.9"; do
+    out="$(harness_version_ge "${pair% *}" "${pair#* }" 2>&1)"; rc=$?
+    [ "$rc" -eq 0 ] && [ -z "$out" ] \
+      && ok "a leading zero is decimal: $pair compares at or above, silently" \
+      || bad "a leading zero is decimal: $pair compares at or above, silently" "rc=$rc out: $out"
+done
+
+# Only a version it can read is compared. Doctor can take a version from a file
+# (bin/keel#KEEL_CLAUDE_VERSION_FILE), and bash runs a command substitution inside an array
+# subscript in $(( )), so a field that is not all digits must return 1 before any arithmetic. Each
+# call runs in a subshell, because before the guard the second one aborted the shell it ran in. The
+# command touches a relative path from inside the scratch directory, because a dot in the path
+# would split the field and the payload with it.
+vg="$(mktemp -d)"
+out="$(cd "$vg" && harness_version_ge "1+a[\$(touch p)]" 2 2>&1)"; rc=$?
+[ "$rc" -eq 1 ] && [ ! -e "$vg/p" ] \
+  && ok "harness_version_ge compares only versions it can read: a field holding a command returns 1 and runs nothing" \
+  || bad "harness_version_ge compares only versions it can read: a field holding a command returns 1 and runs nothing" "rc=$rc, $vg/p $([ -e "$vg/p" ] && echo created || echo absent), out: $out"
+out="$(harness_version_ge abc 2 2>&1)"; rc=$?
+[ "$rc" -eq 1 ] && [ -z "$out" ] \
+  && ok "harness_version_ge compares only versions it can read: abc returns 1 with nothing on stderr" \
+  || bad "harness_version_ge compares only versions it can read: abc returns 1 with nothing on stderr" "rc=$rc out: $out"
+rm -rf "$vg"
+
+# The regression pin, like the five gates above: a row that raises it is a row that changed what
+# keel needs, and this is where that shows. validated_word_ceiling is at 2.1.302 too and has no
+# requires row, so it is pretooluse_agent_type, which review-guard requires, that sets it.
+got="$(harness_min_version)"
+[ "$got" = 2.1.302 ] \
+  && ok "the minimum is derived from the ledger: 2.1.302 with today's rows" \
+  || bad "the minimum is derived from the ledger: 2.1.302 with today's rows" "got: ${got:-<empty>}"
+
+min_of() {   # min_of <printf-escaped manifest>; echoes harness_min_version against it
+    local f
+    f="$(mktemp)"
+    printf '%b' "$1" > "$f"
+    KEEL_CAPABILITIES="$f" harness_min_version
+    rm -f "$f"
+}
+# p1 sits at 2.1.99 so that a string comparison, which puts 2.1.99 above 2.1.296, gets it wrong.
+mv_base='provides|claude|p1|src|2.1.99|2026-01-01\nprovides|claude|p2|src|2.1.296|2026-01-01\nrequires|g1|p1\nrequires|g2|p2\n'
+got="$(min_of "$mv_base")"
+[ "$got" = 2.1.296 ] \
+  && ok "the minimum is derived from the ledger: the highest required row, 2.1.296" \
+  || bad "the minimum is derived from the ledger: the highest required row, 2.1.296" "got: ${got:-<empty>}"
+got="$(min_of "${mv_base}provides|claude|p3|src|2.1.310|2026-01-01\n")"
+[ "$got" = 2.1.296 ] \
+  && ok "the minimum is derived from the ledger: a 2.1.310 row nothing requires leaves it at 2.1.296" \
+  || bad "the minimum is derived from the ledger: a 2.1.310 row nothing requires leaves it at 2.1.296" "got: ${got:-<empty>}"
+got="$(min_of 'provides|claude|p1|src|2.1.99|2026-01-01\nprovides|claude|p2|src| |2026-01-01\nrequires|g1|p1\nrequires|g2|p2\n')"
+[ "$got" = 2.1.99 ] \
+  && ok "the minimum is derived from the ledger: a required row with a blank version is ignored" \
+  || bad "the minimum is derived from the ledger: a required row with a blank version is ignored" "got: ${got:-<empty>}"
+# A seven-field row is malformed, and malformed is absent evidence: it sets no minimum.
+got="$(min_of "${mv_base}provides|claude|p2|src|2.1.500|2026-01-01|extra\n")"
+[ "$got" = 2.1.296 ] \
+  && ok "the minimum is derived from the ledger: a seven-field row is ignored" \
+  || bad "the minimum is derived from the ledger: a seven-field row is ignored" "got: ${got:-<empty>}"
+got="$(min_of "${mv_base}provides|ghost|p2|src|2.1.400|2026-01-01\n")"
+[ "$got" = 2.1.296 ] \
+  && ok "the minimum is derived from the ledger: only claude rows count" \
+  || bad "the minimum is derived from the ledger: only claude rows count" "got: ${got:-<empty>}"
+
+got="$(harness_gate_version review-guard)"
+[ "$got" = 2.1.302 ] \
+  && ok "a gate's version is its highest required primitive's: review-guard at 2.1.302" \
+  || bad "a gate's version is its highest required primitive's: review-guard at 2.1.302" "got: ${got:-<empty>}"
+got="$(harness_gate_version no-such-gate)"; rc=$?
+[ "$rc" != 0 ] && [ -z "$got" ] \
+  && ok "a gate with no requires row has no version" \
+  || bad "a gate with no requires row has no version" "rc=$rc got: ${got:-<empty>}"
+
+# ---- the generated hook manifest -------------------------------------------
+#
+# Three things have to agree about which gates Claude Code gets: this manifest, hooks/hooks.json
+# and the support page. A hand-maintained copy is the one that goes stale, so the hook manifest is
+# generated and a stale file is a failing build. Same bargain tests/generate-profile-keys.sh makes
+# for docs/profile-keys.md.
 
 GEN="$ROOT/tests/generate-harness-artifacts.sh"
 
@@ -437,47 +566,36 @@ if [ -x "$GEN" ]; then
           "$( "$GEN" claude | diff - "$ROOT/hooks/hooks.json" | head -5 | tr '\n' ' ' )"
     fi
 
-    diff -q <("$GEN" codex) "$ROOT/hooks/hooks.codex.json" >/dev/null 2>&1 \
-      && ok "hooks/hooks.codex.json is not stale" \
-      || bad "hooks/hooks.codex.json is not stale" "regenerate it"
+    # The generator produces Claude Code artifacts only. Asked for codex it refuses with its usage
+    # message, so the operator learns what it does accept rather than getting a second manifest.
+    err="$("$GEN" codex 2>&1 >/dev/null)"; rc=$?
+    [ "$rc" != 0 ] && printf '%s' "$err" | grep -q '^usage: ' \
+      && ok "the generator refuses codex with its usage message" \
+      || bad "the generator refuses codex with its usage message" "rc=$rc err=${err:-<empty>}"
 
-    for g in sensitive-guard review-guard; do
-        grep -q "$g" "$ROOT/hooks/hooks.codex.json" 2>/dev/null \
-          && bad "codex manifest omits $g" "an entry is present" \
-          || ok "codex manifest omits $g"
-    done
-
-    for g in session-start done-guard context-watch; do
-        grep -q "$g" "$ROOT/hooks/hooks.codex.json" 2>/dev/null \
-          && ok "codex manifest registers $g" \
-          || bad "codex manifest registers $g" "no entry"
-    done
-
-    # The exit-2 control path and the Stop decision path both need a synchronous hook.
-    # codex-rs/hooks/src/engine/mod.rs:141-156. A silent flip here makes every gate advisory.
-    for f in "$ROOT/hooks/hooks.json" "$ROOT/hooks/hooks.codex.json"; do
-        n_hooks="$(grep -c '"type": "command"' "$f")"
-        n_sync="$(grep -c '"async": false' "$f")"
-        [ "$n_hooks" = "$n_sync" ] \
-          && ok "$(basename "$f") pins async false on all $n_hooks entries" \
-          || bad "$(basename "$f") pins async false on all entries" "$n_hooks commands, $n_sync synchronous"
-    done
+    # A silent flip to async makes every gate advisory: the hook still runs, and nothing it
+    # decides is applied.
+    n_hooks="$(grep -c '"type": "command"' "$ROOT/hooks/hooks.json")"
+    n_sync="$(grep -c '"async": false' "$ROOT/hooks/hooks.json")"
+    [ "$n_hooks" = "$n_sync" ] \
+      && ok "hooks.json pins async false on all $n_hooks entries" \
+      || bad "hooks.json pins async false on all entries" "$n_hooks commands, $n_sync synchronous"
 
     # The generator reads the manifest, so a gate the manifest withholds must not reach the file.
     # Without this the emitters could ignore is_active entirely and every case above still passes,
-    # because Codex happens to hold every gate but one today.
-    withheld="$(KEEL_CAPABILITIES="$ROOT/lib/harness/capabilities" "$GEN" codex | grep -c 'done-guard' || true)"
-    [ "$withheld" -gt 0 ] || bad "the codex manifest carries done-guard" "absent"
+    # because Claude Code holds every gate today.
+    withheld="$(KEEL_CAPABILITIES="$ROOT/lib/harness/capabilities" "$GEN" claude | grep -c 'done-guard' || true)"
+    [ "$withheld" -gt 0 ] || bad "the claude manifest carries done-guard" "absent"
     cut_cap="$(mktemp)"
-    grep -v '^provides|codex|transcript_turn_tool_calls|' "$ROOT/lib/harness/capabilities" > "$cut_cap"
-    n="$(KEEL_CAPABILITIES="$cut_cap" "$GEN" codex | grep -c 'done-guard' || true)"
+    grep -v '^provides|claude|transcript_turn_tool_calls|' "$ROOT/lib/harness/capabilities" > "$cut_cap"
+    n="$(KEEL_CAPABILITIES="$cut_cap" "$GEN" claude | grep -c 'done-guard' || true)"
     [ "$n" = 0 ] \
       && ok "a gate the manifest withholds is not registered" \
       || bad "a gate the manifest withholds is not registered" "done-guard still emitted $n time(s)"
 
     # ...and the file it produces then is still a well-formed document, not one with a dangling
     # comma or an empty event array. An emitter that drops a group has to drop its event too.
-    KEEL_CAPABILITIES="$cut_cap" "$GEN" codex | python3 -c '
+    KEEL_CAPABILITIES="$cut_cap" "$GEN" claude | python3 -c '
 import json,sys
 d=json.load(sys.stdin)
 sys.exit(1) if any(not v for v in d["hooks"].values()) else sys.exit(0)' 2>/dev/null \
@@ -495,6 +613,12 @@ sys.exit(1) if any(not v for v in d["hooks"].values()) else sys.exit(0)' 2>/dev/
 else
     bad "tests/generate-harness-artifacts.sh is executable" "not found or not executable"
 fi
+
+# Whether or not the generator is there to refuse codex, nothing Codex-specific is left to install.
+for f in hooks/hooks.codex.json .codex-plugin lib/harness/codex.sh; do
+    [ -e "$ROOT/$f" ] && bad "no Codex artifact remains: $f" "present" \
+      || ok "no Codex artifact remains: $f"
+done
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

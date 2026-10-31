@@ -174,8 +174,8 @@ run "an em dash in an agent file is rejected" 1 m_agent_em_dash
 
 # The model value is the one field a dispatching skill cannot override, so a typo here routes every
 # dispatch naming this profile to nothing. The vendor set is allowed HERE and rejected in a skill
-# body: an agent file is where a harness resolves a profile to a model, which is the indirection
-# lib/harness/codex.sh:86-88 relies on to map keel-fanout to a Codex model.
+# body: agents/*.md is where Claude Code turns a delegation profile into a model, so an agent file
+# is the one place a model alias belongs.
 m_agent_bad_model() {
     mkdir -p "$1/agents"
     printf -- '---\nname: a\ndescription: Use when testing.\nmodel: gpt-4o\n---\n\nBody.\n' \
@@ -746,14 +746,14 @@ run_out "an observed: marker naming a file that is not a record is rejected" 1 m
 # validator, because the fixture roots these tests run in have no templates/profile.schema.json.
 run_out "no profile schema present means the fingerprint check stays quiet" 0 noop "fingerprint" no
 
-# A key bin/keel says schema 4 retired, still declared in the schema. The register in bin/keel is
+# A key the register says schema 4 retired, still declared in the schema. lib/retired-keys.sh is
 # what doctor reads to tell a person their profile carries a dead key, and a register naming a key
 # that is still live tells them to remove one that still works. Nothing else can catch it: the
 # fingerprint above is a hash of the field set, so it sees that the set changed and never which way.
 m_retired_key_still_declared() {
-    mkdir -p "$1/templates" "$1/bin"
-    cat > "$1/bin/keel" <<'KEEL'
-SCHEMA_VERSION=1
+    mkdir -p "$1/templates" "$1/bin" "$1/lib"
+    printf 'SCHEMA_VERSION=1\n' > "$1/bin/keel"
+    cat > "$1/lib/retired-keys.sh" <<'KEEL'
 retired_keys() {
     cat <<RETIRED
 gates.tdd|4|it does nothing now.
@@ -765,13 +765,13 @@ KEEL
 JSON
 }
 run_out "a key listed as retired that the schema still declares is rejected" 1 \
-    m_retired_key_still_declared "retired" yes
+    m_retired_key_still_declared "still declares" yes
 
 # And the register stays quiet when it agrees with the schema, or every commit reports it.
 m_retired_key_absent() {
-    mkdir -p "$1/templates" "$1/bin"
-    cat > "$1/bin/keel" <<'KEEL'
-SCHEMA_VERSION=1
+    mkdir -p "$1/templates" "$1/bin" "$1/lib"
+    printf 'SCHEMA_VERSION=1\n' > "$1/bin/keel"
+    cat > "$1/lib/retired-keys.sh" <<'KEEL'
 retired_keys() {
     cat <<RETIRED
 gates.tdd|4|it does nothing now.
@@ -784,6 +784,75 @@ JSON
 }
 run_out "a register that agrees with the schema says nothing" 1 \
     m_retired_key_absent "retired" no
+
+# A row written as a printf argument rather than a heredoc line, which the register does for the row
+# that carries a trailing comment, is read as a row too.
+m_retired_printf_still_declared() {
+    mkdir -p "$1/templates" "$1/bin" "$1/lib"
+    printf 'SCHEMA_VERSION=1\n' > "$1/bin/keel"
+    cat > "$1/lib/retired-keys.sh" <<'KEEL'
+retired_keys() {
+    printf '%s\n' 'harnesses|7|it does nothing now.' # a trailing comment
+}
+KEEL
+    cat > "$1/templates/profile.schema.json" <<'JSON'
+{ "properties": { "harnesses": { "type": "array" } } }
+JSON
+}
+run_out "a printf row in the register that the schema still declares is rejected" 1 \
+    m_retired_printf_still_declared "still declares" yes
+
+# The register is whatever retired_keys prints, so a row spelled another way is still a row.
+m_retired_echo_still_declared() {
+    mkdir -p "$1/templates" "$1/bin" "$1/lib"
+    printf 'SCHEMA_VERSION=1\n' > "$1/bin/keel"
+    cat > "$1/lib/retired-keys.sh" <<'KEEL'
+retired_keys() {
+    echo "foo.bar|7|gone"
+}
+KEEL
+    cat > "$1/templates/profile.schema.json" <<'JSON'
+{ "properties": { "foo": { "properties": { "bar": { "type": "string" } } } } }
+JSON
+}
+run_out "an echo row in the register that the schema still declares is rejected" 1 \
+    m_retired_echo_still_declared "register names keys .*still declares: foo.bar" yes
+
+# A register that cannot be read, or reads empty, is reported by name. Read as an empty register
+# instead, it checks nothing and passes in silence, which is the failure the check exists to stop.
+m_retired_register_missing() {
+    mkdir -p "$1/templates" "$1/bin"
+    printf 'SCHEMA_VERSION=1\n' > "$1/bin/keel"
+    cat > "$1/templates/profile.schema.json" <<'JSON'
+{ "properties": { "gates": { "properties": { "tdd": { "type": "string" } } } } }
+JSON
+}
+run_out "a missing register is reported naming lib/retired-keys.sh" 1 \
+    m_retired_register_missing "lib/retired-keys.sh" yes
+
+m_retired_register_empty() {
+    mkdir -p "$1/templates" "$1/bin" "$1/lib"
+    printf 'SCHEMA_VERSION=1\n' > "$1/bin/keel"
+    printf 'retired_keys() {\n    :\n}\n' > "$1/lib/retired-keys.sh"
+    cat > "$1/templates/profile.schema.json" <<'JSON'
+{ "properties": { "gates": { "properties": { "tdd": { "type": "string" } } } } }
+JSON
+}
+run_out "a register that prints nothing is reported naming lib/retired-keys.sh" 1 \
+    m_retired_register_empty "lib/retired-keys.sh" yes
+
+# A register that fails partway is unreadable, not shorter: its rows before the failure are not the
+# register, and checked as it, they would pass a key the rest still names.
+m_retired_register_fails() {
+    mkdir -p "$1/templates" "$1/bin" "$1/lib"
+    printf 'SCHEMA_VERSION=1\n' > "$1/bin/keel"
+    printf 'retired_keys() {\n    echo "foo.bar|7|gone"\n    return 1\n}\n' > "$1/lib/retired-keys.sh"
+    cat > "$1/templates/profile.schema.json" <<'JSON'
+{ "properties": { "gates": { "properties": { "tdd": { "type": "string" } } } } }
+JSON
+}
+run_out "a retired-key register that fails partway is unreadable, not shorter" 1 \
+    m_retired_register_fails "could not be read" yes
 
 # Every key the example template sets is declared in the schema, or a project that copies the
 # example sets a key that does nothing. conventions.branch_prefix was exactly this, pre-existing
@@ -1352,6 +1421,21 @@ m_wh_plan_document() {
 }
 run "a withheld document with a dash and a broken link is not checked" 0 m_wh_audit_document
 run "the same text in a plan is checked" 1 m_wh_plan_document
+
+# No skill or agent names Codex. The needle is the reported file and line, so the case proves the
+# rule lists where the name is, not only that something failed.
+m_skill_names_codex() { printf '\nOn Codex, run it by hand.\n' >> "$1/skills/example/SKILL.md"; }
+m_agent_names_codex() {
+    mkdir -p "$1/agents"
+    printf -- '---\nname: a\ndescription: Use when testing.\nmodel: inherit\n---\n\nOn codex too.\n' \
+        > "$1/agents/a.md"
+}
+m_skill_names_claude_code() { printf '\nOn Claude Code, run it by hand.\n' >> "$1/skills/example/SKILL.md"; }
+check_reports "a skill naming Codex is reported with its line" yes \
+  "skills/example/SKILL.md:15:On Codex" m_skill_names_codex
+run "a skill naming Codex is rejected" 1 m_skill_names_codex
+run "an agent naming codex in lower case is rejected" 1 m_agent_names_codex
+run "a skill naming only Claude Code passes" 0 m_skill_names_claude_code
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

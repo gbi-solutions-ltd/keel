@@ -250,7 +250,7 @@ Create `lib/harness/capabilities`:
 # of 368 transcripts hold that key.
 #
 # `subagent_transcript_path` is PROVIDED and required by nothing, deliberately. done-guard reads it
-# only on SubagentStop and falls back to transcript_path when it is absent (hooks/done-guard:218-220),
+# only on SubagentStop and falls back to transcript_path when it is absent (hooks/done-guard:231-233),
 # so requiring it would disable the whole gate on a harness whose Stop path works. Under-requiring
 # resolved done-guard active on Codex; over-requiring would resolve it inactive where it works. The
 # rule is that a gate requires what it cannot function without, not everything it can use. Codex supplies a
@@ -356,7 +356,7 @@ touch, say so and leave it unstaged.
 > prevent:
 >
 > 1. **A whitespace-only provenance field granted the primitive.** `[ -n "$f4" ]` accepts a single
->    space. `tests/test-harness-resolve.sh:35-37` had already settled this and says the opposite in
+>    space. `tests/test-harness-resolve.sh:41-43` had already settled this and says the opposite in
 >    its own comment, so the validator and the resolver were applying two different definitions of
 >    absent evidence to the same row. A trailing space is invisible in a diff.
 > 2. **A manifest with no trailing newline dropped its last row.** `read` returns non-zero on a
@@ -1681,7 +1681,7 @@ coordinator commits after both review passes, with
 > Four things the steps did not have right:
 >
 > 1. **The capability row breaks two of the manifest's own rules as written.** Its `<source>` has no
->    `vendor:` or `probe:` prefix, which `tests/test-harness-resolve.sh:66` fails outright, and its
+>    `vendor:` or `probe:` prefix, which `tests/test-harness-resolve.sh:106` fails outright, and its
 >    `<version>` is `0.18.0`, which is **keel's** version where the file's header says the column is
 >    the harness's and that `keel doctor`'s comparison means nothing if keel's goes there. The row
 >    landed as a `probe:` citing ADR-0001 and `tests/evals/results.md` at "Both bodies over the 700
@@ -1822,9 +1822,9 @@ gives the 18 locations with line numbers and remedy classes **W** word change, *
 the reason a mechanical pass over the 18 would be wrong:
 
 - **A nineteenth location.**
-  `docs/03-install-and-distribution.md#The skills are no longer Claude-only.` says "The skills
-  themselves stay Claude-only for now". It is true today and false the moment this ships. Class N,
-  and it is the natural home for the Tier B install path.
+  `docs/03-install-and-distribution.md` at v0.26.0 ("The skills are no longer Claude-only.") says
+  "The skills themselves stay Claude-only for now". It is true today and false the moment this
+  ships. Class N, and it is the natural home for the Tier B install path.
 - **`docs/04-plugin-strategy.md` is Claude-shaped across all 221 lines**, not at line 11. Rewrite the
   document with a stated scope line rather than qualifying one row.
 - **`docs/05-token-and-memory-design.md` has no false sentence and a false derivation.** Its
@@ -1884,7 +1884,7 @@ touch, say so and leave it unstaged.
 >    tagging this check's own header says destroys it, so lines inside a fence are skipped and a
 >    fixture pins that a fenced line is skipped where an unfenced one is not. **`docs/06` needed no
 >    edit at all** once the scan stopped being wrong about it.
-> 4. **`README.md:233` was a false positive and was reworded, not tagged.** It is a credit table
+> 4. **`README.md:236` was a false positive and was reworded, not tagged.** It is a credit table
 >    line reading "session-start hook pattern", crediting a pattern borrowed from another project.
 >    Tagging it would assert a gate claim the sentence is not making.
 > 5. **`tests/validate-skills.sh` needed the same treatment `tests/supply-chain-scan.sh` needed in
@@ -1928,7 +1928,7 @@ touch, say so and leave it unstaged.
   for Codex.
 
 **The sixth exists because of what `cmd_doctor` does.** `settings_report_load`, `plugin_report` and
-`boundary_report` (`bin/keel:167,242,268`) are read by `cmd_doctor` (`:1316`), which stays in the
+`boundary_report` (`bin/keel:167,242,268`) are read by `cmd_doctor` (`:1346`), which stays in the
 neutral file. Moving them into `lib/harness/claude.sh` under a five-function contract would leave
 `cmd_doctor` calling functions that exist for one harness only, which breaks the moment `codex.sh`
 is the loaded one. `harness_doctor_findings` prints zero or more `level|message` lines and is the
@@ -2137,7 +2137,7 @@ codex"
 
 Parse `--harness <list>` in `cmd_init`'s flag loop (`:909`) alongside `-y`, `--team` and `--force`.
 
-**Invalidate the JSON cache before re-reading.** `bin/keel:126-132` caches a flattened profile per
+**Invalidate the JSON cache before re-reading.** `bin/keel:105-113` caches a flattened profile per
 process keyed on filename, and `cmd_init` rewrites `.keel/profile.json` during the run. Anything
 reading the profile after the write, `harness_set_for_repo` included when `init` is re-run in a
 session, must clear `JSON_CACHE_FILE` first or it reads the pre-write copy.
@@ -2564,7 +2564,7 @@ passes, with `git commit -m "feat(harness): ship the Codex plugin manifest"`.
 > `provides` row is unsafe; a doctor line that cries wolf on every machine gets ignored, which
 > costs more than it saves.
 >
-> **2. The two context window messages at `bin/keel:1546` and `:1552` are Claude Code numbers.**
+> **2. The two context window messages at `bin/keel:1640` and `:1584` are Claude Code numbers.**
 > They say the watchdog is "assuming 200000" and that a value below "the $cwdef default" has no
 > effect. Since 2026-09-06 a Codex rollout states its own window, `model_context_window`, 258400 on
 > the probed session, so on Codex both sentences name the wrong baseline. This was left to this task
@@ -3253,12 +3253,12 @@ def read_usage(path):
     return (UNSUPPORTED, "unsupported")
 ```
 
-**The caller is `hook()`** (`lib/context_watch.py:358`), the entry point that reads
+**The caller is `hook()`** (`lib/context_watch.py:416`), the entry point that reads
 `transcript_path` off the event and today does `if not transcript or not os.path.exists(transcript):
 return 0` at `:376-377`. That early return is the behaviour this task changes: a transcript that
 exists and does not parse must not take the same silent path as one that is absent. `measure()`
-(`:87`) and `_cached_measure()` (`:330`) keep their signatures. In `hook()`:
-
+(folded into `_measure_parts` at `:88` after v0.26.0) and `_cached_measure()` (`:330`) keep their
+signatures. In `hook()`:
 ```python
 tokens, kind = read_usage(transcript)
 if kind == "unsupported":
@@ -3582,7 +3582,7 @@ and `/security-review` instruction: both are Claude Code mechanisms with no esta
 counterpart, and the paragraph already carries an inline fallback, the pattern eighteen skills use.
 Do the same for `skill-creator` at `skills/create-skill/SKILL.md:74-75`.
 
-Keep the plugin name in the body. `tests/validate-skills.sh:390-463` requires a plugin delegation
+Keep the plugin name in the body. `tests/validate-skills.sh:391-464` requires a plugin delegation
 claimed in `docs/04-plugin-strategy.md` or `docs/02-skill-catalog.md` to be named in the delegating
 skill's **body**, so removing it there fails the build. Update the two documents in the same task, so
 body and document move together.
@@ -3980,7 +3980,7 @@ correct.** Fixed in place:
 | Task 4 step 2 mutated a tracked file while `MAX_JOBS=4` jobs read it | `tests/run-tests.sh#capped at 4 concurrent` | task 4 |
 | A one-line tag lookback fails any claim that wraps | the support page's own paragraph | task 5 |
 | Task 7's committed baseline contradicts the suite's stated policy | `tests/keel-test-lib.sh#Fixtures are generated per` | task 7 |
-| `cmd_doctor` would call functions that exist for one harness only | `bin/keel:1323` | task 7, sixth contract function |
+| `cmd_doctor` would call functions that exist for one harness only | `bin/keel:1417` | task 7, sixth contract function |
 
 ### Not fixed, with reasons
 

@@ -522,7 +522,7 @@ is a substring match over a `Bash` tool call (`hooks/done-guard:127`), and the f
 "cannot see the exit code, and does not pretend to" (`:34-36`). "Did this edit follow the
 conventions" has no equivalent observable. The only hook-shaped check available is that
 `standards.md` exists when `gates.coding_standards` is `required`, and that belongs in `keel doctor`,
-whose `fail`/`warn`/`good` idiom (`bin/keel:1323-1325`) makes it about four lines of bash and zero
+whose `fail`/`warn`/`good` idiom (`bin/keel:1417-1419`) makes it about four lines of bash and zero
 skill words. Worth doing on its own merits; it is not enforcement.
 
 **6. A sentence in each coding skill. Ranked last and partly unaffordable.** See question 4.

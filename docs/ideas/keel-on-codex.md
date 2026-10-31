@@ -1,5 +1,8 @@
 # Idea: keel on OpenAI Codex CLI
 
+> Superseded on 2026-10-29 by ADR-0013
+> ([`ADR-0013-claude-code-is-the-only-harness.md`](../decisions/ADR-0013-claude-code-is-the-only-harness.md)).
+
 | | |
 |---|---|
 | Raised by | Bernard, 2026-09-05 |
@@ -135,7 +138,7 @@ and it is the one keel spent a decision on avoiding.
 
 | Option | What it costs | Why not this |
 |---|---|---|
-| Do nothing | Zero | This is the recommendation. keel already dual-writes `AGENTS.md` (`bin/keel:927-928`), so Codex users get Layer 2 today. It is honest, already shipped, and already documented as a deliberate stop (`docs/03-install-and-distribution.md#and nothing else, which is the tier below.`) |
+| Do nothing | Zero | This is the recommendation. keel already dual-writes `AGENTS.md` (`bin/keel` at v0.26.0), so Codex users get Layer 2 today. It is honest, already shipped, and already documented as a deliberate stop (`docs/03-install-and-distribution.md` at v0.26.0, "and nothing else, which is the tier below.") |
 | Do it manually | A Codex user clones keel and copies `skills/` into `.agents/skills/` themselves | Actually works, and is worth documenting as an unsupported recipe. It is not "first-class" and makes no guarantee, which is the point: it does not pretend |
 | Buy it | Nothing to buy | No product ports an SOP's enforcement layer between agent harnesses. Not an option |
 | Build something smaller | Ship Layers 2 and 3 on Codex (skills, `AGENTS.md`, the session router, `done-guard`, `context-watch`) and document `sensitive-guard` as absent | **This is the tempting one and it is what the constraint forbids.** keel with three of four gates is not keel at the same level of guarantee; it is keel with the security gate quietly missing on one of its two supported harnesses |
@@ -213,14 +216,14 @@ Classified (a) already harness-neutral, (b) portable with an adapter, (c) Claude
 | Mechanism | `file:line` | Class | Why | What an adapter does |
 |---|---|---|---|---|
 | `lib/merge-claude-md.sh` | whole file, 42 lines | **(a)** | Nothing in it names `.claude`, `CLAUDE.md` or `AGENTS.md`; both functions take the target as a parameter. The filename lies about the file | Nothing |
-| `bin/keel:927-928` dual-write | `merge_block CLAUDE.md "$block"` / `merge_block AGENTS.md "$block"` | **(a)** | Same rendered `$block` into both. **Refinement to the starting facts:** "identically" is true of the managed block, not of the whole files, since each merges against its own pre-existing content | Nothing |
+| `bin/keel` at v0.26.0 dual-write | `merge_block CLAUDE.md "$block"` / `merge_block AGENTS.md "$block"` | **(a)** | Same rendered `$block` into both. **Refinement to the starting facts:** "identically" is true of the managed block, not of the whole files, since each merges against its own pre-existing content | Nothing |
 | `lib/detect-stack.sh` stack detection | bulk of 940 lines | **(a)** | Pure detection, no harness reference | Nothing |
 | `lib/detect-stack.sh` `lang_lsp` / `detect_plugins` | `890-940` | **(b)** | Returns Claude-marketplace plugin names | A Codex plugin list, or drop the recommendation |
 | `hooks/hooks.json` | whole file, 95 lines | **(b), and cheaper than expected** | Codex plugins bundle lifecycle hooks at `"hooks": "./hooks/hooks.json"` in the **same** `{event: [{matcher, hooks:[{type:"command", command}]}]}` shape, with the same event names, and **Codex sets `CLAUDE_PLUGIN_ROOT` and `CLAUDE_PLUGIN_DATA` for compatibility**, which is exactly what `hooks/hooks.json:9` interpolates | Close to nothing. `SubagentStop` and `PreCompact` both exist on Codex too |
 | `hooks/session-start` | 167 lines | **(b)** | Reads no stdin fields; emits `hookSpecificOutput.additionalContext`, which Codex supports on `SessionStart` | Nothing structural |
 | `hooks/done-guard` | 143 lines, emits at `:86` | **(b)** | Emits `{"decision": "deny", ...}`. Codex's `Stop` schema enumerates `decision` as `["block"]` only | A one-word rename, `deny` to `block` |
 | `hooks/context-watch` + `lib/context_watch.py` | `lib/context_watch.py#transcript = ev.get("transcript_path") or ""`, `107-116` | **(b), fragile** | Reads `transcript_path`, which **Codex does provide** in common input fields, then sums `message.usage.{input_tokens, cache_creation_input_tokens, cache_read_input_tokens, output_tokens}` per non-sidechain assistant turn. Codex warns: "`transcript_path` points to a chat transcript for convenience, but **the transcript format isn't a stable interface for hooks and may change over time**" | A second parser, on a format the vendor declines to stabilise. This is a maintenance liability, not a one-off port |
-| `hooks/sensitive-guard` | 188 lines, emits at `:37` and `:82-83` | **(c)** | Emits `permissionDecision: "ask"`. See Part 1 test 3 | **None exists.** This is the whole decision |
+| `hooks/sensitive-guard` | 188 lines, emits at `:37` and `:98-99` | **(c)** | Emits `permissionDecision: "ask"`. See Part 1 test 3 | **None exists.** This is the whole decision |
 | `bin/keel` `settings_report_load` / `plugin_report` / `boundary_report` | `159-276` | **(c)** | Reads `enabledPlugins` and globs `<cfg>/plugins/cache/*/*/*/skills/*/SKILL.md` | n/a |
 | `bin/keel` `write_nudge` | `515-553` | **(c)** | Emits Claude hook JSON and names `/plugin marketplace add` | n/a |
 | `bin/keel` `keel_deny_rules` / `keel_ask_rules` | `575-591`, `614-633` | **(b) in part, (c) in part** | 13 deny rules, 13 ask rules. See the permissions row below | n/a |
@@ -311,7 +314,7 @@ In runs, not adjectives:
 
 **Cost 2: the claims audit.** Under "same guarantees or not supported", **18 sentences become
 false**, 7 need an asterisk, and 3 stay true while misleading. The false ones cluster:
-`README.md:16` ("That is the whole install"), `README.md:82-84` (the output style in `/config`),
+`README.md:16` ("That is the whole install"), `README.md:85-87` (the output style in `/config`),
 `README.md`'s "Bypassing prompts is bounded" paragraph (deny and ask rules surviving
 `bypassPermissions`, the headline safety claim);
 `docs/01-architecture.md` and `:152` and `:156-159` (Layer 1 as "enforced by the runtime not
@@ -327,8 +330,9 @@ Five places need a new section rather than a word change: `docs/03-install-and-d
 `docs/07-open-decisions.md` decisions 3 and 12, `docs/05-token-and-memory-design.md`, and README's
 Install and Upgrading sections.
 
-`docs/03-install-and-distribution.md#The skills are no longer Claude-only.` is confirmed exactly
-as the requester described it, and is the sentence to keep true rather than work around:
+`docs/03-install-and-distribution.md` at v0.26.0 ("The skills are no longer Claude-only.") is
+confirmed exactly as the requester described it, and is the sentence to keep true rather than
+work around:
 
 > The skills themselves stay Claude-only for now; porting them is a later decision, not a Phase 1
 > one.
@@ -365,9 +369,9 @@ supported", that is a no, and it should be written down as one in
 naming the missing primitive so the next person does not re-derive this.
 
 What happens next is that nothing is built, and
-`docs/03-install-and-distribution.md#The skills are no longer Claude-only.` gains a paragraph
-naming Codex, `permissionDecision: "ask"`, and `openai/codex#28437`. Separately and regardless of
-this decision, `hooks/sensitive-guard:13` should be repaired to cite `bin/keel:558`.
+`docs/03-install-and-distribution.md` at v0.26.0 ("The skills are no longer Claude-only.") gains a
+paragraph naming Codex, `permissionDecision: "ask"`, and `openai/codex#28437`. Separately and
+regardless of this decision, `hooks/sensitive-guard:13` should be repaired to cite `bin/keel:558`.
 
 **The single fact that would flip this:** `openai/codex#28437` shipping `permissionDecision: "ask"`
 as a native approval prompt, *and* that prompt surviving `approval_policy = "never"`. Both halves.

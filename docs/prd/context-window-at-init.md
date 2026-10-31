@@ -39,7 +39,7 @@ writes it.
 
 **What that costs today.** `write_profile` emits the gates object at `bin/keel:364` and
 `context_window` is not among its eight keys, so no profile has it unless a human added one. This
-repository's own profile carries `"context_window": 1000000`, added by hand.  `bin/keel:1307` exists
+repository's own profile carries `"context_window": 1000000`, added by hand.  `bin/keel:1401` exists
 purely to tell the next reader to do the same: "If sessions here use a larger context, set
 gates.context_window in .keel/profile.json". The residual error, recorded in the code, is that a 1M
 session below 200,000 tokens is assumed to be in a full 200,000 window and warned early.
@@ -50,7 +50,7 @@ correction at `:149-150`. Today an unset project self-corrects: occupancy above 
 window is larger, because the API would have refused the request otherwise. Writing 200,000 into
 every profile would remove that. A 1M session in such a project would hard-stop at 170,000 tokens
 and never lift, with the user's only escape being to edit the file keel had just written. That is
-the precise failure `lib/context_watch.py:125-127` records the function as having been rewritten to
+the precise failure `lib/context_watch.py:198-201` records the function as having been rewritten to
 prevent, found against a real 2.4MB transcript holding 401,247 tokens.
 
 ## 3. Goals and non-goals
@@ -79,7 +79,7 @@ prevent, found against a real 2.4MB transcript holding 401,247 tokens.
 | A developer running `keel init` on a new project | Get a working profile without reading keel's source | That a profile exists. Not that `gates.context_window` does: it is undocumented, per `docs/ideas/profile-key-documentation.md` |
 | A developer in a long session | Not lose their work to a mid-task compaction | Only what the watchdog tells them, when it fires |
 | The watchdog itself, as a consumer of the profile | Decide whether to stay silent, warn, or stop | `gates.context_window`, `KEEL_CONTEXT_WINDOW`, the model string, and observed occupancy |
-| `keel doctor` | Report which window is in use | The profile key only (`bin/keel:1554-1600`) |
+| `keel doctor` | Report which window is in use | The profile key only (`bin/keel:1648-1694`) |
 
 ## 5. Functional requirements
 
@@ -92,7 +92,7 @@ prevent, found against a real 2.4MB transcript holding 401,247 tokens.
 | FR-05 | Re-running `keel init` on a project whose profile already sets `gates.context_window` must leave that value unchanged. | inferred | `merge_profile` at `bin/keel#out[k] = v            # human value wins` already gives a non-empty human value precedence. Asserting it so the guarantee is not lost later |
 | FR-06 | After `keel init --force` on a project whose profile set a different `gates.context_window`, the value must be `200000`. | inferred | Consistent with `--force` replacing the profile at `bin/keel#if [ -f .keel/profile.json ] && [ "${FORCE:-0}" -eq 0 ]; then`. Safe only because FR-01 makes the resulting value self-correcting |
 | FR-07 | The watchdog must remain silent below the warn threshold in a project where the written value understates the true window. | confirmed | The cost argument at `hooks/context-watch:9-12`. This is the observable consequence of FR-01 |
-| FR-08 | `keel doctor` must continue to report the window in use and its source. | inferred | Existing behaviour at `bin/keel:1554-1600`; no requirement to change it, and losing it would hide FR-01's effect |
+| FR-08 | `keel doctor` must continue to report the window in use and its source. | inferred | Existing behaviour at `bin/keel:1648-1694`; no requirement to change it, and losing it would hide FR-01's effect |
 | FR-09 | For a profile that sets `gates.context_window`, `keel doctor` must state that the value is a floor which observation can raise. | confirmed | Bernard, 2026-08-18, answering Q1. The current message at `bin/keel#window $cw from gates.context_window` names the value and its source only, which stops being the whole truth under FR-01 |
 | FR-10 | Every location that documents the window precedence must describe the behaviour FR-01 to FR-03 and FR-11 define. Those locations are the `gates.context_window` description at `templates/profile.schema.json:290`, both doctor messages at `bin/keel#window $cw from gates.context_window` and `:1271`, and the priority list in `window_for`'s docstring at `lib/context_watch.py:130-140`. | confirmed | Bernard, 2026-08-18: "let's re-word so that the documentation is up to date". All four currently state that a configured value simply wins |
 | FR-11 | The effective window must never exceed 1,000,000 tokens. A configured value above that, from either source, must be treated as 1,000,000. | confirmed | Bernard, 2026-08-18, answering Q2: bound it by the largest window that exists, else 1M. Those are the same number, see CON-06 |
@@ -104,7 +104,7 @@ prevent, found against a real 2.4MB transcript holding 401,247 tokens.
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
 | NFR-01 | The floor computation must add no filesystem or network reads to `window_for`. | inferred | It already receives `configured` and `observed` as arguments (`lib/context_watch.py:120`). The hook runs on every prompt and every tool call |
-| NFR-02 | This change must add zero tokens to what `hooks/session-start` injects. | confirmed | Piece three is out of scope. The hook measured 356 estimated tokens against a 400 ceiling on 2026-08-18 (`tests/validate-skills.sh:283-284`) |
+| NFR-02 | This change must add zero tokens to what `hooks/session-start` injects. | confirmed | Piece three is out of scope. The hook measured 356 estimated tokens against a 400 ceiling on 2026-08-18 (`tests/validate-skills.sh:284-285`) |
 | NFR-03 | The watchdog must continue to do nothing when `python3` is absent, rather than reporting an error. | inferred | `hooks/context-watch:14-16, 22` |
 | NFR-04 | Every existing assertion in `tests/test-context-watch.sh` must still pass unmodified after FR-01. | inferred | Verified 2026-08-18: every configured value in that file (500000 at `:86`, 1000000 at `:91`) exceeds the observed occupancy in its fixture, so the floor rule yields the same result |
 
@@ -113,7 +113,7 @@ prevent, found against a real 2.4MB transcript holding 401,247 tokens.
 | ID | Constraint | Imposed by |
 |---|---|---|
 | CON-01 | `SCHEMA_VERSION` must not move for this change. `gates.context_window` is already declared at `templates/profile.schema.json:287`, so writing it adds no field. | The existing schema, and the drift rule at `tests/validate-skills.sh:351-365` |
-| CON-02 | Between the true window and 1,000,000, a configured value that overstates the window cannot be corrected downward. FR-11 bounds the damage but does not eliminate it: setting 1,000,000 on a 200,000 session still silences the watchdog. | The platform: occupancy proves a lower bound on the window and never an upper one (`lib/context_watch.py:134-136`) |
+| CON-02 | Between the true window and 1,000,000, a configured value that overstates the window cannot be corrected downward. FR-11 bounds the damage but does not eliminate it: setting 1,000,000 on a 200,000 session still silences the watchdog. | The platform: occupancy proves a lower bound on the window and never an upper one (`lib/context_watch.py:224-225`) |
 | CON-03 | `200000` is correct for the default model tier and understates a 1M session. It is written knowing it is sometimes wrong, because FR-01 makes being wrong recoverable. | The absence of any readable window field (`lib/context_watch.py:121-127`) |
 | CON-04 | `/clear` cannot be triggered by keel. No hook output clears a session and a plugin cannot start one. | Claude Code's hook interface |
 | CON-05 | The watchdog is advisory infrastructure, not a correctness gate, and must fail silently. | `hooks/context-watch:14-16` |
@@ -124,7 +124,7 @@ prevent, found against a real 2.4MB transcript holding 401,247 tokens.
 Not applicable: this is `from-idea` mode. The section exists for `from-repo`, where the job is
 separating what the code does from what it must do.
 
-One note that would otherwise belong here: `bin/keel:1307`'s nudge is not a requirement, it is a
+One note that would otherwise belong here: `bin/keel:1401`'s nudge is not a requirement, it is a
 workaround for FR-04 being absent. Whether it is reworded once FR-04 lands is Q1.
 
 ## 9. Success metrics
@@ -160,14 +160,14 @@ follow this batch of work, which orders it but does not date it.
 | Injecting the handoff's contents anywhere | About 1,300 tokens of the most volatile file keel writes, into a prefix that `hooks/session-start:4-7` requires to be byte-identical forever |
 | Automating `/clear` | CON-04 |
 | Writing `context_warn_pct` or `context_stop_pct` at init | Both are already documented and both have working defaults. Adding them is a separate argument about whether init writes optional keys generally |
-| Removing `bin/keel:1307` | The message stays, for every profile that predates FR-04. Its wording is now in scope as part of FR-10 |
+| Removing `bin/keel:1401` | The message stays, for every profile that predates FR-04. Its wording is now in scope as part of FR-10 |
 | Documenting `gates.context_window` for users | Genuinely needed, and it is `docs/ideas/profile-key-documentation.md`'s job. Doing it here would put one key in a second place |
 
 ## 12. Assumptions
 
 | # | Assumption | Falsified if | Checked |
 |---|---|---|---|
-| A1 | Observed occupancy above a tier proves the window is larger than that tier | A request could succeed while exceeding the window | Yes. Stated at `lib/context_watch.py:134-136`, and it follows from the API rejecting oversized requests |
+| A1 | Observed occupancy above a tier proves the window is larger than that tier | A request could succeed while exceeding the window | Yes. Stated at `lib/context_watch.py:208-210`, and it follows from the API rejecting oversized requests |
 | A2 | `200000` is the right conservative default to write | Most sessions in keel projects use a larger window | Partly. True of the default model tier; this session and this repository are both 1M |
 | A3 | No existing test breaks under the floor rule | Any current fixture configures a window below its observed occupancy | Yes, verified 2026-08-18. See NFR-04 |
 | A4 | `merge_profile` preserves a hand-set value on re-init | A non-empty existing value could be replaced by the generated one | Yes, `bin/keel#out[k] = v            # human value wins` |
@@ -180,7 +180,7 @@ follow this batch of work, which orders it but does not date it.
 
 | # | Question | Needs | Blocks |
 |---|---|---|---|
-| Q1 | ~~Once FR-04 lands, is `bin/keel:1307`'s nudge reworded, kept as-is for older profiles, or removed?~~ **Answered 2026-08-18: reworded, and so is every other place that documents the precedence.** Now `FR-09` and `FR-10` | Answered | Was: nothing |
+| Q1 | ~~Once FR-04 lands, is `bin/keel:1401`'s nudge reworded, kept as-is for older profiles, or removed?~~ **Answered 2026-08-18: reworded, and so is every other place that documents the precedence.** Now `FR-09` and `FR-10` | Answered | Was: nothing |
 | Q2 | ~~Does a configured window need an upper sanity bound, so a typo of `200000000` cannot silence the watchdog entirely?~~ **Answered 2026-08-18: yes, bounded by the largest window that exists, which is 1,000,000.** Now `FR-11` to `FR-13`, `CON-06` | Answered | Was: nothing |
 | Q5 | ~~Does the FR-11 bound apply to `KEEL_CONTEXT_WINDOW`, or to the profile key only?~~ **Answered 2026-08-18: both.** Flagged in the approval request and approved as written. `A8` stands as the reasoning; `S-02`'s second scenario is where it is now asserted | Answered | Was: `FR-02`, `FR-11` |
 | Q3 | How is a stale handoff detected, so a session-start pointer cannot send a new session to last week's work? | Bernard | The follow-up PRD for piece three. Not this one |

@@ -36,39 +36,13 @@ HERE="$(cd "$(dirname "$SELF")/.." && pwd)"
 # expects", which is the only version of that question worth warning about. Bump it only when a
 # field is added, removed, renamed or moved. 0.7.0 and 0.7.1 changed none, and a warning that fires
 # on releases like those is one nobody reads by the time it matters.
-SCHEMA_VERSION=6
-
-# The keys a schema version removed, the version that removed each, and what to do instead. Read by
-# cmd_doctor, which is the only thing that can tell a person their profile still carries one.
-#
-# A register rather than a walk of the schema, because every object in
-# templates/profile.schema.json is additionalProperties: true on purpose: a project may carry keys
-# of its own, and a rule reporting anything the schema does not declare would warn at people for
-# using a documented affordance, and could name no remedy for the keys that do matter.
-#
-# Append a line here in the same commit that removes a key from the schema. Nothing detects a
-# removal you did not record. The fingerprint in tests/validate-skills.sh is a hash of the field
-# set, so it proves the set changed and cannot say which way; that validator checks only the other
-# direction, that no key named here is still declared in the schema.
-retired_keys() {
-    cat <<'RETIRED'
-gates.tdd|4|skills/tdd/SKILL.md asks for the cycle unconditionally and always did, so removing the key changes nothing.
-gates.review|4|skills/ship/SKILL.md runs its review step every time, so a project that set required already had it and one that set off never had the effect it expected.
-gates.docs_updated|4|skills/ship/SKILL.md runs its docs step every time, on the same terms as gates.review.
-gates.observability|4|nothing was asking, so removing the key changes nothing.
-conventions.working_branch|4|record the branch in CONTRIBUTING.md or in notes, where a person will read it.
-observability.log_shipping|4|set observability.backend to none for stdout only, which is the distinction the table in skills/coding-standards/references/observability.md keys on.
-RETIRED
-}
-
-# Set by `keel init --harness <list>`. Empty means "work it out", which is what harness_set_for_repo
-# does from the existing profile and then from the tracked tree.
-HARNESS_FLAG=""
+SCHEMA_VERSION=7
 
 # Fail loudly on a broken install. Without this the sources below print to stderr and execution
 # continues into undefined functions, which reads as a bug in the project being configured.
 for _need in lib/detect-stack.sh lib/merge-claude-md.sh lib/apex-export.sh \
-             lib/harness/resolve.sh lib/harness/claude.sh lib/deny-list.sh VERSION; do
+             lib/harness/resolve.sh lib/harness/claude.sh lib/deny-list.sh lib/retired-keys.sh \
+             VERSION; do
     [ -e "$HERE/$_need" ] || {
         printf 'keel: incomplete install: %s not found under %s\n' "$_need" "$HERE" >&2
         exit 1
@@ -81,173 +55,24 @@ done
 . "$HERE/lib/merge-claude-md.sh"
 # shellcheck source=lib/apex-export.sh
 . "$HERE/lib/apex-export.sh"
+# shellcheck source=lib/retired-keys.sh
+. "$HERE/lib/retired-keys.sh"
 
-# The harness layer. resolve.sh answers which gates are active where, from lib/harness/capabilities;
-# each lib/harness/<id>.sh implements the same seven-function contract for one harness.
-#
-# Claude Code's is sourced here so the contract is always defined, and because it is the harness
-# this CLI itself runs under. It is NOT the selection mechanism: every harness file defines the same
-# function names, so sourcing two leaves only the second reachable. harness_each below is what
-# actually runs a contract function once per harness, sourcing each one immediately before calling
-# it. A repository serving both harnesses is the case that a "source them all and call once" design
-# passes for one and silently skips for the other.
+# The harness layer. resolve.sh answers which gates are active, from lib/harness/capabilities, and
+# lib/harness/claude.sh holds everything keel writes and reads that belongs to Claude Code.
 # shellcheck source=lib/harness/resolve.sh
 . "$HERE/lib/harness/resolve.sh"
 # shellcheck source=lib/harness/claude.sh
 . "$HERE/lib/harness/claude.sh"
 
-# Run one contract function once per harness this repository serves.
-#
-# The source has to happen INSIDE the loop, immediately before the call, for the reason above. That
-# makes the loaded harness whichever ran last, so nothing outside a harness_each call may assume
-# which one is loaded; go through harness_each instead, even for a single value.
-# Validate before recording. Unchecked, `--harness bogus` wrote a harness nothing implements into
-# the profile, and `--harness --team` ate the next flag: the profile recorded a harness called
-# "--team", --team never ran, nothing was staged, and init said "configured" as though it had. Both
-# found in review. harness_known is the authority and already existed, unused here.
-harness_flag_set() {
-    local want="${1:-}" h known
-    known="$(harness_ids | tr '\n' ' ')"
-    case "$want" in
-        ""|-*) die "--harness needs a comma separated list of harness ids, not '$want'. Known: $known" ;;
-    esac
-    for h in ${want//,/ }; do
-        harness_known "$h" || die "unknown harness '$h'. Known: $known"
-        [ -f "$HERE/lib/harness/$h.sh" ] || die "harness '$h' is in the capability manifest and lib/harness/$h.sh does not exist, so keel cannot configure a repository for it."
-    done
-    HARNESS_FLAG="$want"
-}
-
-# Every harness the capability manifest knows, one per line. Read from the manifest rather than
-# listed here, so a harness added there cannot be missing from an error message that names them.
-harness_ids() {
-    _harness_cap || return 1
-    awk -F'|' '$1=="provides" && !seen[$2]++ {print $2}' "$_HARNESS_CAP"
-}
-
-# Every gate the capability manifest knows, one per line. Read from the manifest for the same
-# reason harness_ids is: a fifth gate added under hooks/ with a requires row would otherwise be
-# missing from what doctor reports, and a report that quietly omits a gate is the failure this
-# whole design exists to prevent. tests/test-harness-claims.sh already fails the build when the
+# Every gate the capability manifest knows, one per line. Read from the manifest rather than listed
+# here: a fifth gate added under hooks/ with a requires row would otherwise be missing from what
+# doctor reports, and a report that quietly omits a gate is the failure this whole design exists to
+# prevent. tests/test-harness-claims.sh already fails the build when the
 # requires rows and the files under hooks/ disagree, so either is the same list.
 harness_gates() {
     _harness_cap || return 1
     awk -F'|' '$1=="requires" && !seen[$2]++ {print $2}' "$_HARNESS_CAP"
-}
-
-# Which harness is running this process.
-#
-# CLAUDE_PLUGIN_ROOT is NOT a discriminator: Codex sets it deliberately for compatibility, at
-# codex-rs/hooks/src/engine/discovery.rs:266-269, and only for plugin hooks at that. Checked rather
-# than assumed, because hooks/hooks.json interpolates that variable.
-#
-# CODEX_VERSION is injected into every shell command Codex's exec tool runs
-# (codex-rs/core/src/exec_env.rs:40-49). A hook reads turn_id from its stdin payload instead; that
-# path lives in the hooks, not here.
-harness_running() {
-    [ -n "${CODEX_VERSION:-}" ] && { printf 'codex\n'; return 0; }
-    [ -n "${CLAUDECODE:-}" ] && { printf 'claude\n'; return 0; }
-    printf 'unknown\n'
-}
-
-# Whether the hooks keel ships will actually RUN for this harness on this machine. Prints
-# `trusted`, `untrusted` or `unknown`.
-#
-# THIS IS NOT THE QUESTION THE CAPABILITY MANIFEST ANSWERS, and open question 6 of the architecture
-# is the gap between the two. The manifest says what a harness CAN do. Doctor has to say what THIS
-# installation does. Codex runs no hook until its source is trusted and says nothing when it skips
-# one, measured 2026-09-06 on codex-cli 0.153.4, so `harness_active_gates codex` is a true statement
-# about Codex and a false one about a user whose hooks are untrusted. Reporting the manifest's
-# answer there would be keel agreeing with itself.
-#
-# The same probe found the 25 skills load without trust and the hooks do not, so an untrusted
-# install does not look broken, it looks like most of keel working. That is why the doctor line this
-# feeds says which half a person is looking at.
-#
-# WHAT IS READ. The key is `hooks.state."<id>"`, carried as a literal `hooks.state."` prefix in the
-# 0.153.4 binary beside the `enabled` and `trusted_hash` fields, in the user's config. Installing
-# the real keel plugin wrote `[plugins."keel@gbi"] enabled = true` and no trust entry of any kind,
-# and running a session added none, so the absence of `trusted_hash` beside an installed keel is
-# itself the signal.
-#
-# ONLY KEEL'S OWN TABLES COUNT, and this is the correction that matters. The first version of this
-# function tracked the three flags across every `[hooks.state.*]` and `[plugins.*]` table in the
-# file, which on any config holding a second plugin answered about the wrong one. Both directions
-# were wrong and one of them fails OPEN: an unrelated plugin the user had trusted made keel read as
-# trusted, and doctor printed three gates active on an installation where none of them would ever
-# run. The id is `<plugin name>@<marketplace>`, so the tables are matched on a quoted id of `keel`
-# or `keel@anything` and nothing else contributes.
-#
-# UNKNOWN IS NOT A FAILURE STATE AND MUST NOT READ AS ONE. The manifest fails closed on missing
-# evidence because a wrong `provides` row is unsafe. A doctor line that cries wolf on every machine
-# gets ignored, which costs more than it saves, so an absent or unreadable config says so rather
-# than reporting a gate dark.
-#
-# It lives in this file rather than in lib/harness/codex.sh because cmd_doctor asks it for a named
-# harness id, including one the repository does not serve, and harness_each only walks the set the
-# repository does serve.
-harness_hooks_trusted() {   # harness_hooks_trusted <harness>
-    case "${1:-}" in
-        # Claude Code has no trust step. A hook in settings.json runs, so there is nothing to read
-        # and nothing to withhold.
-        claude) printf 'trusted\n'; return 0 ;;
-        codex)  ;;
-        *) printf 'unknown\n'; return 0 ;;
-    esac
-    # `${HOME:-}` and not `$HOME`: this file runs under `set -u`, and an unset HOME (a container, a
-    # cron shell) would abort doctor on an unbound variable instead of reporting. Both unset leaves
-    # an unreadable path, which is the `unknown` this function already has an answer for.
-    local cfg="${CODEX_HOME:-${HOME:-}/.codex}/config.toml"
-    [ -r "$cfg" ] || { printf 'unknown\n'; return 0; }
-    # The section is tracked rather than grepped, because `enabled` and `trusted_hash` are ordinary
-    # field names and the answer depends on which table they sit in. A hash that is blank or empty
-    # is absent evidence and grants nothing, the same rule ADR-0003 puts on a provides row.
-    awk -F= '
-        /^[[:space:]]*\[/ {
-            state  = ($0 ~ /^[[:space:]]*\[hooks\.state\."keel(@[^"]*)?"\][[:space:]]*$/)
-            plugin = ($0 ~ /^[[:space:]]*\[plugins\."keel(@[^"]*)?"\][[:space:]]*$/)
-            next
-        }
-        state {
-            if ($1 ~ /^[[:space:]]*trusted_hash[[:space:]]*$/ && $2 ~ /[^[:space:]"]/) hash = 1
-            if ($1 ~ /^[[:space:]]*enabled[[:space:]]*$/ && $2 ~ /false/) off = 1
-        }
-        plugin {
-            if ($1 ~ /^[[:space:]]*enabled[[:space:]]*$/ && $2 ~ /false/) off = 1
-            installed = 1
-        }
-        END {
-            if (hash && !off) print "trusted"
-            else if (hash || installed) print "untrusted"
-            else print "unknown"
-        }
-    ' "$cfg"
-}
-
-# Asked once per process. harness_set_for_repo starts an interpreter to parse the profile's
-# `harnesses` array, and harness_each is called a dozen times in one init: for the context file, the
-# config paths, the permission rules, the writers and each doctor phase. Unprimed that is a dozen
-# python starts for a constant, and tests/test-keel.sh counts interpreter starts precisely because
-# this file has been bitten by that before. Primed in the parent shell, so the $( ) subshells below
-# inherit it full. Same shape and same reason as json_load and settings_report_load.
-HARNESS_SET=""
-harness_set_load() {
-    HARNESS_SET="$(harness_set_for_repo "$HARNESS_FLAG")"
-}
-
-harness_each() {   # harness_each <contract function> [args...]
-    local h
-    [ -n "$HARNESS_SET" ] || harness_set_load
-    for h in $HARNESS_SET; do
-        [ -f "$HERE/lib/harness/$h.sh" ] || continue
-        # shellcheck source=/dev/null
-        . "$HERE/lib/harness/$h.sh"
-        "$@"
-    done
-    # Leave Claude Code's contract loaded, so a caller that forgets the rule above gets the
-    # behaviour keel has always had rather than whichever harness happened to sort last.
-    # shellcheck source=lib/harness/claude.sh
-    . "$HERE/lib/harness/claude.sh"
 }
 
 DEFAULT_DOCS_ROOT="docs/keel"
@@ -415,8 +240,8 @@ default_branch() {
 merge_profile() {
     local fresh="$1" existing="$2"
     have_python || { mv "$fresh" "$existing"; return 0; }
-    KEEL_HARNESS_EXPLICIT="$HARNESS_FLAG" python3 - "$fresh" "$existing" <<'PY'
-import json, os, sys
+    python3 - "$fresh" "$existing" <<'PY'
+import json, sys
 fresh = json.load(open(sys.argv[1]))
 old = json.load(open(sys.argv[2]))
 def merge(new, cur):
@@ -436,13 +261,6 @@ merged["keel_version"] = fresh["keel_version"]
 # reading schema_version, so an old value surviving a re-init would make the refresh invisible to
 # the one check that exists to notice it.
 merged["schema_version"] = fresh["schema_version"]
-# `harnesses` is a human value and the merge above is right to keep it: re-running init must not
-# re-infer the set from the tree and quietly drop a harness somebody added by hand. But an explicit
-# --harness IS the human speaking, and it lost to the value it was trying to replace, silently, on
-# every repository that already had a profile. The only ways to change the set were --force, which
-# discards every human value in the file, and hand-editing. Found in review.
-if os.environ.get("KEEL_HARNESS_EXPLICIT") and "harnesses" in fresh:
-    merged["harnesses"] = fresh["harnesses"]
 json.dump(merged, open(sys.argv[2], "w"), indent=2)
 open(sys.argv[2], "a").write("\n")
 PY
@@ -473,48 +291,6 @@ json_or_null() {
     if [ -n "$1" ]; then printf '"%s"' "$1"; else printf 'null'; fi
 }
 
-# Which harnesses this repository serves. A set, not a switch: a team with some developers on Claude
-# Code and some on Codex works on one repository, and a switch makes that repository's config a
-# running argument between the two of them. ADR-0004.
-#
-# Tracked files only. An untracked .codex/ is one developer's local state and must not change what
-# the repository claims for everybody.
-#
-# AGENTS.md is deliberately NOT a signal. keel has dual written it since long before Codex was
-# supported and Cursor, Copilot CLI and Gemini CLI read it too, so treating it as evidence would
-# mark the whole installed base as Codex-serving in one upgrade.
-harness_set_for_repo() {
-    local explicit="${1:-}"
-    if [ -n "$explicit" ]; then printf '%s\n' "${explicit//,/$'\n'}"; return 0; fi
-    if [ -f .keel/profile.json ]; then
-        # Read through json_get, which answers from the flattened cache json_load already filled,
-        # so this costs no interpreter start of its own. tests/test-keel.sh counts them, and a
-        # second python3 for a value the process has already parsed is the thing it counts.
-        #
-        # The cache flattens with Python str(), so a list comes back as ['claude', 'codex'],
-        # single-quoted and on one line. Unpicking that repr is only safe because every id in it is
-        # validated on the way in by harness_flag_set, so the alphabet is [A-Za-z0-9_-]; anything
-        # else is dropped here rather than half-parsed into a harness name nothing implements.
-        local existing="" raw h
-        raw="$(json_get .keel/profile.json harnesses 2>/dev/null || true)"
-        case "$raw" in
-            \[*\])
-                for h in $(printf '%s' "$raw" | tr -d "[]'\"" | tr ',' ' '); do
-                    case "$h" in
-                        *[!A-Za-z0-9_-]*|"") continue ;;
-                    esac
-                    existing="$existing$h
-"
-                done ;;
-        esac
-        [ -n "$existing" ] && { printf '%s' "$existing"; return 0; }
-    fi
-    local out="claude"
-    git ls-files --error-unmatch .codex/config.toml >/dev/null 2>&1 && out="$out
-codex"
-    printf '%s\n' "$out"
-}
-
 # The verify keys write_profile always writes, in the order it writes them. write_ci reads this
 # same list, deriving its subset by exclusion, rather than hand-typing a second copy: two lists is
 # how a key added, renamed, or removed here gets missed there (docs/standards.md: "One definition
@@ -541,7 +317,6 @@ write_profile() {
       printf '{\n'
       printf '  "keel_version": "%s",\n' "$kver"
       printf '  "schema_version": %s,\n' "$SCHEMA_VERSION"
-      printf '  "harnesses": [%s],\n' "$(json_str_array "$(harness_set_for_repo "$HARNESS_FLAG")")"
       printf '  "project": { "name": "%s", "kind": "%s", "description": "" },\n' "$name" "$kind"
       printf '  "stack": { "language": "%s", "runtime": "%s", "framework": "%s", "package_manager": %s, "also": [%s], "datastores": [%s], "has_ui": %s },\n' \
         "$lang" "$rt" "$fw" "$pm_json" "$(json_str_array "$(detect_also)")" \
@@ -588,7 +363,7 @@ write_profile() {
       # fallen back to a fixed three when it was absent, which is why a language server was never
       # named on a repository that already had a .claude/settings.json: nothing enabled it and
       # nothing reported it missing.
-      printf '  "plugins": { "recommended": [%s] },\n' "$(json_str_array "$(harness_each harness_recommend_plugins)")"
+      printf '  "plugins": { "recommended": [%s] },\n' "$(json_str_array "$(harness_recommend_plugins)")"
       printf '  "artifacts": {\n'
       printf '    "_note": "Set any of these to a path when the artifact already exists elsewhere. Skills read the mapped path instead of the default under docs_root, so a repo with its own naming convention is not duplicated.",\n'
       printf '    "snapshot": null, "prd": null, "stories": null, "architecture": null, "decisions": null, "plans": null\n'
@@ -719,9 +494,7 @@ $(git -c core.quotePath=false ls-tree -r --name-only HEAD 2>/dev/null)
     # the physical path, so under /var every prefix test failed and the check silently found
     # nothing. doctor already runs from the project root everywhere else.
     top="$(pwd)"
-    # harness_each, not a bare call: the rule at the top of this file is that nothing outside one
-    # may assume which harness is loaded, and a bare call here scanned whichever was sourced last.
-    for f in README.md $(harness_each harness_context_file) AGENTS.md "$root"/*.md; do
+    for f in README.md $(harness_context_file) "$root"/*.md; do
         [ -f "$f" ] || continue
         dir="${f%/*}"; [ "$dir" = "$f" ] && dir='.'
         while IFS= read -r target; do
@@ -783,10 +556,9 @@ ignore_local_state() {
     # neither of keel's. Found on the existing-service pilot, where it silently un-ignored the
     # settings.local.json rule the repository already had.
     [ -s .gitignore ] && [ -n "$(tail -c 1 .gitignore)" ] && printf '\n' >> .gitignore
-    # The harness's own uncommitted config, plus the handoff. Read from the contract rather than
-    # named here, so a repository serving a second harness ignores that harness's local file too
-    # without this function learning what it is called.
-    for line in $(harness_each harness_config_paths | sed -n 's/^local|//p') ".keel/handoff.md"; do
+    # The harness's own uncommitted config, plus the handoff. Read from lib/harness/claude.sh rather
+    # than named here.
+    for line in $(harness_config_paths | sed -n 's/^local|//p') ".keel/handoff.md"; do
         if [ -f .gitignore ] && grep -qxF "$line" .gitignore; then continue; fi
         printf '%s\n' "$line" >> .gitignore
     done
@@ -807,7 +579,7 @@ stage_for_team() {
     # hold a space and this file uses no arrays; `$1` is already read into `root` above.
     local p
     set --
-    for p in .keel $(harness_each harness_context_file) AGENTS.md $(harness_each harness_config_dirs) "$root" .gitignore; do
+    for p in .keel $(harness_context_file) $(harness_config_dirs) "$root" .gitignore; do
         [ -e "$p" ] && set -- "$@" "$p"
     done
     if [ "$#" -gt 0 ] && git add -- "$@" >/dev/null 2>&1; then
@@ -823,17 +595,14 @@ cmd_init() {
     # written against it keep working when prompts are added.
     local team=0
     FORCE=0
-    HARNESS_FLAG=""
-    # --harness takes its value in the NEXT argument, so the loop cannot be a plain `for a in "$@"`
-    # any more: that form has no way to consume two. `shift`-based parsing keeps every existing flag
-    # behaving exactly as it did and is the smallest change that can read a value at all.
+    # --harness is refused rather than ignored like other unknown flags: whoever passes it expects
+    # it to do something, and nothing is written before the refusal.
     while [ $# -gt 0 ]; do
         case "$1" in
             -y|--yes) ;;
             --team) team=1 ;;
             --force) FORCE=1 ;;
-            --harness) shift; harness_flag_set "${1:-}" ;;
-            --harness=*) harness_flag_set "${1#--harness=}" ;;
+            --harness|--harness=*) die "--harness is no longer accepted: this plugin serves Claude Code only, and Codex support ended at v0.26.0." ;; # names Codex: the v0.26.0 notice
         esac
         shift
     done
@@ -841,7 +610,7 @@ cmd_init() {
     local root; root="$(docs_root)"
     check_docs_ignored "$root" || exit 1
 
-    for f in $(harness_each harness_context_file) AGENTS.md; do
+    for f in $(harness_context_file); do
         check_markers "$f"; local rc=$?
         [ $rc -eq 2 ] && die "$f has duplicate keel markers. Remove the extra block by hand; keel will not guess which to keep."
         [ $rc -eq 3 ] && die "$f has an unbalanced keel marker. Fix it by hand."
@@ -852,15 +621,13 @@ cmd_init() {
     # so the reads below and the ones inside render_block inherit it full. Each of those is a $( ),
     # which cannot fill it for anybody else. Not redundant.
     json_load .keel/profile.json || true
-    harness_set_load
     local block; block="$(mktemp)"
     render_block "$block" "$root"
-    for _ctx in $(harness_each harness_context_file); do merge_block "$_ctx" "$block"; done
-    merge_block AGENTS.md "$block"
+    for _ctx in $(harness_context_file); do merge_block "$_ctx" "$block"; done
     rm -f "$block"
     scaffold_docs "$root"
-    harness_each harness_write_config "$root"
-    harness_each harness_write_local_config "$root"
+    harness_write_config "$root"
+    harness_write_local_config "$root"
     ignore_local_state
     merge_ts_strict
     # Only where nothing declares a CI platform yet. deploy.ci is already filled by write_profile,
@@ -880,28 +647,12 @@ cmd_init() {
     say "keel: configured $(basename "$PWD")"
     [ "$FORCE" -eq 1 ] && say "  (--force: detected values overwrote the existing profile)"
     say "  profile   .keel/profile.json"
-    # Each line is skipped when the harness set has nothing to put in it, rather than printed with
-    # an empty value. A codex-only repository has no context file of its own and no local config, so
-    # unguarded these read "block      AGENTS.md" with a doubled space and "mode      :
-    # bypassPermissions, not committed" with no path in front of the colon.
-    say "  block     $(harness_each harness_context_file | sed 's/$/,/' | tr '\n' ' ')AGENTS.md"
+    say "  block     $(harness_context_file)"
     say "  docs      $root/"
-    say "  plugins   $(harness_each harness_config_paths | sed -n 's/^committed|//p' | paste -sd' ' -)"
-    say "  guards    $(harness_each harness_config_paths | sed -n 's/^committed|//p' | head -1) permissions: $(harness_each harness_permission_rules | grep -c "^deny|") deny, $(harness_each harness_permission_rules | grep -c "^ask|") ask"
-    local _local_cfg; _local_cfg="$(harness_each harness_config_paths | sed -n 's/^local|//p')"
+    say "  plugins   $(harness_config_paths | sed -n 's/^committed|//p' | paste -sd' ' -)"
+    say "  guards    $(harness_config_paths | sed -n 's/^committed|//p' | head -1) permissions: $(harness_permission_rules | grep -c "^deny|") deny, $(harness_permission_rules | grep -c "^ask|") ask"
+    local _local_cfg; _local_cfg="$(harness_config_paths | sed -n 's/^local|//p')"
     [ -n "$_local_cfg" ] && say "  mode      $_local_cfg: bypassPermissions, not committed"
-    # Anything a harness needs the person to do that keel cannot do for it. Open question 6 of
-    # docs/architecture/tiered-multi-harness-support.md is the case this exists for: Codex runs no
-    # hook until its source is trusted and says nothing when it skips one, so an install that says
-    # nothing leaves every gate silently dark and looking installed. Printed here rather than left
-    # to doctor because this is the moment the person is configuring the repository.
-    while IFS= read -r line; do
-        [ -n "$line" ] || continue
-        case "$line" in
-          fail\|*|warn\|*) say "  action    ${line#*|}" ;;
-          *)               say "  note      ${line#*|}" ;;
-        esac
-    done < <(harness_each harness_doctor_findings install)
 
     local kind; kind="$(json_get .keel/profile.json project.kind || true)"
     local t; t="$(json_get .keel/profile.json verify.test || true)"
@@ -1329,12 +1080,11 @@ cmd_new() {
 
     local block; block="$(mktemp)"
     render_block "$block" "$root"
-    for _ctx in $(harness_each harness_context_file); do merge_block "$_ctx" "$block"; done
-    merge_block AGENTS.md "$block"
+    for _ctx in $(harness_context_file); do merge_block "$_ctx" "$block"; done
     rm -f "$block"
     scaffold_docs "$root"
-    harness_each harness_write_config "$root"
-    harness_each harness_write_local_config "$root"
+    harness_write_config "$root"
+    harness_write_local_config "$root"
     ignore_local_state
     write_ci
 
@@ -1408,14 +1158,6 @@ import json, re, sys
 
 schema_version, keel_version, verify_test, text = sys.argv[1:5]
 
-# The profile's harnesses array, verbatim. json_get cannot hand a list over cleanly, so read the
-# file here. Anything but a list of strings (absent, older schema, hand-edited) is reported as [].
-try:
-    h = json.load(open(".keel/profile.json")).get("harnesses")
-    harnesses = h if isinstance(h, list) and all(isinstance(x, str) for x in h) else []
-except Exception:
-    harnesses = []
-
 findings = []
 problems = warnings = 0
 for line in text.splitlines():
@@ -1433,7 +1175,6 @@ for line in text.splitlines():
 print(json.dumps({
     "schema_version": int(schema_version) if schema_version.isdigit() else None,
     "keel_version": keel_version or None,
-    "harnesses": harnesses,
     "verify_test_null": verify_test == "",
     "problems": problems,
     "warnings": warnings,
@@ -1468,7 +1209,7 @@ cmd_doctor_text() {
               warn\|*) warn "${line#warn|}" ;;
               ok\|*)   good "${line#ok|}" ;;
             esac
-        done < <(harness_each harness_doctor_findings "$1")
+        done < <(harness_doctor_findings "$1")
     }
 
     [ -f .keel/profile.json ] || { fail "no .keel/profile.json. Run 'keel init'."; return 1; }
@@ -1530,52 +1271,116 @@ PY
         warn "python3 absent: cannot validate the profile or read its fields"
     fi
     json_load .keel/profile.json || true
-    harness_set_load
 
-    # The harness section. ADR-0004: a guarantee is a property of (repository, harness), so this
-    # answers for the harness in front of the person and names what the others do not get.
-    #
-    # It is printed before everything below it because it says which of the answers below apply.
-    local running trust active harnesses h g
-    running="$(harness_running)"
-    if [ "$running" = unknown ]; then
-        warn "cannot determine which harness is running, so this reports on every harness this repository serves"
-        harnesses="$HARNESS_SET"
-    else
-        good "running under $running"
-        harnesses="$running"
-    fi
-    for h in $harnesses; do
-        # Trailing space stripped: the list sits mid-sentence in the two warnings below, and
-        # `tr` leaves one before the full stop.
-        active="$(harness_active_gates "$h" | tr '\n' ' ')"; active="${active% }"
-        trust="$(harness_hooks_trusted "$h")"
-        case "$trust" in
-          # No "gates active" line beside either of these. Two lines, one calling the gates live and
-          # one calling them dark, is worse than either alone.
-          untrusted)
-            warn "$h will run none of keel's hooks here until you have trusted them, so these gates are dark: ${active:-none}. The skills load without that trust and the hooks do not, so keel looks installed and is not. That trust lives in your own $h configuration and keel cannot grant it." ;;
-          unknown)
-            warn "$h gates the manifest grants: ${active:-none}. keel cannot tell from your $h configuration whether the hooks behind them will run on this machine, so treat none of them as proven here." ;;
-          *)
-            good "$h gates active: ${active:-none}" ;;
-        esac
-        for g in $(harness_gates); do
-            harness_gate_active "$h" "$g" || warn "$h does not get $g"
-        done
+    # The gates section: which of keel's gates the capability manifest grants Claude Code, and any
+    # it does not. Printed before everything below it because it says which of the answers apply.
+    local active g
+    # Trailing space stripped, because the list sits mid-sentence.
+    active="$(harness_active_gates claude | tr '\n' ' ')"; active="${active% }"
+    good "claude gates active: ${active:-none}"
+    for g in $(harness_gates); do
+        harness_gate_active claude "$g" || warn "claude does not get $g"
     done
-    # A repository declaring hard_block_paths and serving a harness with no ask is protected for
-    # some of the people working in it and not others.
-    if grep -q '"hard_block_paths"' .keel/profile.json 2>/dev/null; then
-        for h in $HARNESS_SET; do
-            harness_provides "$h" pretooluse_ask \
-              || warn "this repository declares hard_block_paths, which is not enforced for its $h users"
-        done
+    # The installed Claude Code against keel's minimum, the highest version a gate's primitive was
+    # verified on, which lib/harness/resolve.sh derives from the ledger. No minimum is a warning of
+    # its own and never a pass: harness_version_ge counts every version at or above nothing.
+    # KEEL_CLAUDE names the command and defaults to `claude`. Set but empty is an error and not a
+    # fallback, the rule KEEL_CAPABILITIES follows in lib/harness/resolve.sh, so it names no command
+    # and doctor cannot tell. The command runs in the background and is polled, then killed after
+    # five seconds: a claude stopped at a login or an update prompt must not stop doctor, neither
+    # `timeout` nor `gtimeout` can be assumed, and bash 3.2 has no `wait -n`. The kill is SIGKILL,
+    # because a claude that ignores SIGTERM held an unbounded `wait`, and a --version run has
+    # nothing to clean up. Its output goes to a file rather than a $( ), where a child it left
+    # behind would hold the pipe open past the kill. Parsed in bash, because doctor's python3
+    # starts are budgeted (tests/test-keel.sh): the first line whose first word, less a leading v,
+    # starts with a dotted number, so `v2.1.312`, `2.1.303-beta.1` and a warning line before the
+    # version all read. Ten polls a tenth of a second apart, which is when a working claude
+    # answers, then four a second apart: five seconds in fourteen sleeps rather than fifty, since
+    # each is a process start and fifty of them added half a second to a hung run. `sleep 0.1`
+    # takes a fraction on macOS, GNU and BusyBox. Each warning names its cause, since the fix for a
+    # missing command, a hung one and one printing something else differs.
+    # KEEL_CLAUDE_VERSION_FILE naming a file that holds a line, `<version>|<reason>` with one side
+    # empty, makes that line the answer and the command is not run; naming an empty file, the answer
+    # is written there. keel-fleet sets it, so a fleet asks once per run rather than once per
+    # repository, where each ask can take the five seconds above. Its version side counts only when
+    # the parser would keep it, because harness_version_ge does arithmetic on it. Any other line,
+    # one with both sides empty, or a file doctor cannot read, is no answer, and doctor asks. The
+    # answer is written back only to a file that is doctor's own, empty, absent or holding a line
+    # with a `|`, and never through a symlink: a path set by hand to the wrong file, or a symlink
+    # another local user planted in a shared directory, must not have its target overwritten. The
+    # read and the write print no shell error, since doctor asks instead and a bash error naming a
+    # line of this script tells the reader nothing about their Claude Code.
+    local cc_cmd="${KEEL_CLAUDE-claude}" cc_min cc_out cc_pid cc_n=0 cc_ver="" cc_why="" cc_w
+    local cc_late="" cc_gv cc_vf="${KEEL_CLAUDE_VERSION_FILE-}" cc_vl="" cc_l="" cc_own=""
+    # cc_kept WORD: 0 when WORD is a version the parser keeps, digits and dots holding a dot, with
+    # none at either end and no two together. The file's version goes through it too.
+    cc_kept() {
+        case "$1" in .*|*.|*..*|*[!0-9.]*) return 1 ;; *.*) return 0 ;; *) return 1 ;; esac
+    }
+    if ! cc_min="$(harness_min_version)"; then
+        warn "cannot read keel's minimum Claude Code version from the capability ledger, so this Claude Code is not checked against it"
+    else
+        if [ -n "$cc_vf" ] && [ -s "$cc_vf" ]; then
+            { IFS= read -r cc_l < "$cc_vf"; } 2>/dev/null
+            cc_ver="${cc_l%%|*}"
+            case "$cc_l" in *'|'*) cc_why="${cc_l#*|}"; cc_own=1 ;; esac
+            if [ -n "$cc_own" ] && { cc_kept "$cc_ver" || { [ -z "$cc_ver" ] && [ -n "$cc_why" ]; }; }; then
+                cc_vl=1
+            else
+                cc_ver=""; cc_why=""
+            fi
+        elif [ -n "$cc_vf" ] && { [ -f "$cc_vf" ] || [ ! -e "$cc_vf" ]; }; then
+            cc_own=1
+        fi
+        if [ -n "$cc_vl" ]; then
+            :
+        elif ! command -v "$cc_cmd" >/dev/null 2>&1; then
+            cc_why="'$cc_cmd' was not found"
+        elif ! cc_out="$(mktemp)"; then
+            cc_why="no temporary file for the output of '$cc_cmd --version'"
+        else
+            "$cc_cmd" --version </dev/null >"$cc_out" 2>/dev/null &
+            cc_pid=$!
+            while kill -0 "$cc_pid" 2>/dev/null && [ "$cc_n" -lt 14 ]; do
+                if [ "$cc_n" -lt 10 ]; then sleep 0.1; else sleep 1; fi
+                cc_n=$((cc_n+1))
+            done
+            if kill -0 "$cc_pid" 2>/dev/null; then
+                kill -KILL "$cc_pid" 2>/dev/null
+                cc_why="'$cc_cmd --version' was stopped after 5 seconds without answering"
+            else
+                while read -r cc_w _ || [ -n "$cc_w" ]; do
+                    cc_w="${cc_w#v}"; cc_w="${cc_w%%[!0-9.]*}"
+                    cc_kept "$cc_w" && { cc_ver="$cc_w"; break; }
+                done < "$cc_out"
+                [ -n "$cc_ver" ] || cc_why="'$cc_cmd --version' ran, but its output named no version"
+            fi
+            wait "$cc_pid" 2>/dev/null
+            rm -f "$cc_out"
+        fi
+        [ -n "$cc_own" ] && [ ! -L "$cc_vf" ] && [ -z "$cc_vl" ] \
+          && { printf '%s|%s\n' "$cc_ver" "$cc_why" > "$cc_vf"; } 2>/dev/null
+        if [ -z "$cc_ver" ]; then
+            warn "cannot tell whether this Claude Code runs keel's gates: $cc_why. keel needs Claude Code $cc_min or later."
+        elif harness_version_ge "$cc_ver" "$cc_min"; then
+            good "Claude Code $cc_ver meets keel's minimum, $cc_min"
+        else
+            for g in $(harness_gates); do
+                cc_gv="$(harness_gate_version "$g")" || continue
+                harness_version_ge "$cc_ver" "$cc_gv" || cc_late="$cc_late, $g ($cc_gv)"
+            done
+            warn "Claude Code $cc_ver is older than keel's minimum, $cc_min. These gates rest on a primitive verified only on a later version: ${cc_late#, }. Update Claude Code, or treat them as unverified here."
+        fi
     fi
-    # A harness installed here that the repository does not list. A machine fact, so it belongs in
-    # doctor and never in init, which writes a committed team fact.
-    command -v codex >/dev/null 2>&1 && ! grep -qx codex <<< "$HARNESS_SET" \
-      && warn "codex is installed on this machine but this repository does not list it in harnesses"
+    if grep -q '"hard_block_paths"' .keel/profile.json 2>/dev/null; then
+        harness_provides claude pretooluse_ask \
+          || warn "this repository declares hard_block_paths, which is not enforced for its claude users"
+    fi
+    # Agent files an earlier keel wrote, left in place because they may have been edited since.
+    { [ -f .codex/agents/keel-fanout.toml ] || [ -f .codex/agents/keel-implementer.toml ]; } && warn "keel wrote .codex/agents/keel-fanout.toml and .codex/agents/keel-implementer.toml for Codex, and this plugin no longer manages them: Codex support ended at v0.26.0. Delete them unless something else here uses them." # names Codex: the v0.26.0 notice
+    # The managed block the same keel appended to that harness's config, found by its start marker,
+    # so a config holding only the repository's own settings gets no line.
+    grep -q '^# keel:start v1 - managed by keel init' .codex/config.toml 2>/dev/null && warn "keel wrote a managed block into .codex/config.toml for Codex, from its '# keel:start v1' line to its '# keel:end' line, and nothing in this plugin uses it: Codex support ended at v0.26.0. The block can be deleted." # names Codex: the v0.26.0 notice
 
     local root; root="$(docs_root)"
     check_docs_ignored "$root" && good "docs root '$root' is not gitignored" \
@@ -1591,7 +1396,7 @@ PY
     done < <(referenced_docs_findings "$root")
     [ "$refs" -eq 0 ] && good "every referenced document is in HEAD" || true
 
-    for f in $(harness_each harness_context_file) AGENTS.md; do
+    for f in $(harness_context_file); do
         check_markers "$f"; local rc=$?
         case $rc in
           0) [ -f "$f" ] && good "$f markers intact" || warn "$f is absent" ;;
@@ -1876,11 +1681,8 @@ for k,v in d.items():
     # Give the harness a chance to fill any cache its readers share, here, in this shell. Claude
     # Code's readers sit in a `< <( )`, which is a subshell: it inherits a variable already full,
     # but anything it loads itself dies with it, so without this each would start its own
-    # interpreter. Called through the contract rather than by name: `settings_report_load` exists
-    # on one harness only, and cmd_doctor calling it directly is the break this task's own note
-    # says the sixth contract function exists to prevent.
-    harness_set_load
-    harness_each harness_doctor_findings prime >/dev/null
+    # interpreter.
+    harness_doctor_findings prime >/dev/null
 
     harness_section plugins
 
@@ -1935,21 +1737,13 @@ for k,v in d.items():
             elif [ "$cwnum" = 1 ] && [ -n "$cwmax" ] && [ "$cw" -gt "$cwmax" ]; then
                 warn "gates.context_window is $cw, above the largest context window that exists. The watchdog is using $cwmax. Correct the value, or a session will never be warned."
             elif [ "$cwnum" = 1 ] && [ -n "$cwdef" ] && [ "$cw" -lt "$cwdef" ]; then
-                if [ "$running" = codex ]; then
-                    warn "gates.context_window is $cw and the watchdog is ignoring it. The key is a floor and only ever raises the window, and on codex the window starts from the model_context_window the session's own rollout states. Set KEEL_CONTEXT_WINDOW to force a smaller one."
-                else
-                    warn "gates.context_window is $cw, below the $cwdef default, so the watchdog is using $cwdef. The key is a floor and only ever raises the window. Set KEEL_CONTEXT_WINDOW to force a smaller one."
-                fi
+                warn "gates.context_window is $cw, below the $cwdef default, so the watchdog is using $cwdef. The key is a floor and only ever raises the window. Set KEEL_CONTEXT_WINDOW to force a smaller one."
             elif [ "$cwnum" = 1 ]; then
                 good "context watchdog available (window $cw from gates.context_window, raised automatically if a session is observed exceeding it)."
             elif [ -n "$cw" ] && [ "$cw" != "None" ]; then
                 warn "gates.context_window is '$cw', which is not a usable number, so the watchdog is ignoring it and assuming 200000. Set a positive integer."
             else
-                if [ "$running" = codex ]; then
-                    good "context watchdog available (on codex the window is read from the session itself, which states model_context_window; the conservative default applies only to a session that states none). gates.context_window is a floor and raises that starting point."
-                else
-                    good "context watchdog available (window assumed 200000, raised once a session is observed exceeding it). A profile written by a newer keel carries gates.context_window; set it here to start from a larger value."
-                fi
+                good "context watchdog available (window assumed 200000, raised once a session is observed exceeding it). A profile written by a newer keel carries gates.context_window; set it here to start from a larger value."
             fi
         fi
     fi

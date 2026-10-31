@@ -1156,7 +1156,7 @@ regenerate the page with `bash tests/generate-profile-keys.sh > docs/profile-key
 Changing a description does not move `SCHEMA_VERSION`: the validator fingerprints key paths and not
 descriptions, which `docs/prd/usable-profile.md` `CON-01` records.
 
-`docs/03-install-and-distribution.md:210-227` is a `Signal | Inferred` table with a row per detected
+`docs/03-install-and-distribution.md:200-217` is a `Signal | Inferred` table with a row per detected
 language. Every existing row keys on a declared file and pairs the language with a language server;
 PL/SQL has neither, so its row has to say so or it reads as an omission. Add this row immediately
 after the `.luarc.json` row and before the `More than one of the above` row:

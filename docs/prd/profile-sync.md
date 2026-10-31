@@ -89,7 +89,7 @@ run `sync`; they are why its output has to be a path that resolves.
 | FR-07 | `sync` must be idempotent: a second run against an unchanged tree writes nothing and says so. | inferred | Named as a property of the chosen variant in the idea record's variants table |
 | FR-08 | `sync` must report each key it filled and the path it wrote, and report when it filled none. | inferred | A command that edits a tracked file silently is not reviewable. `keel init` prints what it wrote, `bin/keel#(--force: detected values overwrote the existing profile)` |
 | FR-09 | A written path must be relative to the repository root. | inferred | `bin/keel#[ -e "$path" ] && good "artifacts.$key -> $path"` tests `[ -e "$path" ]` with the working directory at the repository root, so an absolute path would resolve on one machine only |
-| FR-10 | `keel doctor` must warn, never fail, on an artifact key that is null while its default location is present, and must name `keel profile sync` in the message. | confirmed | Bernard, 2026-08-29, as part of the same decision: doctor's report is how anyone learns the command exists. Shape follows the `stack.has_ui` precedent at `bin/keel:1634` |
+| FR-10 | `keel doctor` must warn, never fail, on an artifact key that is null while its default location is present, and must name `keel profile sync` in the message. | confirmed | Bernard, 2026-08-29, as part of the same decision: doctor's report is how anyone learns the command exists. Shape follows the `stack.has_ui` precedent at `bin/keel:1728` |
 | FR-11 | Doctor's warning must cover only the keys `sync` can fill. | inferred | A warning whose named remedy does not apply is noise. `prd`, `stories` and `architecture` have no remedy under FR-04 |
 | FR-12 | `keel --help` must list `sync` on the `profile` line. | confirmed, was author-added | `bin/keel#read or correct one profile field` documents `get` and `set` there. An undocumented subcommand is discoverable only from doctor's warning, which a user reaches only if their tree already has the gap. Invented by the author, put to Bernard as a choice and kept, 2026-08-30 |
 | FR-13 | In a monorepo, `snapshot` must stay null when only `snapshot-<unit>.md` files exist and `snapshot.md` does not. | confirmed | Bernard, 2026-08-30. Settles the idea record's open question 2. `skills/repo-snapshot/SKILL.md:90` emits one file per unit, and the key is `["string","null"]` in the schema, so it cannot hold them |
@@ -102,14 +102,14 @@ run `sync`; they are why its output has to be a path that resolves.
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
 | NFR-01 | `sync` must add no dependency beyond what `keel profile` already requires. | inferred | `cmd_profile` already hard-requires `python3` at `bin/keel:1020`. Three existence checks and one JSON write need nothing else |
-| NFR-02 | `sync` must write the profile through the same path as `keel profile set`, so the file's formatting is unchanged relative to that command. | inferred | `profile_set` at `bin/keel:973-1017` is the existing writer, and two writers producing different formatting would show up as spurious diffs |
+| NFR-02 | `sync` must write the profile through the same path as `keel profile set`, so the file's formatting is unchanged relative to that command. | inferred | `profile_set` at `bin/keel:699-760` is the existing writer, and two writers producing different formatting would show up as spurious diffs |
 | NFR-03 | Doctor's added check must not measurably slow `keel doctor --fast`. | inferred | `--fast` exists because the full run takes minutes. Three `[ -e ]` tests are free, but the check must sit where `--fast` still reaches it, since a fast run is where most people will meet it |
 
 ## 7. Constraints
 
 | ID | Constraint | Imposed by |
 |---|---|---|
-| CON-01 | No new writer may be built. `profile_set` refuses a dotted path not already in the file, `bin/keel:941-950`, and all six `artifacts.*` keys are seeded by `write_profile` at `bin/keel:445-448`, so all six are settable today. | The existing code. This is a wiring change, not a feature |
+| CON-01 | No new writer may be built. `profile_set` refuses a dotted path not already in the file, `bin/keel:692-701`, and all six `artifacts.*` keys are seeded by `write_profile` at `bin/keel:367-370`, so all six are settable today. | The existing code. This is a wiring change, not a feature |
 | CON-02 | `keel doctor` must not edit the profile. | Decided in the idea record, 2026-08-29. Doctor is a diagnostic; users run it to find out what is wrong, not to have a tracked file rewritten under them |
 | CON-03 | No skill body may gain a word for this. | ADR-0001 and measurement. `write-plan` is 897 words against a 900 ceiling, so the per-skill variant fails `tests/validate-skills.sh` outright. This constraint is the entire reason the command was chosen |
 | CON-04 | No `PostToolUse` hook. | Decided in the idea record. keel holds its hook budget to 400 tokens, `tests/validate-skills.sh:362-366`, and this event happens a few times per repository |

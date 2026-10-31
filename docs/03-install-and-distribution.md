@@ -28,10 +28,6 @@ Project level (once per repo)
   -> writes .keel/profile.json
   -> merges a block into CLAUDE.md
   -> writes .claude/settings.json with recommended plugins and hooks
-  (Claude Code. On Codex the equivalents are .codex/config.toml, where keel init manages one
-   marked block and leaves the rest alone, .codex/agents/keel-{fanout,implementer}.toml, and
-   .codex-plugin/plugin.json, which ships in the plugin. See docs/harness-support.md for which
-   gates the capability manifest grants that harness, and trust the hooks before relying on them.)
   -> scaffolds docs/keel/
   -> optionally stages all of it for commit (keel init --team)
 ```
@@ -183,12 +179,6 @@ variables, none of which names a loaded plugin. The reader knows its own skill l
 the message asks it to look there. Keying off the variable instead, which is what the hook
 did originally, made it silent under a test that set the variable by hand and wrong in
 every real session.
-
-**`CLAUDE_PLUGIN_ROOT` is not a Claude Code variable any more**, recorded 2026-09-05: Codex sets it
-for plugin hooks too (`codex-rs/hooks/src/engine/discovery.rs:266-269`), which is why the generated
-Codex hook manifest can use the same command strings as the Claude Code one. The passage above is
-about which hooks receive it, and that part still holds; read the name as "the plugin's own root",
-not as "we are on Claude Code".
 
 It therefore prints in every session rather than only plugin-less ones, so it is budgeted
 at 200 tokens like the `SessionStart` injection it sits beside, and a test fails if it
@@ -575,8 +565,9 @@ when keel runs through that path.
 
 <!-- keel:claim gate=sensitive-guard harness=claude -->
 **The list is a union.** `hooks/sensitive-guard` reads the nearest `.keel/profile.json` walking up
-from the directory it runs in, and that can be any directory, so `plan risk` matches the changed
-paths against the patterns of every profile the hook could read from anywhere:
+from the session's directory, the first of these that names a directory that exists: the event's
+`cwd`, then `CLAUDE_PROJECT_DIR`, then `$PWD`. That can be any directory, so `plan risk` matches the
+changed paths against the patterns of every profile the hook could read from anywhere:
 
 - the root profile as the base has it (`HEAD` for `--staged`, `<a>` for `--range`) and as the
   working tree has it, which is the only way explicit paths, naming no commit, read it;
@@ -587,8 +578,9 @@ paths against the patterns of every profile the hook could read from anywhere:
   first profile it meets, so run from `svc`, which has its own, it never reads one above the
   repository, but run from the root, which has none, it does. keel therefore also walks up from the
   repository's parent, and adds the nearest profile it finds there. It walks from the current
-  directory too, by the logical `$PWD` with symlinks unresolved, as the hook does, and by the
-  resolved path, and from the logical parent of the repository when that differs.
+  directory too, by the logical `$PWD` with symlinks unresolved, where the hook starts when neither
+  the event's `cwd` nor `CLAUDE_PROJECT_DIR` names an existing directory, and by the resolved path,
+  and from the logical parent of the repository when that differs.
 
 The base is in the union so a change cannot lower its own review, and the working tree is in it
 because the hook reads that: with `["src/auth"]` at `HEAD`, an unstaged edit making it
@@ -1022,7 +1014,7 @@ allowlist is the only restriction on the reviewer, and no deny rule is set for r
 
 `anthropics/claude-code-action@v1` is a tag, the form the vendor documents, and not a commit. Pin
 it to a commit, with the tag in a trailing comment, as `.github/workflows/ci.yml` pins the other
-actions. This is Claude Code on GitHub only: there is no Codex or GitLab version. The tests pin
+actions. This is GitHub only: there is no GitLab version. The tests pin
 what the file says and what the command does; the workflow has not been run against a real
 repository.
 
@@ -1036,8 +1028,8 @@ your project. That is unverified until a real run, and the job holds the secret 
 ## `keel-fleet <repo-path>... | --file <path-list-file>`
 
 Fans out `keel doctor --json --fast` across repositories and prints one tab-separated row per
-repository: `repo`, `keel_version`, `schema_version`, `harnesses` (the profile's list,
-comma-joined, a fact and not a compliance verdict), `verify_test_null`, `problems`, `warnings`.
+repository: `repo`, `keel_version`, `schema_version`, `verify_test_null`, `problems`,
+`warnings`.
 Exits non-zero if any repository has a problem or could not be read. It is a second binary the
 plugin adds to `PATH` alongside `keel`, not a `keel` subcommand, and it runs the `keel` sitting
 next to it, falling back to the one on `PATH`, so the login-shell install's single symlink is
@@ -1135,37 +1127,20 @@ The managed block is in [`templates/project-claude-md-block.md`](../templates/pr
 and is deliberately short, around 450 tokens, because it sits in every request. See
 [doc 05](05-token-and-memory-design.md).
 
-## Cross-agent portability
+## Other harnesses
 
-`keel init` also writes `AGENTS.md` containing the same managed block. Cursor, Codex,
-Copilot CLI, and Gemini CLI all read it. This costs one extra file write and means the
-principles and verify commands apply even when someone is not in Claude Code.
+`keel init` writes the managed block to `CLAUDE.md` alone. An `AGENTS.md` already in the
+repository is left byte for byte and unstaged, and `keel doctor` does not read it, because its
+readers are other harnesses and keel serves Claude Code only (ADR-0013).
+v0.26.0 is the last keel release that wrote `AGENTS.md`, which Cursor, Codex, Copilot CLI and
+Gemini CLI read.
 
-**The skills are no longer Claude-only.** `.codex-plugin/plugin.json` declares a relative path to
-the same `skills/` directory Claude Code's manifest uses, so there is one copy of every skill and
-nothing is vendored, copied or synchronised. Measured 2026-09-06 by installing the plugin into a
-real Codex and reading the session: all 25 skills were advertised. Cursor, Copilot CLI and Gemini CLI still get
-`AGENTS.md` and nothing else, which is the tier below.
+v0.26.0 is also the last keel release with Codex support, and a separate keel plugin for Codex is
+planned. Until it ships, a Codex user installs the v0.26.0 tag:
 
-### Installing on Codex
-
-Codex reads `.claude-plugin/marketplace.json`, the same marketplace manifest Claude Code reads, so
-the repository needs no second one. Hooks reach Codex only through a plugin: a project-level
-`.codex/hooks.json` is never consulted. `.codex-plugin/plugin.json` points `hooks` at
-`hooks/hooks.codex.json`, which is generated without the gates the capability manifest withholds
-from Codex.
-
-**And Codex runs no hook until you have trusted the plugin's hooks, and says nothing when it skips
-one.** Measured 2026-09-06 against a real install: **the skills arrive and the gates do not**. A
-session with keel installed and enabled advertised all 25 skills and fired no hook, and installing
-wrote `enabled = true` with no trust entry of any kind. So an untrusted install does not look
-broken, it looks like most of keel working, which is worse. Trust the plugin's hooks in Codex
-before relying on any gate. `keel init` says so on a repository serving Codex; `keel doctor` does
-**not** check it yet, and that is task 11.
-
-What actually fires on Codex is a smaller set than on Claude Code, and
-[`docs/harness-support.md`](harness-support.md) is generated from the capability manifest and is
-the only answer that cannot drift.
+```bash
+codex plugin marketplace add gbi-solutions-ltd/keel --ref v0.26.0 && codex plugin add keel@gbi
+```
 
 ## Rollout
 

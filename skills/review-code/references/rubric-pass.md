@@ -6,11 +6,11 @@ work least worth making cheaper, and a description with no routing label is ambi
 inherited and forgotten. `docs/standards.md`, "A dispatch names its model, and says so", has the
 rule.
 
-Dispatch it as agent type `keel-reviewer` where the harness has it, keeping the `inherit: `
-description. On Claude Code a hook, `hooks/review-guard`, refuses that agent type the git commands
-that would change the author's tree, and the hook sees the agent type, not the description. Where
-the agent type does not exist, on Codex or in a session without the plugin, dispatch a general agent
-with the same brief; the prompt below states the git rules for every harness.
+Dispatch it as agent type `keel-reviewer`, keeping the `inherit: ` description. A hook,
+`hooks/review-guard`, refuses that agent type the git commands that would change the author's tree,
+and the hook sees the agent type, not the description. Where the agent type does not exist, in a
+session without the plugin, dispatch a general agent with the same brief; the prompt below states
+the git rules, so they hold without the hook.
 
 ## Why a dispatch and not a section of the skill
 
@@ -119,7 +119,7 @@ directory, named for this review alone: `review-<short commit>-<four letters you
 fixed name, because two reviews on one machine would share it and one would change the other's tree.
 Look up the short commit first and write the name out in full. If the path exists, choose other
 letters; never reuse or remove a worktree you did not create. Write `<path>` as
-`"${TMPDIR:-/tmp}/<name>"` or a literal path under the temp directory, because on Claude Code a hook
+`"${TMPDIR:-/tmp}/<name>"` or a literal path under the temp directory, because a hook
 refuses a target it cannot resolve, such as one held in `"$wt"`, and `TMPDIR` is often unset on
 Linux. If the change is not committed, apply it there with `git diff HEAD | git -C <path> apply`,
 but skip that when `git diff HEAD` is empty (only new files changed): `apply` rejects empty input,
@@ -138,8 +138,8 @@ changes the author's index, working tree or stash: no `stash`, `checkout`, `rest
 worktree's files are yours to change, but its stash is the author's, since every worktree of a
 repository shares one: run no `stash` there either. On 2026-10-12 one reviewer ran `git stash` on
 the tree under review and put the stash back, and another left a worktree behind; the next may not
-clean up. Where you run as `keel-reviewer` on Claude Code, a hook enforces these git rules by
-refusing the command; they are stated here for every harness, and hold where no hook does. If it
+clean up. Where you run as `keel-reviewer`, a hook enforces these git rules by refusing the
+command; they are stated here because they hold where no hook does. If it
 refuses one, report the step you could not do rather than look for another way to run it.
 
 Rank each finding, by these meanings and no others:

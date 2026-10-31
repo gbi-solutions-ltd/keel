@@ -4,7 +4,7 @@
 # Pure bash on purpose. hooks/sensitive-guard sources this to decide whether it can do its job, and
 # a gate that needs python3 to know whether it is a gate has the dependency in the wrong place.
 #
-# ADR-0003: a provides row grants its primitive only when source, version and date are all present.
+# ADR-0014: a provides row grants its primitive only when source, version and date are all present.
 # Absent evidence fails, never passes. Three ways a row can be absent evidence while looking
 # populated, all of which resolved a gate ACTIVE in the first version of this file:
 #   - a field holding only spaces is blank, not empty, and [ -n ] accepts it
@@ -115,4 +115,82 @@ harness_active_gates() {
         harness_gate_active "$harness" "$f2" && printf '%s\n' "$f2"
     done < "$cap"
     return 0
+}
+
+# ---- keel's minimum Claude Code version ------------------------------------
+#
+# Derived here rather than written down anywhere: the highest version a gate's primitive was verified
+# on. README carries the number and tests/test-harness-claims.sh compares the two, so a row that
+# raises it is a red build until README says so. Pure bash like the rest of this file, and with no
+# external command either, because keel doctor calls it on every run.
+
+# harness_version_ge A B: 0 when version A is at or above B, comparing each dotted field as a
+# number, so 2.1.302 is above 2.1.99 where a string comparison says the opposite. A field one
+# version lacks counts as 0. 10# because a field with a leading zero is otherwise read as octal.
+# A field that is not all digits returns 1 before any arithmetic: bash runs a command substitution
+# inside an array subscript in $(( )), and keel doctor can read a version from a file.
+harness_version_ge() {
+    [ $# -eq 2 ] || return 1
+    case "$1$2" in *[!0-9.]*) return 1 ;; esac
+    local a="$1" b="$2" x y
+    while [ -n "$a" ] || [ -n "$b" ]; do
+        x="${a%%.*}"; y="${b%%.*}"
+        case "$a" in *.*) a="${a#*.}" ;; *) a="" ;; esac
+        case "$b" in *.*) b="${b#*.}" ;; *) b="" ;; esac
+        [ "$((10#${x:-0}))" -gt "$((10#${y:-0}))" ] && return 0
+        [ "$((10#${x:-0}))" -lt "$((10#${y:-0}))" ] && return 1
+    done
+    return 0
+}
+
+# _harness_gate_version GATE: sets _HARNESS_VERSION to the highest version among the evidenced
+# provides|claude rows for the primitives GATE requires, or empty, returning 1. A variable rather
+# than output, for the fork the comment on _harness_cap counts. Evidenced is harness_provides'
+# test, field for field: a row with no version grants nothing, so it sets no minimum either.
+_harness_gate_version() {
+    local gate="$1" cap f1 f2 f3 f4 f5 f6 f7 needs=" "
+    _HARNESS_VERSION=""
+    _harness_cap || return 1; cap="$_HARNESS_CAP"
+    [ -r "$cap" ] || return 1
+    while IFS='|' read -r f1 f2 f3 || [ -n "$f1" ]; do
+        [ "$f1" = "requires" ] && [ "$f2" = "$gate" ] && needs="$needs$f3 "
+    done < "$cap"
+    while IFS='|' read -r f1 f2 f3 f4 f5 f6 f7 || [ -n "$f1" ]; do
+        [ "$f1" = "provides" ] || continue
+        [ "$f2" = "claude" ] || continue
+        case "$needs" in *" $f3 "*) ;; *) continue ;; esac
+        [ -z "$f7" ] || continue
+        _harness_present "$f4" || continue
+        _harness_present "$f5" || continue
+        _harness_present "$f6" || continue
+        if [ -z "$_HARNESS_VERSION" ] || ! harness_version_ge "$_HARNESS_VERSION" "$f5"; then
+            _HARNESS_VERSION="$f5"
+        fi
+    done < "$cap"
+    [ -n "$_HARNESS_VERSION" ]
+}
+
+harness_gate_version() {
+    [ $# -eq 1 ] || return 1
+    _harness_gate_version "$1" || return 1
+    printf '%s\n' "$_HARNESS_VERSION"
+}
+
+# harness_min_version: the highest harness_gate_version over every gate in a requires row, which
+# is the oldest Claude Code on which every gate keel ships has its evidence.
+harness_min_version() {
+    local cap f1 f2 rest seen=" " best=""
+    _harness_cap || return 1; cap="$_HARNESS_CAP"
+    [ -r "$cap" ] || return 1
+    while IFS='|' read -r f1 f2 rest || [ -n "$f1" ]; do
+        [ "$f1" = "requires" ] || continue
+        case "$seen" in *" $f2 "*) continue ;; esac
+        seen="$seen$f2 "
+        _harness_gate_version "$f2" || continue
+        if [ -z "$best" ] || ! harness_version_ge "$best" "$_HARNESS_VERSION"; then
+            best="$_HARNESS_VERSION"
+        fi
+    done < "$cap"
+    [ -n "$best" ] || return 1
+    printf '%s\n' "$best"
 }

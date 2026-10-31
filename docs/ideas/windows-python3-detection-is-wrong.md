@@ -22,7 +22,7 @@ downstream check that gates on `have_python()` believes python3 works.
 
 - `bin/keel:253-254`, the central `HAVE_PYTHON` flag `merge_permissions_into_settings` and others
   read
-- `bin/keel:1439-1440`, doctor's profile-parse check, which folds "didn't run" and "invalid JSON"
+- `bin/keel:1260-1267`, doctor's profile-parse check, which folds "didn't run" and "invalid JSON"
   into one failure message
 - `bin/keel#&& have_py=1`, the pre-push loosening check, `have_py=1`, does not go through
   `HAVE_PYTHON`
@@ -40,8 +40,8 @@ invisible trailing character.
 
 **Sites still present:**
 
-- `bin/keel:288`, `JSON_CACHE`
-- `bin/keel:1541` (line moved since the PR; same call), the artifacts loop
+- `bin/keel:113`, `JSON_CACHE`
+- `bin/keel:1635` (line moved since the PR; same call), the artifacts loop
 
 **Already moot:** the PR's third site, `SETTINGS_REPORT`, no longer exists, superseded by the
 harness capability-manifest system since 2026-09-07.

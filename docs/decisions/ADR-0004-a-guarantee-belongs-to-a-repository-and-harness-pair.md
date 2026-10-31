@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | accepted |
+| Status | superseded by ADR-0013 |
 | Date | 2026-09-05 |
 | Deciders | Bernard Tebandeke, accepted 2026-09-05 |
 | Requirements | none written; driver is `docs/ideas/keel-on-codex.md` as amended 2026-09-05 |
@@ -18,7 +18,7 @@ The real case answers it. A team where some developers use Claude Code and some 
 on one repository. Under a switch, that repository's configuration is whatever the last person to
 run `keel init` chose, and the two of them take turns undoing each other. keel already accepts this
 in one place: `keel init` dual-writes the same managed block to `CLAUDE.md` and `AGENTS.md`
-(`bin/keel:927-928`) precisely because both readers exist at once.
+(`bin/keel` at v0.26.0) precisely because both readers exist at once.
 
 So it is a set. And a set produces a fact this repository has never had to state before:
 `.keel/profile.json` declares `hard_block_paths`, and that declaration is enforced for the people

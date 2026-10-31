@@ -1920,22 +1920,22 @@ reading the cited line and asking whether it says what the document says it says
 Haiku's failures are systematic rather than random. It is consistently **one line low on
 `.keel/profile.json`**, citing `:11` for `language` (line 10), `:13` for `framework` (line 12) and
 `:14` for `package_manager` (line 13), three separate claims in three separate sections all off by
-the same one. It cites `bin/keel:1863` for the `keel init` dispatch, which is the `*) die "unknown
-command"` catch-all, the dispatch being at `:1845`. It cites `.gitignore:9-11` for an evals carve-out
+the same one. It cites `bin/keel:1957` for the `keel init` dispatch, which is the `*) die "unknown
+command"` catch-all, the dispatch being at `:4953`. It cites `.gitignore:9-11` for an evals carve-out
 that is at `:20`. It cites `lib/apex_export.py:123-134` for when SQLcl is invoked, which is a SQL
 header constant.
 
-Sonnet's three are `bin/keel:1868-1876` for the profile defaults, which are past the end of a
+Sonnet's three are `bin/keel:1962-1970` for the profile defaults, which are past the end of a
 1,864-line file and actually at `:430-444`, and `.keel/profile.json:36-40` for the `observability`
 block, which is the `gates` block.
 
 **The substance separates them further, in both directions.**
 
-Sonnet found three real contradictions haiku did not. The largest: `docs/06-repo-layout.md:183-185`
+Sonnet found three real contradictions haiku did not. The largest: `docs/06-repo-layout.md:180-182`
 states `plugin.json` carries `"license": "SEE LICENSE IN LICENSE"` "because keel is proprietary to
 GBi Solutions Ltd", while `.claude-plugin/plugin.json:10` is `"MIT"` and `LICENSE:1` is MIT. Verified
 by reading all three. It also found that `doctor` prints `ok` for checks it skipped when git is
-absent (`bin/keel:288-290`, `:766`, `:1264`, all verified), and that `docs/06-repo-layout.md:104-108`
+absent (`bin/keel:288-290`, `:766`, `:1264`, all verified), and that `docs/06-repo-layout.md:100-104`
 omits `hooks/done-guard`, which is wired at `hooks/hooks.json:55-80`.
 
 Haiku was not merely worse. It found the decision log contradicting itself in its own header,
@@ -2661,15 +2661,15 @@ both be true unless the denominator is wrong. It is.
 **Section 5, delegated, scores zero of zero because it is invisible, not because it passed.** Opened
 and read: it is prose paragraphs plus two fenced blocks, and the instrument skips fenced blocks and
 counts only table rows and bullets. It carries real claims and real citations
-(`.github/workflows/ci.yml:23-28`, `.keel/profile.json:30-35`, `bin/keel:1800`) and real uncited ones
+(`.github/workflows/ci.yml:23-28`, `.keel/profile.json:30-35`, `bin/keel:1894`) and real uncited ones
 ("`timeout` is absent on this macOS host"), and **none of them scored in either direction**. A section
 written as prose cannot be marked uncited, so writing prose is how a document scores well.
 
 **Section 8 is one finding written two ways.** Both documents report that `tests/evals/` is absent.
 The delegated arm writes one prose paragraph carrying `.keel/profile.json:22`,
-`CONTRIBUTING.md:138-142`, `CHANGELOG.md:10-18` and `tests/export-public.sh:43-48`: **counted as zero
+`CONTRIBUTING.md:138-142`, `CHANGELOG.md:10-47` and `tests/export-public.sh:43-48`: **counted as zero
 rows**, so four citations earned nothing and cost nothing. The inline arm writes a numbered item with
-five nested bullets, better organised and citing `docs/06-repo-layout.md:138` and `CLAUDE.md:19` on
+five nested bullets, better organised and citing `docs/06-repo-layout.md:134` and `CLAUDE.md:19` on
 top: **counted as six rows, five uncited**. One of those is "`tests/test-eval-harness.sh` fails 15 of
 18 assertions", which is an **observed test result with no line to cite and no hatch word**, penalised
 for being a measurement rather than a reference.
@@ -5622,8 +5622,8 @@ parallel merge") in one of four runs under load, and once on the Mac. The output
 satisfies every assertion, so the assertion is what flaked: `printf '%s\n' "$out" | grep -qx ...`
 under `set -o pipefail` fails when `grep -q` exits before `printf` has written, with status 141.
 Measured on 18,000 trials of the bare pattern, six in parallel: five failures. About 190 sites in
-`tests/*.sh` have that shape, and so do `bin/keel:1573` and
-`tests/generate-harness-artifacts.sh:126`. It was not fixed in this change, because a rewrite of
+`tests/*.sh` have that shape, and so do `bin/keel:1667` and
+`tests/generate-harness-artifacts.sh:118`. It was not fixed in this change, because a rewrite of
 that many assertions was not this change's to make. **It is fixed afterwards** by `tests/grep-quiet.sh`
 and the one-line `set` form in every test file that has such a pipeline, with a lint in
 `tests/test-grep-quiet.sh` (`docs/plans/2026-10-21-flake-and-batched-scenario.md`; the stress run is

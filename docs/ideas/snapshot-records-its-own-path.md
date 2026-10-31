@@ -33,7 +33,7 @@ says "Set any of these to a path when the artifact already exists **elsewhere**"
 under `docs_root`". A snapshot written at `<docs_root>/snapshot.md` is at the default, so every
 consumer already finds it by falling back. Grepped across `skills/`, `bin/keel` and `templates/` on
 2026-08-29: **no skill reads `artifacts.snapshot` at all.** The only code that touches it is
-`bin/keel:1356-1370`, which fails doctor when a set path does not exist. Verified on a scratch
+`bin/keel:1450-1464`, which fails doctor when a set path does not exist. Verified on a scratch
 fixture the same day: `keel profile set artifacts.snapshot docs/snapshot.md` succeeds with no code
 change, and `keel doctor` then reports
 
@@ -82,8 +82,8 @@ wired to it, and the monorepo path is not derivable at all.
 |---|---|---|
 | Nothing reads `artifacts.snapshot` | Grep over `skills/`, `bin/keel`, `templates/`, 2026-08-29. Five skills read sibling keys: `write-prd/SKILL.md:32` (`prd`), `write-user-stories/SKILL.md:18` (`prd`), `design-architecture/SKILL.md:25`, `write-plan/SKILL.md:19`, `repo-snapshot/SKILL.md:41` | The writer half has no consumer. Building it first produces a key that is written and never read, which is the definition of ceremony |
 | `write-prd` reads the snapshot from a hardcoded path | `skills/write-prd/SKILL.md:32` gives `from-repo`'s first read as `<docs_root>/snapshot.md`, while `:35` checks `profile.artifacts.prd` | **The defect, and it is not the one that was reported.** A repository that maps its snapshot elsewhere is silently ignored by the one skill built to consume it |
-| The writer already exists and needs no code | `bin/keel:973-1017` `profile_set`, reachable as `keel profile set <dotted.path> <value>`. It refuses a path that is not already in the file (`:990-998`), and every `artifacts.*` key is seeded by `write_profile` at `bin/keel:445-448`, so all six are settable today. Proven on a fixture 2026-08-29 | Whatever is decided, this is a wiring change and not a feature. No new writer needs building |
-| Doctor already validates the map, generically | `bin/keel:1356-1370` iterates every non-underscore key with a value | Doctor needs no change to cover a newly set key, and it is where a "null but the default exists" report belongs |
+| The writer already exists and needs no code | `bin/keel:699-760` `profile_set`, reachable as `keel profile set <dotted.path> <value>`. It refuses a path that is not already in the file (`:715-724`), and every `artifacts.*` key is seeded by `write_profile` at `bin/keel:367-370`, so all six are settable today. Proven on a fixture 2026-08-29 | Whatever is decided, this is a wiring change and not a feature. No new writer needs building |
+| Doctor already validates the map, generically | `bin/keel:1450-1464` iterates every non-underscore key with a value | Doctor needs no change to cover a newly set key, and it is where a "null but the default exists" report belongs |
 | The gap is systemic, not `repo-snapshot`'s | All five artifact-producing skills write to a fixed path and set nothing: `repo-snapshot/SKILL.md:87-88`, `write-prd/SKILL.md:74-75`, `write-user-stories/SKILL.md:59-60`, `design-architecture/SKILL.md:56-57`, `write-plan/SKILL.md:55-56` | Fixing `repo-snapshot` alone answers the feedback and leaves four instances of it |
 | One skill body physically cannot take the line | `tests/validate-skills.sh` on 2026-08-29: `write-plan` is 897 words, 3 from the ceiling | The per-skill variant is not a matter of preference. It fails the suite on one of the five |
 | The `keel profile set` callback pattern is already in use | `design-architecture/SKILL.md:65-66`: "When the design commits to a user interface, run `keel profile set stack.has_ui true`" | The precedent exists and is one sentence long, which is what the per-skill variant would cost each body |
@@ -107,7 +107,7 @@ wired to it, and the monorepo path is not derivable at all.
 3. ~~**Should doctor warn on a null key whose default path exists?**~~ **Answered: yes, and it
    names the command.** Not a separate decision in the end, because question 1's answer already made
    doctor's report the only way anyone learns the command exists. Now `FR-10` and `FR-11` of
-   `docs/prd/profile-sync.md`, shaped after the `stack.has_ui` warning at `bin/keel:1634`: a warning
+   `docs/prd/profile-sync.md`, shaped after the `stack.has_ui` warning at `bin/keel:1728`: a warning
    and never a failure, and only for the keys sync can actually fill.
 
 ## What has landed

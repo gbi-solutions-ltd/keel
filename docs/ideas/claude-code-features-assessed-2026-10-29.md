@@ -4,8 +4,8 @@
 |---|---|
 | Raised by | Bernard, 2026-10-29, asking for an assessment of the plugin against current Claude Code features, explored by Sonnet subagents |
 | Status | agreed 2026-10-29: items 1, 2, 3, 4 and 9, with the open questions answered by Bernard below |
-| Recommendation | Build something smaller: items 1 to 4 and 9. Do not build items 5, 6 and 8. Item 7 waits for its first instance |
-| Next | Waits on the decision to strip Codex support from this plugin, raised by Bernard on 2026-10-29: that removes the case against's ADR-0004 argument and reopens item 8. Once its ADR lands, revise the case against, then `write-plan` for items 1 to 4 and 9 |
+| Recommendation | Build something smaller: items 1 to 4 and 9. Do not build items 5 and 6. Item 7 waits for its first instance. Item 8 is reopened |
+| Next | `write-plan` for items 1 to 4 and 9 |
 
 ## The problem
 
@@ -25,7 +25,7 @@ the one promise `hard_block_paths` makes, on any commit where the guard does not
   hook doesn't block the tool call ... so don't count on a stalled hook to act as a gate."
   `hooks/hooks.json:47-50` gives `sensitive-guard` a 10 second timeout and no `onFailure`. **No
   timeout is on record**, so this half rests on the documented gap and not on an incident.
-- **Decision 10 has waited on one observation since 2026-08.** `docs/07-open-decisions.md:495`
+- **Decision 10 has waited on one observation since 2026-08.** `docs/07-open-decisions.md:488`
   leaves writing `outputStyle` open until someone sees how a plugin style is named. On
   2026-10-29, `claude -p "/output-style"` on 2.1.312 listed `keel:keel terse` among the styles.
 
@@ -40,12 +40,11 @@ the one promise `hard_block_paths` makes, on any commit where the guard does not
 ## The case against
 
 **Strongest argument for not building this at all.** Every item here makes keel depend on a
-Claude Code version it never declares. `onFailure` needs 2.1.295, the `userConfig` picker needs
-2.1.271, plugin `dependencies` resolution has its own version notes, and nothing in `README.md`,
-`docs/03-install-and-distribution.md` or `lib/harness/capabilities` states a minimum. On an older
-client a new field either does nothing, which leaves the gap open while the docs say it is closed,
-or stops the plugin loading, which is worse than the gap. Each item is also Claude only, so per
-ADR-0004 it adds another guarantee held at two strengths, and Codex users get none of it.
+Claude Code version. `onFailure` needs 2.1.295, the `userConfig` picker needs 2.1.271, and plugin
+`dependencies` resolution has its own version notes. keel's minimum, derived from the capability
+ledger, is 2.1.302, stated in `README.md` and checked by `keel doctor`, but doctor only warns. On
+an older client a new field either does nothing, which leaves the gap open while the docs say it is
+closed, or stops the plugin loading, which is worse than the gap.
 
 **Alternatives**
 
@@ -62,13 +61,13 @@ ADR-0004 it adds another guarantee held at two strengths, and Codex users get no
 |---|---|---|
 | 1. `"onFailure": "block"` on `sensitive-guard` | A timeout, a hook that cannot start, or a crash the trap misses blocks the call instead of letting it through | **Build**, after the `EXIT` trap lands. It blocks as exit 2 does, not `ask`, so a failure costs a retry rather than a prompt. Not on `review-guard`, which runs on every Bash call, so its failure would block the main session too, and not on the advisory `context-watch` or the Stop-time `done-guard` |
 | 2. Record the output-style observation | A `provides|claude|...` row with source, version and date, per ADR-0004, and decision 10's open half answered | **Build** the record, and have `keel init` write `"outputStyle": "keel:keel terse"`, per the answer to open question 2 |
-| 3. `dependencies` in `plugin.json` | The required plugins in `docs/04-plugin-strategy.md` install with keel, replacing the `enabledPlugins` that `lib/harness/claude.sh:324` writes | **Build**, per the answer to open question 1, with `allowCrossMarketplaceDependenciesOn: ["claude-plugins-official"]` in `marketplace.json`. Building it overrules this record's default answer, and the cost is recorded there |
+| 3. `dependencies` in `plugin.json` | The required plugins in `docs/04-plugin-strategy.md` install with keel, replacing the `enabledPlugins` that `lib/harness/claude.sh:327` writes | **Build**, per the answer to open question 1, with `allowCrossMarketplaceDependenciesOn: ["claude-plugins-official"]` in `marketplace.json`. Building it overrules this record's default answer, and the cost is recorded there |
 | 4. `claude plugin validate --strict` in CI | Manifest and marketplace errors fail the build instead of a user's install | **Build**, if open question 3 comes back cheap |
 | 5. An `if` condition on `sensitive-guard`, such as `Bash(git commit*)` | Spares a process on Bash calls that are not commits | **Do not build.** The docs call `if` best-effort, and a commit written `cd x && git commit` or `git -C x commit` could skip a gate the hook's own parser already handles |
-| 6. `userConfig` for per-user switches such as `KEEL_CONTEXT_WATCH` | A `/config` row instead of an environment variable | **Do not build.** No complaint about the variable is on record, and most of keel's switches are project facts that belong in `.keel/profile.json`, committed and shared, not per user. Compatibility is not the reason: only the `options` picker field stops older clients (before 2.1.271) loading the plugin, plain fields only lack a `/config` row before 2.1.269, and the 2.1.295 minimum from open question 4 covers both |
+| 6. `userConfig` for per-user switches such as `KEEL_CONTEXT_WATCH` | A `/config` row instead of an environment variable | **Do not build.** No complaint about the variable is on record, and most of keel's switches are project facts that belong in `.keel/profile.json`, committed and shared, not per user. Compatibility is not the reason: only the `options` picker field stops older clients (before 2.1.271) loading the plugin, plain fields only lack a `/config` row before 2.1.269, and the 2.1.302 minimum from open question 4 covers both |
 | 7. `argument-hint` and `$ARGUMENTS` on user-invoked skills | `/keel:ship <branch>` style invocation | **Not yet, revisit on the first instance.** Cheap and low risk, so the only reason against is that no user passing arguments to a keel skill is on record. The cost when built is a second invocation path the evals would cover |
-| 8. Plugin `workflows/` for the review and execute-plan fan-outs | Deterministic orchestration instead of prose dispatch | **Do not build.** ADR-0005 keeps one skill body across harnesses, and Codex has no workflow runtime |
-| 9. Two doc corrections | The docs state what is true now | **Build.** `docs/04-plugin-strategy.md:14` says every plugin named is in `claude-plugins-official`, while `:24` and `:28` mark Context7 and Playwright external. `docs/07-open-decisions.md:12` and `:54` say the repo is private, and `gh repo view` reports it `PUBLIC` |
+| 8. Plugin `workflows/` for the review and execute-plan fan-outs | Deterministic orchestration instead of prose dispatch | **Reopened.** Its reason was ADR-0005's one skill body across harnesses, and ADR-0013 supersedes ADR-0005, so the reason is gone and the item needs a fresh assessment |
+| 9. Two doc corrections | The docs state what is true now | **Build.** `docs/04-plugin-strategy.md:8` says every plugin named is in `claude-plugins-official`, while `:24` and `:28` mark Context7 and Playwright external. `docs/07-open-decisions.md:12` and `:54` say the repo is private, and `gh repo view` reports it `PUBLIC` |
 
 **Assumptions this rests on**
 
@@ -87,7 +86,7 @@ ADR-0004 it adds another guarantee held at two strengths, and Codex users get no
 | `maxTurns` on `keel-fanout` was dropped on purpose, not missed | `docs/plans/2026-10-13-harness-held-dispatch-guarantees.md:95`: "a turn cap ends a read silently" | The 2026-10-29 assessment listed it as a gap. It is not one, and it is not an item here |
 | `AGENTS.md` is not read twice beside `CLAUDE.md` | Memory docs: by default Claude reads `AGENTS.md` "only when you have no `CLAUDE.md` in your working directory or above it" | The dual write ADR-0004 describes costs no context on Claude Code. Nothing to change |
 | Every skill uses only `name`, `description` and `allowed-tools` | `skills/*/SKILL.md` frontmatter | `allowed-tools` pre-approves tools and does not restrict them, per the skills docs. No skill text was found relying on it as a restriction |
-| The Claude capability rows stop at 2.1.302 | `lib/harness/capabilities:99-113` | Items 1 and 2 each add a row, and the version column is where a minimum would first show |
+| The Claude capability rows stop at 2.1.302 | `lib/harness/capabilities:81-95` | Items 1 and 2 each add a row, and the version column is where a minimum would first show |
 | The guard's wiring has no failure policy | `hooks/hooks.json:42-53` | Item 1 is one key on one entry |
 
 ## Open questions
@@ -107,16 +106,17 @@ All four answered by Bernard on 2026-10-29.
 3. **What does `claude plugin validate` cost in CI?** It needs the Claude Code CLI on the runner.
    **Answer: add it only if it runs without credentials; otherwise record why and drop it.**
 4. **What minimum Claude Code version does keel declare?** Item 1 forces the question. **Answer:
-   2.1.295, stated in `README.md` and checked by `keel doctor`.**
+   2.1.302, derived from the capability ledger, stated in `README.md` and checked by `keel
+   doctor`.**
 
 ## Recommendation
 
 Build something smaller: land the `EXIT` trap, then add `onFailure: "block"` to `sensitive-guard`
-behind a declared 2.1.295 minimum that `keel doctor` checks, record the output-style observation
+behind the declared 2.1.302 minimum that `keel doctor` checks, record the output-style observation
 and have `keel init` write the style, declare the required plugins as `dependencies`, add `plugin
-validate` to CI if it runs unsigned, and correct the two docs. Do not build `if`, `userConfig` or
-workflows, and build skill arguments when someone first needs them. Next is `write-plan` for those
-items.
+validate` to CI if it runs unsigned, and correct the two docs. Do not build `if` or `userConfig`,
+assess workflows again, and build skill arguments when someone first needs them. Next is
+`write-plan` for those items.
 
 ## Not decided here
 

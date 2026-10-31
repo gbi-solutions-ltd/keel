@@ -201,25 +201,18 @@ run "an invisible bidirectional character is rejected" 1 m_invisible
 m_orphan()   { printf '#!/bin/sh\necho hi\n' > "$1/hooks/extra-hook"; chmod +x "$1/hooks/extra-hook"; }
 run "a hook not registered in any manifest is rejected" 1 m_orphan
 
-# There is more than one manifest since 2026-09-06, and both halves of that need pinning.
-#
-# A hook registered only on the SECOND harness is registered. Without this the rule reads hooks.json
-# alone and flags the first gate that is Codex-only, which is a false stop on a correct tree, and
-# the check people learn to ignore.
-m_orphan_codex() {
-    printf '#!/bin/sh\necho hi\n' > "$1/hooks/codex-only-hook"; chmod +x "$1/hooks/codex-only-hook"
-    printf '{"hooks":{"Stop":[{"hooks":[{"command":"codex-only-hook"}]}]}}\n' > "$1/hooks/hooks.codex.json"
-}
-run "a hook registered only in the codex manifest is allowed" 0 m_orphan_codex
-
-# ...and a manifest is not itself an orphan hook. This is the case that went red the day
-# hooks/hooks.codex.json was first generated, because the rule exempted the one manifest it knew by
-# name. Exempting by shape rather than by name is what stops the third manifest doing it again.
-m_second_manifest() {
-    printf '{"hooks":{"SessionStart":[{"hooks":[{"command":"session-start"}]}]}}\n' \
-      > "$1/hooks/hooks.codex.json"
-}
-run "a second hooks manifest is not an orphan hook" 0 m_second_manifest
+# A second manifest beside hooks/hooks.json, such as one for Codex, which keel does not serve, is a
+# file the manifest does not name like any other. Skipping every hooks.*.json would let it back in
+# unseen, so the case checks the rule and the path in the output, not only the exit code.
+so_root="$(fixture)"
+printf '{}\n' > "$so_root/hooks/hooks.codex.json"
+so_out="$( cd "$so_root" && git add -A >/dev/null 2>&1; "$SCANNER" 2>&1 )"; so_rc=$?
+case "$so_rc:$so_out" in
+  1:*'hooks/hooks.codex.json [structural-orphan-hook]'*)
+    ok "a stray hooks/hooks.codex.json is reported as an orphan hook" ;;
+  *) bad "a stray hooks/hooks.codex.json is reported as an orphan hook" "exit $so_rc: $so_out" ;;
+esac
+rm -rf "$so_root"
 
 # ---- must NOT be rejected --------------------------------------------------
 #

@@ -15,6 +15,8 @@ pass=0
 fail=0
 
 # A repository with a profile, one sensitive path declared, and git configured enough to commit.
+# The profile is committed, because a commit staging it asks for that reason alone, which would
+# hide whatever a case stages after it.
 fixture() {
     local root="$1" paths="$2"
     mkdir -p "$root/.keel" "$root/src/auth" "$root/src/ui"
@@ -23,6 +25,7 @@ fixture() {
     git -C "$root" config user.name Test
     printf '{\n  "project": {"name": "t"},\n  "hard_block_paths": [%s]\n}\n' "$paths" \
       > "$root/.keel/profile.json"
+    git -C "$root" add .keel/profile.json; git -C "$root" commit -qm profile
 }
 
 # A PreToolUse event for a Bash call, the shape Claude Code sends. The command is JSON-escaped:
@@ -92,18 +95,17 @@ check "an unreadable profile on a command that is not a commit asks nothing" "" 
 chmod 644 "$r/.keel/profile.json"
 rm -rf "$r"
 
-# The same commit with the hook run by a relative path, CDPATH set and no CLAUDE_PLUGIN_ROOT. A cd
-# that finds its directory through CDPATH prints it, so a ROOT captured from one held two lines, the
-# resolver could not be read, and the hook asked on a commit it should have let through. kp is a
-# link to this repository, because CDPATH is never consulted for a path starting with a dot.
+# The same commit with the hook run by a relative path and no CLAUDE_PLUGIN_ROOT. The hook reads
+# nothing beside itself, so where it is run from must not change its answer. kp is a link to this
+# repository, which puts the hook at a relative path from inside the fixture.
 r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
 : > "$r/src/ui/button.tsx"; git -C "$r" add -A
 ln -s "$(cd "$(dirname "$GUARD")/.." && pwd)" "$r/kp"
-out="$(event "git commit -m x" "$r" | ( cd "$r" && unset CLAUDE_PLUGIN_ROOT && CDPATH="$r" kp/hooks/sensitive-guard ) 2>/dev/null)"
+out="$(event "git commit -m x" "$r" | ( cd "$r" && unset CLAUDE_PLUGIN_ROOT && kp/hooks/sensitive-guard ) 2>/dev/null)"
 if [ -z "$out" ]; then
-    printf '  PASS  run by a relative path with CDPATH set, it still lets a safe commit through\n'; pass=$((pass+1))
+    printf '  PASS  run by a relative path, it still lets a safe commit through\n'; pass=$((pass+1))
 else
-    printf '  FAIL  run by a relative path with CDPATH set, it still lets a safe commit through (got: %s)\n' "${out:0:90}"; fail=$((fail+1))
+    printf '  FAIL  run by a relative path, it still lets a safe commit through (got: %s)\n' "${out:0:90}"; fail=$((fail+1))
 fi
 rm -rf "$r"
 
@@ -111,6 +113,80 @@ rm -rf "$r"
 r="$(mktemp -d)"; fixture "$r" ''
 : > "$r/src/auth/token.go"; git -C "$r" add -A
 check "no hard_block_paths means no interference" "" "$r" "git commit -m x"
+rm -rf "$r"
+
+# Only the top-level list counts. A regex over the whole profile text read an empty list nested in
+# `_notes` as the repository declaring nothing, so one note turned the guard off (audit M-01).
+nested='{"project":{"name":"t"},"hard_block_paths":["auth"],"_notes":{"hard_block_paths":[]}}'
+r="$(mktemp -d)"; fixture "$r" ''
+printf '%s\n' "$nested" > "$r/.keel/profile.json"; git -C "$r" commit -qam nested
+mkdir -p "$r/auth"; : > "$r/auth/x"; git -C "$r" add -A
+check "an empty list nested under another key does not turn the guard off" ask "$r" "git commit -m x"
+rm -rf "$r"
+
+# A commit that changes the profile can change the list that judges it, so it asks, and says why.
+r="$(mktemp -d)"; fixture "$r" '"auth"'
+: > "$r/src/ui/button.tsx"; git -C "$r" add -A; git -C "$r" commit -qm init
+printf '{"project": {"name": "t2"}, "hard_block_paths": ["auth"]}\n' > "$r/.keel/profile.json"
+git -C "$r" add .keel/profile.json
+out="$(event "git commit -m x" "$r" | ( cd "$r" && "$GUARD" ) 2>/dev/null)"
+if printf '%s' "$out" | grep -q '"permissionDecision": *"ask"' \
+   && printf '%s' "$out" | grep -q '\.keel/profile\.json'; then
+    printf '  PASS  a commit staging the profile asks, naming it\n'; pass=$((pass+1))
+else printf '  FAIL  a commit staging the profile asks, naming it (got: %s)\n' "${out:0:120}"; fail=$((fail+1)); fi
+rm -rf "$r"
+
+# A commit that empties, removes or breaks the list is asked, whatever the working-tree profile now
+# says. Judged by that profile alone, each of these exited in silence, and the next commit to a
+# sensitive path went unguarded.
+for body in '{"project": {"name": "t"}, "hard_block_paths": []}' '{"project": {"name": "t"}}' \
+            '{"project": {"name": "t"},}' '{"hard_block_paths": [],}'; do
+    r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+    printf '%s\n' "$body" > "$r/.keel/profile.json"; git -C "$r" add .keel/profile.json
+    out="$(event "git commit -m x" "$r" | ( cd "$r" && "$GUARD" ) 2>/dev/null)"
+    if printf '%s' "$out" | grep -q '"permissionDecision": *"ask"' \
+       && printf '%s' "$out" | grep -q '\.keel/profile\.json'; then
+        printf '  PASS  staging %s asks, naming the profile\n' "$body"; pass=$((pass+1))
+    else printf '  FAIL  staging %s asks, naming the profile (got: %s)\n' "$body" "${out:0:120}"; fail=$((fail+1)); fi
+    rm -rf "$r"
+done
+
+# The list a commit is judged by includes the committed one, so emptying it in the working tree
+# without staging it does not lift the gate.
+r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+printf '{"project": {"name": "t"}, "hard_block_paths": []}\n' > "$r/.keel/profile.json"
+: > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+check "the committed list still judges a commit when the working tree empties it" ask "$r" "git commit -m x"
+rm -rf "$r"
+
+# With no working-tree profile left, the committed one still judges. Staging its deletion is staging
+# the profile, and deleting it without staging that does not lift the gate either.
+r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+git -C "$r" rm -q .keel/profile.json
+out="$(event "git commit -m x" "$r" | ( cd "$r" && "$GUARD" ) 2>/dev/null)"
+if printf '%s' "$out" | grep -q '"permissionDecision": *"ask"' \
+   && printf '%s' "$out" | grep -q '\.keel/profile\.json'; then
+    printf '  PASS  staging the profile deletion asks, naming the profile\n'; pass=$((pass+1))
+else printf '  FAIL  staging the profile deletion asks, naming the profile (got: %s)\n' "${out:0:120}"; fail=$((fail+1)); fi
+rm -rf "$r"
+
+r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+rm "$r/.keel/profile.json"; : > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+check "the committed list still judges a commit when the working-tree profile is deleted" ask "$r" "git commit -m x"
+rm -rf "$r"
+
+# A repository that declares nothing anywhere, neither at HEAD nor in the working tree, is never
+# asked, including when the commit changes its profile.
+r="$(mktemp -d)"; fixture "$r" ''
+printf '{"project": {"name": "t"}}\n' > "$r/.keel/profile.json"; git -C "$r" commit -qam none
+: > "$r/src/auth/token.go"; git -C "$r" add src/auth/token.go
+ev="$(event "git commit -m x" "$r")"
+out="$( cd "$r" && "$GUARD" <<<"$ev" 2>&1 )"; rc=$?     # no pipe, so rc is the hook's own
+if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+    printf '  PASS  a repository declaring nothing anywhere is not asked\n'; pass=$((pass+1))
+else printf '  FAIL  a repository declaring nothing anywhere is not asked (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
+printf '{"project": {"name": "t2"}}\n' > "$r/.keel/profile.json"; git -C "$r" add .keel/profile.json
+check "a profile change in a repository declaring nothing anywhere is not asked" "" "$r" "git commit -m x"
 rm -rf "$r"
 
 # The guard only concerns itself with committing. Blocking every edit to auth code would make the
@@ -243,88 +319,366 @@ else
 fi
 rm -rf "$r" "$shim"
 
+# The cases below share these. A repository whose only commit holds README.md, so HEAD exists and no
+# profile is committed at it, which leaves a case's working-tree profile with nothing to stand in.
+plain_repo() {
+    local root="$1"
+    mkdir -p "$root/src/auth" "$root/src/ui"
+    git -C "$root" init -q
+    git -C "$root" config user.email t@example.com
+    git -C "$root" config user.name Test
+    : > "$root/README.md"; git -C "$root" add README.md; git -C "$root" commit -qm readme
+}
+asks() { printf '%s' "$1" | grep -q '"permissionDecision": *"ask"'; }
+silent() { [ "$1" -eq 0 ] && [ -z "$2" ]; }     # an exit code, then what the hook printed
+# name, then 0 for a pass, then what the hook printed
+verdict() {
+    if [ "$2" -eq 0 ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1))
+    else printf '  FAIL  %s (got: %s)\n' "$1" "${3:0:120}"; fail=$((fail+1)); fi
+}
+codex_guard() { env -u CLAUDE_PROJECT_DIR CODEX_VERSION=0.153.4 "$GUARD"; }
 
-# --- where the harness cannot ask ---------------------------------------------------------------
+# A global git option before `commit` does not hide the commit. The prefilter needed the literal
+# text `git commit` and the token walk stopped at the first token after `git` not starting with `-`,
+# so `git -c core.hooksPath=/dev/null commit` went through in silence. A tab arrives in the event as
+# `\t`, and a quoted value can hold an escaped quote; neither hides the commit either.
+for cmd in 'git -c core.hooksPath=/dev/null commit -m x' 'git -C . commit -m x' \
+           'git --git-dir .git --work-tree . commit -m x' 'git --git-dir=.git commit -m x' \
+           $'git\tcommit -m x' 'git -c "a=\"b c\"" commit -m x'; do
+    r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+    : > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+    check "a global option before commit does not hide it: $cmd" ask "$r" "$cmd"
+    rm -rf "$r"
+done
+
+# And a global option on a command that is not a commit is not one, even with the word in its value
+# and the profile staged, which is the one change that asks whatever the command's files are.
+r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+: > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+check "a global option on a command that is not a commit asks nothing" "" "$r" \
+    'git -c commit.gpgsign=false log -1'
+printf '{"project": {"name": "t2"}, "hard_block_paths": ["src/auth"]}\n' > "$r/.keel/profile.json"
+git -C "$r" add .keel/profile.json
+check "a global option on a command that is not a commit asks nothing with the profile staged" "" \
+    "$r" 'git -c commit.gpgsign=false log -1'
+rm -rf "$r"
+
+# The prefilter reads the command, not the whole event. Matched against the event, a global option
+# in the command and the word commit in its description read as a commit, so with the profile
+# staged a `git diff` asked on Claude Code and was refused on Codex.
+devent() {   # devent <command> <cwd> <description>; event, with a description
+    CMD="$1" CWD="$2" DESC="$3" python3 -c '
+import json, os
+print(json.dumps({"hook_event_name": "PreToolUse", "tool_name": "Bash",
+                  "tool_input": {"command": os.environ["CMD"], "description": os.environ["DESC"]},
+                  "cwd": os.environ["CWD"]}))'
+}
+r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+printf '{"project": {"name": "t2"}, "hard_block_paths": ["src/auth"]}\n' > "$r/.keel/profile.json"
+git -C "$r" add .keel/profile.json
+desc='Show the staged diff before commit'
+out="$(devent 'git -C . diff --cached --stat' "$r" "$desc" | ( cd "$r" && env -u CODEX_VERSION "$GUARD" ) 2>&1)"; rc=$?
+silent "$rc" "$out"
+verdict "the prefilter reads the command: a diff whose description says commit prints nothing" $? "rc $rc: $out"
+out="$(devent 'git -C . diff --cached --stat' "$r" "$desc" | ( cd "$r" && codex_guard ) 2>&1)"; rc=$?
+silent "$rc" "$out"
+verdict "the prefilter reads the command: on codex a diff whose description says commit exits 0" $? "rc $rc: $out"
+out="$(devent 'git -C . commit -m x' "$r" "$desc" | ( cd "$r" && env -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
+asks "$out" && printf '%s' "$out" | grep -q '\.keel/profile\.json'
+verdict "the prefilter reads the command: a commit with that description asks, naming the profile" $? "$out"
+out="$(devent 'git -C . commit -m x' "$r" "$desc" | ( cd "$r" && codex_guard ) 2>&1 >/dev/null)"; rc=$?
+[ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'v0\.26\.0'
+verdict "the prefilter reads the command: on codex a commit with that description refuses" $? "rc $rc: $out"
+rm -rf "$r"
+
+# A repeated "command" key makes the prefilter read the whole event. Reading the first value alone,
+# a nested "command" key ahead of the tool's own was the one matched, and the commit went silent.
+r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+: > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+tev="$(CWD="$r" python3 -c '
+import json, os
+print(json.dumps({"cwd": os.environ["CWD"], "x": {"command": "ls"},
+                  "tool_input": {"command": "git commit -m x"}}, separators=(",", ":")))')"
+out="$(printf '%s' "$tev" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
+asks "$out"
+verdict "a repeated command key reads the whole event: a commit after a nested one asks" $? "$out"
+out="$(printf '%s' "$tev" | ( cd "$r" && codex_guard ) 2>&1 >/dev/null)"; rc=$?
+[ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'v0\.26\.0'
+verdict "a repeated command key reads the whole event: on codex that commit refuses" $? "rc $rc: $out"
+rm -rf "$r"
+
+# A profile that exists and cannot be read asks on a commit. With no profile at HEAD the committed
+# list cannot stand in for it, and reading it as absent let the commit through in silence. Codex
+# discards the ask, so there it is the refusal. Root reads a mode 000 file, so as root the case
+# would pass without testing an unreadable profile at all, and it says so instead.
+if [ "$(id -u)" = 0 ]; then
+    printf '  SKIP  an unreadable profile asks on a commit: running as root, which reads mode 000\n'
+else
+    r="$(mktemp -d)"; plain_repo "$r"
+    mkdir -p "$r/.keel"; printf '{"hard_block_paths": ["src/auth"]}\n' > "$r/.keel/profile.json"
+    chmod 000 "$r/.keel/profile.json"
+    : > "$r/src/ui/button.tsx"; git -C "$r" add src/ui/button.tsx
+    out="$(event "git commit -m x" "$r" | ( cd "$r" && "$GUARD" ) 2>/dev/null)"
+    asks "$out" && printf '%s' "$out" | grep -q 'profile could not be read'
+    verdict "an unreadable profile with none at HEAD asks on a commit, saying it could not be read" $? "$out"
+    check "an unreadable profile with none at HEAD asks nothing on ls" "" "$r" "ls"
+    out="$(event "git commit -m x" "$r" | ( cd "$r" && codex_guard ) 2>&1 >/dev/null)"; rc=$?
+    [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'v0\.26\.0'
+    verdict "on codex an unreadable profile with none at HEAD refuses the commit" $? "rc $rc: $out"
+    chmod 644 "$r/.keel/profile.json"; rm -rf "$r"
+fi
+
+# The profile walk calls no external command. It stepped up with `dirname`, so with PATH holding
+# bash, git and python3 only, the walk lost its directory at the first step up, found no profile and
+# let the commit through in silence. The profile is untracked, so HEAD cannot stand in for it.
+r="$(mktemp -d)"; plain_repo "$r"
+mkdir -p "$r/.keel"; printf '{"hard_block_paths": ["src/auth"]}\n' > "$r/.keel/profile.json"
+: > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+shim="$(mktemp -d)"
+for t in bash git python3; do ln -s "$(command -v "$t")" "$shim/$t"; done
+out="$(event "git commit -m x" "$r/src/ui" | ( cd "$r/src/ui" && PATH="$shim" "$GUARD" ) 2>/dev/null)"
+asks "$out"
+verdict "the profile walk finds an untracked profile with only bash, git and python3 on PATH" $? "$out"
+rm -rf "$r" "$shim"
+
+# The walk and both git calls start from the session's directory: the event's cwd, then
+# CLAUDE_PROJECT_DIR, then $PWD, the first that names a directory that exists. The hook process's
+# own directory is not promised to be the one the command runs in, and a profile and a staged set
+# read from a directory outside the repository found neither. The repository path holds a space.
+base="$(mktemp -d)"; r="$base/with space"; mkdir -p "$r"; fixture "$r" '"src/auth"'
+: > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+away="$(mktemp -d)"
+out="$(event "git commit -m x" "$r" | ( cd "$away" && env -u CLAUDE_PROJECT_DIR "$GUARD" ) 2>/dev/null)"
+asks "$out"
+verdict "run from outside the repository, the event's cwd names it, path with a space" $? "$out"
+nocwd='{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git commit -m x"}}'
+out="$(printf '%s' "$nocwd" | ( cd "$away" && CLAUDE_PROJECT_DIR="$r" "$GUARD" ) 2>/dev/null)"
+asks "$out"
+verdict "with no cwd in the event, CLAUDE_PROJECT_DIR names the repository" $? "$out"
+out="$(event "git commit -m x" "$away/gone" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR "$GUARD" ) 2>/dev/null)"
+asks "$out"
+verdict "an event cwd that does not exist falls back to the directory the hook runs in" $? "$out"
+rm -rf "$base" "$away"
+
+# Outside any repository a wrong directory gets the "git diff failed" ask, the same decision as a
+# right one, so the cases above cannot tell them apart. Run from inside B, a repository with no
+# profile and nothing staged, a wrong directory gives silence instead, and each case asks naming
+# the file A stages.
+a="$(mktemp -d)"; fixture "$a" '"src/auth"'
+: > "$a/src/auth/t.go"; git -C "$a" add src/auth/t.go
+b="$(mktemp -d)"; plain_repo "$b"
+names_t() { asks "$1" && printf '%s' "$1" | grep -q 'src/auth/t\.go'; }
+out="$(event "git commit -m x" "$a" | ( cd "$b" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
+names_t "$out"
+verdict "run from inside another repository, the event's cwd judges the commit" $? "$out"
+out="$(event "git commit -m x" "$a" | ( cd "$b" && CLAUDE_PROJECT_DIR="$b" env -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
+names_t "$out"
+verdict "the event's cwd is read before CLAUDE_PROJECT_DIR" $? "$out"
+rm "$a/.keel/profile.json"
+out="$(event "git commit -m x" "$a" | ( cd "$b" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
+names_t "$out"
+verdict "run from inside another repository, the profile at HEAD is read from the event's cwd" $? "$out"
+rm -rf "$a" "$b"
+
+# A hard_block_paths that is present and not a list of strings is an unparseable profile. A string
+# was iterated character by character, so `"src/auth"` declared s, r, c and so on, and a commit
+# under none of them went through in silence.
+for list in '"src/auth"' '{"src/auth": true}' '["src/auth", 1]'; do
+    r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+    printf '{"project": {"name": "t"}, "hard_block_paths": %s}\n' "$list" > "$r/.keel/profile.json"
+    git -C "$r" commit -qam list
+    : > "$r/src/ui/button.tsx"; git -C "$r" add src/ui/button.tsx
+    out="$(event "git commit -m x" "$r" | ( cd "$r" && "$GUARD" ) 2>/dev/null)"
+    asks "$out" && printf '%s' "$out" | grep -q 'not a list of strings'
+    verdict "a hard_block_paths of $list asks as an unparseable profile, saying not a list of strings" $? "$out"
+    out="$(event "git commit -m x" "$r" | ( cd "$r" && codex_guard ) 2>&1 >/dev/null)"; rc=$?
+    [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'v0\.26\.0'
+    verdict "on codex a hard_block_paths of $list refuses the commit" $? "rc $rc: $out"
+    rm -rf "$r"
+done
+
+# And an empty list, an absent key and null still declare nothing, on either harness.
+for body in '"hard_block_paths": []' '"name": "t"' '"hard_block_paths": null'; do
+    r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+    printf '{%s}\n' "$body" > "$r/.keel/profile.json"; git -C "$r" commit -qam list
+    : > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+    check "a profile of {$body} asks nothing" "" "$r" "git commit -m x"
+    out="$(event "git commit -m x" "$r" | ( cd "$r" && codex_guard ) 2>&1)"; rc=$?
+    silent "$rc" "$out"
+    verdict "on codex a profile of {$body} is untouched" $? "rc $rc: $out"
+    rm -rf "$r"
+done
+
+# A repository with a HEAD and no profile anywhere is never asked, whatever it stages.
+r="$(mktemp -d)"; plain_repo "$r"
+: > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+ev="$(event "git commit -m x" "$r")"
+out="$( cd "$r" && "$GUARD" <<<"$ev" 2>&1 )"; rc=$?     # no pipe, so rc is the hook's own
+silent "$rc" "$out"
+verdict "a repository with a HEAD and no profile anywhere is not asked" $? "rc $rc: $out"
+rm -rf "$r"
+
+# With CDPATH set, a relative cd in the hook would land in the decoy and print its path to stdout,
+# which corrupts the hook's JSON. So the hook is run, not read: an ask is exactly one JSON object,
+# and a repository with no profile gets no output at all.
+decoy="$(mktemp -d)"; mkdir -p "$decoy/.keel" "$decoy/src"
+r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+: > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+out="$(event 'git -c core.hooksPath=/dev/null commit -m x' "$r" \
+  | ( cd "$r" && CDPATH="$decoy" "$GUARD" ) 2>/dev/null)"
+printf '%s' "$out" | python3 -c '
+import json, sys
+sys.exit(json.load(sys.stdin)["hookSpecificOutput"]["permissionDecision"] != "ask")' 2>/dev/null
+verdict "with CDPATH set, an ask is exactly one JSON object on stdout" $? "$out"
+rm -rf "$r"
+r="$(mktemp -d)"; plain_repo "$r"
+: > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+out="$(event "git commit -m x" "$r" | ( cd "$r" && CDPATH="$decoy" "$GUARD" ) 2>&1)"
+silent 0 "$out"; verdict "with CDPATH set, a repository with no profile gets no output" $? "$out"
+rm -rf "$r" "$decoy"
+
+
+# --- on Codex, where the gate cannot ask -------------------------------------------------------
 #
-# This gate is `ask` or it is nothing. Codex CLI has no ask: openai/codex@rust-v0.153.4
-# codex-rs/protocol/src/permissions.rs:105 defines FileSystemAccessMode as Read, Write and Deny with
-# no prompt variant, so `harness_provides codex pretooluse_ask` is false and always will be.
+# This gate is `ask` or it is nothing, and Codex discards `ask`. Codex still runs this hook: it
+# reads hooks/hooks.json, the file Claude Code reads, as the probe in
+# docs/architecture/claude-code-only.md under "Probe: Codex without .codex-plugin/" records. A guard
+# that exits 0 in silence there is a guard the repository believes it has, so it refuses the commit
+# and names the last keel release that supports Codex.
 #
-# THIS IS THE PAYLOAD CASE. The plugin is distributed by cloning one repository, so this file is on
-# every Codex machine whatever hooks/hooks.codex.json registers. It cannot be made absent. It can be
-# made impossible to operate through, and a guard that exits 0 in silence there is a guard the
-# repository believes it has.
-r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
+# The hook no longer sources the resolver or reads the capability ledger: what Codex does with `ask`
+# is a measured fact, not a row to look up.
+n="$(grep -c resolve.sh "$GUARD")"
+if [ "$n" = 0 ]; then printf '  PASS  the hook no longer sources the resolver\n'; pass=$((pass+1))
+else printf '  FAIL  the hook no longer sources the resolver (resolve.sh named %s times)\n' "$n"; fail=$((fail+1)); fi
+
+r="$(mktemp -d)"; fixture "$r" '"src/auth"'
 : > "$r/src/auth/token.go"; git -C "$r" add -A
 ev="$(event "git commit -m x" "$r")"
 
-out="$(printf '%s' "$ev" | ( cd "$r" && CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1 >/dev/null)"; rc=$?
-if [ "$rc" -eq 2 ]; then printf '  PASS  exits 2 where the harness cannot ask\n'; pass=$((pass+1))
-else printf '  FAIL  exits 2 where the harness cannot ask (got %s)\n' "$rc"; fail=$((fail+1)); fi
+out="$(printf '%s' "$ev" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1 >/dev/null)"; rc=$?
+if [ "$rc" -eq 2 ]; then printf '  PASS  exits 2 on CODEX_VERSION with no turn_id\n'; pass=$((pass+1))
+else printf '  FAIL  exits 2 on CODEX_VERSION with no turn_id (got %s)\n' "$rc"; fail=$((fail+1)); fi
 
 # Exit 2 and not 1: on Codex a PreToolUse hook exiting with any non-zero code other than 2 has its
 # stderr discarded and the tool call proceeds, so exit 1 would be quieter than doing nothing.
 if printf '%s' "$out" | grep -qi 'codex'; then printf '  PASS  names the harness on stderr\n'; pass=$((pass+1))
 else printf '  FAIL  names the harness on stderr (got: %s)\n' "${out:0:90}"; fail=$((fail+1)); fi
 
-# The invariant, and the case that catches the self-check being placed too early. A repository
-# declaring nothing must cost one builtin string match and produce nothing, on every harness. Above
-# the cheap gate this block would exit 2 on every Bash tool call in every repository on Codex.
+# The refusal is only useful if it says where to go: the last keel release that supports Codex.
+if printf '%s' "$out" | grep -q 'v0\.26\.0'; then printf '  PASS  the refusal on codex names v0.26.0\n'; pass=$((pass+1))
+else printf '  FAIL  the refusal on codex names v0.26.0 (got: %s)\n' "${out:0:120}"; fail=$((fail+1)); fi
+
+# It names the release once and unambiguously: v0.26.0 is the last keel release that supports Codex,
+# with the line that installs it. Beside the word Codex alone, "stay on v0.26.0" reads as a Codex
+# version rather than a keel one.
+if printf '%s' "$out" | grep -q 'keel v0\.26\.0 is the last keel release that supports Codex'; then
+    printf '  PASS  the refusal says v0.26.0 is the last keel release that supports Codex\n'; pass=$((pass+1))
+else printf '  FAIL  the refusal says v0.26.0 is the last keel release that supports Codex (got: %s)\n' "${out:0:160}"; fail=$((fail+1)); fi
+install='codex plugin marketplace add gbi-solutions-ltd/keel --ref v0.26.0 && codex plugin add keel@gbi'
+case "$out" in
+    *"$install"*) printf '  PASS  the refusal gives the v0.26.0 install line\n'; pass=$((pass+1)) ;;
+    *) printf '  FAIL  the refusal gives the v0.26.0 install line (got: %s)\n' "${out:0:160}"; fail=$((fail+1)) ;;
+esac
+case "$out" in
+    *'stay on v0.26.0'*) printf '  FAIL  the refusal does not say "stay on v0.26.0" (got: %s)\n' "${out:0:160}"; fail=$((fail+1)) ;;
+    *) printf '  PASS  the refusal does not say "stay on v0.26.0"\n'; pass=$((pass+1)) ;;
+esac
+
+# Codex's schema requires a turn_id key on PreToolUse input, and the one Codex hook environment
+# observed had no CODEX_VERSION, so either signal alone refuses. The payload is written compactly,
+# the way the example in the plan gives it.
+tev="$(CMD="git commit -m x" CWD="$r" python3 -c '
+import json, os
+print(json.dumps({"hook_event_name": "PreToolUse", "tool_name": "Bash", "turn_id": "t1",
+                  "tool_input": {"command": os.environ["CMD"]}, "cwd": os.environ["CWD"]},
+                 separators=(",", ":")))')"
+out="$(printf '%s' "$tev" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>&1 >/dev/null)"; rc=$?
+if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'keel v0\.26\.0'; then
+    printf '  PASS  exits 2 naming keel v0.26.0 on a turn_id event with no CODEX_VERSION\n'; pass=$((pass+1))
+else printf '  FAIL  exits 2 naming keel v0.26.0 on a turn_id event with no CODEX_VERSION (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
+
+# Claude Code exports CLAUDE_PROJECT_DIR to hook processes and Codex has no such variable, so with
+# it set neither signal refuses. Claude Code's MessageDisplay input already carries turn_id, and a
+# PreToolUse input that gained it must still get the ask rather than a hard block.
+out="$(printf '%s' "$tev" | ( cd "$r" && env -u CODEX_VERSION CLAUDE_PROJECT_DIR=/repo "$GUARD" ) 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q '"permissionDecision": *"ask"'; then
+    printf '  PASS  with CLAUDE_PROJECT_DIR set, a turn_id event gets the ask and exit 0\n'; pass=$((pass+1))
+else printf '  FAIL  with CLAUDE_PROJECT_DIR set, a turn_id event gets the ask and exit 0 (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
+
+out="$(printf '%s' "$ev" | ( cd "$r" && CLAUDE_PROJECT_DIR=/repo CODEX_VERSION=0.153.4 "$GUARD" ) 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q '"permissionDecision": *"ask"'; then
+    printf '  PASS  with CLAUDE_PROJECT_DIR set, CODEX_VERSION gets the ask and exit 0\n'; pass=$((pass+1))
+else printf '  FAIL  with CLAUDE_PROJECT_DIR set, CODEX_VERSION gets the ask and exit 0 (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
+
+# The match is on the key, with its colon. A field whose value is exactly turn_id appears in the raw
+# event as "description":"turn_id", unescaped, so a pattern without the colon reads it as the key.
+dev="$(CWD="$r" python3 -c '
+import json, os
+print(json.dumps({"hook_event_name": "PreToolUse", "tool_name": "Bash",
+                  "tool_input": {"command": "git commit -m x", "description": "turn_id"},
+                  "cwd": os.environ["CWD"]}, separators=(",", ":")))')"
+out="$(printf '%s' "$dev" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q '"permissionDecision": *"ask"'; then
+    printf '  PASS  a value of exactly turn_id is not read as the turn_id key\n'; pass=$((pass+1))
+else printf '  FAIL  a value of exactly turn_id is not read as the turn_id key (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
+
+# The match is on the JSON key. A Claude Code commit whose message says turn_id reaches the hook as
+# \"turn_id\", escaped, so it still gets the ask.
+out="$(event 'git commit -m "turn_id"' "$r" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q '"permissionDecision": *"ask"'; then
+    printf '  PASS  a commit message naming turn_id is not read as Codex\n'; pass=$((pass+1))
+else printf '  FAIL  a commit message naming turn_id is not read as Codex (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
+
+# The invariant, and the case that catches the refusal being placed too early. A repository whose
+# list is empty declares nothing and must produce nothing, on every harness. Above the empty-list
+# check the refusal would block every commit in a repository that asked for nothing.
 q="$(mktemp -d)"; fixture "$q" ''
-ev="$(event "git commit -m x" "$q")"
-out="$(printf '%s' "$ev" | ( cd "$q" && CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1)"; rc=$?
+out="$(printf '%s' "$(event "git commit -m x" "$q")" | ( cd "$q" && env -u CLAUDE_PROJECT_DIR CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1)"; rc=$?
 if [ "$rc" -eq 0 ] && [ -z "$out" ]; then printf '  PASS  silent on codex when the repo declares nothing\n'; pass=$((pass+1))
 else printf '  FAIL  silent on codex when the repo declares nothing (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
 rm -rf "$q"
 
-# PLACEMENT, from the side the plan did not name. The block sits after the `git commit` filter
-# because the fail-closed branch below must not become a prompt on every Read and Grep, and the
-# same argument applies to a hard block: a Codex session running `git status` in a repository that
-# DOES declare paths must be untouched. Placed before the command filter this exits 2 there, and
-# the existing "a non-Bash call is silent even with python3 absent" case catches it too, which is
-# how the collision was found.
-out="$(printf '%s' "$(event "git status" "$r")" | ( cd "$r" && CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1)"; rc=$?
+# And the same judgement on Codex: an empty list nested under another key is not the repository
+# declaring nothing, so the refusal still stands.
+q="$(mktemp -d)"; fixture "$q" ''
+printf '%s\n' "$nested" > "$q/.keel/profile.json"
+out="$(printf '%s' "$(event "git commit -m x" "$q")" | ( cd "$q" && env -u CLAUDE_PROJECT_DIR CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1 >/dev/null)"; rc=$?
+if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'keel v0\.26\.0'; then
+    printf '  PASS  on codex a nested empty list does not lift the refusal\n'; pass=$((pass+1))
+else printf '  FAIL  on codex a nested empty list does not lift the refusal (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
+rm -rf "$q"
+
+# PLACEMENT, from the other side. The refusal sits after the `git commit` filter because the
+# fail-closed python3 branch must not become a prompt on every Read and Grep, and the same argument
+# applies to a hard block: a Codex session running a command that is not a commit, in a repository
+# that DOES declare paths, must be untouched.
+out="$(printf '%s' "$(event "git status" "$r")" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1)"; rc=$?
 if [ "$rc" -eq 0 ] && [ -z "$out" ]; then printf '  PASS  a non-commit command on codex is untouched\n'; pass=$((pass+1))
 else printf '  FAIL  a non-commit command on codex is untouched (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
 
-# An unreadable manifest is not a missing capability, and on Claude Code the difference is the whole
-# gate: `ask` is the contract, a hard block saying Claude Code cannot ask is a lie. The resolver
-# resolves its own path with `dirname`, so a PATH carrying only bash reaches exactly that case.
-shim2="$(mktemp -d)"; ln -s "$(command -v bash)" "$shim2/bash"
-out="$(printf '%s' "$ev" | ( cd "$r" && PATH="$shim2" "$GUARD" ) 2>/dev/null)"
-if printf '%s' "$out" | grep -q '"permissionDecision": *"ask"'; then
-    printf '  PASS  an unresolvable manifest asks rather than hard blocking\n'; pass=$((pass+1))
-else
-    printf '  FAIL  an unresolvable manifest asks rather than hard blocking (got: %s)\n' "${out:0:90}"; fail=$((fail+1))
-fi
-rm -rf "$shim2"
+out="$(printf '%s' "$(event "ls" "$r")" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1)"; rc=$?
+if [ "$rc" -eq 0 ] && [ -z "$out" ]; then printf '  PASS  ls on codex in a repo declaring paths is untouched\n'; pass=$((pass+1))
+else printf '  FAIL  ls on codex in a repo declaring paths is untouched (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
 
 # R-01: no Claude Code behaviour changes. The same repository, the same command, without the Codex
 # signal, still reaches the decision it always did. Every case above this block asserts that too,
-# but none of them asserts it beside the new branch, which is where a misplaced self-check shows.
-check "a Claude Code session still gets the ask, not a block" ask "$r" "git commit -m x"
+# but none of them asserts it beside the refusal, which is where a misplaced one shows.
+out="$(event "git commit -m x" "$r" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q '"permissionDecision": *"ask"'; then
+    printf '  PASS  a Claude Code event with neither signal still gets the ask and exit 0\n'; pass=$((pass+1))
+else printf '  FAIL  a Claude Code event with neither signal still gets the ask and exit 0 (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
 
-# The resolver unreadable. This hook's contract is that it asks whenever it cannot answer, and
-# `if [ -r ... ]; then` around the source would have SKIPPED the harness check in silence, which is
-# the one outcome a gate must never have. CLAUDE_PLUGIN_ROOT is what the hook resolves its root
-# from, so pointing it at an empty directory is the whole fixture.
-empty="$(mktemp -d)"
-out="$(printf '%s' "$ev" | ( cd "$r" && CLAUDE_PLUGIN_ROOT="$empty" "$GUARD" ) 2>/dev/null)"
-err="$(printf '%s' "$ev" | ( cd "$r" && CLAUDE_PLUGIN_ROOT="$empty" "$GUARD" ) 2>&1 >/dev/null)"
-if printf '%s' "$out" | grep -q '"permissionDecision": *"ask"'; then
-    printf '  PASS  an unreadable capability manifest asks rather than skipping the check\n'; pass=$((pass+1))
-else
-    printf '  FAIL  an unreadable capability manifest asks rather than skipping the check (got: %s)\n' "${out:0:90}"; fail=$((fail+1))
-fi
-# And it asks cleanly. Without the readability check the source fails, `harness_known` is undefined,
-# and the ask still happens by accident on a "command not found" - the right answer reached through
-# a broken install shouting at the user, which is the shape of thing nobody debugs twice.
-if printf '%s' "$err" | grep -qE 'command not found|No such file'; then
-    printf '  FAIL  it asks without shouting about a broken install (got: %s)\n' "${err:0:90}"; fail=$((fail+1))
-else
-    printf '  PASS  it asks without shouting about a broken install\n'; pass=$((pass+1))
-fi
-rm -rf "$r" "$empty"
+# On Codex with no python3 the list cannot be parsed, and an unparsed declaration counts as
+# declared. The ask the Claude Code path gives here is one Codex discards, so it must refuse.
+# The shim carries bash and nothing else, as in the python3-absent case above.
+shim="$(mktemp -d)"; ln -s "$(command -v bash)" "$shim/bash"
+out="$(printf '%s' "$ev" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR CODEX_VERSION=0.153.4 PATH="$shim" "$GUARD" ) 2>&1 >/dev/null)"; rc=$?
+if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'keel v0\.26\.0'; then
+    printf '  PASS  on codex with python3 absent the commit is refused, not asked\n'; pass=$((pass+1))
+else printf '  FAIL  on codex with python3 absent the commit is refused, not asked (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
+rm -rf "$shim"
+rm -rf "$r"
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

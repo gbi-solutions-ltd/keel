@@ -19,7 +19,7 @@ files involved are written mechanically.
 
 **Evidence.** This repository's own `.keel/profile.json` carries `"context_window": 1000000`, and
 `write_profile` never emits that key (`bin/keel:364` writes the gates object and it is not in it), so
-it was added by hand. `bin/keel:1307` exists solely to tell the reader to do the same: "If sessions
+it was added by hand. `bin/keel:1401` exists solely to tell the reader to do the same: "If sessions
 here use a larger context, set gates.context_window in .keel/profile.json". The handoff half is
 `lib/context_watch.py:452`, step 3 of the stop instruction: "Tell the user to run /clear and resume
 by pointing at that file."
@@ -72,7 +72,7 @@ deliberate edit. "A handoff exists" versus "it does not" is two forms. The hando
 unbounded and would be a new class of thing entirely.
 
 **Fourth argument: the always-loaded budget is nearly gone.** Measured 2026-08-18, the hook injects
-about 356 tokens against a 250 target and a 400 ceiling enforced at `tests/validate-skills.sh:283-284`.
+about 356 tokens against a 250 target and a 400 ceiling enforced at `tests/validate-skills.sh:284-285`.
 A pointer is perhaps 15 tokens and fits. It does not fit twice, and
 `docs/ideas/plain-language-chat.md` is competing for the same 44 tokens. The two ideas must be
 costed together or the second one to land fails the build.
@@ -103,7 +103,7 @@ costed together or the second one to land fails the build.
 
 | Assumption | True if | How we would know | Checked? |
 |---|---|---|---|
-| Observation only ever proves the window is **larger** | A floor can never be wrong in the dangerous direction | Stated at `lib/context_watch.py:134-136` and it follows from the API refusing oversized requests | Yes |
+| Observation only ever proves the window is **larger** | A floor can never be wrong in the dangerous direction | Stated at `lib/context_watch.py:208-210` and it follows from the API refusing oversized requests | Yes |
 | 200,000 is the right default to write | Most sessions are not 1M | True of the default model tier. This session is `[1m]`, and so is this repository's setting | Partly, and the floor change makes being wrong cheap |
 | A pointer at session start is enough to resume | The model reads the file when told it exists | Nobody has tried it. It is one line and easily tested | **No** |
 | The handoff is fresh when the pointer fires | The file relates to the work about to resume | Not guaranteed. A handoff from last week's task would misdirect a new session | **No, and it is the main risk of piece three** |
@@ -118,13 +118,13 @@ costed together or the second one to land fails the build.
 | The correction exists because of a real 401,247-token session | `lib/context_watch.py:121-127` | The failure mode is not hypothetical; it was found against a real transcript |
 | init never writes `gates.context_window` | `bin/keel:364` | The gap is real and the fix is one field |
 | The schema already declares it | `templates/profile.schema.json:287` | No schema version bump, no drift report on existing profiles |
-| doctor exists to nag about it | `bin/keel:1307` | The nudge is a workaround for the missing write and could be simplified afterwards |
-| The handoff is already written automatically before compaction | `lib/context_watch.py:369-372`, on `PreCompact` | Half of "automatic handoff" already ships. Only the resume side is manual |
+| doctor exists to nag about it | `bin/keel:1401` | The nudge is a workaround for the missing write and could be simplified afterwards |
+| The handoff is already written automatically before compaction | `lib/context_watch.py:472-478`, on `PreCompact` | Half of "automatic handoff" already ships. Only the resume side is manual |
 | SessionStart already fires on `clear` | `hooks/hooks.json`, matcher `startup|clear|compact` | The hook that would carry the pointer already runs at exactly the right moment |
 | `hooks/session-start` never reads the handoff | No `handoff` match anywhere in the file | This is the actual gap, and it is small |
 | The hook forbids reading volatile files, with one bounded exception | `hooks/session-start:4-14` | A pointer is permissible under the stated bound; the contents are not |
 | The handoff is roughly 1,300 tokens | `lib/context_watch.py:200-235`: 5 prompts at 300 chars, 30 paths | Far too large for the cached prefix |
-| The hook is at 356 of a 400 ceiling | Measured 2026-08-18; `tests/validate-skills.sh:283-284` | ~44 tokens for this and `plain-language-chat.md` combined |
+| The hook is at 356 of a 400 ceiling | Measured 2026-08-18; `tests/validate-skills.sh:284-285` | ~44 tokens for this and `plain-language-chat.md` combined |
 | Write, Edit and Read stay allowed at the stop | `lib/context_watch.py:260-263` | The session can always write its handoff. No deadlock to design around |
 | The handoff is git-ignored and doctor enforces it | `bin/keel#if repo_ignores .keel/handoff.md; then` | Nothing here risks committing session state |
 
@@ -175,7 +175,7 @@ and the stop instruction should keep saying so.
 The wording of the pointer, and how a stale handoff is detected, which is open question 2. Whether
 `context_warn_pct` and `context_stop_pct` are also written at init.
 
-Two items that were listed here are now settled in the PRD: doctor's nudge at `bin/keel:1307` is
+Two items that were listed here are now settled in the PRD: doctor's nudge at `bin/keel:1401` is
 reworded rather than removed, along with the three other places that document the precedence
 (`FR-09`, `FR-10`), and the floor change does get a doctor line saying a configured window can be
 raised (`FR-09`). The PRD also added an upper bound of 1,000,000 that this record never considered

@@ -140,8 +140,8 @@ case "$out" in *BLOCK.md*)
   *) ok "a '..' link to a committed file resolves" ;; esac
 rm -rf "$d"
 
-# ---- CLAUDE.md and AGENTS.md are read too ---------------------------------
-# The two files most likely to point an agent at a document, and the two keel writes into itself.
+# ---- CLAUDE.md is read too ------------------------------------------------
+# The file most likely to point an agent at a document, and the one keel writes its block into.
 
 d="$(fixture node-ts)"
 ( cd "$d" || exit 1
@@ -178,6 +178,11 @@ d="$parent/svc-node"
 [ -d "$d" ] && ok "new creates the project directory" || bad "new" "no directory"
 [ -f "$d/.keel/profile.json" ] && ok "new writes a profile" || bad "new" "no profile"
 [ -f "$d/CLAUDE.md" ] && ok "new writes the CLAUDE.md block" || bad "new" "no CLAUDE.md"
+grep -qF '<!-- keel:start' "$d/CLAUDE.md" 2>/dev/null \
+  && ok "new writes no AGENTS.md: CLAUDE.md carries the keel block" \
+  || bad "new writes no AGENTS.md" "CLAUDE.md has no keel block"
+[ -e "$d/AGENTS.md" ] && bad "new writes no AGENTS.md" "new created AGENTS.md" \
+  || ok "new writes no AGENTS.md: no AGENTS.md is created"
 [ -d "$d/docs/keel" ] && ok "new scaffolds the docs root" || bad "new" "no docs root"
 ( cd "$d" && git rev-parse --git-dir >/dev/null 2>&1 ) && ok "new initialises git" || bad "new" "not a repo"
 [ -f "$d/.github/workflows/ci.yml" ] && ok "new writes a CI workflow" || bad "new" "no CI"
@@ -221,13 +226,10 @@ nfindings="$(printf '%s' "$out" | python3 -c "import json,sys; print(len(json.lo
 [ "$nfindings" -gt 0 ] && ok "doctor --json reports at least one finding" \
   || bad "doctor --json" "findings array is empty"
 
-# harnesses is the profile's list, verbatim. init on a fixture writes at least one entry.
-hs="$(printf '%s' "$out" | python3 -c "import json,sys; d=json.load(sys.stdin); h=d['harnesses']; print(','.join(h) if isinstance(h, list) else 'NOT-A-LIST')")"
-[ -n "$hs" ] && [ "$hs" != "NOT-A-LIST" ] && ok "doctor --json reports harnesses as a list ($hs)" \
-  || bad "doctor --json" "harnesses missing, empty, or not a list: $hs"
-pf="$(python3 -c "import json; print(','.join(json.load(open('$dj/.keel/profile.json')).get('harnesses', [])))")"
-[ "$hs" = "$pf" ] && ok "doctor --json harnesses matches the profile verbatim" \
-  || bad "doctor --json" "harnesses differs from the profile: json=$hs profile=$pf"
+# The harness set is retired in schema 7, and doctor --json no longer reports one.
+has_h="$(printf '%s' "$out" | python3 -c "import json,sys; print('harnesses' in json.load(sys.stdin))")"
+[ "$has_h" = False ] && ok "doctor --json has no harnesses key" \
+  || bad "doctor --json has no harnesses key" "harnesses is still reported"
 
 # --fast without --json still behaves exactly as before
 ( cd "$dj" && "$KEEL" doctor --fast >/dev/null 2>&1 )

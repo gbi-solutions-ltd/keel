@@ -290,7 +290,7 @@ must still obey these.
 - **Never start on `main`.** Work goes on `sandbox`, which is the current branch.
 - **No em dashes and no en dashes anywhere**, including in reference files, the changelog and this
   plan. `tests/validate-skills.sh:171-172` checks shipped content and `:203-204` checks `docs/`.
-- **Relative links must resolve.** `tests/validate-skills.sh:177-182` resolves every link inside a
+- **Relative links must resolve.** `tests/validate-skills.sh:178-183` resolves every link inside a
   reference file against the filesystem, and `:207-213` does the same for `docs/`. A body must not
   link a reference file that does not exist yet, so each link lands in the task that creates its
   file.
@@ -322,7 +322,7 @@ each.
 
 **Interfaces:**
 - Produces: `skills/setup-deployment/references/release-operations.md`, linked from the body. The
-  link and the file land in the same commit, because `tests/validate-skills.sh:149-153` resolves
+  link and the file land in the same commit, because `tests/validate-skills.sh:150-154` resolves
   body links and a link written first fails the suite.
 
 **Depends on:** none

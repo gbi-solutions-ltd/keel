@@ -4,12 +4,6 @@
 > subject is the Anthropic plugin marketplace, and every verdict, id and mechanism below is a Claude
 > Code one. Qualifying individual rows would produce a document that is locally correct and globally
 > wrong, so the scope is stated once, here.
->
-> **None of it carries to Codex.** Codex has its own plugin system and none of these plugins is
-> published for it, so a Codex user gets keel's own skills and gates and nothing on this page.
-> `docs/harness-support.md` is generated from the capability manifest and says what they do get.
-> Where keel's own behaviour depends on one of these plugins, that dependence is Claude Code only
-> and is marked as such in `docs/02-skill-catalog.md`.
 
 Every plugin named below is in the official Anthropic marketplace, `claude-plugins-official`,
 which is registered by default and needs no separate setup.

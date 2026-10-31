@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-08-18, from open question 1 of `plsql-stack-detection.md` |
-| Status | **built 2026-08-18**, via `docs/plans/2026-08-18-usable-profile.md`, fully ticked. `plugins.recommended` is written at init, `bin/keel:444`, and read back at `bin/keel:196`. Open question 1 was answered by the requester on 2026-08-18 in favour of reporting, which is what shipped. Status corrected 2026-08-30 |
+| Status | **built 2026-08-18**, via `docs/plans/2026-08-18-usable-profile.md`, fully ticked. `plugins.recommended` is written at init, `bin/keel:366`, and read back at `lib/harness/claude.sh:82`. Open question 1 was answered by the requester on 2026-08-18 in favour of reporting, which is what shipped. Status corrected 2026-08-30 |
 | Recommendation | Build something smaller: write `plugins.recommended` at init so the reporting machinery that already exists starts checking the right list, and have doctor name the install command. Do not silently write into a settings file the project already had |
 | Next | `docs/prd/usable-profile.md` (draft, awaiting approval), written jointly with `profile-key-documentation.md` |
 
@@ -87,7 +87,7 @@ every skill its facts. If effort is scarce, `plsql-stack-detection.md` is worth 
 | Write `plugins.recommended` at init from `detect_plugins` | Gives `plugin_report` the right list, so doctor names the missing language server and `keel@gbi` | **Recommended.** Read-only with respect to the user's settings, one line, and it makes a mechanism that already ships correct for the first time |
 | Also merge missing entries into an existing `enabledPlugins` | Closes the gap completely | The variant that takes the position argued against above. If chosen, it should be symmetrical with the fresh path and stated in the docs, not left implicit |
 | Merge, but only behind a prompt at init | Same, with consent | `keel init -y` needs a default, and the safe default is "do not write", which means CI runs stay in the broken state. Honest, and it makes the flag matter |
-| Print the `/plugin install` commands at the end of init | Tells the user exactly what to run, changes nothing | Pairs well with the recommended variant and costs almost nothing. Doctor already does this for the marketplace at `bin/keel:1407` |
+| Print the `/plugin install` commands at the end of init | Tells the user exactly what to run, changes nothing | Pairs well with the recommended variant and costs almost nothing. Doctor already does this for the marketplace at `lib/harness/claude.sh:629` |
 | Verify that an enabled plugin resolves | Closes the enable-versus-install gap | Bigger, needs the plugin cache walked, and `boundary_report` (`bin/keel:190-205`) already reads that cache, so the capability exists |
 | Reverse it: stop enabling plugins on fresh repos too | Makes the two paths consistent the other way | The honest opposite. Rejected only because the fresh-repo behaviour has shipped and nobody has complained about it |
 
@@ -99,7 +99,7 @@ every skill its facts. If effort is scarce, `plsql-stack-detection.md` is worth 
 | `lang_lsp` covers every language keel detects | No detected language is left without a server | Thirteen languages, twelve servers, `typescript` and `javascript` sharing one. Complete | **Yes** |
 | A committed `settings.json` is the norm on a mature repo | The mature path is the common one | `bin/keel:580` says so in its own comment, and the real Oracle repo matches | Partly |
 | A language server measurably improves the experience | The premise of the request | Asserted, not measured. It is a widely held view and cheap to act on | No |
-| Writing `plugins.recommended` is safe | Nothing else consumes that key in a conflicting way | `plugin_report` is the only reader (`bin/keel:153`), and the schema already declares it | **Yes** |
+| Writing `plugins.recommended` is safe | Nothing else consumes that key in a conflicting way | `plugin_report` is the only reader (`lib/harness/claude.sh:140`), and the schema already declares it | **Yes** |
 | Doctor naming a missing plugin leads to it being installed | The reader acts on a warning | Unknown, and it is the whole theory of change for the recommended variant | **No** |
 
 ## What the system says
@@ -114,7 +114,7 @@ every skill its facts. If effort is scarce, `plsql-stack-detection.md` is worth 
 | `plugin_report` reads a key init never writes | `bin/keel:142-163`; `templates/profile.schema.json:403` declares `plugins` | The reporting machinery is built, correct, and starved of input |
 | The omission is recorded as deliberate | `tests/validate-skills.sh:358-360`, "which init never writes because a human adds them" | Writing it reverses a stated decision. Small, but it should be reversed knowingly |
 | keel already refuses to make machine-level decisions in a committed file | `bin/keel:608-614`, on permission mode | The precedent argues against the merge variant and for the report variant |
-| Marketplace absence is already handled by naming the command | `bin/keel:1407` | The pattern for "tell the user what to run" exists and is worth copying |
+| Marketplace absence is already handled by naming the command | `lib/harness/claude.sh:629` | The pattern for "tell the user what to run" exists and is worth copying |
 | No SQL or PL/SQL language server exists in the catalogue | Searched 2026-08-18: `oracledb` is a database client from a third-party URL source, not a server | Answers `plsql-stack-detection.md` open question 2. `lang_lsp` returning nothing is the correct outcome |
 
 ## Open questions
