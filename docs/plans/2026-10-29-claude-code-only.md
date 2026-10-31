@@ -1773,19 +1773,40 @@ The same review found that two of task 12's cases cannot fail, and one global op
    passes on the "git diff failed" ask.
 4. `--attr-source <tree>` is a global option that takes a value. Example: `git --attr-source HEAD
    commit -m x` with `src/auth/t.go` staged asks. Before the change it prints nothing.
+5. On Codex, a guard that cannot answer refuses. Moving the refusal behind the walk must not turn a
+   failure before or inside the walk into the exit trap's ask, which Codex discards. Any outcome of
+   the Python other than "no commit" (exit 0) or a decision ends in the refusal on Codex: a crash,
+   a `python3` that exits non-zero without running (a pyenv shim with no version installed exits
+   127), and an event that is not JSON. Claude Code keeps its current outcomes for each. Examples,
+   each with `CODEX_VERSION` set, `CLAUDE_PROJECT_DIR` unset, and a committed profile listing
+   `src/auth`: an event whose `tool_input` is a string, with a command text holding `git commit`,
+   exits 2 with `v0.26.0` on stderr; a `PATH` whose `python3` is a script that exits 127 exits 2
+   with `v0.26.0`. Before the change both print the ask and exit 0. Added 2026-10-31: the first
+   attempt at this task did exactly that, and its quality review found it (HEAD refused both).
+6. The walk reads a commit that sits behind a shell operator or a path to git. Shell operators
+   (`&&`, `||`, `;`, `|`, `&`, `(`, `)`) are their own tokens even when written without spaces,
+   and a token whose last path component is `git` is git. Examples, each with `src/auth/t.go`
+   staged, asking on Claude Code and exiting 2 on Codex: `/usr/bin/git commit -m x`, `(git commit
+   -m x)`, `git add -A&&git commit -m x`, `true;git commit -m x` and `echo x|git commit -F -`.
+   `git --no-pager log --grep commit` and `echo commit;git status` still get no decision on either
+   harness. Before the change the five commits print nothing on either harness. Added 2026-10-31,
+   Bernard's decision, from the same review: task 12's walk let these through, and before task 12c
+   Codex refused them only because it refused anything the bash filter matched.
 
 **Done when:** `tests/test-sensitive-guard.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
 
 - [ ] **Step 12c.1: Build it test first**
 
-Follow `keel:tdd` for behaviours 1 and 4: write each case from its examples and watch it fail for
-the reason named, then implement. Behaviours 2 and 3 are `verify`: their red comes from the
+Follow `keel:tdd` for behaviours 1, 4, 5 and 6: write each case from its examples and watch it fail
+for the reason named, then implement. Behaviours 2 and 3 are `verify`: their red comes from the
 scratch-copy mutations they name.
 Run: `tests/test-sensitive-guard.sh`
 Expected before: FAIL, behaviour 1's Codex `git --no-pager log --grep commit` case exits 2 where it
-should exit 0, its Claude Code cases ask, and behaviour 4's case gets no output. Expected after:
-PASS. Quote the failing output in your report.
+should exit 0, its Claude Code cases ask, behaviour 4's case gets no output, and behaviour 6's
+commits get no output. Behaviour 5's Codex cases pass on arrival, since HEAD still refuses them;
+prove they bite on a scratch copy whose Codex refusal runs only on the Python's exit 3, and watch
+them print the ask. Expected after: PASS. Quote the failing output in your report.
 
 Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
