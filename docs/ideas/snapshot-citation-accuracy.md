@@ -40,10 +40,10 @@ most important thing on this page. It is why the recommendation is as small as i
 **Strongest argument for not building this at all.** The check as described would measure the
 cheapest failure mode and miss the expensive one. Every citation defect found on 2026-08-20 was wrong
 *coordinates* attached to a substantially right *claim*: `.keel/profile.json:14` for
-`package_manager` where it is at `:13`, `bin/keel:1930` for defaults that are at `:430`. A reader who
+`package_manager` where it is at `:13`, `bin/keel:1940` for defaults that are at `:430`. A reader who
 opens one loses thirty seconds and finds the thing two lines up. Meanwhile the worst factual error in
 either document, sonnet's claim that `bin/keel` holds **six** subcommands where the dispatch table at
-`bin/keel:1934-1941` holds **eight**, carried **no `path:line` at all**, so a citation-accuracy check
+`bin/keel:1944-1951` holds **eight**, carried **no `path:line` at all**, so a citation-accuracy check
 of any design would have scored that document clean on it. The failure that actually propagates into
 a PRD is an uncited confident sentence, and this instrument is blind to exactly those.
 

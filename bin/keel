@@ -1299,12 +1299,18 @@ PY
     # each is a process start and fifty of them added half a second to a hung run. `sleep 0.1`
     # takes a fraction on macOS, GNU and BusyBox. Each warning names its cause, since the fix for a
     # missing command, a hung one and one printing something else differs.
+    # KEEL_CLAUDE_VERSION_FILE naming a file that holds a line, `<version>|<reason>` with one side
+    # empty, makes that line the answer and the command is not run; naming an empty file, the answer
+    # is written there. keel-fleet sets it, so a fleet asks once per run rather than once per
+    # repository, where each ask can take the five seconds above.
     local cc_cmd="${KEEL_CLAUDE-claude}" cc_min cc_out cc_pid cc_n=0 cc_ver="" cc_why="" cc_w
-    local cc_late="" cc_gv
+    local cc_late="" cc_gv cc_vf="${KEEL_CLAUDE_VERSION_FILE-}"
     if ! cc_min="$(harness_min_version)"; then
         warn "cannot read keel's minimum Claude Code version from the capability ledger, so this Claude Code is not checked against it"
     else
-        if ! command -v "$cc_cmd" >/dev/null 2>&1; then
+        if [ -n "$cc_vf" ] && [ -s "$cc_vf" ]; then
+            IFS='|' read -r cc_ver cc_why < "$cc_vf"
+        elif ! command -v "$cc_cmd" >/dev/null 2>&1; then
             cc_why="'$cc_cmd' was not found"
         elif ! cc_out="$(mktemp)"; then
             cc_why="no temporary file for the output of '$cc_cmd --version'"
@@ -1326,11 +1332,12 @@ PY
                       *.*) cc_ver="$cc_w"; break ;;
                     esac
                 done < "$cc_out"
-                cc_why="'$cc_cmd --version' ran, but its output named no version"
+                [ -n "$cc_ver" ] || cc_why="'$cc_cmd --version' ran, but its output named no version"
             fi
             wait "$cc_pid" 2>/dev/null
             rm -f "$cc_out"
         fi
+        [ -n "$cc_vf" ] && [ ! -s "$cc_vf" ] && printf '%s|%s\n' "$cc_ver" "$cc_why" > "$cc_vf"
         if [ -z "$cc_ver" ]; then
             warn "cannot tell whether this Claude Code runs keel's gates: $cc_why. keel needs Claude Code $cc_min or later."
         elif harness_version_ge "$cc_ver" "$cc_min"; then
@@ -1349,6 +1356,9 @@ PY
     fi
     # Agent files an earlier keel wrote, left in place because they may have been edited since.
     { [ -f .codex/agents/keel-fanout.toml ] || [ -f .codex/agents/keel-implementer.toml ]; } && warn "keel wrote .codex/agents/keel-fanout.toml and .codex/agents/keel-implementer.toml for Codex, and this plugin no longer manages them: Codex support ended at v0.26.0. Delete them unless something else here uses them." # names Codex: the v0.26.0 notice
+    # The managed block the same keel appended to that harness's config, found by its start marker,
+    # so a config holding only the repository's own settings gets no line.
+    grep -q '^# keel:start v1 - managed by keel init' .codex/config.toml 2>/dev/null && warn "keel wrote a managed block into .codex/config.toml for Codex, from its '# keel:start v1' line to its '# keel:end' line, and nothing in this plugin uses it: Codex support ended at v0.26.0. The block can be deleted." # names Codex: the v0.26.0 notice
 
     local root; root="$(docs_root)"
     check_docs_ignored "$root" && good "docs root '$root' is not gitignored" \

@@ -86,7 +86,7 @@ closed, or stops the plugin loading, which is worse than the gap.
 | `maxTurns` on `keel-fanout` was dropped on purpose, not missed | `docs/plans/2026-10-13-harness-held-dispatch-guarantees.md:95`: "a turn cap ends a read silently" | The 2026-10-29 assessment listed it as a gap. It is not one, and it is not an item here |
 | `AGENTS.md` is not read twice beside `CLAUDE.md` | Memory docs: by default Claude reads `AGENTS.md` "only when you have no `CLAUDE.md` in your working directory or above it" | The dual write ADR-0004 describes costs no context on Claude Code. Nothing to change |
 | Every skill uses only `name`, `description` and `allowed-tools` | `skills/*/SKILL.md` frontmatter | `allowed-tools` pre-approves tools and does not restrict them, per the skills docs. No skill text was found relying on it as a restriction |
-| The Claude capability rows stop at 2.1.302 | `lib/harness/capabilities:76-90` | Items 1 and 2 each add a row, and the version column is where a minimum would first show |
+| The Claude capability rows stop at 2.1.302 | `lib/harness/capabilities:81-95` | Items 1 and 2 each add a row, and the version column is where a minimum would first show |
 | The guard's wiring has no failure policy | `hooks/hooks.json:42-53` | Item 1 is one key on one entry |
 
 ## Open questions

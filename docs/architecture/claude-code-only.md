@@ -115,7 +115,7 @@ superseded rather than deleted, because they explain why the current answer look
 | `lib/harness/capabilities` | The nine `provides|codex|...` rows and the Codex commentary go. `provides|claude|...` and `requires|...` rows stay, each with source, version and date | Contributors | `resolve.sh`, the generator, `keel doctor` |
 | `.keel/profile.json` `harnesses` | Retired in schema 7 (`SCHEMA_VERSION` 6 to 7), through the existing `retired_keys` list. A profile written before 7 keeps loading, the key does nothing, and `keel doctor` warns that it is retired, as it does for every retired key; removing it is a hand edit | `keel init` before this change | `keel doctor`'s retired-key warning only |
 | `.keel/profile.json` gate keys | Unchanged | | |
-| `.codex/config.toml`, `.codex/agents/*.toml` in user repositories | No longer written or read. Left in place where they exist | `keel init` before this change | `keel-codex`, once it exists |
+| `.codex/config.toml`, `.codex/agents/*.toml` in user repositories | No longer written. Left in place where they exist, and `keel doctor` warns that keel's agent files, or the managed block v0.26.0 wrote into `.codex/config.toml`, can be deleted | `keel init` before this change | `keel doctor`, for that warning only; `keel-codex`, once it exists |
 | `AGENTS.md` in user repositories | No longer written or checked. An existing managed block is left as it is | `keel init` before this change | Other harnesses and their ports |
 
 The minimum Claude Code version is **derived, not stored**: it is the highest version among the

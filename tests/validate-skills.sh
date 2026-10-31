@@ -791,10 +791,11 @@ if [ -f templates/profile.schema.json ] && command -v python3 >/dev/null 2>&1; t
     # Read by sourcing the register in a subshell and running retired_keys, rather than by
     # parsing its source: a row printed some other way is still a row doctor shows. The file defines
     # that function and runs nothing. A register that cannot be read, or prints no rows, is reported:
-    # read as empty, it would check nothing and pass.
+    # read as empty, it would check nothing and pass. One that fails partway is unreadable too, so
+    # the subshell's status is tested under pipefail: its rows so far are not the register.
     # shellcheck source=lib/retired-keys.sh
-    registered="$( . lib/retired-keys.sh && retired_keys | cut -d'|' -f1 )"
-    [ -n "$registered" ] \
+    registered="$( set -o pipefail; . lib/retired-keys.sh && retired_keys | cut -d'|' -f1 )" \
+      && [ -n "$registered" ] \
       || report "lib/retired-keys.sh could not be read or printed no rows, so no retired key was checked against templates/profile.schema.json. The register defines retired_keys, printing one key|version|message row per line."
     still_declared="$(REGISTERED="$registered" python3 - <<'PYR'
 import json, os

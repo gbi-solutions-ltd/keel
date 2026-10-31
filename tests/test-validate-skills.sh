@@ -841,6 +841,19 @@ JSON
 run_out "a register that prints nothing is reported naming lib/retired-keys.sh" 1 \
     m_retired_register_empty "lib/retired-keys.sh" yes
 
+# A register that fails partway is unreadable, not shorter: its rows before the failure are not the
+# register, and checked as it, they would pass a key the rest still names.
+m_retired_register_fails() {
+    mkdir -p "$1/templates" "$1/bin" "$1/lib"
+    printf 'SCHEMA_VERSION=1\n' > "$1/bin/keel"
+    printf 'retired_keys() {\n    echo "foo.bar|7|gone"\n    return 1\n}\n' > "$1/lib/retired-keys.sh"
+    cat > "$1/templates/profile.schema.json" <<'JSON'
+{ "properties": { "gates": { "properties": { "tdd": { "type": "string" } } } } }
+JSON
+}
+run_out "a retired-key register that fails partway is unreadable, not shorter" 1 \
+    m_retired_register_fails "could not be read" yes
+
 # Every key the example template sets is declared in the schema, or a project that copies the
 # example sets a key that does nothing. conventions.branch_prefix was exactly this, pre-existing
 # and undetected: in the example, in neither schema revision, read by nothing.

@@ -1097,6 +1097,34 @@ rm -rf "$w/.codex/agents"; echo 'model = "x"' > "$w/.codex/config.toml"
 n="$( cd "$w" && "$ROOT/bin/keel" doctor 2>&1 | grep -c 'no longer manages' )"
 [ "$n" = 0 ] && ok "a repository's own .codex/config.toml gets no such line" \
   || bad "a repository's own .codex/config.toml gets no such line" "$n lines"
+
+# The managed block v0.26.0 appended to .codex/config.toml, after the repository's own settings, is
+# named once, as can be deleted. Doctor still reads no AGENTS.md, with or without that block.
+cfg_block_line='^WARN .*\.codex/config\.toml.*v0\.26\.0.*can be deleted'
+n="$( cd "$w" && "$ROOT/bin/keel" doctor 2>&1 | grep -c "$cfg_block_line" )"
+[ "$n" = 0 ] && ok "doctor warns about the keel block v0.26.0 left: a config.toml of model = x gives no such line" \
+  || bad "doctor warns about the keel block v0.26.0 left: a config.toml of model = x gives no such line" "$n lines"
+printf 'AGENTS.md\n<!-- keel:start v1 -->\nold block\n<!-- keel:end -->\n' > "$w/AGENTS.md"
+n="$( cd "$w" && "$ROOT/bin/keel" doctor 2>&1 | grep -c 'AGENTS\.md' )"
+[ "$n" = 0 ] && ok "doctor still reads no AGENTS.md: an old keel block there gets no line" \
+  || bad "doctor still reads no AGENTS.md: an old keel block there gets no line" "$n lines"
+cat >> "$w/.codex/config.toml" <<'TOML'
+
+# keel:start v1 - managed by keel init, edits here are overwritten
+# Path denies only: Codex has no command-pattern rule syntax and no ask, so keel's
+# 13 ask rules have no counterpart here and none is faked.
+# See docs/harness-support.md for what this harness does and does not enforce.
+[permissions.keel.filesystem.":workspace_roots"]
+".env" = "deny"
+# keel:end
+TOML
+out="$( cd "$w" && "$ROOT/bin/keel" doctor 2>&1 )"
+n="$(printf '%s\n' "$out" | grep -c "$cfg_block_line")"
+[ "$n" = 1 ] && ok "doctor warns about the keel block v0.26.0 left: the keel table in .codex/config.toml gives one line" \
+  || bad "doctor warns about the keel block v0.26.0 left: the keel table in .codex/config.toml gives one line" "$n lines"
+n="$(printf '%s\n' "$out" | grep -c 'AGENTS\.md')"
+[ "$n" = 0 ] && ok "doctor still reads no AGENTS.md: an old keel block there gets no line beside the config.toml block" \
+  || bad "doctor still reads no AGENTS.md: an old keel block there gets no line beside the config.toml block" "$n lines"
 rm -rf "$w"
 
 # Doctor no longer asks which harness is running. With every Codex signal set it prints what it
@@ -1133,9 +1161,9 @@ left="$(grep -nE 'harness_each|HARNESS_SET|harness_set_for_repo|harness_hooks_tr
 codex_lines="$(grep -ni codex "$KEEL")"
 n_codex="$(printf '%s\n' "$codex_lines" | grep -c .)"
 n_noted="$(printf '%s\n' "$codex_lines" | grep -c '# names Codex: the v0.26.0 notice$')"
-[ "$n_codex" = 2 ] && [ "$n_noted" = 2 ] && ok "bin/keel names Codex only in the two v0.26.0 notices" \
-  || bad "bin/keel names Codex only in the two v0.26.0 notices" "$n_codex lines, $n_noted carrying the comment: $(printf '%s\n' "$codex_lines" | grep -v '# names Codex: the v0.26.0 notice$' | head -2 | tr '\n' ' ')"
-# The third notice is the harnesses row, which lives in the register bin/keel sources.
+[ "$n_codex" = 3 ] && [ "$n_noted" = 3 ] && ok "bin/keel names Codex only in the three v0.26.0 notices" \
+  || bad "bin/keel names Codex only in the three v0.26.0 notices" "$n_codex lines, $n_noted carrying the comment: $(printf '%s\n' "$codex_lines" | grep -v '# names Codex: the v0.26.0 notice$' | head -2 | tr '\n' ' ')"
+# The fourth notice is the harnesses row, which lives in the register bin/keel sources.
 codex_lines="$(grep -ni codex "$ROOT/lib/retired-keys.sh" 2>&1)"
 n_codex="$(printf '%s\n' "$codex_lines" | grep -c .)"
 n_noted="$(printf '%s\n' "$codex_lines" | grep -c '# names Codex: the v0.26.0 notice$')"

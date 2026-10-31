@@ -27,7 +27,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
   the evidenced Claude Code rows a gate requires in the capability ledger: 2.1.302 today, stated in
   `README.md`. Each warning names its cause: `claude` not found, older than the minimum, no version
   in its output, or stopped after 5 seconds, when doctor kills it. An unreadable minimum is a
-  warning, never a pass.
+  warning, never a pass. `keel-fleet` asks once per run, and every doctor it runs reads that answer
+  through `KEEL_CLAUDE_VERSION_FILE`. The ledger holds one row per primitive, and re-verifying one
+  on a later Claude Code leaves its row as it is, so the minimum does not rise.
 - `hooks/sensitive-guard` no longer reads the capability ledger, and keeps one Codex refusal. On a
   commit in a repository declaring a non-empty `hard_block_paths`, with `CLAUDE_PROJECT_DIR` empty
   and either `CODEX_VERSION` set or a `"turn_id":` key in the event, it exits 2 with a message
@@ -49,6 +51,10 @@ Entries are terse by design; the narrative for each release is in this file's gi
   `gbi-solutions-ltd/keel-internal` was archived read-only on 2026-10-24. The first pull request
   (#3) was merged by its author on 2026-10-24, before `main` was protected, so it went in without
   a review.
+- `keel doctor` warns about what keel v0.26.0 left under `.codex/`: the
+  `.codex/agents/keel-fanout.toml` and `.codex/agents/keel-implementer.toml` files, and a managed
+  block in `.codex/config.toml` from its `# keel:start v1` line to its `# keel:end` line. Both
+  warnings say Codex support ended at v0.26.0 and the leftovers can be deleted.
 - `tests/test-keel.sh` is split at its section headers into five parts (`tests/test-keel.sh` and
   `tests/test-keel-2.sh` to `tests/test-keel-5.sh`) sharing `tests/keel-test-lib.sh`, so
   `tests/run-tests.sh` runs them in parallel. It ran 771 cases serially in 501s and set the suite's

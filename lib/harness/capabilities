@@ -15,6 +15,11 @@
 # <version> is THE HARNESS's version, never keel's. keel doctor prints it beside the version of the
 # harness it is running, and that comparison means nothing if this column holds 0.18.0.
 #
+# A primitive has one row, and tests/test-harness-resolve.sh refuses a second. Re-verifying it on a
+# later Claude Code leaves its row as it is: <version> is the earliest version the primitive was
+# evidenced on, keel's minimum is the highest such version among the primitives a gate requires,
+# and so raising a row's version raises keel's minimum though nothing keel needs has changed.
+#
 # THE RULE THIS FILE EXISTS TO EXPRESS, which lives nowhere else in the tree: a gate is active IF
 # AND ONLY IF Claude Code provides EVERY primitive the gate requires. So a `requires` row is not
 # documentation. It is an instruction that silently disables that gate when Claude Code lacks the

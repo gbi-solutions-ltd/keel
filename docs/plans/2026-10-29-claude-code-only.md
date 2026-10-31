@@ -345,8 +345,8 @@ so and leave it unstaged.
 - Test: `tests/test-done-guard.sh`
 - Test: `tests/test-context-watch.sh`
 - Plus each file whose citation into `hooks/done-guard` or `lib/context_watch.py` this task's edits
-  break. The review found these: `lib/harness/capabilities:66`, `docs/snapshot.md:72`,
-  `docs/profile-keys.md:59`, `tests/validate-skills.sh:885`,
+  break. The review found these: `lib/harness/capabilities:71`, `docs/snapshot.md:72`,
+  `docs/profile-keys.md:59`, `tests/validate-skills.sh:886`,
   `docs/ideas/declared-profile-keys-take-effect.md:83` and
   `docs/plans/2026-09-07-declared-profile-keys-take-effect.md` lines 402 and 810
 
@@ -438,7 +438,7 @@ so and leave it unstaged.
 **Behaviours:**
 
 1. `--harness` is refused with a reason rather than silently ignored, since init ignores unknown
-   flags (`bin/keel:1450`) and a user passing it expects it to do something. Example: `keel init
+   flags (`bin/keel:1460`) and a user passing it expects it to do something. Example: `keel init
    --harness codex` exits 1 with a message naming `--harness`, "Claude Code only" and v0.26.0, and
    writes nothing.
 2. `keel init` writes no `harnesses` key and no `.codex/` file. Example: `keel init` in a fresh
@@ -1841,7 +1841,7 @@ The same review found that two of task 12's cases cannot fail, and one global op
    not an option's value is read as a pathspec, which widens as any pathspec does; the CHANGELOG
    entry and the hook's comments say exactly that. The comment above the exit trap states what is
    true: the trap asks, and on Codex the Python's failures are refused further down, while a
-   failure in the bash part still reaches the trap's ask. `CHANGELOG.md:35`'s "any other
+   failure in the bash part still reaches the trap's ask. `CHANGELOG.md:37`'s "any other
    unexpected exit asks" says "on Claude Code", reworded within its line. Examples, with
    `src/auth/t.go` staged, asking on Claude Code and exiting 2 with `v0.26.0` on Codex: `git -c
    core.hooksPath=$(mktemp -d) commit -m x`, `git -C $(pwd) commit -m x`, `git
@@ -1901,7 +1901,9 @@ Narrowed on 2026-10-31 by Bernard: doctor keeps never reading AGENTS.md.
 - Modify: `bin/keel-fleet`
 - Modify: `lib/harness/capabilities` (its header: one `provides` row per primitive)
 - Modify: `tests/validate-skills.sh` (its retired-key reader)
-- Modify: `CHANGELOG.md` (the Unreleased line on the version check)
+- Modify: `CHANGELOG.md` (the Unreleased line on the version check, and one Unreleased line
+  naming doctor's two warnings about what v0.26.0 left under `.codex/`, added 2026-10-31 by the
+  coordinator after the spec review found neither warning recorded)
 - Modify: `docs/architecture/claude-code-only.md` (section 5's `.codex/config.toml` row, which says
   the file is no longer read; behaviour 2 reads it for the notice)
 - Test: `tests/test-keel-fleet.sh`, `tests/test-keel-4.sh`,
@@ -1958,7 +1960,7 @@ Narrowed on 2026-10-31 by Bernard: doctor keeps never reading AGENTS.md.
 `tests/test-validate-skills.sh` and `tests/test-harness-resolve.sh` pass, and
 `tests/validate-citations.sh` and `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 14.1: Build it test first**
+- [x] **Step 14.1: Build it test first** Note: passed on arrival, never seen red on the real file: behaviour 2's two AGENTS.md cases; proved able to fail on a scratch copy
 
 Follow `keel:tdd` for behaviours 1 to 4: write each case from its example and watch it fail for the
 reason named, then implement.
@@ -1974,7 +1976,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 14.2: Hand over**
+- [x] **Step 14.2: Hand over** Note: rounds: 2; routing: inherit; loop: full; DEVIATES on one unrepaired bare citation, fixed on top under the standing rule; coordinator added a CHANGELOG line for both .codex/ warnings and repointed five plan citations; quality should-fix: doctor does not validate a version read from KEEL_CLAUDE_VERSION_FILE (a hand-set bad line aborts doctor, --json then reports 0 problems), and 'a primitive has one row' should say one provides row
 
 ```bash
 git add bin/keel bin/keel-fleet lib/harness/capabilities tests/validate-skills.sh CHANGELOG.md \
@@ -2129,7 +2131,7 @@ commit.** The coordinator commits after both review passes, with
   `--attr-source` and `--shallow-file` as global options that take a value; a commit behind a shell
   operator, a substitution or a path to git (behaviours 6 to 9, and the seven cases above); on
   Codex, any failure of the guard refusing rather than reaching the trap's ask, including a
-  bash-side failure; the comment above the exit trap, and `CHANGELOG.md:35`, saying what each
+  bash-side failure; the comment above the exit trap, and `CHANGELOG.md:37`, saying what each
   harness does. The lesson recorded for that plan: four rounds of hand-written shell tokenizing
   each opened a new silent path, so the next attempt should decide on Codex without a parser
   (refuse whatever the bash filter matches, as HEAD did) and keep any parser to Claude Code, where

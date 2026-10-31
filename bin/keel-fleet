@@ -21,6 +21,15 @@ fi
 
 [ "${#paths[@]}" -gt 0 ] || { printf 'usage: keel-fleet <repo-path>...\n       keel-fleet --file <path-list-file>\n' >&2; exit 1; }
 
+# Every doctor below asks Claude Code for its version, which can take five seconds each, and the
+# answer cannot differ between repositories in one run. The first doctor writes it to this file and
+# the rest read it, and it goes when the run ends, so no answer outlives the run that asked. Without
+# a temporary file the variable is empty, and each doctor asks for itself, as outside a fleet.
+if KEEL_CLAUDE_VERSION_FILE="$(mktemp)"; then
+    export KEEL_CLAUDE_VERSION_FILE
+    trap 'rm -f "$KEEL_CLAUDE_VERSION_FILE"' EXIT
+fi
+
 status=0
 printf 'repo\tkeel_version\tschema_version\tverify_test_null\tproblems\twarnings\n'
 for p in "${paths[@]}"; do

@@ -921,11 +921,12 @@ fi
 # runs nothing, so no part of keel runs here.
 # retired_set_in <register> <profile> prints the register's keys that the profile sets, and fails
 # when the register cannot be read or prints no rows: an empty register would find no retired key
-# in any profile, which is a pass that checked nothing.
+# in any profile, which is a pass that checked nothing. One that fails partway fails here too, so
+# the subshell runs under pipefail and its status is tested: its rows so far are not the register.
 retired_set_in() {
     local keys
     # shellcheck source=lib/retired-keys.sh
-    keys="$( . "$1" && retired_keys | cut -d'|' -f1 )"
+    keys="$( set -o pipefail; . "$1" && retired_keys | cut -d'|' -f1 )" || return 1
     [ -n "$keys" ] || return 1
     KEYS="$keys" python3 - "$2" <<'PYR'
 import json, os, sys
@@ -954,7 +955,8 @@ trap 'rm -rf "$retired_tmp"' EXIT
 
 # The same check on a copy of that profile that sets the first key the register prints, dotted ones
 # as nested objects. A check that only passes is indistinguishable from one that cannot see.
-retired_first="$( . lib/retired-keys.sh && retired_keys | awk -F'|' 'NR == 1 {print $1}' )"
+retired_first="$( set -o pipefail; . lib/retired-keys.sh && retired_keys | awk -F'|' 'NR == 1 {print $1}' )" \
+  || bad "dogfood profile" "lib/retired-keys.sh failed partway, so its first key was not tried"
 python3 - "$retired_first" .keel/profile.json "$retired_tmp/profile.json" <<'PYS'
 import json, sys
 key, src, dst = sys.argv[1:]
@@ -995,6 +997,15 @@ if retired_set_in "$retired_tmp/no-such-register.sh" "$retired_tmp/foo.json" >/d
     bad "dogfood profile" "a missing register was read as no retired key"
 else
     ok "a missing register fails rather than reading as no retired key"
+fi
+
+# A register that fails partway is unreadable, not shorter: the rows before the failure are not the
+# register, and read as it, they would check fewer keys than doctor names and pass.
+printf 'retired_keys() {\n    echo "foo.bar|7|gone"\n    return 1\n}\n' > "$retired_tmp/failing-register.sh"
+if retired_set_in "$retired_tmp/failing-register.sh" "$retired_tmp/foo.json" >/dev/null 2>&1; then
+    bad "dogfood profile" "a register that prints a row and then fails was read as one row"
+else
+    ok "a retired-key register that fails partway is unreadable, not shorter"
 fi
 
 # CONTRIBUTING.md tells whoever removes a schema key where to register it, and the register is the

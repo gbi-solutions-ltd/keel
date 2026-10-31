@@ -84,6 +84,23 @@ got="$(version_gaps "$fx" | tr '\n' ' ')"
   || bad "a malformed ledger version is caught by the ledger test: a fixture with 2.1.x fails it" "got: ${got:-<none>}"
 rm -f "$fx"
 
+# A primitive has one provides row. Two rows are two claims about one fact, and the minimum is the
+# highest version a gate's primitives were evidenced on, so a second row at a later version raises
+# keel's minimum, and which version doctor's late-gate warning names would depend on row order.
+duplicate_primitives() {   # duplicate_primitives <file>
+    awk -F'|' '$1=="provides" { n[$2"/"$3]++ } END { for (k in n) if (n[k] > 1) print k }' "$1"
+}
+dup="$(duplicate_primitives "$CAP" | tr '\n' ' ')"
+[ -z "$dup" ] && ok "a second ledger row for a primitive is refused: the ledger holds one row per primitive" \
+  || bad "a second ledger row for a primitive is refused: the ledger holds one row per primitive" "$dup"
+fx="$(mktemp)"
+printf 'provides|claude|p1|src|2.1.296|2026-01-01\nprovides|claude|p2|src|2.1.296|2026-01-01\nprovides|claude|p2|src|2.1.400|2026-02-01\n' > "$fx"
+got="$(duplicate_primitives "$fx" | tr '\n' ' ')"
+[ "$got" = "claude/p2 " ] \
+  && ok "a second ledger row for a primitive is refused: a fixture with two p2 rows names claude/p2" \
+  || bad "a second ledger row for a primitive is refused: a fixture with two p2 rows names claude/p2" "got: ${got:-<none>}"
+rm -f "$fx"
+
 # Every source says which kind of evidence it is. A keel file is neither kind.
 unkinded="$(awk -F'|' '$1=="provides" && $4 !~ /^(vendor|probe):/ {print $2"/"$3}' "$CAP")"
 [ -z "$unkinded" ] && ok "every source is marked vendor: or probe:" \

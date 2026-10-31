@@ -387,7 +387,7 @@ task can make.
 
 **Interfaces:**
 - Consumes: nothing new. Reads `.keel/profile.json`'s `keel_version` field with `sed`, the same
-  technique the pre-push hook already uses for `default_branch` (`bin/keel:1945`), because this
+  technique the pre-push hook already uses for `default_branch` (`bin/keel:1955`), because this
   hook needs exactly one scalar field and the pre-commit hook's own comment explains why `python3`
   is reserved for cases needing more than one. Writes the trailer with `git interpret-trailers
   --in-place` (git 2.13 and later), which is what `git commit --trailer` itself uses: it puts the
@@ -617,7 +617,7 @@ session is the check that would falsify this conclusion if wrong.
 
 **Interfaces:**
 - Consumes: nothing new. `guard_hook_body` already receives old-sha/new-sha pairs on stdin per ref
-  and previously discarded both (`bin/keel:2572-2575`, `_lsha`, `_rsha`).
+  and previously discarded both (`bin/keel:2582-2585`, `_lsha`, `_rsha`).
 - Produces: a second refusal path in the generated `.githooks/pre-push`, alongside the existing
   default-branch refusal, sharing the same single stdin read.
 
@@ -920,7 +920,7 @@ value this plan cannot source from the tree. See open question 5.
 **Idea:** `docs/ideas/fleet-view-for-doctor.md`
 
 **Files:**
-- Modify: `bin/keel` (`cmd_doctor` at `bin/keel:1268-1747`, renamed to `cmd_doctor_text` with a
+- Modify: `bin/keel` (`cmd_doctor` at `bin/keel:1268-1757`, renamed to `cmd_doctor_text` with a
   thin `cmd_doctor` wrapper in front of it; the two usage lines at `bin/keel:8` and
   `bin/keel#say "  doctor [--fast] [--json]`)
 - Modify: `README.md` (the `keel doctor --fast` usage line, near line 41)

@@ -19,7 +19,7 @@ files involved are written mechanically.
 
 **Evidence.** This repository's own `.keel/profile.json` carries `"context_window": 1000000`, and
 `write_profile` never emits that key (`bin/keel:364` writes the gates object and it is not in it), so
-it was added by hand. `bin/keel:1369` exists solely to tell the reader to do the same: "If sessions
+it was added by hand. `bin/keel:1379` exists solely to tell the reader to do the same: "If sessions
 here use a larger context, set gates.context_window in .keel/profile.json". The handoff half is
 `lib/context_watch.py:452`, step 3 of the stop instruction: "Tell the user to run /clear and resume
 by pointing at that file."
@@ -118,7 +118,7 @@ costed together or the second one to land fails the build.
 | The correction exists because of a real 401,247-token session | `lib/context_watch.py:121-127` | The failure mode is not hypothetical; it was found against a real transcript |
 | init never writes `gates.context_window` | `bin/keel:364` | The gap is real and the fix is one field |
 | The schema already declares it | `templates/profile.schema.json:287` | No schema version bump, no drift report on existing profiles |
-| doctor exists to nag about it | `bin/keel:1369` | The nudge is a workaround for the missing write and could be simplified afterwards |
+| doctor exists to nag about it | `bin/keel:1379` | The nudge is a workaround for the missing write and could be simplified afterwards |
 | The handoff is already written automatically before compaction | `lib/context_watch.py:472-478`, on `PreCompact` | Half of "automatic handoff" already ships. Only the resume side is manual |
 | SessionStart already fires on `clear` | `hooks/hooks.json`, matcher `startup|clear|compact` | The hook that would carry the pointer already runs at exactly the right moment |
 | `hooks/session-start` never reads the handoff | No `handoff` match anywhere in the file | This is the actual gap, and it is small |
@@ -175,7 +175,7 @@ and the stop instruction should keep saying so.
 The wording of the pointer, and how a stale handoff is detected, which is open question 2. Whether
 `context_warn_pct` and `context_stop_pct` are also written at init.
 
-Two items that were listed here are now settled in the PRD: doctor's nudge at `bin/keel:1369` is
+Two items that were listed here are now settled in the PRD: doctor's nudge at `bin/keel:1379` is
 reworded rather than removed, along with the three other places that document the precedence
 (`FR-09`, `FR-10`), and the floor change does get a doctor line saying a configured window can be
 raised (`FR-09`). The PRD also added an upper bound of 1,000,000 that this record never considered

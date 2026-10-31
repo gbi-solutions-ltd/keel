@@ -143,6 +143,35 @@ got="$(printf '%s\n' "$out" | awk -F'\t' -v r="$repo_a" '$1 == r { print $2 }')"
 [ "$got" = "$(cat "$ROOT/VERSION")" ] && ok "run by a relative path with CDPATH set, fleet still finds its own keel" \
   || bad "keel-fleet" "with CDPATH set the row was: $out"
 
+# keel-fleet asks Claude Code for its version once per run: each ask can take five seconds when
+# claude hangs, so a fleet of forty repositories asked forty times. The stub counts its runs.
+counter="$(mktemp)"
+printf '#!/bin/sh\necho x >> "%s"\necho "%s (Claude Code)"\n' "$counter" \
+  "$(bash -c ". '$ROOT/lib/harness/resolve.sh'; harness_min_version")" > "$(dirname "$KEEL_CLAUDE")/counted"
+chmod +x "$(dirname "$KEEL_CLAUDE")/counted"
+out="$(KEEL_CLAUDE="$(dirname "$KEEL_CLAUDE")/counted" "$FLEET" "$repo_a" "$repo_b" 2>&1)"
+n="$(grep -c . "$counter")"
+[ "$n" = 1 ] && ok "keel-fleet asks Claude Code for its version once per run: two repositories, one ask" \
+  || bad "keel-fleet asks Claude Code for its version once per run: two repositories, one ask" "$n asks"
+w_a="$(printf '%s\n' "$out" | awk -F'\t' -v r="$repo_a" '$1 == r { print $6 }')"
+w_b="$(printf '%s\n' "$out" | awk -F'\t' -v r="$repo_b" '$1 == r { print $6 }')"
+[ -n "$w_a" ] && [ "$w_a" = "$w_b" ] \
+  && ok "keel-fleet asks Claude Code for its version once per run: both rows show the same warnings count" \
+  || bad "keel-fleet asks Claude Code for its version once per run: both rows show the same warnings count" "$out"
+KEEL_CLAUDE="$(dirname "$KEEL_CLAUDE")/counted" "$FLEET" "$repo_a" >/dev/null 2>&1
+n="$(grep -c . "$counter")"
+[ "$n" = 2 ] && ok "keel-fleet asks Claude Code for its version once per run: a second run asks again" \
+  || bad "keel-fleet asks Claude Code for its version once per run: a second run asks again" "$n asks after two runs"
+: > "$counter"
+for _ in 1 2; do
+    ( cd "$repo_a" && env -u KEEL_CLAUDE_VERSION_FILE KEEL_CLAUDE="$(dirname "$KEEL_CLAUDE")/counted" \
+        "$KEEL" doctor --fast >/dev/null 2>&1 )
+done
+n="$(grep -c . "$counter")"
+[ "$n" = 2 ] && ok "keel-fleet asks Claude Code for its version once per run: two doctor runs with the variable unset ask twice" \
+  || bad "keel-fleet asks Claude Code for its version once per run: two doctor runs with the variable unset ask twice" "$n asks"
+rm -f "$counter"
+
 rm -rf "$a" "$b" "$(dirname "$KEEL_CLAUDE")"
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
