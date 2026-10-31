@@ -2059,6 +2059,81 @@ Stage those paths and each file whose citation this task repaired, by name, and 
 commit.** The coordinator commits after both review passes, with
 `git commit -s -m "test(harness): prove the codex claim and orphan hook checks fire, and cite ADR-0014"`.
 
+### Task 16: a version doctor did not parse never reaches shell arithmetic
+
+Added by the coordinator on 2026-10-31, Bernard's decision, from finding L-01 of the security
+audit of `c93081c..8336744`, dated 2026-10-31 (audit reports are not tracked). Task 14 lets
+doctor take Claude Code's version from the file `KEEL_CLAUDE_VERSION_FILE` names, skipping the
+parser that keeps only digits and dots. The value reaches `harness_version_ge`, which evaluates
+each field as `$((10#...))`, and bash runs a command substitution inside an array subscript there,
+so a line such as `1+a[$(cmd)]|` runs `cmd`. Task 14's quality review found the same unchecked read
+from the robustness side: a bad line aborts doctor, and `doctor --json` then reports 0 problems.
+The branch changes `.keel/profile.json`, so every changed file is sensitive and the finding blocks
+shipping.
+
+**Story:** G2, ADR-0014
+**Files:**
+- Modify: `bin/keel`
+- Modify: `lib/harness/resolve.sh`
+- Modify: `CHANGELOG.md` (the Unreleased line on the version check)
+- Test: `tests/test-keel-4.sh`, `tests/test-harness-resolve.sh`
+
+**Interfaces:**
+- Consumes: task 14's `KEEL_CLAUDE_VERSION_FILE` read in `cmd_doctor`, and `harness_version_ge`
+- Produces: nothing new. `KEEL_CLAUDE_VERSION_FILE` keeps the contract task 14 gave it, except
+  that a line whose version side is not a version doctor's own parser would keep is read as no
+  answer.
+
+**Depends on:** task 15
+
+**Behaviours:**
+
+1. `harness_version_ge` compares only versions it can read. A field that is not all digits makes it
+   return 1 without evaluating anything, an empty field still counts as 0, and the comparison of
+   real versions is unchanged. Examples: `harness_version_ge '1+a[$(touch <scratch>/p)]' 2` returns
+   1 and `<scratch>/p` does not exist afterwards; `harness_version_ge abc 2` returns 1 with nothing
+   on stderr; `harness_version_ge 2.1.302 2.1.99` returns 0 and `harness_version_ge 2.1.99
+   2.1.302` returns 1, as today. Before the change the first creates the file and the second prints
+   `value too great for base` and aborts the shell.
+2. Doctor uses a version read from the file only when it is one its own parser would keep: digits
+   and dots, holding a dot. Any other line, a line with both sides empty, or a file it cannot read,
+   is read as an empty file, so doctor asks Claude Code itself and writes the answer there.
+   Examples, each with `KEEL_CLAUDE` a stub printing keel's minimum and appending to a counter:
+   the file holding `1+a[$(touch <scratch>/p)]|` gives no `<scratch>/p`, one line in the counter,
+   no warning about the version, and exit 0; the file holding `abc|` does the same with no `value
+   too great for base` on stderr, and `keel doctor --json` on it reports the same `problems` and
+   `warnings` as with no variable set; the file holding `|` asks the stub once. A file holding
+   keel's minimum followed by `|` still asks nothing, as task 14's cases assert. Before the change
+   the first creates `<scratch>/p`, and the second aborts doctor.
+
+**Done when:** `tests/test-keel-4.sh` and `tests/test-harness-resolve.sh` pass, and
+`tests/validate-citations.sh` and `tests/validate-skills.sh` report OK.
+
+- [ ] **Step 16.1: Build it test first**
+
+Follow `keel:tdd` for behaviours 1 and 2: write each case from its examples and watch it fail for
+the reason named, then implement.
+Run: `tests/test-harness-resolve.sh`, then `tests/test-keel-4.sh`
+Expected before: FAIL, behaviour 1's crafted field creates the file and `abc` aborts with `value
+too great for base`, and behaviour 2's crafted line creates the file. Expected after: PASS. Quote
+the failing output in your report.
+
+Run: `tests/run-tests.sh`.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+This is the one boundary run the task schedules.
+
+- [ ] **Step 16.2: Hand over**
+
+```bash
+git add bin/keel lib/harness/resolve.sh CHANGELOG.md tests/test-keel-4.sh \
+        tests/test-harness-resolve.sh
+git status --porcelain
+```
+
+Stage those paths and each file whose citation this task repaired, by name, and stop. **Do not
+commit.** The coordinator commits after both review passes, with
+`git commit -s -m "fix(doctor): use a version from the shared file only when it parses as one"`.
+
 ## Notes for the coordinator
 
 - **The minimum is 2.1.302, not 2.1.295.** The idea record proposed 2.1.295 because `onFailure`
