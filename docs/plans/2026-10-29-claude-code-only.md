@@ -2134,6 +2134,78 @@ Stage those paths and each file whose citation this task repaired, by name, and 
 commit.** The coordinator commits after both review passes, with
 `git commit -s -m "fix(doctor): use a version from the shared file only when it parses as one"`.
 
+### Task 16b: doctor writes the shared version file only when the file is its own
+
+Added by the coordinator on 2026-10-31, Bernard's decision, from task 16's quality review. Task 16
+made doctor write its answer back whenever it did not use the file's line, where task 14 wrote only
+to an empty file. So a `KEEL_CLAUDE_VERSION_FILE` set by hand to the wrong file, or to a symlink
+another local user planted in a shared directory, has its target overwritten. keel-fleet's `mktemp`
+file is never affected. The same review found the reason-only line untested and raw bash errors on
+a file doctor cannot read.
+
+**Story:** G2, ADR-0014
+**Files:**
+- Modify: `bin/keel`
+- Modify: `CHANGELOG.md` (the Unreleased line on the version check)
+- Test: `tests/test-keel-4.sh`
+
+**Interfaces:**
+- Consumes: task 16's read and write of `KEEL_CLAUDE_VERSION_FILE` in `cmd_doctor`
+- Produces: nothing new. The variable keeps task 16's contract, except that doctor writes the file
+  only when it is empty, absent, or holds a line with a `|`, and never through a symlink.
+
+**Depends on:** task 16
+
+**Behaviours:**
+
+1. Doctor writes the file only when it is doctor's own: empty, absent, or holding a line with a
+   `|`. A file in any other shape is left exactly as it was, and doctor asks Claude Code and uses
+   the answer. A path that is a symlink is never written, dangling or not. Examples, each with
+   `KEEL_CLAUDE` a stub printing keel's minimum and appending to a counter: a file holding the two
+   lines `hello` and `world` asks once and is byte-for-byte unchanged afterwards; a symlink to such
+   a file asks once and its target is unchanged; a dangling symlink asks once and creates nothing
+   at its target; `abc|` is rewritten to keel's minimum followed by `|`, as task 16 asserts; a path
+   that does not exist, in a directory that does, is created holding keel's minimum followed by
+   `|`. Before the change the first two leave the file holding keel's minimum followed by `|`, and
+   the dangling symlink creates its target.
+2. A reason-only line is read as the answer. Example: a file holding `|some reason` gives one
+   `WARN` line naming `some reason`, no ask, and the file unchanged. This is a `verify` behaviour:
+   it holds since task 16 and passes on arrival, so prove it bites on a scratch copy that ignores
+   the reason side.
+3. A file doctor cannot read prints no shell error. Examples: a file at mode 000, and a path naming
+   a directory, each ask once and leave nothing from the read or the write on stderr. Before the
+   change each prints bash errors naming `bin/keel` and a line number. Root reads a mode 000 file,
+   so where the test runs as root (`id -u` prints 0) the mode 000 case is skipped with a line saying
+   so.
+
+**Done when:** `tests/test-keel-4.sh` passes, and `tests/validate-citations.sh` and
+`tests/validate-skills.sh` report OK.
+
+- [ ] **Step 16b.1: Build it test first**
+
+Follow `keel:tdd` for behaviours 1 and 3: write each case from its examples and watch it fail for
+the reason named, then implement. Behaviour 2 is `verify`; its red comes from the scratch copy it
+names.
+Run: `tests/test-keel-4.sh`
+Expected before: FAIL, behaviour 1's `hello` file is overwritten and its dangling symlink creates
+its target, and behaviour 3's cases print bash errors. Expected after: PASS. Quote the failing
+output in your report.
+
+Run: `tests/run-tests.sh`.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+This is the one boundary run the task schedules.
+
+- [ ] **Step 16b.2: Hand over**
+
+```bash
+git add bin/keel CHANGELOG.md tests/test-keel-4.sh
+git status --porcelain
+```
+
+Stage those paths and each file whose citation this task repaired, by name, and stop. **Do not
+commit.** The coordinator commits after both review passes, with
+`git commit -s -m "fix(doctor): write the shared version file only when it is doctor's own"`.
+
 ## Notes for the coordinator
 
 - **The minimum is 2.1.302, not 2.1.295.** The idea record proposed 2.1.295 because `onFailure`
