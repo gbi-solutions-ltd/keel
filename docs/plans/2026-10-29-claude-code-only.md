@@ -1348,7 +1348,7 @@ targeted fix pass on the staged work instead of discarding it, and accepted by n
 citations the sweep repointed although they were already wrong at `main` (they were judged against
 `d6c421a`), since each now lands on the content its sentence names. The fix pass names 2.1.302 in
 the idea record, reverts the four `bin/keel:626` repoints (ADR-0004 and the 2026-09-05 design), and
-restates the sweep's counts. The 13 accepted rows: `docs/07-open-decisions.md:578` and `:608`;
+restates the sweep's counts. The 13 accepted rows: `docs/07-open-decisions.md:579` and `:609`;
 `docs/ideas/declared-profile-keys-take-effect.md:92`; `docs/ideas/leon-van-zyl-skill-collection.md:144`;
 `docs/ideas/snapshot-records-its-own-path.md:85`; `docs/plans/2026-08-30-profile-sync.md:47`;
 `docs/plans/2026-09-05-tiered-multi-harness-support.md:2140`;
@@ -1617,7 +1617,7 @@ repository that declared sensitive paths, or a test that checks the wrong thing.
 **Done when:** `tests/test-sensitive-guard.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 12.1: Build it test first**
+- [x] **Step 12.1: Build it test first** Note: passed on arrival, never seen red: behaviour 6, git --git-dir=.git commit, the missing-cwd case, the Codex refusals of behaviour 5, the [], absent and null silent cases; behaviour 7 red seen on a scratch copy with cd src
 
 Follow `keel:tdd` for behaviours 1 to 5: write each case from its examples and watch it fail for
 the reason named, then implement. Behaviour 7's red comes from its scratch-copy `cd src` mutation,
@@ -1632,7 +1632,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 12.2: Hand over**
+- [x] **Step 12.2: Hand over** Note: rounds: 3; routing: inherit; loop: full; attempt 1 discarded on a blocking quality finding and the task tightened; attempt 2 DEVIATES on a docs/07 paragraph merge, fixed on top of it by Bernard's decision of 2026-10-31 rather than discarded; final quality review should-fix: wider prefilter makes non-commit commands ask or refuse, start-order and git-directory tests cannot fail, header line 30 short
 
 ```bash
 git add hooks/sensitive-guard tests/test-sensitive-guard.sh docs/07-open-decisions.md \

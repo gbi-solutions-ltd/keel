@@ -70,7 +70,15 @@ Entries are terse by design; the narrative for each release is in this file's gi
   any hook exit but 0 and 2, so a crash in the guard, such as the embedded Python raising on an
   event whose `tool_input` is a string rather than an object, let a commit touching
   `hard_block_paths` through without asking. An `EXIT` trap now answers `ask` on any exit but 0
-  and 2. An event that is not JSON at all still exits 0 without asking.
+  and 2. An event that is not JSON at all still exits 0 without asking. It sees a commit behind a
+  global git option (`git -c core.hooksPath=/dev/null commit`, `git -C . commit`, `--git-dir`,
+  `--work-tree`, `--namespace`, `--config-env`), which went through in silence. It asks on a
+  profile that exists and cannot be read, one that is not a JSON object, and a `hard_block_paths`
+  that is present and not a list of strings, where a string was read character by character and
+  guarded nothing; on Codex each of these is the refusal. An absent key, `null` and `[]` still
+  declare nothing. It walks up for the profile, and runs git, from the event's `cwd`, then
+  `CLAUDE_PROJECT_DIR`, then `$PWD`, without calling `dirname`. A commit in another repository
+  (`git -C ../other commit`) is judged by the session's repository, and the hook says so.
 
 ## 0.26.0 - 2026-10-22
 

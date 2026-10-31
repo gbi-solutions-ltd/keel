@@ -25,7 +25,7 @@ the one promise `hard_block_paths` makes, on any commit where the guard does not
   hook doesn't block the tool call ... so don't count on a stalled hook to act as a gate."
   `hooks/hooks.json:47-50` gives `sensitive-guard` a 10 second timeout and no `onFailure`. **No
   timeout is on record**, so this half rests on the documented gap and not on an incident.
-- **Decision 10 has waited on one observation since 2026-08.** `docs/07-open-decisions.md:487`
+- **Decision 10 has waited on one observation since 2026-08.** `docs/07-open-decisions.md:488`
   leaves writing `outputStyle` open until someone sees how a plugin style is named. On
   2026-10-29, `claude -p "/output-style"` on 2.1.312 listed `keel:keel terse` among the styles.
 

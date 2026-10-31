@@ -565,8 +565,9 @@ when keel runs through that path.
 
 <!-- keel:claim gate=sensitive-guard harness=claude -->
 **The list is a union.** `hooks/sensitive-guard` reads the nearest `.keel/profile.json` walking up
-from the directory it runs in, and that can be any directory, so `plan risk` matches the changed
-paths against the patterns of every profile the hook could read from anywhere:
+from the session's directory, the first of these that names a directory that exists: the event's
+`cwd`, then `CLAUDE_PROJECT_DIR`, then `$PWD`. That can be any directory, so `plan risk` matches the
+changed paths against the patterns of every profile the hook could read from anywhere:
 
 - the root profile as the base has it (`HEAD` for `--staged`, `<a>` for `--range`) and as the
   working tree has it, which is the only way explicit paths, naming no commit, read it;
@@ -577,8 +578,9 @@ paths against the patterns of every profile the hook could read from anywhere:
   first profile it meets, so run from `svc`, which has its own, it never reads one above the
   repository, but run from the root, which has none, it does. keel therefore also walks up from the
   repository's parent, and adds the nearest profile it finds there. It walks from the current
-  directory too, by the logical `$PWD` with symlinks unresolved, as the hook does, and by the
-  resolved path, and from the logical parent of the repository when that differs.
+  directory too, by the logical `$PWD` with symlinks unresolved, where the hook starts when neither
+  the event's `cwd` nor `CLAUDE_PROJECT_DIR` names an existing directory, and by the resolved path,
+  and from the logical parent of the repository when that differs.
 
 The base is in the union so a change cannot lower its own review, and the working tree is in it
 because the hook reads that: with `["src/auth"]` at `HEAD`, an unstaged edit making it

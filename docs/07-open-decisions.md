@@ -211,10 +211,11 @@ pathspec, because all three commit working tree content that `--cached` does not
 whenever it cannot answer: an absent python3, an unparseable profile, or a failing `git diff` all
 produce a prompt rather than silence.
 
-Its limit is stated in the hook and repeated here: it reads a command string, so `sh -c`, an alias,
-a here-doc, or `git -C dir commit` reaches a commit without passing through it, exactly as the
-permission deny rules already warn. It raises the cost of a careless commit. It is not a boundary
-against a determined one, and review remains the boundary.
+Its limit is stated in the hook and repeated here: it reads a command string, so `sh -c`, an alias
+or a here-doc reaches a commit without passing through it, as the permission deny rules warn. It
+judges the session's repository, not one that `-C`, `--git-dir` or `--work-tree` names, so a commit
+in another (`git -C ../other commit`, `cd ../other && git commit`) passes in silence. It raises the
+cost of a careless commit, is not a boundary against a determined one, and review is the boundary.
 
 The list of paths that get the non-overridable block, proposed here and confirmed per repo in
 <!-- keel:claim gate=sensitive-guard harness=claude -->

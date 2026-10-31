@@ -109,16 +109,6 @@ else
 fi
 rm -rf "$r"
 
-# A cd in a hook needs a CDPATH guard: with CDPATH set, a relative cd can land elsewhere and print
-# the directory to stdout, which corrupts the hook's JSON. Comments are stripped first, so only a cd
-# the hook runs counts, and the case fails only on a cd with no guard beside it.
-code="$(grep -v '^[[:space:]]*#' "$GUARD")"
-cds="$(printf '%s\n' "$code" | grep -cE '(^|[[:space:];&|(])cd([[:space:]]|$)')"
-guards="$(printf '%s\n' "$code" | grep -c CDPATH)"
-if [ "$cds" -eq 0 ] || [ "$guards" -gt 0 ]; then
-    printf '  PASS  a cd the hook runs is guarded against CDPATH\n'; pass=$((pass+1))
-else printf '  FAIL  a cd the hook runs is guarded against CDPATH (%s cd, no CDPATH guard)\n' "$cds"; fail=$((fail+1)); fi
-
 # A repository that declares no sensitive paths must be untouched, which is almost every repository.
 r="$(mktemp -d)"; fixture "$r" ''
 : > "$r/src/auth/token.go"; git -C "$r" add -A
@@ -328,6 +318,158 @@ else
     printf '  FAIL  %s (expected ask, got: %s)\n' "an absent python3 fails closed, not silent" "${out:0:90}"; fail=$((fail+1))
 fi
 rm -rf "$r" "$shim"
+
+# The cases below share these. A repository whose only commit holds README.md, so HEAD exists and no
+# profile is committed at it, which leaves a case's working-tree profile with nothing to stand in.
+plain_repo() {
+    local root="$1"
+    mkdir -p "$root/src/auth" "$root/src/ui"
+    git -C "$root" init -q
+    git -C "$root" config user.email t@example.com
+    git -C "$root" config user.name Test
+    : > "$root/README.md"; git -C "$root" add README.md; git -C "$root" commit -qm readme
+}
+asks() { printf '%s' "$1" | grep -q '"permissionDecision": *"ask"'; }
+silent() { [ "$1" -eq 0 ] && [ -z "$2" ]; }     # an exit code, then what the hook printed
+# name, then 0 for a pass, then what the hook printed
+verdict() {
+    if [ "$2" -eq 0 ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1))
+    else printf '  FAIL  %s (got: %s)\n' "$1" "${3:0:120}"; fail=$((fail+1)); fi
+}
+codex_guard() { env -u CLAUDE_PROJECT_DIR CODEX_VERSION=0.153.4 "$GUARD"; }
+
+# A global git option before `commit` does not hide the commit. The prefilter needed the literal
+# text `git commit` and the token walk stopped at the first token after `git` not starting with `-`,
+# so `git -c core.hooksPath=/dev/null commit` went through in silence. A tab arrives in the event as
+# `\t`, and a quoted value can hold an escaped quote; neither hides the commit either.
+for cmd in 'git -c core.hooksPath=/dev/null commit -m x' 'git -C . commit -m x' \
+           'git --git-dir .git --work-tree . commit -m x' 'git --git-dir=.git commit -m x' \
+           $'git\tcommit -m x' 'git -c "a=\"b c\"" commit -m x'; do
+    r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+    : > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+    check "a global option before commit does not hide it: $cmd" ask "$r" "$cmd"
+    rm -rf "$r"
+done
+
+# And a global option on a command that is not a commit is not one, even with the word in its value
+# and the profile staged, which is the one change that asks whatever the command's files are.
+r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+: > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+check "a global option on a command that is not a commit asks nothing" "" "$r" \
+    'git -c commit.gpgsign=false log -1'
+printf '{"project": {"name": "t2"}, "hard_block_paths": ["src/auth"]}\n' > "$r/.keel/profile.json"
+git -C "$r" add .keel/profile.json
+check "a global option on a command that is not a commit asks nothing with the profile staged" "" \
+    "$r" 'git -c commit.gpgsign=false log -1'
+rm -rf "$r"
+
+# A profile that exists and cannot be read asks on a commit. With no profile at HEAD the committed
+# list cannot stand in for it, and reading it as absent let the commit through in silence. Codex
+# discards the ask, so there it is the refusal. Root reads a mode 000 file, so as root the case
+# would pass without testing an unreadable profile at all, and it says so instead.
+if [ "$(id -u)" = 0 ]; then
+    printf '  SKIP  an unreadable profile asks on a commit: running as root, which reads mode 000\n'
+else
+    r="$(mktemp -d)"; plain_repo "$r"
+    mkdir -p "$r/.keel"; printf '{"hard_block_paths": ["src/auth"]}\n' > "$r/.keel/profile.json"
+    chmod 000 "$r/.keel/profile.json"
+    : > "$r/src/ui/button.tsx"; git -C "$r" add src/ui/button.tsx
+    out="$(event "git commit -m x" "$r" | ( cd "$r" && "$GUARD" ) 2>/dev/null)"
+    asks "$out" && printf '%s' "$out" | grep -q 'profile could not be read'
+    verdict "an unreadable profile with none at HEAD asks on a commit, saying it could not be read" $? "$out"
+    check "an unreadable profile with none at HEAD asks nothing on ls" "" "$r" "ls"
+    out="$(event "git commit -m x" "$r" | ( cd "$r" && codex_guard ) 2>&1 >/dev/null)"; rc=$?
+    [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'v0\.26\.0'
+    verdict "on codex an unreadable profile with none at HEAD refuses the commit" $? "rc $rc: $out"
+    chmod 644 "$r/.keel/profile.json"; rm -rf "$r"
+fi
+
+# The profile walk calls no external command. It stepped up with `dirname`, so with PATH holding
+# bash, git and python3 only, the walk lost its directory at the first step up, found no profile and
+# let the commit through in silence. The profile is untracked, so HEAD cannot stand in for it.
+r="$(mktemp -d)"; plain_repo "$r"
+mkdir -p "$r/.keel"; printf '{"hard_block_paths": ["src/auth"]}\n' > "$r/.keel/profile.json"
+: > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+shim="$(mktemp -d)"
+for t in bash git python3; do ln -s "$(command -v "$t")" "$shim/$t"; done
+out="$(event "git commit -m x" "$r/src/ui" | ( cd "$r/src/ui" && PATH="$shim" "$GUARD" ) 2>/dev/null)"
+asks "$out"
+verdict "the profile walk finds an untracked profile with only bash, git and python3 on PATH" $? "$out"
+rm -rf "$r" "$shim"
+
+# The walk and both git calls start from the session's directory: the event's cwd, then
+# CLAUDE_PROJECT_DIR, then $PWD, the first that names a directory that exists. The hook process's
+# own directory is not promised to be the one the command runs in, and a profile and a staged set
+# read from a directory outside the repository found neither. The repository path holds a space.
+base="$(mktemp -d)"; r="$base/with space"; mkdir -p "$r"; fixture "$r" '"src/auth"'
+: > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+away="$(mktemp -d)"
+out="$(event "git commit -m x" "$r" | ( cd "$away" && env -u CLAUDE_PROJECT_DIR "$GUARD" ) 2>/dev/null)"
+asks "$out"
+verdict "run from outside the repository, the event's cwd names it, path with a space" $? "$out"
+nocwd='{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git commit -m x"}}'
+out="$(printf '%s' "$nocwd" | ( cd "$away" && CLAUDE_PROJECT_DIR="$r" "$GUARD" ) 2>/dev/null)"
+asks "$out"
+verdict "with no cwd in the event, CLAUDE_PROJECT_DIR names the repository" $? "$out"
+out="$(event "git commit -m x" "$away/gone" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR "$GUARD" ) 2>/dev/null)"
+asks "$out"
+verdict "an event cwd that does not exist falls back to the directory the hook runs in" $? "$out"
+rm -rf "$base" "$away"
+
+# A hard_block_paths that is present and not a list of strings is an unparseable profile. A string
+# was iterated character by character, so `"src/auth"` declared s, r, c and so on, and a commit
+# under none of them went through in silence.
+for list in '"src/auth"' '{"src/auth": true}' '["src/auth", 1]'; do
+    r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+    printf '{"project": {"name": "t"}, "hard_block_paths": %s}\n' "$list" > "$r/.keel/profile.json"
+    git -C "$r" commit -qam list
+    : > "$r/src/ui/button.tsx"; git -C "$r" add src/ui/button.tsx
+    check "a hard_block_paths of $list asks as an unparseable profile" ask "$r" "git commit -m x"
+    out="$(event "git commit -m x" "$r" | ( cd "$r" && codex_guard ) 2>&1 >/dev/null)"; rc=$?
+    [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'v0\.26\.0'
+    verdict "on codex a hard_block_paths of $list refuses the commit" $? "rc $rc: $out"
+    rm -rf "$r"
+done
+
+# And an empty list, an absent key and null still declare nothing, on either harness.
+for body in '"hard_block_paths": []' '"name": "t"' '"hard_block_paths": null'; do
+    r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+    printf '{%s}\n' "$body" > "$r/.keel/profile.json"; git -C "$r" commit -qam list
+    : > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+    check "a profile of {$body} asks nothing" "" "$r" "git commit -m x"
+    out="$(event "git commit -m x" "$r" | ( cd "$r" && codex_guard ) 2>&1)"; rc=$?
+    silent "$rc" "$out"
+    verdict "on codex a profile of {$body} is untouched" $? "rc $rc: $out"
+    rm -rf "$r"
+done
+
+# A repository with a HEAD and no profile anywhere is never asked, whatever it stages.
+r="$(mktemp -d)"; plain_repo "$r"
+: > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+ev="$(event "git commit -m x" "$r")"
+out="$( cd "$r" && "$GUARD" <<<"$ev" 2>&1 )"; rc=$?     # no pipe, so rc is the hook's own
+silent "$rc" "$out"
+verdict "a repository with a HEAD and no profile anywhere is not asked" $? "rc $rc: $out"
+rm -rf "$r"
+
+# With CDPATH set, a relative cd in the hook would land in the decoy and print its path to stdout,
+# which corrupts the hook's JSON. So the hook is run, not read: an ask is exactly one JSON object,
+# and a repository with no profile gets no output at all.
+decoy="$(mktemp -d)"; mkdir -p "$decoy/.keel" "$decoy/src"
+r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+: > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+out="$(event 'git -c core.hooksPath=/dev/null commit -m x' "$r" \
+  | ( cd "$r" && CDPATH="$decoy" "$GUARD" ) 2>/dev/null)"
+printf '%s' "$out" | python3 -c '
+import json, sys
+sys.exit(json.load(sys.stdin)["hookSpecificOutput"]["permissionDecision"] != "ask")' 2>/dev/null
+verdict "with CDPATH set, an ask is exactly one JSON object on stdout" $? "$out"
+rm -rf "$r"
+r="$(mktemp -d)"; plain_repo "$r"
+: > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
+out="$(event "git commit -m x" "$r" | ( cd "$r" && CDPATH="$decoy" "$GUARD" ) 2>&1)"
+silent 0 "$out"; verdict "with CDPATH set, a repository with no profile gets no output" $? "$out"
+rm -rf "$r" "$decoy"
 
 
 # --- on Codex, where the gate cannot ask -------------------------------------------------------
