@@ -1446,7 +1446,7 @@ whatever the gate says; the rubric pass's two surviving mutants are Blocking by 
 `tests/test-keel-fleet.sh` pass, and `tests/validate-citations.sh` and `tests/validate-skills.sh`
 report OK.
 
-- [ ] **Step 11.1: Build it test first**
+- [x] **Step 11.1: Build it test first** Note: built by the implementer; reds quoted for behaviours 1 to 4 and 6 and reproduced by the spec reviewer for 1, 3 and 4; a fix pass restored the Codex refusal without python3
 
 Follow `keel:tdd` for behaviours 1 to 4 and 6: write each test from its example and watch it fail
 for the reason named (for 3 and 4, by removing `10#` or the field-count check in a scratch copy),
@@ -1457,7 +1457,7 @@ Expected before: FAIL, behaviour 1's case gets no output where it should ask. Ex
 Run: `tests/run-tests.sh`.
 Expected: PASS. This is the one boundary run the task schedules.
 
-- [ ] **Step 11.2: Hand over**
+- [x] **Step 11.2: Hand over** Note: rounds: 2; routing: inherit; loop: full; spec DEVIATES then fixed and re-checked; quality: no blocking, two pre-existing gaps recorded as follow-ups
 
 ```bash
 git add hooks/sensitive-guard tests/test-sensitive-guard.sh tests/test-harness-resolve.sh \
@@ -1532,5 +1532,8 @@ with `git commit -s -m "fix(sensitive-guard): judge only the top-level list, and
   and its child keeps running (doctor is not blocked); keel-fleet repeats the machine-wide version
   check per repository; a second ledger row for an already-verified primitive would raise the
   minimum.
+- **From task 11's review, pre-existing:** a commit that removes or empties `hard_block_paths` is
+  not asked about, because the guard judges by the working-tree profile; a string value for
+  `hard_block_paths` fails open on Claude Code (Python iterates its characters).
 - **Not in this plan.** `keel-cursor`'s generator reads the archived `keel-internal` checkout; that
   is the port's to fix. The idea record's items are the next plan.
