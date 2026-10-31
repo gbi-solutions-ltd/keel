@@ -28,8 +28,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
   `README.md`. Each warning names its cause: `claude` not found, older than the minimum, no version
   in its output, or stopped after 5 seconds, when doctor kills it. An unreadable minimum is a
   warning, never a pass. `keel-fleet` asks once per run, and every doctor it runs reads that answer
-  through `KEEL_CLAUDE_VERSION_FILE`. The ledger holds one row per primitive, and re-verifying one
-  on a later Claude Code leaves its row as it is, so the minimum does not rise.
+  through `KEEL_CLAUDE_VERSION_FILE`, where a line whose version is not digits and dots is no
+  answer, so doctor asks Claude Code itself. The ledger holds one row per primitive, and
+  re-verifying one on a later Claude Code leaves its row as it is, so the minimum does not rise.
 - `hooks/sensitive-guard` no longer reads the capability ledger, and keeps one Codex refusal. On a
   commit in a repository declaring a non-empty `hard_block_paths`, with `CLAUDE_PROJECT_DIR` empty
   and either `CODEX_VERSION` set or a `"turn_id":` key in the event, it exits 2 with a message

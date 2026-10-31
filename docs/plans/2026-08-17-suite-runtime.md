@@ -294,7 +294,7 @@ git commit -m "perf(detect-stack): read package.json scripts once, not once per 
   stores it in `JSON_CACHE` for the file named in `JSON_CACHE_FILE`; and `json_cache_clear`, which
   empties both. `json_get` keeps its exact signature, `json_get <file> <dotted.path>`, its exact
   output, and its exit code contract: **0 and the value when the key is present, 1 when it is
-  absent.** Callers depend on that difference; `bin/keel:1394` reads
+  absent.** Callers depend on that difference; `bin/keel:1406` reads
   `json_get .keel/profile.json project.kind || echo service` and an absent key must reach the
   default while a null key must not.
 

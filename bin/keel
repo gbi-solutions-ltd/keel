@@ -1302,14 +1302,29 @@ PY
     # KEEL_CLAUDE_VERSION_FILE naming a file that holds a line, `<version>|<reason>` with one side
     # empty, makes that line the answer and the command is not run; naming an empty file, the answer
     # is written there. keel-fleet sets it, so a fleet asks once per run rather than once per
-    # repository, where each ask can take the five seconds above.
+    # repository, where each ask can take the five seconds above. Its version side counts only when
+    # the parser would keep it, because harness_version_ge does arithmetic on it. Any other line,
+    # one with both sides empty, or a file doctor cannot read, is read as an empty file.
     local cc_cmd="${KEEL_CLAUDE-claude}" cc_min cc_out cc_pid cc_n=0 cc_ver="" cc_why="" cc_w
-    local cc_late="" cc_gv cc_vf="${KEEL_CLAUDE_VERSION_FILE-}"
+    local cc_late="" cc_gv cc_vf="${KEEL_CLAUDE_VERSION_FILE-}" cc_vl=""
+    # cc_kept WORD: 0 when WORD is a version the parser keeps, digits and dots holding a dot, with
+    # none at either end and no two together. The file's version goes through it too.
+    cc_kept() {
+        case "$1" in .*|*.|*..*|*[!0-9.]*) return 1 ;; *.*) return 0 ;; *) return 1 ;; esac
+    }
     if ! cc_min="$(harness_min_version)"; then
         warn "cannot read keel's minimum Claude Code version from the capability ledger, so this Claude Code is not checked against it"
     else
         if [ -n "$cc_vf" ] && [ -s "$cc_vf" ]; then
             IFS='|' read -r cc_ver cc_why < "$cc_vf"
+            if cc_kept "$cc_ver" || { [ -z "$cc_ver" ] && [ -n "$cc_why" ]; }; then
+                cc_vl=1
+            else
+                cc_ver=""; cc_why=""
+            fi
+        fi
+        if [ -n "$cc_vl" ]; then
+            :
         elif ! command -v "$cc_cmd" >/dev/null 2>&1; then
             cc_why="'$cc_cmd' was not found"
         elif ! cc_out="$(mktemp)"; then
@@ -1327,17 +1342,14 @@ PY
             else
                 while read -r cc_w _ || [ -n "$cc_w" ]; do
                     cc_w="${cc_w#v}"; cc_w="${cc_w%%[!0-9.]*}"
-                    case "$cc_w" in
-                      .*|*.|*..*) ;;
-                      *.*) cc_ver="$cc_w"; break ;;
-                    esac
+                    cc_kept "$cc_w" && { cc_ver="$cc_w"; break; }
                 done < "$cc_out"
                 [ -n "$cc_ver" ] || cc_why="'$cc_cmd --version' ran, but its output named no version"
             fi
             wait "$cc_pid" 2>/dev/null
             rm -f "$cc_out"
         fi
-        [ -n "$cc_vf" ] && [ ! -s "$cc_vf" ] && printf '%s|%s\n' "$cc_ver" "$cc_why" > "$cc_vf"
+        [ -n "$cc_vf" ] && [ -z "$cc_vl" ] && printf '%s|%s\n' "$cc_ver" "$cc_why" > "$cc_vf"
         if [ -z "$cc_ver" ]; then
             warn "cannot tell whether this Claude Code runs keel's gates: $cc_why. keel needs Claude Code $cc_min or later."
         elif harness_version_ge "$cc_ver" "$cc_min"; then

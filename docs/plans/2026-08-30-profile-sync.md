@@ -125,7 +125,7 @@ want="$root/snapshot.md $root/decisions $root/plans "
 rm -rf "$d"
 
 # FR-05. A default location that is not there leaves the key null. Writing an absent path would
-# convert a silent gap into a hard doctor failure, bin/keel:1407.
+# convert a silent gap into a hard doctor failure, bin/keel:1419.
 d="$(fixture node-ts)"
 ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
 root="$(prof_of "$d" docs_root)"
@@ -623,7 +623,7 @@ assertion's output rather than trusting the reasoning.
 ```bash
 # S-08, FR-10, FR-11, NFR-03. A null key whose default is present means the profile does not know
 # about a document sitting in docs_root. A warning and never a failure, because nothing is broken
-# and the remedy is one command. Shape follows the stack.has_ui warning at bin/keel:1462.
+# and the remedy is one command. Shape follows the stack.has_ui warning at bin/keel:1474.
 d="$(fixture node-ts)"
 ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
 root="$(prof_of "$d" docs_root)"
@@ -665,7 +665,7 @@ them, since they are what a later broadening of the loop would break.
 - [x] **Step 3: Write the minimal implementation**
 
 In `cmd_doctor`, immediately after the existing artifacts loop's closing `fi` (after
-`bin/keel:1599`):
+`bin/keel:1611`):
 
 ```bash
     # The other half of the map: a key that is null while its default is sitting there. The profile
@@ -750,7 +750,7 @@ Expected: `FAIL  help: the profile line in --help does not name sync`.
 
 - [x] **Step 3: Write the minimal implementation**
 
-At `bin/keel:2246`:
+At `bin/keel:2258`:
 
 ```bash
         say "  profile get|set|sync <dotted.path> [value]   read or correct one profile field, or record where this project's documents are"

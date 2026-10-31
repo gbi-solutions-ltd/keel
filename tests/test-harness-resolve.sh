@@ -67,9 +67,9 @@ got="$(provenance_gaps "$fx" | sort | tr '\n' ' ')"
   || bad "the provenance check fires on empty, blank and wrong-arity rows" "got: $got"
 rm -f "$fx"
 
-# Every version is dotted numbers. harness_version_ge does arithmetic on each field, so a 2.1.x
-# would reach keel doctor as an arithmetic error rather than as a ledger row to fix; caught here,
-# it names the row.
+# Every version is dotted numbers. harness_version_ge returns 1 for a field that is not a number,
+# so a 2.1.x would reach keel doctor as a wrong minimum rather than as a ledger row to fix; caught
+# here, it names the row.
 version_gaps() {   # version_gaps <file>
     awk -F'|' '$1=="provides" && $5 !~ /^[0-9]+(\.[0-9]+)+$/ {print $2"/"$3}' "$1"
 }
@@ -456,6 +456,23 @@ for pair in "2.1.10 2.1.09" "2.1.08 2.1.7" "2.1.010 2.1.9"; do
       && ok "a leading zero is decimal: $pair compares at or above, silently" \
       || bad "a leading zero is decimal: $pair compares at or above, silently" "rc=$rc out: $out"
 done
+
+# Only a version it can read is compared. Doctor can take a version from a file
+# (bin/keel#KEEL_CLAUDE_VERSION_FILE), and bash runs a command substitution inside an array
+# subscript in $(( )), so a field that is not all digits must return 1 before any arithmetic. Each
+# call runs in a subshell, because before the guard the second one aborted the shell it ran in. The
+# command touches a relative path from inside the scratch directory, because a dot in the path
+# would split the field and the payload with it.
+vg="$(mktemp -d)"
+out="$(cd "$vg" && harness_version_ge "1+a[\$(touch p)]" 2 2>&1)"; rc=$?
+[ "$rc" -eq 1 ] && [ ! -e "$vg/p" ] \
+  && ok "harness_version_ge compares only versions it can read: a field holding a command returns 1 and runs nothing" \
+  || bad "harness_version_ge compares only versions it can read: a field holding a command returns 1 and runs nothing" "rc=$rc, $vg/p $([ -e "$vg/p" ] && echo created || echo absent), out: $out"
+out="$(harness_version_ge abc 2 2>&1)"; rc=$?
+[ "$rc" -eq 1 ] && [ -z "$out" ] \
+  && ok "harness_version_ge compares only versions it can read: abc returns 1 with nothing on stderr" \
+  || bad "harness_version_ge compares only versions it can read: abc returns 1 with nothing on stderr" "rc=$rc out: $out"
+rm -rf "$vg"
 
 # The regression pin, like the five gates above: a row that raises it is a row that changed what
 # keel needs, and this is where that shows. validated_word_ceiling is at 2.1.302 too and has no

@@ -1409,6 +1409,69 @@ line2="$(cv_line "$( cd "$cv_fx" && PATH="${noclaude%:}" "$KEEL" doctor --fast 2
 [ "$line" = "$line2" ] && case "$line" in "ok    "*"$cv_min"*"$cv_min"*) true ;; *) false ;; esac \
   && ok "the suite's doctor runs do not depend on the machine's Claude Code" \
   || bad "the suite's doctor runs do not depend on the machine's Claude Code" "with PATH: ${line:-<none>}; without claude: ${line2:-<none>}"
+
+# A version doctor takes from KEEL_CLAUDE_VERSION_FILE reaches harness_version_ge, which does
+# arithmetic on it, so doctor uses it only when its own parser would keep it. Any other line is read
+# as an empty file: doctor asks Claude Code and writes the answer there. The stub prints the minimum
+# and counts its runs. The fixture is seeded, so doctor finds no problem and its exit is the version
+# line's alone. The command touches a relative path, so it lands in the fixture doctor runs in, and
+# a dot in a scratch path cannot split the payload.
+vf_fx="$(fixture node-ts)"
+( cd "$vf_fx" && "$KEEL" init -y >/dev/null 2>&1 )
+seed_standards "$vf_fx"
+printf '#!/bin/sh\necho x >> "%s"\necho "%s (Claude Code)"\n' "$cv_stub/count" "$cv_min" > "$cv_stub/counted"
+chmod +x "$cv_stub/counted"
+vf_doctor() {   # vf_doctor <file line> [doctor args]; stdout to out, stderr to err, exit in vf_rc
+    local l="$1"; shift
+    printf '%s\n' "$l" > "$cv_stub/vf"; : > "$cv_stub/count"
+    ( cd "$vf_fx" && KEEL_CLAUDE="$cv_stub/counted" KEEL_CLAUDE_VERSION_FILE="$cv_stub/vf" \
+        "$KEEL" doctor --fast "$@" ) > "$cv_stub/out" 2> "$cv_stub/err"
+    vf_rc=$?
+}
+vf_asked() {   # vf_asked <case name>; one ask, its answer in the file, the good line alone, exit 0
+    local n line
+    n="$(grep -c . "$cv_stub/count")"; line="$(cv_line "$(cat "$cv_stub/out")")"
+    if [ "$n" != 1 ]; then
+        bad "$1" "$n asks"
+    elif [ "$(cat "$cv_stub/vf")" != "$cv_min|" ]; then
+        bad "$1" "the file holds: $(cat "$cv_stub/vf")"
+    elif [ "$vf_rc" -ne 0 ]; then
+        bad "$1" "exit $vf_rc"
+    else
+        case "$line" in
+          "ok    Claude Code $cv_min meets keel's minimum, $cv_min") ok "$1" ;;
+          *) bad "$1" "line: ${line:-<none>}" ;;
+        esac
+    fi
+}
+rm -f "$vf_fx/p"
+vf_doctor "1+a[\$(touch p)]|"
+if [ -e "$vf_fx/p" ]; then
+    bad "doctor uses a version from the file only when its parser would keep it: a line holding a command runs nothing and asks" "the command ran: $vf_fx/p exists"
+else
+    vf_asked "doctor uses a version from the file only when its parser would keep it: a line holding a command runs nothing and asks"
+fi
+vf_doctor "abc|"
+if grep -q 'value too great for base' "$cv_stub/err"; then
+    bad "doctor uses a version from the file only when its parser would keep it: abc asks, with no arithmetic error" "stderr: $(cat "$cv_stub/err")"
+else
+    vf_asked "doctor uses a version from the file only when its parser would keep it: abc asks, with no arithmetic error"
+fi
+vf_counts() { python3 -c 'import json, sys; d = json.load(sys.stdin); print(d["problems"], d["warnings"])'; }
+want="$( cd "$vf_fx" && env -u KEEL_CLAUDE_VERSION_FILE KEEL_CLAUDE="$cv_stub/counted" "$KEEL" doctor --fast --json 2>/dev/null | vf_counts )"
+vf_doctor "abc|" --json
+got="$(vf_counts < "$cv_stub/out" 2>/dev/null)"
+[ -n "$want" ] && [ "$got" = "$want" ] \
+  && ok "doctor uses a version from the file only when its parser would keep it: --json on abc counts what it counts with no file" \
+  || bad "doctor uses a version from the file only when its parser would keep it: --json on abc counts what it counts with no file" "problems and warnings: ${got:-<none>}, with no file: ${want:-<none>}"
+vf_doctor "|"
+vf_asked "doctor uses a version from the file only when its parser would keep it: a line with both sides empty asks once"
+vf_doctor "$cv_min|"
+n="$(grep -c . "$cv_stub/count")"; line="$(cv_line "$(cat "$cv_stub/out")")"
+[ "$n" = 0 ] && [ "$line" = "ok    Claude Code $cv_min meets keel's minimum, $cv_min" ] \
+  && ok "doctor uses a version from the file only when its parser would keep it: the minimum is used and nothing is asked" \
+  || bad "doctor uses a version from the file only when its parser would keep it: the minimum is used and nothing is asked" "$n asks, line: ${line:-<none>}"
+rm -rf "$vf_fx"
 rm -rf "$cv_fx" "$cv_stub"
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"

@@ -127,8 +127,11 @@ harness_active_gates() {
 # harness_version_ge A B: 0 when version A is at or above B, comparing each dotted field as a
 # number, so 2.1.302 is above 2.1.99 where a string comparison says the opposite. A field one
 # version lacks counts as 0. 10# because a field with a leading zero is otherwise read as octal.
+# A field that is not all digits returns 1 before any arithmetic: bash runs a command substitution
+# inside an array subscript in $(( )), and keel doctor can read a version from a file.
 harness_version_ge() {
     [ $# -eq 2 ] || return 1
+    case "$1$2" in *[!0-9.]*) return 1 ;; esac
     local a="$1" b="$2" x y
     while [ -n "$a" ] || [ -n "$b" ]; do
         x="${a%%.*}"; y="${b%%.*}"

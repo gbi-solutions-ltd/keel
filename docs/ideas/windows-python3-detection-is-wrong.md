@@ -41,7 +41,7 @@ invisible trailing character.
 **Sites still present:**
 
 - `bin/keel:113`, `JSON_CACHE`
-- `bin/keel:1613` (line moved since the PR; same call), the artifacts loop
+- `bin/keel:1625` (line moved since the PR; same call), the artifacts loop
 
 **Already moot:** the PR's third site, `SETTINGS_REPORT`, no longer exists, superseded by the
 harness capability-manifest system since 2026-09-07.
