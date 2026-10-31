@@ -1723,6 +1723,85 @@ Stage those paths and each file whose citation this task repaired, by name, and 
 commit.** The coordinator commits after both review passes, with
 `git commit -s -m "fix(done-guard): warn on a transcript with no Claude Code row, and bound transcript_kind"`.
 
+### Task 12c: `sensitive-guard` decides only on a command that commits
+
+Added by the coordinator on 2026-10-31, Bernard's decision, from task 12's final quality review.
+Task 12 widened the bash prefilter so a global option before `commit` no longer hides it. Commands
+that are not commits now pass that prefilter too, and three decisions are taken before or without
+the token walk that tells a commit from anything else: the Codex refusal, the staged-profile ask
+and the unreadable-profile ask. So a `git log` that mentions `commit` gets an ask on Claude Code or
+the refusal on Codex, which breaks the standard that a check is never stricter than correct output.
+The same review found that two of task 12's cases cannot fail, and one global option it missed.
+
+**Story:** G1, ADR-0013, ADR-0015
+**Files:**
+- Modify: `hooks/sensitive-guard`
+- Modify: `CHANGELOG.md` (the Unreleased `hooks/sensitive-guard` entry)
+- Test: `tests/test-sensitive-guard.sh`
+
+**Interfaces:**
+- Consumes: task 12's hook
+- Produces: nothing new. `matches` is unchanged, because `tests/test-plan.sh` cuts it out of the
+  hook and requires `keel plan risk` to agree with it.
+
+**Depends on:** task 13
+
+**Behaviours:**
+
+1. A command the token walk does not read as a commit gets no decision, wherever python3 runs. The
+   Codex refusal, the staged-profile ask and the unreadable-profile ask are each taken only once the
+   walk has found `git ... commit`. Examples, each in a repository whose working-tree profile lists
+   `src/auth`: with `CODEX_VERSION` set and `CLAUDE_PROJECT_DIR` unset, `git --no-pager log --grep
+   commit` and `git -C . status && echo commit` each exit 0 with no output, and `git -C . commit -m
+   x` with `src/auth/t.go` staged still exits 2 with `v0.26.0` on stderr; on Claude Code with
+   `.keel/profile.json` staged, `git --no-pager log --oneline | grep commit` prints nothing and
+   `git commit -m x` still asks naming the profile; on Claude Code with the profile at mode 000 and
+   none at `HEAD`, `git --no-pager log --grep commit` prints nothing (skipped as root, as task 12's
+   case is). Before the change the Codex cases exit 2 and the Claude Code cases ask. Without
+   python3 the walk cannot run, so that path keeps failing closed as it does today, and the
+   existing case "on codex with python3 absent the commit is refused" still passes.
+2. The start order is tested where it decides something. Example: two repositories, A whose
+   profile lists `src/auth` with `src/auth/t.go` staged, and B with no profile; an event whose
+   `cwd` is A, with `CLAUDE_PROJECT_DIR` set to B, asks; an event whose `cwd` is B, with
+   `CLAUDE_PROJECT_DIR` set to A, prints nothing. This is a `verify` behaviour: it holds today and
+   passes on arrival, so prove it bites on a scratch copy of the hook that reads
+   `CLAUDE_PROJECT_DIR` before the event's `cwd`, and watch the first case fail.
+3. The git calls are tested to run in the start directory. Example: the case from task 12 whose
+   event `cwd` names the repository while the hook runs from outside it asserts that the ask's
+   reason names `src/auth/t.go`, not only that it asks. A `verify` behaviour: prove it bites on a
+   scratch copy whose `git diff` call drops its `cwd=` and watch the case fail, where today it
+   passes on the "git diff failed" ask.
+4. `--attr-source <tree>` is a global option that takes a value. Example: `git --attr-source HEAD
+   commit -m x` with `src/auth/t.go` staged asks. Before the change it prints nothing.
+
+**Done when:** `tests/test-sensitive-guard.sh` passes, and `tests/validate-citations.sh` and
+`tests/validate-skills.sh` report OK.
+
+- [ ] **Step 12c.1: Build it test first**
+
+Follow `keel:tdd` for behaviours 1 and 4: write each case from its examples and watch it fail for
+the reason named, then implement. Behaviours 2 and 3 are `verify`: their red comes from the
+scratch-copy mutations they name.
+Run: `tests/test-sensitive-guard.sh`
+Expected before: FAIL, behaviour 1's Codex `git --no-pager log --grep commit` case exits 2 where it
+should exit 0, its Claude Code cases ask, and behaviour 4's case gets no output. Expected after:
+PASS. Quote the failing output in your report.
+
+Run: `tests/run-tests.sh`.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+This is the one boundary run the task schedules.
+
+- [ ] **Step 12c.2: Hand over**
+
+```bash
+git add hooks/sensitive-guard tests/test-sensitive-guard.sh CHANGELOG.md
+git status --porcelain
+```
+
+Stage those paths and each file whose citation this task repaired, by name, and stop. **Do not
+commit.** The coordinator commits after both review passes, with
+`git commit -s -m "fix(sensitive-guard): decide only on a command that commits"`.
+
 ### Task 14: doctor and the fleet ask once, name what v0.26.0 left, and read their registers whole
 
 Added by the coordinator on 2026-10-31 from the follow-ups of task 4c's and task 7's quality
@@ -1751,7 +1830,7 @@ Narrowed on 2026-10-31 by Bernard: doctor keeps never reading AGENTS.md.
   line to it. `keel-fleet` creates one empty file per run with `mktemp`, exports the variable to
   every doctor it runs, and removes the file when it exits.
 
-**Depends on:** task 13
+**Depends on:** task 12c
 
 **Behaviours:**
 
