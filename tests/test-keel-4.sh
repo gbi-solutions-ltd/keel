@@ -1490,6 +1490,20 @@ n="$(grep -c . "$cv_stub/count")"; line="$(cv_line "$(cat "$cv_stub/out")")"
   && ok "doctor uses a version from the file only when its parser would keep it: the minimum is used and nothing is asked" \
   || bad "doctor uses a version from the file only when its parser would keep it: the minimum is used and nothing is asked" "$n asks, line: ${line:-<none>}"
 
+# A line with no `|` is not doctor's own, so it is no answer, whatever it holds: doctor asks, and
+# leaves the file as it was. Used as the answer, a file set by hand to the wrong path decided the
+# version doctor reported.
+printf '%s\n' "$cv_min" > "$cv_stub/bare.copy"; cp "$cv_stub/bare.copy" "$cv_stub/bare"
+vf_run "$cv_stub/bare"
+vf_kept "doctor uses a line from the version file only when it holds a |: keel's minimum alone asks once and stays as it was" "$cv_stub/bare" "$cv_stub/bare.copy"
+printf '0.26.0\n' > "$cv_stub/bare"
+vf_run "$cv_stub/bare"
+why="$(vf_once)"
+[ -z "$why" ] && grep -q '^WARN.*0\.26\.0' "$cv_stub/out" && why="$(grep '^WARN.*0\.26\.0' "$cv_stub/out")"
+[ -z "$why" ] \
+  && ok "doctor uses a line from the version file only when it holds a |: 0.26.0 alone asks once and no WARN names it" \
+  || bad "doctor uses a line from the version file only when it holds a |: 0.26.0 alone asks once and no WARN names it" "$why"
+
 # Doctor writes the file only when it is doctor's own: empty, absent, or holding a line with a `|`,
 # and never through a symlink. A path set by hand to the wrong file, or a symlink another local
 # user planted in a shared directory, must not have its target overwritten. Each file is reset

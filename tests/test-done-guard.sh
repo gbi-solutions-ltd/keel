@@ -317,5 +317,22 @@ fi
 { row_type mode; row_type queue-operation; row_user "go"; row_edit "src/x.py" ""; } > "$tmp/tc/meta-edit.jsonl"
 expect "metadata rows first, code edited and no test run: block under required" block "$(send "$tmp/tc" "$tmp/tc/meta-edit.jsonl" Stop)"
 
+# A row is Claude Code's when its message is an object or its type is user, assistant or summary,
+# either alone. Each side is tested without the other, so joining them with `and` would warn here.
+shape_alone() {   # shape_alone <name> <second row>; a row of no shape, then that row: silent, exit 0
+    local out rc
+    { printf '{"type":"event"}\n'; printf '%s\n' "$2"; } > "$tmp/tc/alone.jsonl"
+    out="$(send "$tmp/tc" "$tmp/tc/alone.jsonl" Stop)"; rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        printf '  PASS  %s\n' "$1"; pass=$((pass+1))
+    else
+        printf '  FAIL  %s (rc=%s, got: %s)\n' "$1" "$rc" "${out:0:80}"; fail=$((fail+1))
+    fi
+}
+shape_alone "a summary row with no message is a Claude Code row: silent, exit 0" \
+    '{"type":"summary","summary":"x"}'
+shape_alone "a message row with no type is a Claude Code row: silent, exit 0" \
+    '{"message":{"role":"user","content":"x"}}'
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

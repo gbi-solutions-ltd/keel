@@ -1324,7 +1324,7 @@ PY
             { IFS= read -r cc_l < "$cc_vf"; } 2>/dev/null
             cc_ver="${cc_l%%|*}"
             case "$cc_l" in *'|'*) cc_why="${cc_l#*|}"; cc_own=1 ;; esac
-            if cc_kept "$cc_ver" || { [ -z "$cc_ver" ] && [ -n "$cc_why" ]; }; then
+            if [ -n "$cc_own" ] && { cc_kept "$cc_ver" || { [ -z "$cc_ver" ] && [ -n "$cc_why" ]; }; }; then
                 cc_vl=1
             else
                 cc_ver=""; cc_why=""

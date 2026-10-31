@@ -363,6 +363,34 @@ check "a global option on a command that is not a commit asks nothing with the p
     "$r" 'git -c commit.gpgsign=false log -1'
 rm -rf "$r"
 
+# The prefilter reads the command, not the whole event. Matched against the event, a global option
+# in the command and the word commit in its description read as a commit, so with the profile
+# staged a `git diff` asked on Claude Code and was refused on Codex.
+devent() {   # devent <command> <cwd> <description>; event, with a description
+    CMD="$1" CWD="$2" DESC="$3" python3 -c '
+import json, os
+print(json.dumps({"hook_event_name": "PreToolUse", "tool_name": "Bash",
+                  "tool_input": {"command": os.environ["CMD"], "description": os.environ["DESC"]},
+                  "cwd": os.environ["CWD"]}))'
+}
+r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+printf '{"project": {"name": "t2"}, "hard_block_paths": ["src/auth"]}\n' > "$r/.keel/profile.json"
+git -C "$r" add .keel/profile.json
+desc='Show the staged diff before commit'
+out="$(devent 'git -C . diff --cached --stat' "$r" "$desc" | ( cd "$r" && env -u CODEX_VERSION "$GUARD" ) 2>&1)"; rc=$?
+silent "$rc" "$out"
+verdict "the prefilter reads the command: a diff whose description says commit prints nothing" $? "rc $rc: $out"
+out="$(devent 'git -C . diff --cached --stat' "$r" "$desc" | ( cd "$r" && codex_guard ) 2>&1)"; rc=$?
+silent "$rc" "$out"
+verdict "the prefilter reads the command: on codex a diff whose description says commit exits 0" $? "rc $rc: $out"
+out="$(devent 'git -C . commit -m x' "$r" "$desc" | ( cd "$r" && env -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
+asks "$out" && printf '%s' "$out" | grep -q '\.keel/profile\.json'
+verdict "the prefilter reads the command: a commit with that description asks, naming the profile" $? "$out"
+out="$(devent 'git -C . commit -m x' "$r" "$desc" | ( cd "$r" && codex_guard ) 2>&1 >/dev/null)"; rc=$?
+[ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'v0\.26\.0'
+verdict "the prefilter reads the command: on codex a commit with that description refuses" $? "rc $rc: $out"
+rm -rf "$r"
+
 # A profile that exists and cannot be read asks on a commit. With no profile at HEAD the committed
 # list cannot stand in for it, and reading it as absent let the commit through in silence. Codex
 # discards the ask, so there it is the refusal. Root reads a mode 000 file, so as root the case
@@ -416,6 +444,26 @@ asks "$out"
 verdict "an event cwd that does not exist falls back to the directory the hook runs in" $? "$out"
 rm -rf "$base" "$away"
 
+# Outside any repository a wrong directory gets the "git diff failed" ask, the same decision as a
+# right one, so the cases above cannot tell them apart. Run from inside B, a repository with no
+# profile and nothing staged, a wrong directory gives silence instead, and each case asks naming
+# the file A stages.
+a="$(mktemp -d)"; fixture "$a" '"src/auth"'
+: > "$a/src/auth/t.go"; git -C "$a" add src/auth/t.go
+b="$(mktemp -d)"; plain_repo "$b"
+names_t() { asks "$1" && printf '%s' "$1" | grep -q 'src/auth/t\.go'; }
+out="$(event "git commit -m x" "$a" | ( cd "$b" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
+names_t "$out"
+verdict "run from inside another repository, the event's cwd judges the commit" $? "$out"
+out="$(event "git commit -m x" "$a" | ( cd "$b" && CLAUDE_PROJECT_DIR="$b" env -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
+names_t "$out"
+verdict "the event's cwd is read before CLAUDE_PROJECT_DIR" $? "$out"
+rm "$a/.keel/profile.json"
+out="$(event "git commit -m x" "$a" | ( cd "$b" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
+names_t "$out"
+verdict "run from inside another repository, the profile at HEAD is read from the event's cwd" $? "$out"
+rm -rf "$a" "$b"
+
 # A hard_block_paths that is present and not a list of strings is an unparseable profile. A string
 # was iterated character by character, so `"src/auth"` declared s, r, c and so on, and a commit
 # under none of them went through in silence.
@@ -424,7 +472,9 @@ for list in '"src/auth"' '{"src/auth": true}' '["src/auth", 1]'; do
     printf '{"project": {"name": "t"}, "hard_block_paths": %s}\n' "$list" > "$r/.keel/profile.json"
     git -C "$r" commit -qam list
     : > "$r/src/ui/button.tsx"; git -C "$r" add src/ui/button.tsx
-    check "a hard_block_paths of $list asks as an unparseable profile" ask "$r" "git commit -m x"
+    out="$(event "git commit -m x" "$r" | ( cd "$r" && "$GUARD" ) 2>/dev/null)"
+    asks "$out" && printf '%s' "$out" | grep -q 'not a list of strings'
+    verdict "a hard_block_paths of $list asks as an unparseable profile, saying not a list of strings" $? "$out"
     out="$(event "git commit -m x" "$r" | ( cd "$r" && codex_guard ) 2>&1 >/dev/null)"; rc=$?
     [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'v0\.26\.0'
     verdict "on codex a hard_block_paths of $list refuses the commit" $? "rc $rc: $out"

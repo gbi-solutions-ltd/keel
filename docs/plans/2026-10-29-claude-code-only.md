@@ -2281,7 +2281,7 @@ prefilter and corrects its comment, and changes nothing in the Python walk.
 and `tests/test-harness-resolve.sh` pass, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 17.1: Build it test first**
+- [x] **Step 17.1: Build it test first** Note: passed on arrival, red seen only on scratch copies: behaviours 1, 3, 5 and 6
 
 Follow `keel:tdd` for behaviours 2 and 4: write each case from its examples and watch it fail for
 the reason named, then implement. Behaviours 1, 3, 5 and 6 hold today: write their cases and prove
@@ -2295,7 +2295,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 17.2: Hand over**
+- [x] **Step 17.2: Hand over** Note: rounds: 1; routing: inherit; loop: full; quality should-fix: the twice_re fallback has no test though a mutant without it silences a commit; the hook comment and CHANGELOG understate that a command holding a quote, backslash, tab or newline is still matched against the whole event, description included
 
 ```bash
 git add bin/keel hooks/sensitive-guard CHANGELOG.md tests/test-done-guard.sh \

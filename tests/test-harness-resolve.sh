@@ -288,6 +288,29 @@ if command -v harness_active_gates >/dev/null 2>&1; then
     [ "$(gate_on 'provides|ghost|p|src|\t|2026-01-01\nrequires|done-guard|p\n')" = "inactive" ] \
       && ok "a tab-only version grants nothing" || bad "a tab-only version grants nothing" "reported active"
 
+    # The same rule on a claude row, read by harness_provides itself. Every fixture above is a ghost
+    # row, so a resolver that trusted claude rows without their evidence passed them all.
+    claude_grants() {   # claude_grants <printf-escaped manifest>; echoes granted or nothing
+        local f rc
+        f="$(mktemp)"
+        printf '%b' "$1" > "$f"
+        KEEL_CAPABILITIES="$f" harness_provides claude p; rc=$?
+        rm -f "$f"
+        [ "$rc" -eq 0 ] && printf 'granted' || printf 'nothing'
+    }
+    [ "$(claude_grants 'provides|claude|p|src|1|2026-01-01\n')" = "granted" ] \
+      && ok "a complete claude row grants its primitive" \
+      || bad "a complete claude row grants its primitive" "the three cases below would prove nothing"
+    [ "$(claude_grants 'provides|claude|p| |1|2026-01-01\n')" = "nothing" ] \
+      && ok "a claude row with a blank source grants nothing" \
+      || bad "a claude row with a blank source grants nothing" "granted"
+    [ "$(claude_grants 'provides|claude|p|src| |2026-01-01\n')" = "nothing" ] \
+      && ok "a claude row with a blank version grants nothing" \
+      || bad "a claude row with a blank version grants nothing" "granted"
+    [ "$(claude_grants 'provides|claude|p|src|1| \n')" = "nothing" ] \
+      && ok "a claude row with a blank date grants nothing" \
+      || bad "a claude row with a blank date grants nothing" "granted"
+
     # The no-trailing-newline guard is on four separate loops and the gate_on fixture above pins
     # only harness_gate_active's. These two reach the other three: A ends on an unterminated
     # provides row, which only harness_provides and harness_known read, and B ends on an
