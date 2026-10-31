@@ -27,12 +27,13 @@ Entries are terse by design; the narrative for each release is in this file's gi
   the evidenced Claude Code rows a gate requires in the capability ledger: 2.1.302 today, stated in
   `README.md`. Each warning names its cause: `claude` not found, older than the minimum, no version
   in its output, or stopped after 5 seconds, when doctor kills it. An unreadable minimum is a
-  warning, never a pass. `keel-fleet` asks once per run, and every doctor it runs reads that answer
-  through `KEEL_CLAUDE_VERSION_FILE`, where a line with no `|`, or whose version is not digits and
-  dots, is no answer, so doctor asks Claude Code itself. Doctor writes its answer there only when
-  the file is empty, absent or holds a line with a `|`, never through a symlink, and a file it
-  cannot read prints no shell error. The ledger holds one row per primitive, and re-verifying one
-  on a later Claude Code leaves its row as it is, so the minimum does not rise.
+  warning, never a pass. `keel-fleet` asks once per run, and its doctors read that answer through
+  `KEEL_CLAUDE_VERSION_FILE`, where a line with no `|`, or a version not digits and dots or with a
+  field over nine digits, is no answer, so doctor asks Claude Code. Doctor writes there only when
+  the file is empty, absent or holds a line with a `|`, by renaming a temporary file beside it onto
+  it, so a symlink planted at the path is never written through, and an unreadable file prints no
+  shell error. Each primitive has one row, left as it is when re-verified on a later Claude Code,
+  so the minimum does not rise.
 - `hooks/sensitive-guard` no longer reads the capability ledger, and keeps one Codex refusal. On a
   commit in a repository declaring a non-empty `hard_block_paths`, with `CLAUDE_PROJECT_DIR` empty
   and either `CODEX_VERSION` set or a `"turn_id":` key in the event, it exits 2 with a message

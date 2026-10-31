@@ -1309,13 +1309,22 @@ PY
     # with a `|`, and never through a symlink: a path set by hand to the wrong file, or a symlink
     # another local user planted in a shared directory, must not have its target overwritten. The
     # read and the write print no shell error, since doctor asks instead and a bash error naming a
-    # line of this script tells the reader nothing about their Claude Code.
+    # line of this script tells the reader nothing about their Claude Code. The answer goes to a
+    # temporary file beside the path and is renamed onto it, so a symlink planted there after the
+    # check is not written through: where the rename is refused, as over another user's symlink in
+    # a sticky directory, the temporary file is removed and nothing is written, and a symlink to a
+    # directory receives the temporary file under its random name. A directory another user can
+    # write without the sticky bit is not covered, since they can swap the temporary file too. No
+    # temporary file, no write.
     local cc_cmd="${KEEL_CLAUDE-claude}" cc_min cc_out cc_pid cc_n=0 cc_ver="" cc_why="" cc_w
-    local cc_late="" cc_gv cc_vf="${KEEL_CLAUDE_VERSION_FILE-}" cc_vl="" cc_l="" cc_own=""
+    local cc_late="" cc_gv cc_vf="${KEEL_CLAUDE_VERSION_FILE-}" cc_vl="" cc_l="" cc_own="" cc_t
     # cc_kept WORD: 0 when WORD is a version the parser keeps, digits and dots holding a dot, with
-    # none at either end and no two together. The file's version goes through it too.
+    # none at either end, no two together and no field longer than nine digits, which
+    # harness_version_ge refuses since $(( )) wraps it: nine is far above any real version field,
+    # and below where bash's 64-bit arithmetic wraps. The file's version goes through it too.
     cc_kept() {
-        case "$1" in .*|*.|*..*|*[!0-9.]*) return 1 ;; *.*) return 0 ;; *) return 1 ;; esac
+        case "$1" in .*|*.|*..*|*[!0-9.]*|*[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]*) return 1 ;;
+            *.*) return 0 ;; *) return 1 ;; esac
     }
     if ! cc_min="$(harness_min_version)"; then
         warn "cannot read keel's minimum Claude Code version from the capability ledger, so this Claude Code is not checked against it"
@@ -1359,7 +1368,8 @@ PY
             rm -f "$cc_out"
         fi
         [ -n "$cc_own" ] && [ ! -L "$cc_vf" ] && [ -z "$cc_vl" ] \
-          && { printf '%s|%s\n' "$cc_ver" "$cc_why" > "$cc_vf"; } 2>/dev/null
+          && cc_t="$(mktemp "$cc_vf.XXXXXX" 2>/dev/null)" \
+          && { { printf '%s|%s\n' "$cc_ver" "$cc_why" > "$cc_t" && mv -f "$cc_t" "$cc_vf"; } || rm -f "$cc_t"; } 2>/dev/null
         if [ -z "$cc_ver" ]; then
             warn "cannot tell whether this Claude Code runs keel's gates: $cc_why. keel needs Claude Code $cc_min or later."
         elif harness_version_ge "$cc_ver" "$cc_min"; then

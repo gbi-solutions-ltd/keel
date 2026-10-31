@@ -1484,6 +1484,10 @@ got="$(vf_counts < "$cv_stub/out" 2>/dev/null)"
   || bad "doctor uses a version from the file only when its parser would keep it: --json on abc counts what it counts with no file" "problems and warnings: ${got:-<none>}, with no file: ${want:-<none>}"
 vf_doctor "|"
 vf_asked "doctor uses a version from the file only when its parser would keep it: a line with both sides empty asks once"
+vf_doctor "18446744073709551617.0|"
+vf_asked "a version field longer than nine digits is not a version: a version file holding 18446744073709551617.0| asks once"
+vf_doctor "1000000000.0|"
+vf_asked "a version field longer than nine digits is not a version: a version file holding 1000000000.0| asks once"
 vf_doctor "$cv_min|"
 n="$(grep -c . "$cv_stub/count")"; line="$(cv_line "$(cat "$cv_stub/out")")"
 [ "$n" = 0 ] && [ "$line" = "ok    Claude Code $cv_min meets keel's minimum, $cv_min" ] \
@@ -1525,6 +1529,23 @@ why="$(vf_once)"
 rm -f "$cv_stub/vf"
 vf_run "$cv_stub/vf"
 vf_asked "doctor writes the version file only when it is its own: a path that does not exist is created holding the answer"
+
+# Doctor writes a temporary file beside the version file and renames it onto the path, so a symlink
+# planted there after the check is not written through. The race cannot be staged here, so this
+# case pins what the rename leaves: the answer in a regular file and no temporary file beside it, in
+# a directory of its own so that any other file is one doctor left. A hard link to the empty file,
+# made beside that directory, still holds nothing, which a write through the path would not leave.
+vf_dir="$(mktemp -d)"; : > "$vf_dir/vf"; ln "$vf_dir/vf" "$vf_dir.link"
+vf_run "$vf_dir/vf"
+why="$(vf_once)"
+[ -z "$why" ] && [ "$(cat "$vf_dir/vf")" != "$cv_min|" ] && why="the file holds: $(cat "$vf_dir/vf")"
+[ -z "$why" ] && { [ ! -f "$vf_dir/vf" ] || [ -L "$vf_dir/vf" ]; } && why="the path is not a regular file"
+[ -z "$why" ] && [ "$(find "$vf_dir" -mindepth 1)" != "$vf_dir/vf" ] && why="the directory holds: $(find "$vf_dir" -mindepth 1 | tr '\n' ' ')"
+[ -z "$why" ] && [ -s "$vf_dir.link" ] && why="the hard link to the empty file holds: $(cat "$vf_dir.link")"
+[ -z "$why" ] \
+  && ok "doctor renames the version file into place: an empty file holds the answer, is a regular file, nothing is left beside it, and a hard link to it stays empty" \
+  || bad "doctor renames the version file into place: an empty file holds the answer, is a regular file, nothing is left beside it, and a hard link to it stays empty" "$why"
+rm -rf "$vf_dir" "$vf_dir.link"
 
 # A line with only a reason is an answer, the one keel-fleet's first doctor writes when it cannot
 # tell: the doctors after it warn with that reason rather than each asking again.

@@ -438,7 +438,7 @@ so and leave it unstaged.
 **Behaviours:**
 
 1. `--harness` is refused with a reason rather than silently ignored, since init ignores unknown
-   flags (`bin/keel:1482`) and a user passing it expects it to do something. Example: `keel init
+   flags (`bin/keel:1492`) and a user passing it expects it to do something. Example: `keel init
    --harness codex` exits 1 with a message naming `--harness`, "Claude Code only" and v0.26.0, and
    writes nothing.
 2. `keel init` writes no `harnesses` key and no `.codex/` file. Example: `keel init` in a fresh
@@ -1841,7 +1841,7 @@ The same review found that two of task 12's cases cannot fail, and one global op
    not an option's value is read as a pathspec, which widens as any pathspec does; the CHANGELOG
    entry and the hook's comments say exactly that. The comment above the exit trap states what is
    true: the trap asks, and on Codex the Python's failures are refused further down, while a
-   failure in the bash part still reaches the trap's ask. `CHANGELOG.md:40`'s "any other
+   failure in the bash part still reaches the trap's ask. `CHANGELOG.md:41`'s "any other
    unexpected exit asks" says "on Claude Code", reworded within its line. Examples, with
    `src/auth/t.go` staged, asking on Claude Code and exiting 2 with `v0.26.0` on Codex: `git -c
    core.hooksPath=$(mktemp -d) commit -m x`, `git -C $(pwd) commit -m x`, `git
@@ -2476,7 +2476,7 @@ Each is small and none touches a hook.
 `tests/test-harness-claims.sh` pass, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 18.1: Build it test first**
+- [x] **Step 18.1: Build it test first** Note: passed on arrival, red seen only on scratch copies: behaviour 1; behaviours 3 and 4 are prose
 
 Follow `keel:tdd` for behaviour 2: write its cases and watch the first fail for the reason named,
 then implement. Behaviour 1's case passes on arrival; prove it bites on a scratch copy whose write
@@ -2490,7 +2490,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 18.2: Hand over**
+- [x] **Step 18.2: Hand over** Note: rounds: 2; routing: inherit; loop: full; a fix pass from the quality review reworded the rename's prose to what holds (refused over another user's symlink in a sticky directory, a directory symlink receives the temporary file, a non-sticky shared directory not covered) and added a hard-link test and ten-digit boundary cases, each shown failing on a scratch copy
 
 ```bash
 git add bin/keel lib/harness/resolve.sh CHANGELOG.md docs/ideas/keel-on-codex.md \
@@ -2646,7 +2646,7 @@ commit.** The coordinator commits after both review passes, with
   `--attr-source` and `--shallow-file` as global options that take a value; a commit behind a shell
   operator, a substitution or a path to git (behaviours 6 to 9, and the seven cases above); on
   Codex, any failure of the guard refusing rather than reaching the trap's ask, including a
-  bash-side failure; the comment above the exit trap, and `CHANGELOG.md:40`, saying what each
+  bash-side failure; the comment above the exit trap, and `CHANGELOG.md:41`, saying what each
   harness does. The lesson recorded for that plan: four rounds of hand-written shell tokenizing
   each opened a new silent path, so the next attempt should decide on Codex without a parser
   (refuse whatever the bash filter matches, as HEAD did) and keep any parser to Claude Code, where

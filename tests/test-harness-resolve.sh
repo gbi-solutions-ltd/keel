@@ -38,7 +38,7 @@ while IFS='|' read -r k g _; do
       || bad "requires row $g has a hook file" "hooks/$g does not exist"
 done < "$CAP"
 
-# ADR-0003: absent evidence fails, never passes. A field holding only spaces is absent evidence
+# ADR-0014: absent evidence fails, never passes. A field holding only spaces is absent evidence
 # that would pass a test for emptiness, so match blank rather than empty, and check the field count
 # too: a seven-field row would otherwise sail through.
 provenance_gaps() {   # provenance_gaps <file>
@@ -57,7 +57,7 @@ thin="$(provenance_gaps "$CAP")"
 # Row c holds a space in $4 and rows e, f and g hold a tab in $4, $5 and $6, so every column carries
 # a blank that is not empty and at least one that /^ *$/ cannot match. Without them three mutations
 # survive: deleting the $5 disjunct outright, weakening $6 to $6 == "", and weakening $4, $5 or $6
-# to /^ *$/. ADR-0003 says absent evidence never passes, and a tab in a manifest column is invisible
+# to /^ *$/. ADR-0014 says absent evidence never passes, and a tab in a manifest column is invisible
 # in a diff, so the tab cases are the ones that carry the claim.
 fx="$(mktemp)"
 printf 'provides|ghost|a|src|1|2026-01-01\nprovides|ghost|b|src|1|\nprovides|ghost|c| |1|2026-01-01\nprovides|ghost|d|src|1|2026-01-01|extra\nprovides|ghost|e|\t|1|2026-01-01\nprovides|ghost|f|src|\t|2026-01-01\nprovides|ghost|g|src|1|\t\n' > "$fx"
@@ -158,7 +158,7 @@ bad_rows="$(malformed_rows "$CAP" | tr '\n' ' ')"
 # and four legal ones: a comment, a blank, and one record of each kind.
 #
 # Lines 14 to 18 and line 20 are the blank-but-not-empty cases and they are the point
-# rather than padding. ADR-0003's whole claim is that blank is not empty, so a fixture holding only
+# rather than padding. In ADR-0014's evidence rule blank is not empty, so a fixture holding only
 # empty fields lets `$2 ~ /^[[:space:]]*$/` be weakened to `$2 == ""` with the suite still green,
 # and a space in a manifest column is invisible in a diff. Lines 18 and 20 use tabs so `/^ *$/` is
 # not enough either, and between them they cover both columns: 18 the harness, 20 the primitive.
@@ -496,6 +496,23 @@ out="$(harness_version_ge abc 2 2>&1)"; rc=$?
   && ok "harness_version_ge compares only versions it can read: abc returns 1 with nothing on stderr" \
   || bad "harness_version_ge compares only versions it can read: abc returns 1 with nothing on stderr" "rc=$rc out: $out"
 rm -rf "$vg"
+
+# A field longer than nine digits is not a version: $(( )) wraps it silently, so
+# 18446744073709551617 is 1 and a huge version read below the minimum, or a small one above it.
+# Nine digits is the boundary, so a nine-digit field still compares and a ten-digit one does not,
+# on either side. 2 against 1000000000 returns 1 by comparison too, so 3 against 2.1000000000, on
+# which a comparison returns 0, pins the refusal on the second version. The last case is two fields
+# of five digits, one ending the first version and one starting the second, which is not a long
+# field.
+for c in "99999999999999999999.0 2 1" "2 18446744073709551617 1" "2.1.302 2.1.99 0" \
+         "999999999 2 0" "1000000000 2 1" "2 1000000000 1" "3 2.1000000000 1" \
+         "99999.12345 67890.1 0"; do
+    read -r va vb want <<< "$c"
+    harness_version_ge "$va" "$vb"; rc=$?
+    [ "$rc" -eq "$want" ] \
+      && ok "a version field longer than nine digits is not a version: $va against $vb returns $want" \
+      || bad "a version field longer than nine digits is not a version: $va against $vb returns $want" "returned $rc"
+done
 
 # The regression pin, like the five gates above: a row that raises it is a row that changed what
 # keel needs, and this is where that shows. validated_word_ceiling is at 2.1.302 too and has no

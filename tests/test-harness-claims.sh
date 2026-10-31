@@ -49,7 +49,7 @@ matches_generator claude "$stale" \
   || ok "the staleness comparison fires on an edited copy"
 rm -f "$stale"
 
-# 2. ADR-0003: absent evidence fails. A provides row without source, version and date grants nothing,
+# 2. ADR-0014: absent evidence fails. A provides row without source, version and date grants nothing,
 # so a row that looks like a capability and is not one must be caught here rather than trusted.
 #
 # THE PREDICATE IS THE RESOLVER'S, CHARACTER FOR CHARACTER, and it is not the one this task was

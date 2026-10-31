@@ -128,10 +128,13 @@ harness_active_gates() {
 # number, so 2.1.302 is above 2.1.99 where a string comparison says the opposite. A field one
 # version lacks counts as 0. 10# because a field with a leading zero is otherwise read as octal.
 # A field that is not all digits returns 1 before any arithmetic: bash runs a command substitution
-# inside an array subscript in $(( )), and keel doctor can read a version from a file.
+# inside an array subscript in $(( )), and keel doctor can read a version from a file. So does a
+# field longer than nine digits, because $(( )) wraps it silently: nine is far above any real
+# version field, and below where bash's 64-bit arithmetic wraps. The dot between the two keeps the
+# last field of A and the first of B from reading as one.
 harness_version_ge() {
     [ $# -eq 2 ] || return 1
-    case "$1$2" in *[!0-9.]*) return 1 ;; esac
+    case "$1.$2" in *[!0-9.]*|*[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]*) return 1 ;; esac
     local a="$1" b="$2" x y
     while [ -n "$a" ] || [ -n "$b" ]; do
         x="${a%%.*}"; y="${b%%.*}"
