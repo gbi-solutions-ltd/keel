@@ -1728,6 +1728,8 @@ Narrowed on 2026-10-31 by Bernard: doctor keeps never reading AGENTS.md.
 - Modify: `lib/harness/capabilities` (its header: one `provides` row per primitive)
 - Modify: `tests/validate-skills.sh` (its retired-key reader)
 - Modify: `CHANGELOG.md` (the Unreleased line on the version check)
+- Modify: `docs/architecture/claude-code-only.md` (section 5's `.codex/config.toml` row, which says
+  the file is no longer read; behaviour 2 reads it for the notice)
 - Test: `tests/test-keel-fleet.sh`, `tests/test-keel-4.sh`,
   `tests/test-doc-claims.sh`, `tests/test-validate-skills.sh`, `tests/test-harness-resolve.sh`
 
@@ -1802,7 +1804,7 @@ This is the one boundary run the task schedules.
 
 ```bash
 git add bin/keel bin/keel-fleet lib/harness/capabilities tests/validate-skills.sh CHANGELOG.md \
-        tests/test-keel-fleet.sh tests/test-keel-4.sh tests/test-doc-claims.sh \
+        docs/architecture/claude-code-only.md tests/test-keel-fleet.sh tests/test-keel-4.sh tests/test-doc-claims.sh \
         tests/test-validate-skills.sh tests/test-harness-resolve.sh
 git status --porcelain
 ```
