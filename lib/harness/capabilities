@@ -50,7 +50,7 @@
 # tests/test-harness-resolve.sh keeps schema words out of this column.
 #
 # `subagent_transcript_path` is PROVIDED and required by nothing, deliberately. done-guard reads it
-# only on SubagentStop and falls back to transcript_path when it is absent (hooks/done-guard:219-220),
+# only on SubagentStop and falls back to transcript_path when it is absent (hooks/done-guard:232-233),
 # so requiring it would disable the whole gate where its Stop path works. The rule is that a gate
 # requires what it cannot function without, not everything it can use. Collapsing the three
 # transcript primitives into one would resolve done-guard ACTIVE on the strength of stop_blocking

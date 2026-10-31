@@ -475,6 +475,35 @@ n="$(usage "$u" 0)"
   || bad "an unknown format does not report zero tokens" "reported 0, which looks like a quiet session"
 rm -f "$u"
 
+# transcript_kind runs on every prompt, so it reads a bounded prefix and not the whole file. A real
+# transcript opens with metadata rows, the first Claude Code row measured at row 3 to 12 over 500 of
+# them, so the bound is KIND_ROWS rows rather than the first one.
+kind() {   # kind <file>  -> what transcript_kind answers
+    python3 -c 'import sys;sys.path.insert(0,"lib");import context_watch as c;print(c.transcript_kind(sys.argv[1]))' "$1"
+}
+k="$(mktemp)"
+{
+  for t in mode queue-operation last-prompt ai-title; do printf '{"type":"%s"}\n' "$t"; done
+  printf '{"type":"user","message":{"role":"user","content":"go"}}\n'
+} > "$k"
+got="$(kind "$k")"
+[ "$got" = claude ] && ok "four metadata rows then a user row reads claude" \
+  || bad "four metadata rows then a user row reads claude" "got $got"
+{
+  i=0; while [ "$i" -lt 65 ]; do printf '{"type":"event"}\n'; i=$((i+1)); done
+  printf '{"type":"user","message":{"role":"user","content":"go"}}\n'
+} > "$k"
+got="$(kind "$k")"
+[ "$got" = unsupported ] && ok "65 rows with no Claude Code shape read unsupported, stopping before the user row" \
+  || bad "65 rows with no Claude Code shape read unsupported, stopping before the user row" "got $got"
+rm -f "$k"
+
+# measure was a wrapper nothing called, so it is folded into _measure_parts. The command-line
+# `measure` cases above are what show the command itself is unchanged.
+got="$(python3 -c 'import sys;sys.path.insert(0,"lib");import context_watch as c;print(hasattr(c,"measure"))')"
+[ "$got" = False ] && ok "the module defines no measure function" \
+  || bad "the module defines no measure function" "hasattr printed $got"
+
 # The hook says so rather than going quiet. A transcript that exists and does not parse took the
 # same silent path as one that is absent until 2026-09-06, so a watchdog that had stopped working
 # was indistinguishable from a session using no context.

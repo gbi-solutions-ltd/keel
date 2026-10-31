@@ -1698,7 +1698,7 @@ unsupported. A prefix of 64 rows is five times the largest seen.
 **Done when:** `tests/test-done-guard.sh` and `tests/test-context-watch.sh` pass, and
 `tests/validate-citations.sh` and `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 13.1: Build it test first**
+- [x] **Step 13.1: Build it test first** Note: passed on arrival, never seen red: behaviour 2's two cases, as planned
 
 Follow `keel:tdd` for behaviours 1, 3 and 4: write each case from its example and watch it fail for
 the reason named, then implement. Behaviour 2 is `verify` and passes on arrival.
@@ -1711,7 +1711,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 13.2: Hand over**
+- [x] **Step 13.2: Hand over** Note: rounds: 2; routing: inherit; loop: full; DEVIATES on two unrepaired citations, fixed on top under Bernard's standing rule of 2026-10-31; implementer ran git stash and pop once on the shared tree, tree intact; quality should-fix: the 2026-09-05 plan's sentence still cites stale :330 and :376-377 and says measure() keeps its signature, and transcript_kind does not name done-guard's copy of its shape rule
 
 ```bash
 git add hooks/done-guard lib/context_watch.py tests/test-done-guard.sh \
@@ -2021,6 +2021,11 @@ commit.** The coordinator commits after both review passes, with
   task 6's quality review is task 15. Task 13 decides `transcript_kind` on a 64-row prefix rather
   than on the first parsed row, because real transcripts open with metadata rows (its prose gives
   the measurement).
+- **A deviation that is only about citation repair is fixed on top, not discarded.** Bernard
+  decided on 2026-10-31, after tasks 12 and 13 each returned DEVIATES on citations alone while
+  their code and tests complied, that for the rest of this run such an attempt is kept, a fix pass
+  repoints the citations, and both review passes run again. A deviation in code or tests is still
+  discarded and re-dispatched fresh, as `execute-plan`'s full loop says.
 - **Left out as design changes rather than defects:** the resolver's harness parameter that is
   always `claude`, the support page generator's loop over harnesses, the kill that reaches only a
   wrapper shell and not its child, and `keel init` keeping retired keys in a profile.

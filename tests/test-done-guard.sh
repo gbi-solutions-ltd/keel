@@ -272,21 +272,50 @@ expect "a non-object row does not crash the hook" block "$(send "$tmp/tc" "$tmp/
 
 # ---- a transcript in another shape ----------------------------------------
 #
-# The reader understands a Claude Code transcript and nothing else. A file in another shape, here a
-# rollout envelope carrying a patch to src/a.py and no test run, yields no tool calls, so the guard
-# produces no output and exits 0: the fail-open direction the header gives for a transcript it
-# cannot read, and a missed reminder rather than a turn nobody can end.
+# The reader understands a Claude Code transcript and nothing else. A file whose rows parse and none
+# of which has a Claude Code shape yields no tool calls, and reading that as a clean turn is a gate
+# saying nothing where it should warn. So the guard warns that it did not check the turn, and allows
+# the stop: the fail-open direction the header gives, a reminder rather than a turn nobody can end.
+not_checked() {   # not_checked <name> <output> <rc>
+    local name="$1" out="$2" rc="$3"
+    if [ "$rc" -eq 0 ] && [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = 1 ] \
+       && printf '%s' "$out" | grep -q '^{"systemMessage": "keel done-guard: .*not in a shape it reads.*so this turn was not checked\."}$' \
+       && ! printf '%s' "$out" | grep -q '"decision"'; then
+        printf '  PASS  %s\n' "$name"; pass=$((pass+1))
+    else
+        printf '  FAIL  %s (rc=%s, got: %s)\n' "$name" "$rc" "${out:0:120}"; fail=$((fail+1))
+    fi
+}
+
 fixture "$tmp/ro" '"done_verified": "required"' '"tests/run-tests.sh"'
 {
   printf '{"timestamp":"2026-09-06T07:16:40Z","ordinal":7,"type":"turn_context","payload":{"turn_id":"t1","model":"m"}}\n'
   printf '{"timestamp":"2026-09-06T07:16:47Z","ordinal":14,"type":"response_item","payload":{"type":"custom_tool_call","name":"apply_patch","input":"*** Begin Patch\\n*** Update File: src/a.py\\n*** End Patch","turn_id":"t1"}}\n'
 } > "$tmp/ro/rollout.jsonl"
 out="$(send "$tmp/ro" "$tmp/ro/rollout.jsonl" Stop)"; rc=$?
+not_checked "a rollout-shaped transcript warns that the turn was not checked, and exits 0" "$out" "$rc"
+
+{
+  printf '{"type":"event","payload":{"nope":1}}\n'
+  printf '{"type":"event","payload":{"nope":1}}\n'
+} > "$tmp/ro/event.jsonl"
+out="$(send "$tmp/ro" "$tmp/ro/event.jsonl" Stop)"; rc=$?
+not_checked "a transcript with no Claude Code row warns that the turn was not checked, and exits 0" "$out" "$rc"
+
+# A real transcript opens with metadata rows that have no Claude Code shape: measured over 500 of
+# them, the first Claude Code row was row 3 to 12. The shape check looks at every row, so those
+# rows must not turn a real transcript into a warning.
+row_type()  { printf '{"type":"%s","sessionId":"t"}\n' "$1"; }
+row_say()   { printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"%s"}]}}\n' "$1"; }
+{ row_type mode; row_type queue-operation; row_user "go"; row_say "nothing to change"; } > "$tmp/tc/meta-clean.jsonl"
+out="$(send "$tmp/tc" "$tmp/tc/meta-clean.jsonl" Stop)"; rc=$?
 if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
-    printf '  PASS  %s\n' "a rollout-shaped transcript is not read, so the guard is silent and exits 0"; pass=$((pass+1))
+    printf '  PASS  %s\n' "metadata rows first and no tool call: silent, exit 0"; pass=$((pass+1))
 else
-    printf '  FAIL  %s (rc=%s, got: %s)\n' "a rollout-shaped transcript is not read, so the guard is silent and exits 0" "$rc" "${out:0:80}"; fail=$((fail+1))
+    printf '  FAIL  %s (rc=%s, got: %s)\n' "metadata rows first and no tool call: silent, exit 0" "$rc" "${out:0:80}"; fail=$((fail+1))
 fi
+{ row_type mode; row_type queue-operation; row_user "go"; row_edit "src/x.py" ""; } > "$tmp/tc/meta-edit.jsonl"
+expect "metadata rows first, code edited and no test run: block under required" block "$(send "$tmp/tc" "$tmp/tc/meta-edit.jsonl" Stop)"
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

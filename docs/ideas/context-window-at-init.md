@@ -103,7 +103,7 @@ costed together or the second one to land fails the build.
 
 | Assumption | True if | How we would know | Checked? |
 |---|---|---|---|
-| Observation only ever proves the window is **larger** | A floor can never be wrong in the dangerous direction | Stated at `lib/context_watch.py:134-136` and it follows from the API refusing oversized requests | Yes |
+| Observation only ever proves the window is **larger** | A floor can never be wrong in the dangerous direction | Stated at `lib/context_watch.py:208-210` and it follows from the API refusing oversized requests | Yes |
 | 200,000 is the right default to write | Most sessions are not 1M | True of the default model tier. This session is `[1m]`, and so is this repository's setting | Partly, and the floor change makes being wrong cheap |
 | A pointer at session start is enough to resume | The model reads the file when told it exists | Nobody has tried it. It is one line and easily tested | **No** |
 | The handoff is fresh when the pointer fires | The file relates to the work about to resume | Not guaranteed. A handoff from last week's task would misdirect a new session | **No, and it is the main risk of piece three** |
@@ -119,7 +119,7 @@ costed together or the second one to land fails the build.
 | init never writes `gates.context_window` | `bin/keel:364` | The gap is real and the fix is one field |
 | The schema already declares it | `templates/profile.schema.json:287` | No schema version bump, no drift report on existing profiles |
 | doctor exists to nag about it | `bin/keel:1369` | The nudge is a workaround for the missing write and could be simplified afterwards |
-| The handoff is already written automatically before compaction | `lib/context_watch.py:465-471`, on `PreCompact` | Half of "automatic handoff" already ships. Only the resume side is manual |
+| The handoff is already written automatically before compaction | `lib/context_watch.py:472-478`, on `PreCompact` | Half of "automatic handoff" already ships. Only the resume side is manual |
 | SessionStart already fires on `clear` | `hooks/hooks.json`, matcher `startup|clear|compact` | The hook that would carry the pointer already runs at exactly the right moment |
 | `hooks/session-start` never reads the handoff | No `handoff` match anywhere in the file | This is the actual gap, and it is small |
 | The hook forbids reading volatile files, with one bounded exception | `hooks/session-start:4-14` | A pointer is permissible under the stated bound; the contents are not |

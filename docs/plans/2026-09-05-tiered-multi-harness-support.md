@@ -250,7 +250,7 @@ Create `lib/harness/capabilities`:
 # of 368 transcripts hold that key.
 #
 # `subagent_transcript_path` is PROVIDED and required by nothing, deliberately. done-guard reads it
-# only on SubagentStop and falls back to transcript_path when it is absent (hooks/done-guard:218-220),
+# only on SubagentStop and falls back to transcript_path when it is absent (hooks/done-guard:231-233),
 # so requiring it would disable the whole gate on a harness whose Stop path works. Under-requiring
 # resolved done-guard active on Codex; over-requiring would resolve it inactive where it works. The
 # rule is that a gate requires what it cannot function without, not everything it can use. Codex supplies a
@@ -3253,12 +3253,12 @@ def read_usage(path):
     return (UNSUPPORTED, "unsupported")
 ```
 
-**The caller is `hook()`** (`lib/context_watch.py:409`), the entry point that reads
+**The caller is `hook()`** (`lib/context_watch.py:416`), the entry point that reads
 `transcript_path` off the event and today does `if not transcript or not os.path.exists(transcript):
 return 0` at `:376-377`. That early return is the behaviour this task changes: a transcript that
 exists and does not parse must not take the same silent path as one that is absent. `measure()`
-(`:87`) and `_cached_measure()` (`:330`) keep their signatures. In `hook()`:
-
+(folded into `_measure_parts` at `:88` after v0.26.0) and `_cached_measure()` (`:330`) keep their
+signatures. In `hook()`:
 ```python
 tokens, kind = read_usage(transcript)
 if kind == "unsupported":

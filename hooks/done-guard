@@ -141,6 +141,8 @@ def is_code(p):
 # asynchronously and may lag the in-memory conversation". A missing final row means an edit this
 # hook does not see, so it stays quiet when it should have spoken. That direction is the safe one: a
 # missed block costs a reminder, a false block costs a turn nobody can end.
+NOT_CLAUDE = object()   # an object and not a string, so a caller that forgets it cannot iterate it
+
 def turn_tool_calls(path, own_transcript):
     """The tool_use blocks since the last real user turn, or None if the transcript is unreadable.
 
@@ -149,6 +151,8 @@ def turn_tool_calls(path, own_transcript):
     the whole file: measured at 13,708 of 13,708 assistant rows across 253 real subagent
     transcripts. Skipping is only correct on the main transcript, where a sidechain row is some
     other agent's work rather than this turn's.
+
+    Returns NOT_CLAUDE when rows parse and none has a Claude Code shape.
     """
     try:
         with open(path, "r", encoding="utf-8", errors="replace") as fh:
@@ -199,6 +203,15 @@ def turn_tool_calls(path, own_transcript):
     if not rows:
         return None           # empty or wholly unparseable is not the same as a clean turn
 
+    # Rows that parse and none of which Claude Code wrote are not a clean turn either: they yield no
+    # tool calls, so reading them as one is a gate saying nothing where it should warn. The shape
+    # rule is transcript_kind's in lib/context_watch.py, written out because this hook imports
+    # nothing from lib/. It checks every row rather than that function's bounded prefix, because
+    # every row is already in memory here.
+    if not any(isinstance(r.get("message"), dict)
+               or r.get("type") in ("user", "assistant", "summary") for r in rows):
+        return NOT_CLAUDE
+
     start = 0
     for i, r in enumerate(rows):
         if is_real_user(r):
@@ -222,6 +235,9 @@ calls = turn_tool_calls(path, own_transcript=bool(own))
 if calls is None:
     warn("this repository declares gates.done_verified but the turn's transcript could not be read, "
          "so this turn was not checked.")
+if calls is NOT_CLAUDE:
+    warn("this repository declares gates.done_verified but the turn's transcript is not in a shape "
+         "it reads, so this turn was not checked.")
 
 edited, ran = [], False
 for c in calls:

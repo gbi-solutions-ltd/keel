@@ -55,10 +55,11 @@ TAIL_BYTES = 512 * 1024
 def _tail_entries(path):
     """Parse only the end of the transcript.
 
-    `measure` runs on every prompt and, at the stop threshold, on tool calls. Parsing a multi-megabyte
-    transcript each time would make the watchdog the slowest thing in the session, which is a good way
-    to have it turned off. The last assistant turn is by definition at the end of the file, so read
-    the last chunk and drop the first line, which is almost certainly cut in half.
+    `_measure_parts` runs on every prompt and, at the stop threshold, on tool calls. Parsing a
+    multi-megabyte transcript each time would make the watchdog the slowest thing in the session,
+    which is a good way to have it turned off. The last assistant turn is by definition at the end
+    of the file, so read the last chunk and drop the first line, which is almost certainly cut in
+    half.
     """
     try:
         size = os.path.getsize(path)
@@ -84,13 +85,9 @@ def _tail_entries(path):
     return out
 
 
-def measure(path):
-    """Return (tokens, model) for the most recent main-thread assistant turn, or (0, "")."""
-    return _measure_parts(path)
-
-
 def _measure_parts(path):
-    """(tokens, model), from the tail where the tail settles it.
+    """(tokens, model) for the most recent main-thread assistant turn, or (0, ""), from the tail
+    where the tail settles it.
 
     A Claude Code turn in the tail settles the measurement, so the whole file is read only when the
     tail carries none. Reporting zero there instead would read as an empty context and silence the
@@ -129,9 +126,15 @@ def _measure_claude(entries):
 
 UNSUPPORTED = -1
 
+# How many parsed rows transcript_kind reads before it answers "unsupported". Measured, not chosen:
+# over the 500 most recent Claude Code transcripts on one machine on 2026-10-31, the first row with
+# a Claude Code shape was row 3 to 12, after metadata rows typed mode, queue-operation, last-prompt
+# and ai-title. 64 is five times the largest seen.
+KIND_ROWS = 64
+
 
 def transcript_kind(path):
-    """"claude" or "unsupported", from the SHAPE of the first row that settles it.
+    """"claude" or "unsupported", from the SHAPE of the first KIND_ROWS rows.
 
     Shape and not a token count, and that distinction is the whole of this function. Deciding by
     "which parser returned a number" calls a perfectly good transcript unsupported whenever it has
@@ -142,11 +145,15 @@ def transcript_kind(path):
     Sniffing the file is deliberate: a format change is the case that actually bites, and the
     transcript is not a stable interface for hooks.
 
-    STOPS AT THE FIRST ROW THAT ANSWERS. This runs on every prompt, ahead of the measurement cache,
-    so it must not be a parse of the whole file: _tail_entries' own docstring says doing that on
-    every prompt is how a watchdog gets switched off.
+    STOPS AT THE FIRST ROW THAT ANSWERS, OR AFTER KIND_ROWS. This runs on every prompt, ahead of
+    the measurement cache, so it must not be a parse of the whole file: _tail_entries' own docstring
+    says doing that on every prompt is how a watchdog gets switched off. A file in another shape has
+    no row that answers, so without the bound it is read to the end on every prompt. Deciding on the
+    first row instead would call every real transcript unsupported, since they open with metadata.
     """
-    for d in _entries(path):
+    for i, d in enumerate(_entries(path)):
+        if i >= KIND_ROWS:
+            break
         # Claude Code: type-tagged rows carrying a message object.
         if isinstance(d.get("message"), dict) or d.get("type") in ("user", "assistant", "summary"):
             return "claude"

@@ -50,7 +50,7 @@ correction at `:149-150`. Today an unset project self-corrects: occupancy above 
 window is larger, because the API would have refused the request otherwise. Writing 200,000 into
 every profile would remove that. A 1M session in such a project would hard-stop at 170,000 tokens
 and never lift, with the user's only escape being to edit the file keel had just written. That is
-the precise failure `lib/context_watch.py:125-127` records the function as having been rewritten to
+the precise failure `lib/context_watch.py:198-201` records the function as having been rewritten to
 prevent, found against a real 2.4MB transcript holding 401,247 tokens.
 
 ## 3. Goals and non-goals
@@ -113,7 +113,7 @@ prevent, found against a real 2.4MB transcript holding 401,247 tokens.
 | ID | Constraint | Imposed by |
 |---|---|---|
 | CON-01 | `SCHEMA_VERSION` must not move for this change. `gates.context_window` is already declared at `templates/profile.schema.json:287`, so writing it adds no field. | The existing schema, and the drift rule at `tests/validate-skills.sh:351-365` |
-| CON-02 | Between the true window and 1,000,000, a configured value that overstates the window cannot be corrected downward. FR-11 bounds the damage but does not eliminate it: setting 1,000,000 on a 200,000 session still silences the watchdog. | The platform: occupancy proves a lower bound on the window and never an upper one (`lib/context_watch.py:134-136`) |
+| CON-02 | Between the true window and 1,000,000, a configured value that overstates the window cannot be corrected downward. FR-11 bounds the damage but does not eliminate it: setting 1,000,000 on a 200,000 session still silences the watchdog. | The platform: occupancy proves a lower bound on the window and never an upper one (`lib/context_watch.py:224-225`) |
 | CON-03 | `200000` is correct for the default model tier and understates a 1M session. It is written knowing it is sometimes wrong, because FR-01 makes being wrong recoverable. | The absence of any readable window field (`lib/context_watch.py:121-127`) |
 | CON-04 | `/clear` cannot be triggered by keel. No hook output clears a session and a plugin cannot start one. | Claude Code's hook interface |
 | CON-05 | The watchdog is advisory infrastructure, not a correctness gate, and must fail silently. | `hooks/context-watch:14-16` |
@@ -167,7 +167,7 @@ follow this batch of work, which orders it but does not date it.
 
 | # | Assumption | Falsified if | Checked |
 |---|---|---|---|
-| A1 | Observed occupancy above a tier proves the window is larger than that tier | A request could succeed while exceeding the window | Yes. Stated at `lib/context_watch.py:134-136`, and it follows from the API rejecting oversized requests |
+| A1 | Observed occupancy above a tier proves the window is larger than that tier | A request could succeed while exceeding the window | Yes. Stated at `lib/context_watch.py:208-210`, and it follows from the API rejecting oversized requests |
 | A2 | `200000` is the right conservative default to write | Most sessions in keel projects use a larger window | Partly. True of the default model tier; this session and this repository are both 1M |
 | A3 | No existing test breaks under the floor rule | Any current fixture configures a window below its observed occupancy | Yes, verified 2026-08-18. See NFR-04 |
 | A4 | `merge_profile` preserves a hand-set value on re-init | A non-empty existing value could be replaced by the generated one | Yes, `bin/keel#out[k] = v            # human value wins` |

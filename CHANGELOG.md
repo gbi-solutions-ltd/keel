@@ -79,6 +79,8 @@ Entries are terse by design; the narrative for each release is in this file's gi
   declare nothing. It walks up for the profile, and runs git, from the event's `cwd`, then
   `CLAUDE_PROJECT_DIR`, then `$PWD`, without calling `dirname`. A commit in another repository
   (`git -C ../other commit`) is judged by the session's repository, and the hook says so.
+- `hooks/done-guard` warns on a transcript whose rows parse and none has a Claude Code shape,
+  saying the turn was not checked. It read such a transcript as a clean turn and said nothing.
 
 ## 0.26.0 - 2026-10-22
 
