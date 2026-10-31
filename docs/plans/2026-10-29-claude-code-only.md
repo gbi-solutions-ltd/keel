@@ -2307,6 +2307,66 @@ Stage those paths and each file whose citation this task repaired, by name, and 
 commit.** The coordinator commits after both review passes, with
 `git commit -s -m "fix(review): close the final review's findings on doctor and the guards"`.
 
+### Task 17b: the prefilter's fallback is tested, and its docs say when it applies
+
+Added by the coordinator on 2026-10-31 at `ship`'s gate, from task 17's quality review. The
+`CHANGELOG.md` line task 17 added says a `git -C . diff` whose description names a commit is no
+longer asked, which is false when the command holds a quote: a command holding an escape is matched
+against the whole event, description included. The hook's comment understates the same case. And
+the fallback taken when the `"command"` key appears twice is untested, though without it a nested
+`"command"` key silences a commit. `ship`'s check that docs state the current state would fail on
+the first; it is fixed in its own reviewed change, as `ship` requires. No shipped logic changes.
+
+**Story:** G1, ADR-0015
+**Files:**
+- Modify: `hooks/sensitive-guard` (the comment above the prefilter only)
+- Modify: `CHANGELOG.md` (the Unreleased `hooks/sensitive-guard` lines task 17 added)
+- Test: `tests/test-sensitive-guard.sh`
+
+**Interfaces:**
+- Consumes: task 17's prefilter
+- Produces: nothing new
+
+**Depends on:** task 17
+
+**Behaviours:**
+
+1. A repeated `"command"` key makes the prefilter read the whole event. Example: in a repository
+   whose committed profile lists `src/auth`, with `src/auth/t.go` staged, the event
+   `{"cwd":<repo>,"x":{"command":"ls"},"tool_input":{"command":"git commit -m x"}}` asks on Claude
+   Code and exits 2 with `v0.26.0` on Codex. This holds today and passes on arrival; prove it bites
+   on a scratch copy of the hook with the `twice_re` test removed, and watch it go silent.
+2. The comment above the prefilter and the `CHANGELOG.md` line state when the command alone is read:
+   only when its value holds no quote, backslash, tab or newline and the key appears once; any other
+   event is matched whole, description included, so a description naming a commit still asks when
+   the command holds a quote. Example: the reader's check. The changed lines say that, and nothing
+   says the description false positive is gone without that condition. This behaviour has no test.
+
+**Done when:** `tests/test-sensitive-guard.sh` passes, and `tests/validate-citations.sh` and
+`tests/validate-skills.sh` report OK.
+
+- [ ] **Step 17b.1: Build it test first**
+
+Behaviour 1 is `verify`: write its case and watch it fail on the scratch copy it names. Behaviour 2
+is prose, checked by the reviewer.
+Run: `tests/test-sensitive-guard.sh`
+Expected: PASS, after the scratch-copy red. Quote the failing output in your report.
+
+Run: `tests/run-tests.sh`.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+This is the one boundary run the task schedules.
+
+- [ ] **Step 17b.2: Hand over**
+
+```bash
+git add hooks/sensitive-guard CHANGELOG.md tests/test-sensitive-guard.sh
+git status --porcelain
+```
+
+Stage those paths and each file whose citation this task repaired, by name, and stop. **Do not
+commit.** The coordinator commits after both review passes, with
+`git commit -s -m "test(sensitive-guard): pin the prefilter's fallback, and say when it applies"`.
+
 ## Notes for the coordinator
 
 - **The minimum is 2.1.302, not 2.1.295.** The idea record proposed 2.1.295 because `onFailure`
