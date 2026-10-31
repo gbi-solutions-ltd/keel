@@ -1859,7 +1859,7 @@ The same review found that two of task 12's cases cannot fail, and one global op
 **Done when:** `tests/test-sensitive-guard.sh` passes, and `tests/validate-citations.sh` and
 `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 12c.1: Build it test first**
+- [-] **Step 12c.1: Build it test first** Deferred: dropped 2026-10-31 by Bernard's stop rule: after three discarded attempts and two fix passes, behaviour 9's own rule left 7 real commits silent on Codex where HEAD refused (e.g. sudo /usr/bin/git commit, env ./git commit); follow-ups in the coordinator notes
 
 Follow `keel:tdd` for behaviours 1, 4, 5, 6 and 7: write each case from its examples and watch it
 fail for the reason named, then implement. Behaviours 2 and 3 are `verify`: their red comes from
@@ -1877,7 +1877,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 12c.2: Hand over**
+- [-] **Step 12c.2: Hand over** Deferred: dropped with 12c.1; nothing staged or committed; rounds: 5; routing: inherit; loop: full
 
 ```bash
 git add hooks/sensitive-guard tests/test-sensitive-guard.sh CHANGELOG.md
@@ -1916,7 +1916,7 @@ Narrowed on 2026-10-31 by Bernard: doctor keeps never reading AGENTS.md.
   line to it. `keel-fleet` creates one empty file per run with `mktemp`, exports the variable to
   every doctor it runs, and removes the file when it exits.
 
-**Depends on:** task 12c
+**Depends on:** task 13 (task 12c, which it followed, was dropped)
 
 **Behaviours:**
 
@@ -2115,6 +2115,25 @@ commit.** The coordinator commits after both review passes, with
   that fix found another blocking item (a substitution among git's global options); Bernard chose
   a second fix pass on top (behaviour 9), and that a blocking item in the review after it drops
   task 12c.
+- **Task 12c was dropped on 2026-10-31 under that stop rule.** The second fix pass's own
+  comparison against HEAD showed seven real commits silent on Codex where HEAD refused, caused by
+  behaviour 9's command-position rule for a path to git: `sudo /usr/bin/git commit`, `GIT_DIR=.git
+  ./git commit`, `env ./git commit`, `time ~/bin/git commit`, `{ ./git commit -m x; }`, `if true;
+  then ./git commit -m x; fi` and `git -C $(cd . ; pwd) commit -m x`. Bernard chose to drop the
+  task rather than spend a review confirming it. Its staged work was discarded. So task 12's
+  shipped hook keeps the regression 12c was written for: with the wider prefilter, a command that
+  is not a commit but mentions one (`git --no-pager log --grep commit`) is refused on Codex, and
+  asks on Claude Code when the profile is staged or unreadable. **Follow-ups for a later plan**,
+  each found by a review during 12c: decide only on a command that commits (12c's behaviour 1);
+  tests that can fail on the start order and on the git directory (behaviours 2 and 3);
+  `--attr-source` and `--shallow-file` as global options that take a value; a commit behind a shell
+  operator, a substitution or a path to git (behaviours 6 to 9, and the seven cases above); on
+  Codex, any failure of the guard refusing rather than reaching the trap's ask, including a
+  bash-side failure; the comment above the exit trap, and `CHANGELOG.md:35`, saying what each
+  harness does. The lesson recorded for that plan: four rounds of hand-written shell tokenizing
+  each opened a new silent path, so the next attempt should decide on Codex without a parser
+  (refuse whatever the bash filter matches, as HEAD did) and keep any parser to Claude Code, where
+  an over-ask is the cost of a miss.
 - **A deviation that is only about citation repair is fixed on top, not discarded.** Bernard
   decided on 2026-10-31, after tasks 12 and 13 each returned DEVIATES on citations alone while
   their code and tests complied, that for the rest of this run such an attempt is kept, a fix pass
