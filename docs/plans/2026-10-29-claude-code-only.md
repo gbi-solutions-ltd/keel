@@ -2367,6 +2367,67 @@ Stage those paths and each file whose citation this task repaired, by name, and 
 commit.** The coordinator commits after both review passes, with
 `git commit -s -m "test(sensitive-guard): pin the prefilter's fallback, and say when it applies"`.
 
+### Task 17c: the prefilter's docs name every ask that does not wait for the walk
+
+Added by the coordinator on 2026-10-31 at `ship`'s gate, Bernard's decision, from the re-review
+after task 17. The `CHANGELOG.md` text task 17b wrote says a non-commit the prefilter lets past is
+asked on Claude Code "only when the staged-profile or unreadable-profile ask fires", and the hook's
+comment lists those two and the Codex refusal as what does not wait for the token walk. Two more
+asks fire before the walk decides: python3 absent, and git that cannot run or a `git diff` that
+fails. Task 17's behaviour 4 named the same three, so the gap began in this plan. And the citation
+`docs/ideas/keel-on-codex.md:226` names `:92-93`, which task 17b's three added comment lines moved
+off the `while :; do` loop it held. No shipped logic changes.
+
+**Story:** G1, ADR-0015
+**Files:**
+- Modify: `hooks/sensitive-guard` (the comment above the prefilter only)
+- Modify: `CHANGELOG.md` (the Unreleased `hooks/sensitive-guard` lines tasks 17 and 17b wrote)
+- Modify: `docs/ideas/keel-on-codex.md` (the one citation)
+
+**Interfaces:**
+- Consumes: task 17b's comment and CHANGELOG text
+- Produces: nothing new
+
+**Depends on:** task 17b
+
+**Behaviours:**
+
+1. The comment and the CHANGELOG text say what fires on a non-commit the prefilter lets past
+   without listing a subset as the whole: every ask that does not depend on the token walk finding
+   a commit, which today is python3 absent, a profile that cannot be read or parsed, git that
+   cannot run or a failing `git diff`, and a staged profile, and on Codex the refusal. Either name
+   all of them or say "any ask that does not depend on the walk"; nothing says "only". Example: the
+   reader's check against the code (`hooks/sensitive-guard`, the python3 check, the unreadable and
+   staged-profile asks, and `files()`'s asks). This behaviour has no test.
+2. The citation `docs/ideas/keel-on-codex.md:226` points at the lines that held its text before
+   task 17b moved them: the `while :; do` loop and the profile test under it, wherever they now are
+   in `hooks/sensitive-guard`. Example: the cited lines read `while :; do` and
+   `if [ -f "$d/.keel/profile.json" ]...`. `tests/validate-citations.sh` reports OK.
+
+**Done when:** `tests/test-sensitive-guard.sh` passes, and `tests/validate-citations.sh` and
+`tests/validate-skills.sh` report OK.
+
+- [ ] **Step 17c.1: Make the change**
+
+No test: behaviour 1 is prose checked by the reviewer against the code, and behaviour 2 is a
+citation checked by content. Edit comment lines only in the hook; lines 1 to 36 do not change.
+Run: `tests/test-sensitive-guard.sh`, `tests/validate-citations.sh`, `tests/validate-skills.sh`
+Expected: PASS, OK, OK.
+
+Run: `tests/run-tests.sh`.
+Expected: PASS. This is the one boundary run the task schedules.
+
+- [ ] **Step 17c.2: Hand over**
+
+```bash
+git add hooks/sensitive-guard CHANGELOG.md docs/ideas/keel-on-codex.md
+git status --porcelain
+```
+
+Stage those paths and each file whose citation this task repaired, by name, and stop. **Do not
+commit.** The coordinator commits after both review passes, with
+`git commit -s -m "docs(sensitive-guard): name every ask that does not wait for the walk"`.
+
 ## Notes for the coordinator
 
 - **The minimum is 2.1.302, not 2.1.295.** The idea record proposed 2.1.295 because `onFailure`
