@@ -36,8 +36,8 @@ are, so no task's files are fully known before it runs and none may share a tree
   hooks/done-guard hooks/review-guard`. No typecheck or format command exists.
 - Never start on `main`. Work on `design/claude-code-only` or a branch cut from it.
 - `hard_block_paths` in `.keel/profile.json`: `hooks`, `lib/harness`, `settings.json`,
-  `.github/workflows`, `templates/ci-review.yml`, `lib/context_watch.py`. Tasks 2, 3, 4, 6 and 7
-  touch them, which is why routing is `inherit`.
+  `.github/workflows`, `templates/ci-review.yml`, `lib/context_watch.py`. Tasks 2, 3, 4, 6, 7, 11,
+  11b and 12 to 15 touch them, which is why routing is `inherit`.
 - **History is not edited to remove Codex.** History is `CHANGELOG.md` entries for released
   versions, `docs/plans/`, `docs/audits/`, `docs/ideas/`, `docs/decisions/`, `tests/evals/results.md`,
   `docs/architecture/tiered-multi-harness-support.md`,
@@ -1520,6 +1520,367 @@ Stage those paths and each file whose citation this task repaired, by name, and 
 commit.** The coordinator commits with
 `git commit -s -m "fix(sensitive-guard): ask on a profile change before any early exit"`.
 
+### Task 12: `sensitive-guard` sees every commit it can read, and asks on a profile it cannot
+
+Added by the coordinator on 2026-10-31 from the follow-ups the run recorded under "Notes for the
+coordinator": the hooks follow-ups for `sensitive-guard`, and task 11's pre-existing finding that a
+string `hard_block_paths` fails open on Claude Code. Each is a way the gate stays silent on a
+repository that declared sensitive paths, or a test that checks the wrong thing.
+
+**Story:** G1, G3, ADR-0013
+**Files:**
+- Modify: `hooks/sensitive-guard`
+- Modify: `docs/07-open-decisions.md` (the paragraph stating the hook's limit)
+- Modify: `docs/03-install-and-distribution.md` (the sentence saying where the hook's walk starts)
+- Modify: `CHANGELOG.md` (the Unreleased `hooks/sensitive-guard` entry)
+- Test: `tests/test-sensitive-guard.sh`
+
+**Interfaces:**
+- Consumes: task 11b's hook, and the event's `cwd` field, which Claude Code sends on every hook
+  event
+- Produces: nothing new. The matching rule (`matches` in the hook's Python) is unchanged, because
+  `tests/test-plan.sh` cuts it out of the hook and requires `keel plan risk` to agree with it.
+
+**Depends on:** task 11b
+
+**Behaviours:**
+
+1. A global git option before `commit` does not hide the commit. Both the bash prefilter, which
+   today needs the literal text `git commit`, and the token walk, which today stops at the first
+   token after `git` that does not start with `-`, skip a global option and its value: `-C <path>`,
+   `-c <name>=<value>`, `--git-dir <path>`, `--work-tree <path>`, `--namespace <name>`,
+   `--config-env <name>=<var>`, and the `--opt=value` forms. Examples, each in a repository whose
+   committed profile lists `src/auth`, with `src/auth/t.go` staged: `git -c core.hooksPath=/dev/null
+   commit -m x`, `git -C . commit -m x`, `git --git-dir .git --work-tree . commit -m x` and `git
+   --git-dir=.git commit -m x` each print the `ask` decision. `git -c commit.gpgsign=false log -1`
+   with the same staging prints nothing. The header's limit paragraph and its copy in
+   `docs/07-open-decisions.md` stop naming `git -C dir commit` as a way past the hook, and keep `sh
+   -c`, an alias and a here-doc.
+2. A profile that exists and cannot be read asks on a commit. Example: a repository with no profile
+   at `HEAD` (so the committed list cannot stand in for it), a working-tree profile listing
+   `src/auth` at mode 000 and `src/ui/button.tsx` staged: `git commit -m x` prints the `ask`
+   decision, its reason saying the profile could not be read. `ls` in the same repository still
+   prints nothing, as the existing case asserts. Root reads a mode 000 file, so where the test runs
+   as root (`id -u` prints 0) the case is skipped and prints a line saying so, rather than passing
+   for a reason it does not test.
+3. The profile walk calls no external command. It steps up with parameter expansion
+   (`${d%/*}`, with `/` handled), not `dirname`. Example: a repository whose profile is untracked
+   and lists `src/auth`, `src/auth/t.go` staged, the hook run from `src/ui` with `PATH` set to one
+   directory holding links to `bash`, `git` and `python3` only: `git commit -m x` asks. Before the
+   change the walk loses its directory when `dirname` is not found, finds no profile, and the case
+   gets no output.
+4. The walk starts from the session's directory, not the hook process's. The start is the first of
+   these that names an existing directory: the event's `cwd`, then `CLAUDE_PROJECT_DIR`, then
+   `$PWD`. It is read in bash, because the walk and the cheap gate run before the python3 check,
+   and the `git show` and `git diff` calls run in that directory too, or the profile and the staged
+   set would come from different repositories. Examples, the hook started from a scratch directory
+   outside any repository: an event whose `cwd` is a repository listing `src/auth`, with
+   `src/auth/t.go` staged, asks; an event with no `cwd` key and `CLAUDE_PROJECT_DIR` set to that
+   repository asks; an event whose `cwd` names a directory that does not exist, with the hook run
+   from inside the repository, asks. A repository path holding a space reads correctly. The
+   sentence in `docs/03-install-and-distribution.md` that says the hook walks up "from the directory
+   it runs in" names the event's `cwd` instead.
+5. A `hard_block_paths` that is present and not a list of strings is read as an unparseable
+   profile: the ask on Claude Code, the refusal on Codex. Examples, each the committed profile, with
+   `src/ui/button.tsx` staged: `"hard_block_paths": "src/auth"`, `"hard_block_paths": {"src/auth":
+   true}` and `"hard_block_paths": ["src/auth", 1]` each print the `ask` decision; with
+   `CODEX_VERSION` set and `CLAUDE_PROJECT_DIR` unset each exits 2 with `v0.26.0` on stderr.
+   `"hard_block_paths": []`, an absent key and `null` still print nothing. Before the change the
+   string is iterated character by character and the commit goes through in silence (task 11's
+   finding).
+6. A repository with a `HEAD` and no profile anywhere is never asked. Example: a repository whose
+   only commit holds `README.md`, no `.keel/` in the working tree or above it, `src/auth/t.go`
+   staged: no output, exit 0. This is a `verify` behaviour: it holds today, so the case passes on
+   arrival, and the report says so and quotes that run.
+7. The CDPATH case runs the hook instead of reading its text. Example: `CDPATH` set to a decoy
+   directory holding `.keel` and `src` subdirectories, the ask case from behaviour 1 prints exactly
+   one JSON object on stdout (it parses, and its `permissionDecision` is `ask`), and the no-profile
+   case from behaviour 6 prints nothing. The text-reading case, which fails on a `cd` the hook never
+   runs, is removed. It passes on arrival unless behaviour 4 adds an unguarded `cd`, so prove it
+   bites: add `cd src` with no guard to a scratch copy of the hook and watch the case fail on the
+   extra line.
+8. The comment states the one way the Codex refusal is switched off. The paragraph headed "EITHER
+   SIGNAL MEANS CODEX" says that a Codex process which inherited `CLAUDE_PROJECT_DIR`, as one
+   started from inside a Claude Code session does, gets the ask, which Codex discards, so its commit
+   goes through. The existing case "with CLAUDE_PROJECT_DIR set, CODEX_VERSION gets the ask and exit
+   0" pins the behaviour; this behaviour adds the sentence and no test.
+
+**Done when:** `tests/test-sensitive-guard.sh` passes, and `tests/validate-citations.sh` and
+`tests/validate-skills.sh` report OK.
+
+- [ ] **Step 12.1: Build it test first**
+
+Follow `keel:tdd` for behaviours 1 to 5: write each case from its examples and watch it fail for
+the reason named, then implement. Behaviour 7's red comes from its scratch-copy `cd src` mutation,
+since the case passes on the hook as it is. Behaviour 6 is `verify` and passes on arrival; behaviour
+8 is a comment.
+Run: `tests/test-sensitive-guard.sh`
+Expected before: FAIL, behaviour 1's `git -c core.hooksPath=/dev/null commit -m x` case gets no
+output where it should ask, and behaviours 2 to 5 fail the same way. Expected after: PASS. Quote the
+failing output in your report.
+
+Run: `tests/run-tests.sh`.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+This is the one boundary run the task schedules.
+
+- [ ] **Step 12.2: Hand over**
+
+```bash
+git add hooks/sensitive-guard tests/test-sensitive-guard.sh docs/07-open-decisions.md \
+        docs/03-install-and-distribution.md CHANGELOG.md
+git status --porcelain
+```
+
+Stage those paths and each file whose citation this task repaired, by name, and stop. **Do not
+commit.** The coordinator commits after both review passes, with
+`git commit -s -m "fix(sensitive-guard): see a commit behind global git options, and ask on a profile it cannot read"`.
+
+### Task 13: the transcript readers say when a transcript is not Claude Code's
+
+Added by the coordinator on 2026-10-31 from the follow-ups for `done-guard` and
+`lib/context_watch.py`. A transcript in a shape the readers do not know reads as a clean turn in
+`done-guard`, which is a gate saying nothing where it should warn, and costs `transcript_kind` a
+read of the whole file on every prompt.
+
+The bound in behaviour 3 is measured, not chosen: over the 500 most recent Claude Code transcripts
+on Bernard's machine on 2026-10-31, the first row with a Claude Code shape was row 3 to 12, after
+rows typed `mode`, `queue-operation`, `last-prompt` and `ai-title`, and one transcript held none.
+So deciding on the first parsed row, the follow-up's first wording, would call every real transcript
+unsupported. A prefix of 64 rows is five times the largest seen.
+
+**Story:** G2, ADR-0013
+**Files:**
+- Modify: `hooks/done-guard`
+- Modify: `lib/context_watch.py`
+- Modify: `CHANGELOG.md` (an Unreleased line for the `done-guard` warning)
+- Test: `tests/test-done-guard.sh`, `tests/test-context-watch.sh`
+
+**Interfaces:**
+- Consumes: task 3's readers
+- Produces: `KIND_ROWS = 64` in `lib/context_watch.py`, the number of parsed rows
+  `transcript_kind` reads before it answers "unsupported"
+
+**Depends on:** task 12
+
+**Behaviours:**
+
+1. `done-guard` warns on a transcript whose rows parse and none has a Claude Code shape, which is
+   the rule `transcript_kind` uses: an object whose `message` is an object, or whose `type` is
+   `user`, `assistant` or `summary`. Example: a profile with `gates.done_verified` `required` and
+   `verify.test` set, and a Stop event whose transcript is two rows
+   `{"type":"event","payload":{"nope":1}}`: the hook prints one `systemMessage` beginning `keel
+   done-guard:`, saying the transcript is not in a shape it reads and ending `so this turn was not
+   checked.` as the hook's other warnings do, prints no `decision`, and exits 0. Before the change
+   it prints nothing, as a clean turn does.
+2. A real transcript, metadata rows first, is read as today. Examples: rows typed `mode` and
+   `queue-operation`, then a user row and an assistant row with no `tool_use` block: no output,
+   exit 0. The same rows with an assistant `tool_use` block editing `src/x.py` and no test run,
+   under `required`: the `block` decision, as today.
+3. `transcript_kind` reads at most `KIND_ROWS` parsed rows. Examples: four metadata rows then a user
+   row reads `claude`; 65 rows `{"type":"event"}` then a user row reads `unsupported`, which shows
+   it stopped before the user row; a file of `not a transcript` reads `unsupported`, as the
+   existing case asserts. Before the change the 65-row file reads `claude`.
+4. `measure` is folded into `_measure_parts`: the module defines `_measure_parts` and no `measure`
+   function, nothing called the wrapper, and the `_tail_entries` docstring names `_measure_parts`.
+   Example: `python3 -c 'import sys; sys.path.insert(0, "lib"); import context_watch as c;
+   print(hasattr(c, "measure"))'` prints `False`, and every `measure` command-line case in
+   `tests/test-context-watch.sh` passes unchanged.
+
+**Done when:** `tests/test-done-guard.sh` and `tests/test-context-watch.sh` pass, and
+`tests/validate-citations.sh` and `tests/validate-skills.sh` report OK.
+
+- [ ] **Step 13.1: Build it test first**
+
+Follow `keel:tdd` for behaviours 1, 3 and 4: write each case from its example and watch it fail for
+the reason named, then implement. Behaviour 2 is `verify` and passes on arrival.
+Run: `tests/test-done-guard.sh`, then `tests/test-context-watch.sh`
+Expected before: FAIL, behaviour 1's case gets no output where it should warn, behaviour 3's
+65-row file reads `claude`, and behaviour 4's check prints `True`. Expected after: PASS. Quote the
+failing output in your report.
+
+Run: `tests/run-tests.sh`.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+This is the one boundary run the task schedules.
+
+- [ ] **Step 13.2: Hand over**
+
+```bash
+git add hooks/done-guard lib/context_watch.py tests/test-done-guard.sh \
+        tests/test-context-watch.sh CHANGELOG.md
+git status --porcelain
+```
+
+Stage those paths and each file whose citation this task repaired, by name, and stop. **Do not
+commit.** The coordinator commits after both review passes, with
+`git commit -s -m "fix(done-guard): warn on a transcript with no Claude Code row, and bound transcript_kind"`.
+
+### Task 14: doctor and the fleet ask once, name what v0.26.0 left, and read their registers whole
+
+Added by the coordinator on 2026-10-31 from the follow-ups of task 4c's and task 7's quality
+reviews, and from a gap the run left: `keel doctor` names the `.codex/agents/` files keel wrote for
+Codex but not the managed block v0.26.0 wrote into `.codex/config.toml`.
+Narrowed on 2026-10-31 by Bernard: doctor keeps never reading AGENTS.md.
+
+**Story:** G2, G3, ADR-0013, ADR-0014
+**Files:**
+- Modify: `bin/keel`
+- Modify: `bin/keel-fleet`
+- Modify: `lib/harness/capabilities` (its header: one `provides` row per primitive)
+- Modify: `tests/validate-skills.sh` (its retired-key reader)
+- Modify: `CHANGELOG.md` (the Unreleased line on the version check)
+- Test: `tests/test-keel-fleet.sh`, `tests/test-keel-4.sh`,
+  `tests/test-doc-claims.sh`, `tests/test-validate-skills.sh`, `tests/test-harness-resolve.sh`
+
+**Interfaces:**
+- Consumes: task 7's version check in `cmd_doctor`, task 4c's `lib/retired-keys.sh`
+- Produces: `KEEL_CLAUDE_VERSION_FILE`, read by `keel doctor`. Unset: doctor runs
+  `$KEEL_CLAUDE --version` as today. Set to a file holding a line: doctor reads that line,
+  `<version>|<reason>`, in place of running the command, with the version empty when none was read
+  and the reason empty when one was. Set to an empty file: doctor runs the command and writes that
+  line to it. `keel-fleet` creates one empty file per run with `mktemp`, exports the variable to
+  every doctor it runs, and removes the file when it exits.
+
+**Depends on:** task 13
+
+**Behaviours:**
+
+1. `keel-fleet` asks Claude Code for its version once per run. Example: a `KEEL_CLAUDE` stub that
+   appends a line to a counter file and prints keel's minimum; `keel-fleet` over two repositories
+   leaves one line in the counter, and both rows show the same `warnings` count; two `keel-fleet`
+   runs leave two lines, so no answer outlives its run; two `keel doctor` runs with the variable
+   unset leave two lines.
+2. `keel doctor` warns about the keel-managed block v0.26.0 left in `.codex/config.toml`, and still
+   reads no `AGENTS.md`. The marker is the one v0.26.0 wrote there:
+   `# keel:start v1 - managed by keel init`. Examples: a `.codex/config.toml` holding the keel
+   table gives exactly one `WARN` line, which names `.codex/config.toml`, says Codex support ended
+   at v0.26.0 and that the block can be deleted; a `.codex/config.toml` of `model = "x"` gives no
+   such line; an `AGENTS.md` holding an old keel block, `<!-- keel:start v1 -->`, still gets no
+   doctor line naming it, with or without the `.codex/config.toml` block beside it. The line
+   carries the `# names Codex: the v0.26.0 notice` marker, as the `.codex/agents` warning beside it
+   does.
+3. A retired-key register that fails partway is unreadable, not shorter. The two checks that read
+   it, `tests/validate-skills.sh` and `retired_set_in` and the `retired_first` read in
+   `tests/test-doc-claims.sh`, run the register with `pipefail` inside the subshell and test the
+   subshell's exit status, as well as the rows. Example: a register whose `retired_keys` prints
+   `foo.bar|7|gone` and then returns 1 makes `retired_set_in` fail, and in
+   `tests/test-validate-skills.sh` a mutated copy carrying it makes `tests/validate-skills.sh`
+   exit 1 with "could not be read". Doctor's own reader is left as it is: it reads the register
+   these checks pass in CI, so a failing register stops the build before it reaches a doctor.
+4. A second ledger row for a primitive is refused, so it cannot raise the minimum. Of the two
+   remedies this takes the ledger test's ban, and not the lowest evidenced version per primitive,
+   because today's ledger holds one `provides` row per primitive, so the ban costs no row, and the
+   resolver stays one pass in bash 3.2 with no per-primitive state; two rows for one primitive are
+   two claims about one fact, and which version doctor's late-gate warning names would depend on
+   row order. Example: in `tests/test-harness-resolve.sh` a check prints `claude/p2` for a fixture
+   holding `provides|claude|p2|src|2.1.296|2026-01-01` and
+   `provides|claude|p2|src|2.1.400|2026-02-01`, and prints nothing for `lib/harness/capabilities`.
+   The ledger's header says a primitive has one row, and that a re-verification on a later Claude
+   Code leaves it as it is, because its version is the earliest the primitive was evidenced on and
+   raising it raises keel's minimum.
+
+**Done when:** `tests/test-keel-fleet.sh`, `tests/test-keel-4.sh`, `tests/test-doc-claims.sh`,
+`tests/test-validate-skills.sh` and `tests/test-harness-resolve.sh` pass, and
+`tests/validate-citations.sh` and `tests/validate-skills.sh` report OK.
+
+- [ ] **Step 14.1: Build it test first**
+
+Follow `keel:tdd` for behaviours 1 to 4: write each case from its example and watch it fail for the
+reason named, then implement.
+Run: `tests/test-keel-fleet.sh`, `tests/test-keel-4.sh`, `tests/test-doc-claims.sh`,
+`tests/test-validate-skills.sh`, then `tests/test-harness-resolve.sh`
+Expected before: FAIL, behaviour 1's counter holds two lines where it should hold one, behaviour 2's
+`.codex/config.toml` case finds no line, behaviour 3's register is read as one row, and behaviour
+4's check prints nothing for the fixture. Behaviour 2's `AGENTS.md` case passes on arrival, since
+task 5b removed the reader; say so and prove it able to fail. Expected after: PASS. Quote the
+failing output in your report.
+
+Run: `tests/run-tests.sh`.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+This is the one boundary run the task schedules.
+
+- [ ] **Step 14.2: Hand over**
+
+```bash
+git add bin/keel bin/keel-fleet lib/harness/capabilities tests/validate-skills.sh CHANGELOG.md \
+        tests/test-keel-fleet.sh tests/test-keel-4.sh tests/test-doc-claims.sh \
+        tests/test-validate-skills.sh tests/test-harness-resolve.sh
+git status --porcelain
+```
+
+Stage those paths and each file whose citation this task repaired, by name, and stop. **Do not
+commit.** The coordinator commits after both review passes, with
+`git commit -s -m "fix(doctor): ask Claude Code once per fleet run, and name a v0.26.0 block left behind"`.
+
+### Task 15: the claim and hook checks prove they fire, and the ledger cites ADR-0014
+
+Added by the coordinator on 2026-10-31 from task 6's quality review. Each is a check with no case
+showing it fires, a case that repeats another, or a comment citing the superseded ADR.
+
+**Story:** G1, G2, ADR-0014
+**Files:**
+- Modify: `lib/harness/resolve.sh` (its header comment only)
+- Modify: `lib/harness/capabilities` (its comment only)
+- Test: `tests/test-supply-chain.sh`, `tests/test-harness-claims.sh`,
+  `tests/test-harness-resolve.sh`
+
+**Interfaces:**
+- Consumes: the `structural-orphan-hook` rule in `tests/supply-chain-scan.sh`, and `claim_gaps` in
+  `tests/test-harness-claims.sh`
+- Produces: nothing new
+
+**Depends on:** task 14
+
+**Behaviours:**
+
+1. A stray `hooks/hooks.*.json` is reported as an orphan hook. Example: in
+   `tests/test-supply-chain.sh` a mutation writing `{}` to `hooks/hooks.codex.json` makes the scan
+   exit 1 with `[structural-orphan-hook]` naming `hooks/hooks.codex.json`. This is a `verify`
+   behaviour: it holds today and passes on arrival, so prove it bites by skipping `hooks.*.json` in
+   a scratch copy of `tests/supply-chain-scan.sh` and watching the case fail.
+2. The `harness=codex` check matches a claim marker and nothing else, and a case proves it fires.
+   The grep becomes a function over files, anchored to `<!-- keel:claim`, that the tree case calls.
+   Examples: a fixture holding `<!-- keel:claim gate=session-start harness=codex -->` is reported; a
+   fixture whose prose reads `the old marker said harness=codex` is not. Before the change the prose
+   fixture is reported too.
+3. The `cf_blank` resolver case is dropped. It resolves a blank version on a `provides|claude` row,
+   and the `ghost` case before it resolves the same row shape through the same code, which reads no
+   harness name. Example: `grep -c cf_blank tests/test-harness-resolve.sh` prints 0, and the case "a
+   blank version grants nothing" still passes.
+4. The ledger and the resolver cite ADR-0014 for the evidence rule. Example: `grep -n ADR-0003
+   lib/harness/resolve.sh lib/harness/capabilities` prints nothing, and the line each one held reads
+   `ADR-0014:`, since ADR-0014 states that a `provides|claude` row grants its primitive only with
+   source, version and date all present.
+
+**Done when:** `tests/test-supply-chain.sh`, `tests/test-harness-claims.sh` and
+`tests/test-harness-resolve.sh` pass, and `tests/validate-citations.sh` and
+`tests/validate-skills.sh` report OK.
+
+- [ ] **Step 15.1: Build it test first**
+
+Follow `keel:tdd` for behaviour 2: write its cases from the examples and watch the prose fixture
+reported, then implement. Behaviour 1 is `verify` and passes on arrival; behaviours 3 and 4 are a
+deletion and two comments.
+Run: `tests/test-harness-claims.sh`, then `tests/test-supply-chain.sh` and
+`tests/test-harness-resolve.sh`
+Expected before: FAIL, behaviour 2's prose fixture is reported as a `harness=codex` claim. Expected
+after: PASS. Quote the failing output in your report.
+
+Run: `tests/run-tests.sh`.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+This is the one boundary run the task schedules.
+
+- [ ] **Step 15.2: Hand over**
+
+```bash
+git add lib/harness/resolve.sh lib/harness/capabilities tests/test-supply-chain.sh \
+        tests/test-harness-claims.sh tests/test-harness-resolve.sh
+git status --porcelain
+```
+
+Stage those paths and each file whose citation this task repaired, by name, and stop. **Do not
+commit.** The coordinator commits after both review passes, with
+`git commit -s -m "test(harness): prove the codex claim and orphan hook checks fire, and cite ADR-0014"`.
+
 ## Notes for the coordinator
 
 - **The minimum is 2.1.302, not 2.1.295.** The idea record proposed 2.1.295 because `onFailure`
@@ -1562,28 +1923,16 @@ commit.** The coordinator commits with
   `~/.codex/auth.json` in a throwaway home. Codex rotated its refresh token there, and the rotated
   token was deleted with the throwaway home, so the user's real login was left with a revoked token
   (`refresh_token_reused`) and needs `codex login`. No later task runs Codex.
-- **Follow-ups for the hooks, found during this run and not in it.** `sensitive-guard`: `git -c
-  key=val commit` is not recognised as a commit; an unreadable profile on a commit exits 0 silently;
-  the profile walk calls the external `dirname`; the walk starts from `$PWD`, which a cloud
-  session's remote hook may set to the home directory; the CDPATH case task 2c added reads the
-  hook's text and is stricter than correct output, so it should run the hook under a decoy
-  `CDPATH` instead; the comment should state that a Codex process that inherited
-  `CLAUDE_PROJECT_DIR` turns the refusal off. `done-guard`: a transcript whose rows parse but match
-  no Claude Code shape reads as a clean turn instead of warning. `lib/context_watch.py`: on a
-  non-Claude transcript `transcript_kind` reads the whole file on every call.
-  The retired-key checks treat a register that prints some rows and then fails as a shorter
-  register; both should read the subshell's exit status (task 4c's quality review).
-  From task 6's quality review: the `harness=codex` grep in `tests/test-harness-claims.sh` has no
-  test that it fires; the `cf_blank` resolver case repeats the `ghost` one; a stray
-  `hooks/hooks.*.json` is now reported as an orphan hook and nothing pins that; the support page
-  generator still loops over harnesses; the ledger and `resolve.sh` cite ADR-0003 for the evidence
-  rule where ADR-0014 supersedes it.
-  From task 7's quality review: when `claude` is a shell wrapper, the kill reaches only the shell
-  and its child keeps running (doctor is not blocked); keel-fleet repeats the machine-wide version
-  check per repository; a second ledger row for an already-verified primitive would raise the
-  minimum.
-- **From task 11's review, pre-existing:** (the commit that empties `hard_block_paths` is task 11b) a
-  string value for
-  `hard_block_paths` fails open on Claude Code (Python iterates its characters).
+- **Follow-ups found during this run are now tasks 12 to 15.** The `sensitive-guard` items, and
+  task 11's finding that a string `hard_block_paths` fails open on Claude Code, are task 12. The
+  `done-guard` and `lib/context_watch.py` items are task 13. The retired-key readers (task 4c's
+  quality review), keel-fleet's repeated version check and the second ledger row (task 7's), and
+  the managed blocks v0.26.0 left in `.codex/config.toml` and `AGENTS.md`, are task 14. The rest of
+  task 6's quality review is task 15. Task 13 decides `transcript_kind` on a 64-row prefix rather
+  than on the first parsed row, because real transcripts open with metadata rows (its prose gives
+  the measurement).
+- **Left out as design changes rather than defects:** the resolver's harness parameter that is
+  always `claude`, the support page generator's loop over harnesses, the kill that reaches only a
+  wrapper shell and not its child, and `keel init` keeping retired keys in a profile.
 - **Not in this plan.** `keel-cursor`'s generator reads the archived `keel-internal` checkout; that
   is the port's to fix. The idea record's items are the next plan.
