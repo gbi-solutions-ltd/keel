@@ -2622,7 +2622,7 @@ alias of `git add`, is not recognised.
 **Done when:** `tests/test-sensitive-guard.sh` and `tests/test-plan.sh` pass, and
 `tests/validate-citations.sh` and `tests/validate-skills.sh` report OK.
 
-- [x] **Step 19b.1: Build it test first** Note: red seen for the first two cases; the fix pass's rm and mv cases red on the staged hook; 1M untracked files with a tracked hit: staged 2.82s, after 0.12s, HEAD 0.13s
+- [x] **Step 19b.1: Build it test first** Note: the first two cases' red was the implementer's, reported and not witnessed by the coordinator; the coordinator saw the rm, mv and ordering cases red on the staged hook; 1M untracked files with a tracked hit: staged 2.82s, after 0.12s, HEAD 0.13s
 
 Follow `keel:tdd` for behaviour 1: write each case and watch the first two fail, then implement.
 Run: `tests/test-sensitive-guard.sh`, then `tests/test-plan.sh`. Expected after: PASS. Then
