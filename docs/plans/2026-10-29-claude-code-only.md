@@ -2577,6 +2577,62 @@ Stage those paths and each file whose citation this task repaired, by name, and 
 commit.** The coordinator commits after both review passes, with
 `git commit -s -m "fix(sensitive-guard): check unstaged changes when a command stages before it commits"`.
 
+### Task 19b: a staging command's check also sees untracked files
+
+Added by the coordinator on 2026-11-01, Bernard's decision, from task 19's quality review. Task 19
+widens the check to `git diff HEAD` when a command stages before it commits, but that lists only
+tracked changes, so `git add -A && git commit -m x` that stages a brand-new file under a declared
+path still passes in silence, and the prose task 19 wrote reads as if it does not. `git stage`, an
+alias of `git add`, is not recognised.
+
+**Story:** G1, ADR-0015
+**Files:**
+- Modify: `hooks/sensitive-guard`
+- Modify: `CHANGELOG.md` (the sentence task 19 added)
+- Modify: `docs/07-open-decisions.md` (the sentence task 19 rewrote)
+- Test: `tests/test-sensitive-guard.sh`
+
+**Interfaces:**
+- Consumes: task 19's `stages` in the token walk
+- Produces: nothing new. `matches` is unchanged.
+
+**Depends on:** task 19
+
+**Behaviours:**
+
+1. When a command stages before it commits, the check also reads untracked files that are not
+   ignored (`git ls-files --others --exclude-standard`, run in the start directory, its failure
+   asking as a failing `git diff` does), and `git stage` counts as staging. Examples, in task 19's
+   fixture with a new untracked file `src/auth/new.go` and nothing else changed under `src/auth`:
+   `git add -A && git commit -m x` asks naming `src/auth/new.go`; `git stage -A && git commit -m x`
+   asks naming it; `git commit -m x` prints nothing; `git add -A && git commit -m x` with
+   `src/auth/new.go` ignored by `.gitignore` prints nothing. Before the change the first two print
+   nothing.
+2. The hook header, `docs/07-open-decisions.md` and the `CHANGELOG.md` sentence say what the check
+   reads when a command stages before it commits (tracked changes against `HEAD` and untracked files)
+   and name what still passes: a `git rm` of an unmodified file and a `git mv`. The reader's check;
+   no test.
+
+**Done when:** `tests/test-sensitive-guard.sh` and `tests/test-plan.sh` pass, and
+`tests/validate-citations.sh` and `tests/validate-skills.sh` report OK.
+
+- [ ] **Step 19b.1: Build it test first**
+
+Follow `keel:tdd` for behaviour 1: write each case and watch the first two fail, then implement.
+Run: `tests/test-sensitive-guard.sh`, then `tests/test-plan.sh`. Expected after: PASS. Then
+`tests/run-tests.sh`: PASS.
+
+- [ ] **Step 19b.2: Hand over**
+
+```bash
+git add hooks/sensitive-guard CHANGELOG.md docs/07-open-decisions.md tests/test-sensitive-guard.sh
+git status --porcelain
+```
+
+Stage those paths and each file whose citation this task repaired, by name, and stop. **Do not
+commit.** The coordinator commits after both review passes, with
+`git commit -s -m "fix(sensitive-guard): a staging command's check also sees untracked files"`.
+
 ## Notes for the coordinator
 
 - **The minimum is 2.1.302, not 2.1.295.** The idea record proposed 2.1.295 because `onFailure`
