@@ -2639,6 +2639,115 @@ Stage those paths and each file whose citation this task repaired, by name, and 
 commit.** The coordinator commits after both review passes, with
 `git commit -s -m "fix(sensitive-guard): a staging command's check also sees untracked files"`.
 
+### Task 20: the untracked read lists only candidates, inside a deadline that asks
+
+Added by the coordinator on 2026-11-01, Bernard's decision, from the residual the ship gate's
+security addendum recorded. On a tree of 1M untracked files, `git add -A && git commit -m x` with a
+new file under a declared path asked after 5.84s with 6 declared patterns and 11.85s with 15; past
+the hook's 10 second timeout Claude Code kills it and the commit proceeds. The time is Python
+matching every untracked path, and `files()`'s own 10 second `subprocess` timeout cannot fire first.
+
+**Story:** G1, ADR-0015
+**Files:**
+- Modify: `hooks/sensitive-guard`
+- Modify: `CHANGELOG.md` (the sentence task 19b wrote), `docs/07-open-decisions.md` (the same)
+- Test: `tests/test-sensitive-guard.sh`
+
+**Interfaces:**
+- Consumes: task 19b's untracked read and `files()`
+- Produces: nothing new. `matches` is unchanged.
+
+**Depends on:** task 19b
+
+**Behaviours:**
+
+1. The untracked read passes each declared pattern to `git ls-files` as a pathspec, `:(top)<p>` and
+   `:(top)<p>/*` with `p` stripped of trailing slashes and skipped when that leaves nothing, plus
+   `:(top).keel/profile.json`, so git lists only candidates and `judge` still decides. git's
+   pathspec matching without glob magic lets `*` cross `/` as `fnmatch` does, so it lists every
+   file `matches` takes: checked on 22 patterns (`**`, brackets, `?`, a backslash, a leading `-`,
+   `:` or `/`, a space) on macOS git 2.50, one platform. Examples: a shim git recording its
+   arguments sees `:(top)src/auth` and `:(top).keel/profile.json` after `--` for
+   `git add -A && git commit -m x`, and no `:/`; an untracked `.keel/profile.json` in a repository
+   whose profile was never committed still asks naming the profile. Before the change the first
+   fails (the read passes `:/`); the second passes on arrival.
+2. Every git call shares one deadline, 8 seconds after the Python part starts, inside the hook's 10.
+   A call that outlasts it asks, saying git did not answer within the hook's time, not that git
+   could not run. Example: a shim git whose `ls-files` sleeps 30 seconds asks within the deadline
+   with that message. Before the change it asks after 10 seconds saying git could not be run. The
+   case costs one deadline, about 8 seconds, of suite time.
+3. The hook header, `docs/07-open-decisions.md` and the `CHANGELOG.md` sentence stop saying an
+   untracked file passes on a very large tree, and say a git that outlasts the hook's time asks.
+   `docs/07` keeps its line count or repoints its later citations by content. The reader's check.
+
+**Done when:** `tests/test-sensitive-guard.sh` and `tests/test-plan.sh` pass,
+`tests/validate-citations.sh` and `tests/validate-skills.sh` report OK, and on task 19b's 1M fixture
+the no-hit `git add -A && git commit -m x` finishes under the deadline with one plain pattern, 15,
+and one wildcard pattern (`*.pem`) that makes git walk the whole tree.
+
+- [ ] **Step 20.1: Build it test first**
+
+Follow `keel:tdd` for behaviours 1 and 2: write each case, watch the first case of behaviour 1 and
+the case of behaviour 2 fail for the reason named, then implement. Behaviour 1's second case is
+`verify`. Run: `tests/test-sensitive-guard.sh`, then `tests/test-plan.sh`, then the fixture
+timings, then `tests/run-tests.sh`.
+
+- [ ] **Step 20.2: Hand over**
+
+Stage `hooks/sensitive-guard`, `tests/test-sensitive-guard.sh`, `CHANGELOG.md`,
+`docs/07-open-decisions.md` and each file whose citation this task repaired, by name. The
+coordinator commits after review, with
+`git commit -s -m "fix(sensitive-guard): read only candidate untracked files, under a deadline"`.
+
+### Task 21: a waiting tick times out only behind one holder
+
+Added by the coordinator on 2026-11-01, Bernard's decision. `tests/test-plan.sh`'s concurrent-ticks
+case failed once on Linux CI (run 41274516638 on `7fdf46a`: 18 of 20 landed, no lock left).
+`plan_lock` gives up after 100 polls however many holders it waited behind, so a waiter starved by
+a busy queue dies as if the lock were stale. Reproduced at 150 concurrent ticks locally: 91 and 101
+ticks lost, each with "is held by another keel plan tick" and no other message. Not reproduced at
+20 locally (the worst tick needed 18 of its 100 polls); that the CI runner, running four test files
+at once, was slow enough is inferred.
+
+**Story:** none; a defect in `keel plan tick`
+**Files:**
+- Modify: `bin/keel` (`plan_lock`, `plan_unlock`)
+- Modify: `CHANGELOG.md` (an Unreleased line)
+- Test: `tests/test-plan.sh`
+
+**Interfaces:**
+- Consumes: `plan_lock`, `plan_unlock`
+- Produces: `<plan>.lock/owner`, holding the holder's process id
+
+**Depends on:** none
+
+**Behaviours:**
+
+1. The holder writes its process id to `<plan>.lock/owner` after taking the lock, and a waiter
+   restarts its count of 100 polls each time it reads an owner it has not seen, so it gives up
+   only after 100 polls behind one holder. Every release removes `owner` and then the directory.
+   Example: a lock whose `owner` changes every 0.3 seconds for 11 seconds, then is removed, lets a
+   waiting tick land. Before the change the tick gives up after about 10 seconds. The case costs
+   about 11 seconds of suite time.
+2. A lock that stays behind one owner still gives up after 100 polls, naming the lock, and changes
+   nothing. Example: the existing stale-lock case, with an `owner` file as a killed tick now leaves
+   one. The message says to remove the directory. This holds today and passes on arrival.
+3. The concurrent-ticks case keeps the ticks' errors and prints them when it fails, so the next
+   failure names its cause. No test of its own.
+
+**Done when:** `tests/test-plan.sh` passes, and `tests/validate-citations.sh` reports OK.
+
+- [ ] **Step 21.1: Build it test first**
+
+Follow `keel:tdd`: write behaviour 1's case and watch it fail, then implement. Behaviour 2 is
+`verify`. Run: `tests/test-plan.sh`, then `tests/run-tests.sh`.
+
+- [ ] **Step 21.2: Hand over**
+
+Stage `bin/keel`, `tests/test-plan.sh`, `CHANGELOG.md` and each file whose citation this task
+repaired, by name. The coordinator commits after review, with
+`git commit -s -m "fix(plan): a waiting tick times out only behind one holder"`.
+
 ## Notes for the coordinator
 
 - **The minimum is 2.1.302, not 2.1.295.** The idea record proposed 2.1.295 because `onFailure`
