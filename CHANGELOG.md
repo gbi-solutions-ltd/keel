@@ -98,11 +98,16 @@ Entries are terse by design; the narrative for each release is in this file's gi
   a `hard_block_paths` that is not a list of strings); git that cannot run or a failing `git diff`;
   and a staged profile. On Codex the refusal stands in for each, and also fires on any
   `hard_block_paths` that is not empty. It reads the staged set before the command runs, so a
-  command that runs `git add`, `git rm` or `git mv` before its commit
+  command that runs `git add`, `git stage`, `git rm` or `git mv` before its commit
   (`git add -A && git commit -m x`), and a commit with `-p`, `--patch` or
-  `--pathspec-from-file=<f>`, went through in silence; each now widens the check to every change
-  against `HEAD`, as `-a` does. The hook does not read which paths an `add` names, so an `add` of a
-  harmless file widens too.
+  `--pathspec-from-file=<f>`, went through in silence; each now widens the check to every tracked
+  change against `HEAD`, as `-a` does, and a `git add` or `git stage` also to untracked files that
+  are not ignored, so a new file it adds is seen. These still pass, because git shows no change for
+  them before the command runs: a `git rm` or `git mv` of an unmodified file, a `git mv` into a
+  declared path and a `git add -f` of an ignored file. The untracked read runs after every other
+  ask, so it never delays one, but on a very large tree an untracked file passes once reading them
+  all outlasts the hook's timeout. The hook does not read which paths an `add` names, so an `add`
+  of a harmless file widens too.
 - `hooks/done-guard` warns on a transcript whose rows parse and none has a Claude Code shape,
   saying the turn was not checked. It read such a transcript as a clean turn and said nothing.
 

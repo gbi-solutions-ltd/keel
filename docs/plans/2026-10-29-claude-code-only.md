@@ -1348,7 +1348,7 @@ targeted fix pass on the staged work instead of discarding it, and accepted by n
 citations the sweep repointed although they were already wrong at `main` (they were judged against
 `d6c421a`), since each now lands on the content its sentence names. The fix pass names 2.1.302 in
 the idea record, reverts the four `bin/keel:626` repoints (ADR-0004 and the 2026-09-05 design), and
-restates the sweep's counts. The 13 accepted rows: `docs/07-open-decisions.md:579` and `:609`;
+restates the sweep's counts. The 13 accepted rows: `docs/07-open-decisions.md:580` and `:610`;
 `docs/ideas/declared-profile-keys-take-effect.md:92`; `docs/ideas/leon-van-zyl-skill-collection.md:144`;
 `docs/ideas/snapshot-records-its-own-path.md:85`; `docs/plans/2026-08-30-profile-sync.md:47`;
 `docs/plans/2026-09-05-tiered-multi-harness-support.md:2140`;
@@ -2600,29 +2600,35 @@ alias of `git add`, is not recognised.
 
 **Behaviours:**
 
-1. When a command stages before it commits, the check also reads untracked files that are not
-   ignored (`git ls-files --others --exclude-standard`, run in the start directory, its failure
-   asking as a failing `git diff` does), and `git stage` counts as staging. Examples, in task 19's
+1. When a command runs `git add` or `git stage` before it commits, the check also reads untracked
+   files that are not ignored (`git ls-files --others --exclude-standard`, run in the start
+   directory, its failure asking as a failing `git diff` does), and `git stage` counts as staging.
+   A `git rm` or `git mv` cannot stage an untracked file, so it widens to `git diff HEAD` only, as
+   task 19 made it. The untracked read runs after every other ask, so on a large tree it can never
+   delay or remove an ask the check gave before it (corrected 2026-11-01 from the quality review:
+   on 1M untracked files the hook took 10.9s against its 10s timeout). Examples, in task 19's
    fixture with a new untracked file `src/auth/new.go` and nothing else changed under `src/auth`:
    `git add -A && git commit -m x` asks naming `src/auth/new.go`; `git stage -A && git commit -m x`
    asks naming it; `git commit -m x` prints nothing; `git add -A && git commit -m x` with
    `src/auth/new.go` ignored by `.gitignore` prints nothing. Before the change the first two print
    nothing.
 2. The hook header, `docs/07-open-decisions.md` and the `CHANGELOG.md` sentence say what the check
-   reads when a command stages before it commits (tracked changes against `HEAD` and untracked files)
-   and name what still passes: a `git rm` of an unmodified file and a `git mv`. The reader's check;
-   no test.
+   reads when a command stages before it commits (tracked changes against `HEAD`, and untracked
+   files for an `add` or `stage`) and name what still passes: a `git rm` or `git mv` of an
+   unmodified file, a `git mv` into a declared path, a `git add -f` of an ignored file, and on a
+   very large tree an untracked file once the read outlasts the hook's timeout (all but the first
+   added 2026-11-01 from the quality reviews). The reader's check; no test.
 
 **Done when:** `tests/test-sensitive-guard.sh` and `tests/test-plan.sh` pass, and
 `tests/validate-citations.sh` and `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 19b.1: Build it test first**
+- [x] **Step 19b.1: Build it test first** Note: red seen for the first two cases; the fix pass's rm and mv cases red on the staged hook; 1M untracked files with a tracked hit: staged 2.82s, after 0.12s, HEAD 0.13s
 
 Follow `keel:tdd` for behaviour 1: write each case and watch the first two fail, then implement.
 Run: `tests/test-sensitive-guard.sh`, then `tests/test-plan.sh`. Expected after: PASS. Then
 `tests/run-tests.sh`: PASS.
 
-- [ ] **Step 19b.2: Hand over**
+- [x] **Step 19b.2: Hand over** Note: rounds: 3; routing: inherit; loop: full; quality fix pass: untracked read last and only for add or stage, prose names git mv into a declared path and git add -f; the fix agent died mid-pass and the coordinator finished it; the re-review's three should-fix items fixed on top: prose names git rm or git mv of an unmodified file and the timeout on a very large tree, and a test pins the ordering (red on the staged hook)
 
 ```bash
 git add hooks/sensitive-guard CHANGELOG.md docs/07-open-decisions.md tests/test-sensitive-guard.sh

@@ -23,8 +23,12 @@
 #
 # It guards the commit rather than the edit. Blocking every edit to auth code would make this the
 # gate people delete, and the commit is where the change stops being private to the session. It
-# reads the staged set, plus tracked modifications for -a, --all, -p, --patch, --pathspec-from-file,
-# a pathspec or `git add`, `rm` or `mv` alongside: each commits content unstaged when the hook runs.
+# reads the staged set and what these commit unstaged: tracked changes against HEAD for -a, --all,
+# -p, --patch, --pathspec-from-file, a pathspec or a `git add`, `stage`, `rm` or `mv` alongside,
+# and untracked files not ignored for an `add` or `stage`, read last because it is slow on a big
+# tree. Git shows no change for these before they run, so they pass: a `git rm` or `git mv` of an
+# unmodified file, a `git mv` into a declared path and a `git add -f` of an ignored file. On a very
+# large tree an untracked file passes too, once reading them all outlasts the hook's timeout.
 #
 # ITS LIMIT, STATED RATHER THAN DISCOVERED. It reads a command string, so `sh -c`, an alias or a
 # here-doc reaches a commit without passing through here, exactly as the
@@ -263,9 +267,9 @@ except ValueError:
 # `--opt=value` forms are one token starting with `-`, and are skipped as any other flag is.
 GLOBAL_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"}
 
-# The walk reads every `git` in the command, so it also sees an `add`, `rm` or `mv` anywhere in it:
-# each stages changes when the command runs, after the hook has read the staged set.
-start, stages = None, False
+# The walk reads every `git` in the command, so it also sees an `add`, `stage`, `rm` or `mv` in any
+# position: each stages changes when the command runs, after the hook has read the staged set.
+start, stages, adds = None, False, False
 for i, t in enumerate(tokens):
     if t != "git":
         continue
@@ -275,7 +279,8 @@ for i, t in enumerate(tokens):
             start = j + 1 if start is None else start
             break
         if not tokens[j].startswith("-"):
-            stages = stages or tokens[j] in ("add", "rm", "mv")
+            stages = stages or tokens[j] in ("add", "stage", "rm", "mv")
+            adds = adds or tokens[j] in ("add", "stage")
             break
         j += 2 if tokens[j] in GLOBAL_VALUE_OPTS else 1
 
@@ -317,22 +322,23 @@ def files(*args):
     # paths, and it stops git quoting anything unusual. A non-zero exit is not "nothing changed":
     # git missing, a locked index or a timeout would otherwise read as a clean commit.
     try:
-        r = subprocess.run(["git", "diff", "--name-only", "-z"] + list(args),
+        r = subprocess.run(["git", args[0], "-z"] + list(args[1:]),
                            cwd=os.environ["KEEL_DIR"], capture_output=True, text=True, timeout=10)
     except (OSError, subprocess.SubprocessError):
         emit("this repository declares hard_block_paths and git could not be run, so the guard "
              "cannot tell whether this commit touches a sensitive path. Approving is a human "
              "decision.")
     if r.returncode != 0:
-        emit("this repository declares hard_block_paths and `git diff` failed, so the guard cannot "
-             "tell whether this commit touches a sensitive path. Approving is a human decision.")
+        emit("this repository declares hard_block_paths and `git %s` failed, so the guard cannot "
+             "tell whether this commit touches a sensitive path. Approving is a human decision."
+             % args[0])
     return [f for f in r.stdout.split("\0") if f]
 
-changed = set(files("--cached"))
+changed = set(files("diff", "--name-only", "--cached"))
 # -a, --all, -p, --patch, --pathspec-from-file, a pathspec and a staging subcommand all commit
 # working tree content that --cached does not show.
 if widen or pathspecs:
-    changed |= set(files("HEAD"))
+    changed |= set(files("diff", "--name-only", "HEAD"))
 
 def matches(f, p):
     # A bare directory has to match what is under it. Decision 3 proposes patterns like "anything
@@ -341,21 +347,32 @@ def matches(f, p):
     p = p.rstrip("/")
     return fnmatch(f, p) or fnmatch(f, p + "/*")
 
-hit = sorted({f for f in changed for p in patterns if matches(f, p)}) if start is not None else []
-if hit:
-    shown = ", ".join(hit[:5]) + (" and %d more" % (len(hit) - 5) if len(hit) > 5 else "")
-    emit("this commit includes %d file(s) under hard_block_paths: %s. Decision 3 makes this the one "
-         "gate the model cannot clear by saying so, because it covers auth, money movement and "
-         "personal data. Run security-audit --diff and read its findings before approving."
-         % (len(hit), shown))
+def judge(changed):
+    hit = sorted({f for f in changed for p in patterns if matches(f, p)}) if start is not None \
+        else []
+    if hit:
+        shown = ", ".join(hit[:5]) + (" and %d more" % (len(hit) - 5) if len(hit) > 5 else "")
+        emit("this commit includes %d file(s) under hard_block_paths: %s. Decision 3 makes this "
+             "the one gate the model cannot clear by saying so, because it covers auth, money "
+             "movement and personal data. Run security-audit --diff and read its findings before "
+             "approving."
+             % (len(hit), shown))
+    # The profile holds the list that judges this commit, so a commit changing it could change what
+    # the gate covers without touching a declared path. Root-relative, as the patterns are. It runs
+    # before the unreadable ask, so a staged profile that will not parse is named as the profile.
+    if ".keel/profile.json" in changed:
+        emit("this commit changes .keel/profile.json, which holds the hard_block_paths list this "
+             "gate judges commits by. Approving is a human decision.")
 
-# The profile holds the list that judges this commit, so a commit changing it could change what
-# the gate covers without touching a declared path. Root-relative, as the patterns are. It runs
-# before the unreadable ask, so a staged profile that will not parse is named as the profile.
-if ".keel/profile.json" in changed:
-    emit("this commit changes .keel/profile.json, which holds the hard_block_paths list this gate "
-         "judges commits by. Approving is a human decision.")
+judge(changed)
 if unreadable:
     emit(unreadable + ". The guard cannot tell whether this commit touches a sensitive path. "
          "Approving is a human decision.")
+# A `git add` or `git stage` can also add a file git does not track yet, which `git diff HEAD` does
+# not list; `git rm` and `git mv` cannot, so they do not read them. This runs after every other ask
+# because it is slow on a big tree: matching a million untracked files takes seconds, and a hook
+# killed at its 10 second timeout gives no answer. `--full-name` and `:/` list the whole repository
+# root-relative, as `git diff` does: from a subdirectory git lists only the files under it.
+if adds and start is not None:
+    judge(files("ls-files", "--others", "--exclude-standard", "--full-name", ":/"))
 PY

@@ -32,7 +32,7 @@ become the case for building.
 
 ### The three reasons the requester gave, and what each one does to the record
 
-**1. keel's own gate does not claim what the bar assumed it claimed.** `hooks/sensitive-guard:31-32`
+**1. keel's own gate does not claim what the bar assumed it claimed.** `hooks/sensitive-guard:35-36`
 says the gate "raises the cost of a careless commit; it is not a boundary against a
 determined one. The boundary is review." Codex says the same of its own mechanism: "Treat tool
 hooks as a useful guardrail, not a complete enforcement boundary." Part 1 quoted the Codex sentence

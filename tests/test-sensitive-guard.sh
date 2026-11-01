@@ -521,6 +521,46 @@ out="$(event 'git add -A && git commit -m x' "$r" | ( cd "$r" && codex_guard ) 2
 verdict "on codex a command that stages before it commits refuses" $? "rc $rc: $out"
 rm -rf "$r"
 
+# `git diff HEAD` lists tracked changes only, so a new file that a staging command adds was missed.
+# The fixture has a clean tracked src/auth/t.go, an untracked src/auth/new.go and only
+# src/ui/button.tsx staged. `git stage` is an alias of `git add`.
+untracked_fixture() {
+    fixture "$1" '"src/auth"'
+    : > "$1/src/auth/t.go"; git -C "$1" add src/auth/t.go; git -C "$1" commit -qm init
+    : > "$1/src/auth/new.go"
+    : > "$1/src/ui/button.tsx"; git -C "$1" add src/ui/button.tsx
+}
+names_new() { asks "$1" && printf '%s' "$1" | grep -q 'src/auth/new\.go'; }
+for cmd in 'git add -A && git commit -m x' 'git stage -A && git commit -m x'; do
+    r="$(mktemp -d)"; untracked_fixture "$r"
+    out="$(event "$cmd" "$r" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
+    names_new "$out"
+    verdict "a command staging before its commit asks, naming the untracked file: $cmd" $? "$out"
+    rm -rf "$r"
+done
+# From a subdirectory git lists only the untracked files under it, relative to it.
+r="$(mktemp -d)"; untracked_fixture "$r"
+out="$(event 'git add -A && git commit -m x' "$r/src/ui" | ( cd "$r/src/ui" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
+names_new "$out"
+verdict "a session in a subdirectory still sees an untracked file outside it" $? "$out"
+check "a plain commit with an untracked sensitive file prints nothing" "" "$r" "git commit -m x"
+# `git rm` and `git mv` cannot stage a file git does not track, so neither reads untracked files.
+check "an rm before the commit does not ask over an unrelated untracked file" "" "$r" \
+    "git rm --cached src/ui/button.tsx && git commit -m x"
+check "an mv before the commit does not ask over an unrelated untracked file" "" "$r" \
+    "git mv src/ui/button.tsx src/ui/b.tsx && git commit -m x"
+printf 'src/auth/new.go\n' > "$r/.gitignore"
+check "an ignored untracked file does not ask" "" "$r" "git add -A && git commit -m x"
+rm -rf "$r"
+# The untracked read is slow on a big tree, so it runs after the tracked check has asked: a tracked
+# hit is named alone, without waiting to list untracked files.
+r="$(mktemp -d)"; untracked_fixture "$r"; echo x > "$r/src/auth/t.go"
+out="$(event 'git add -A && git commit -m x' "$r" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
+asks "$out" && printf '%s' "$out" | grep -q 'src/auth/t\.go' \
+    && ! printf '%s' "$out" | grep -q 'new\.go'
+verdict "a tracked hit asks before untracked files are read" $? "$out"
+rm -rf "$r"
+
 # A hard_block_paths that is present and not a list of strings is an unparseable profile. A string
 # was iterated character by character, so `"src/auth"` declared s, r, c and so on, and a commit
 # under none of them went through in silence.
