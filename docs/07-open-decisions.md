@@ -206,10 +206,10 @@ decision in the hook protocol the model cannot satisfy for itself: the harness p
 and it survives `bypassPermissions`. The guard names the staged files and tells the reader to run
 `security-audit --diff` before approving.
 
-It reads the staged set, plus tracked modifications when the command carries `-a`, `--all` or a
-pathspec, because all three commit working tree content that `--cached` does not show. It asks
-whenever it cannot answer: an absent python3, an unparseable profile, or a failing `git diff` all
-produce a prompt rather than silence.
+It reads the staged set, plus tracked modifications for `-a`, `--all`, `-p`, `--patch`,
+`--pathspec-from-file`, a pathspec, or a `git add`, `git rm` or `git mv` in the command: each
+commits content unstaged when the hook runs. It asks whenever it cannot answer: an absent python3,
+an unparseable profile, or a failing `git diff` all produce a prompt rather than silence.
 
 Its limit is stated in the hook and repeated here: it reads a command string, so `sh -c`, an alias
 or a here-doc reaches a commit without passing through it, as the permission deny rules warn. It

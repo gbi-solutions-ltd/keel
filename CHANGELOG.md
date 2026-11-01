@@ -97,7 +97,12 @@ Entries are terse by design; the narrative for each release is in this file's gi
   python3 absent; a profile the hook cannot use (unreadable, unparseable, not a JSON object, or with
   a `hard_block_paths` that is not a list of strings); git that cannot run or a failing `git diff`;
   and a staged profile. On Codex the refusal stands in for each, and also fires on any
-  `hard_block_paths` that is not empty.
+  `hard_block_paths` that is not empty. It reads the staged set before the command runs, so a
+  command that runs `git add`, `git rm` or `git mv` before its commit
+  (`git add -A && git commit -m x`), and a commit with `-p`, `--patch` or
+  `--pathspec-from-file=<f>`, went through in silence; each now widens the check to every change
+  against `HEAD`, as `-a` does. The hook does not read which paths an `add` names, so an `add` of a
+  harmless file widens too.
 - `hooks/done-guard` warns on a transcript whose rows parse and none has a Claude Code shape,
   saying the turn was not checked. It read such a transcript as a clean turn and said nothing.
 

@@ -480,6 +480,47 @@ names_t "$out"
 verdict "run from inside another repository, the profile at HEAD is read from the event's cwd" $? "$out"
 rm -rf "$a" "$b"
 
+# The guard reads the staged set when the hook runs, before the command does, so what a `git add`,
+# `git rm` or `git mv` earlier in the command stages is not staged yet, and `-p` or
+# `--pathspec-from-file` commit what the guard cannot list. Each widens the check to every change
+# against HEAD, as -a does. The fixture has a HEAD, an unstaged change to the tracked src/auth/t.go
+# and only src/ui/button.tsx staged.
+staging_fixture() {
+    fixture "$1" '"src/auth"'
+    : > "$1/src/auth/t.go"; git -C "$1" add src/auth/t.go; git -C "$1" commit -qm init
+    printf 'x\n' >> "$1/src/auth/t.go"
+    : > "$1/src/ui/button.tsx"; git -C "$1" add src/ui/button.tsx
+}
+for cmd in 'git add -A && git commit -m x' 'git add src/auth/t.go; git commit -m x' \
+           'git rm src/auth/t.go && git commit -m x'; do
+    r="$(mktemp -d)"; staging_fixture "$r"
+    out="$(event "$cmd" "$r" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
+    names_t "$out"
+    verdict "a command that stages before it commits asks, naming the unstaged file: $cmd" $? "$out"
+    rm -rf "$r"
+done
+# The guard does not read which paths an add names, so an add of a harmless file widens too.
+r="$(mktemp -d)"; staging_fixture "$r"
+out="$(event 'git add src/ui/button.tsx && git commit -m x' "$r" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
+names_t "$out"
+verdict "an add of a harmless file before a commit still widens, an accepted over-ask" $? "$out"
+check "a plain commit in the staging fixture prints nothing" "" "$r" "git commit -m x"
+rm -rf "$r"
+for cmd in 'git commit -p -m x' 'git commit --patch -m x' \
+           'git commit --pathspec-from-file=list -m x' 'git commit --pathspec-from-file list -m x'; do
+    r="$(mktemp -d)"; staging_fixture "$r"
+    out="$(event "$cmd" "$r" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
+    names_t "$out"
+    verdict "a commit of what the guard cannot list widens as -a does: $cmd" $? "$out"
+    rm -rf "$r"
+done
+# On Codex the refusal already fires on each of these.
+r="$(mktemp -d)"; staging_fixture "$r"
+out="$(event 'git add -A && git commit -m x' "$r" | ( cd "$r" && codex_guard ) 2>&1 >/dev/null)"; rc=$?
+[ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'v0\.26\.0'
+verdict "on codex a command that stages before it commits refuses" $? "rc $rc: $out"
+rm -rf "$r"
+
 # A hard_block_paths that is present and not a list of strings is an unparseable profile. A string
 # was iterated character by character, so `"src/auth"` declared s, r, c and so on, and a commit
 # under none of them went through in silence.

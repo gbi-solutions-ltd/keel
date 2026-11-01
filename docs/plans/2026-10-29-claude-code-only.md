@@ -2543,7 +2543,10 @@ cases (`sh -c`, `eval`, `$(...)`, a commit in another repository) stay for a lat
    `a` does; `--pathspec-from-file` takes the next token as its value when written separately.
    Examples in the fixture of behaviour 1, each asking naming `src/auth/t.go`: `git commit -p -m
    x`, `git commit --patch -m x`, `git commit --pathspec-from-file=list -m x`, `git commit
-   --pathspec-from-file list -m x`. Before the change each prints nothing.
+   --pathspec-from-file list -m x`. Before the change each prints nothing except the last, which
+   already asks because the walk reads `list` as a pathspec; it stays as a case pinning that the
+   separate value is taken as a value and still widens (corrected 2026-10-31 from the implementer's
+   red run).
 3. On Codex nothing changes: with a declared list the refusal already fires on each of these, as
    the existing cases assert. Example: `git add -A && git commit -m x` with `CODEX_VERSION` set and
    `CLAUDE_PROJECT_DIR` unset exits 2 with `v0.26.0`. This holds today and passes on arrival.
@@ -2551,7 +2554,7 @@ cases (`sh -c`, `eval`, `$(...)`, a commit in another repository) stay for a lat
 **Done when:** `tests/test-sensitive-guard.sh` and `tests/test-plan.sh` pass, and
 `tests/validate-citations.sh` and `tests/validate-skills.sh` report OK.
 
-- [ ] **Step 19.1: Build it test first**
+- [x] **Step 19.1: Build it test first** Note: passed on arrival: the --pathspec-from-file <value> case (HEAD read the value as a pathspec), red seen on a scratch copy; behaviour 3 (Codex)
 
 Follow `keel:tdd` for behaviours 1 and 2: write each case from its examples and watch it fail for
 the reason named, then implement. Behaviour 3 is `verify`.
@@ -2563,7 +2566,7 @@ Run: `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 19.2: Hand over**
+- [x] **Step 19.2: Hand over** Note: rounds: 3; routing: inherit; loop: full; two prose fix passes (header, docs/07, CHANGELOG 'before its commit'); quality should-fix: git diff HEAD misses new untracked files, an unmodified git rm and git mv, so git add -A of a new file is still silent and the prose overstates; git stage not recognised
 
 ```bash
 git add hooks/sensitive-guard CHANGELOG.md tests/test-sensitive-guard.sh

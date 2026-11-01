@@ -23,8 +23,8 @@
 #
 # It guards the commit rather than the edit. Blocking every edit to auth code would make this the
 # gate people delete, and the commit is where the change stops being private to the session. It
-# reads the staged set, plus tracked modifications when the command carries -a, --all or a pathspec,
-# because all three commit working tree content that `--cached` does not show.
+# reads the staged set, plus tracked modifications for -a, --all, -p, --patch, --pathspec-from-file,
+# a pathspec or `git add`, `rm` or `mv` alongside: each commits content unstaged when the hook runs.
 #
 # ITS LIMIT, STATED RATHER THAN DISCOVERED. It reads a command string, so `sh -c`, an alias or a
 # here-doc reaches a commit without passing through here, exactly as the
@@ -263,20 +263,21 @@ except ValueError:
 # `--opt=value` forms are one token starting with `-`, and are skipped as any other flag is.
 GLOBAL_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"}
 
-start = None
+# The walk reads every `git` in the command, so it also sees an `add`, `rm` or `mv` anywhere in it:
+# each stages changes when the command runs, after the hook has read the staged set.
+start, stages = None, False
 for i, t in enumerate(tokens):
     if t != "git":
         continue
     j = i + 1
     while j < len(tokens):
         if tokens[j] == "commit":
-            start = j + 1
+            start = j + 1 if start is None else start
             break
         if not tokens[j].startswith("-"):
+            stages = stages or tokens[j] in ("add", "rm", "mv")
             break
         j += 2 if tokens[j] in GLOBAL_VALUE_OPTS else 1
-    if start is not None:
-        break
 
 # Options that swallow the next token, so their value is never mistaken for a pathspec.
 VALUE_OPTS = {"-m", "--message", "-F", "--file", "-C", "--reuse-message", "-c", "--reedit-message",
@@ -284,21 +285,28 @@ VALUE_OPTS = {"-m", "--message", "-F", "--file", "-C", "--reuse-message", "-c", 
               "--fixup", "--squash", "--trailer"}
 
 # No `git commit` among the tokens leaves no flags and no pathspec, and no path check below.
-rest, pathspecs, widen, i = (tokens[start:] if start is not None else []), [], False, 0
+# Staging widens only a commit, so a command that is not one reads the staged set alone.
+rest, pathspecs, i = (tokens[start:] if start is not None else []), [], 0
+widen = stages and start is not None
 while i < len(rest):
     t = rest[i]
     if t == "--":
         pathspecs += rest[i + 1:]
         break
+    # --pathspec-from-file takes the next token as its value when written separately.
+    if t == "--pathspec-from-file":
+        widen = True
+        i += 2
+        continue
     if t in VALUE_OPTS:
         i += 2
         continue
     if t.startswith("--"):
-        widen = widen or t == "--all"
+        widen = widen or t in ("--all", "--patch") or t.startswith("--pathspec-from-file=")
         i += 1
         continue
     if t.startswith("-"):
-        widen = widen or "a" in t[1:]
+        widen = widen or "a" in t[1:] or "p" in t[1:]
         i += 1
         continue
     pathspecs.append(t)
@@ -321,7 +329,8 @@ def files(*args):
     return [f for f in r.stdout.split("\0") if f]
 
 changed = set(files("--cached"))
-# -a, --all and a pathspec all commit working tree content that --cached does not show.
+# -a, --all, -p, --patch, --pathspec-from-file, a pathspec and a staging subcommand all commit
+# working tree content that --cached does not show.
 if widen or pathspecs:
     changed |= set(files("HEAD"))
 
