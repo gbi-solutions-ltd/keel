@@ -453,6 +453,7 @@ passes, with `git commit -m "ci: validate the plugin and marketplace manifests"`
   decision 10's "STILL OPEN" paragraph)
 - Modify: `docs/ideas/claude-code-features-assessed-2026-10-29.md` (Status, Next, assumptions)
 - Modify: `CHANGELOG.md` (an Unreleased section)
+- Modify: `README.md` (the output style paragraph)
 
 **Depends on:** tasks 1 to 5
 
@@ -466,7 +467,11 @@ passes, with `git commit -m "ci: validate the plugin and marketplace manifests"`
    public, citing `docs/plans/2026-10-22-public-first-development.md` for when it changed, and the
    original private decision stays recorded as history.
 3. Decision 10 is fully resolved. Example: the summary at `:5-8` no longer lists it as open, row 10
-   reads resolved 2026-11-02, and the "STILL OPEN" paragraph is replaced by what tasks 2 and 3 did.
+   reads resolved 2026-11-02, and decision 10's "What blocks it", "What settles it", "If it is
+   taken" and "STILL OPEN" paragraphs are rewritten from the code to state what tasks 2 and 3 do.
+3a. `README.md` says the project key overrides a style a developer set in their user-level
+   settings, and that `.claude/settings.local.json` is the way back (task 2's quality review).
+   Example: the output style paragraph names both.
 4. The idea record says what was built. Example: Status reads built 2026-11-02 for items 1 to 4
    and 9, Next reads nothing, and the assumptions rows this plan probed cite its evidence section.
 5. `CHANGELOG.md` has an Unreleased entry per user-visible change: the guard blocking on failure,
@@ -485,7 +490,7 @@ Make the edits, then run `tests/run-tests.sh` and quote its summary.
 
 ```bash
 git add docs/04-plugin-strategy.md docs/07-open-decisions.md \
-        docs/ideas/claude-code-features-assessed-2026-10-29.md CHANGELOG.md
+        docs/ideas/claude-code-features-assessed-2026-10-29.md CHANGELOG.md README.md
 git status --porcelain
 ```
 
