@@ -380,6 +380,7 @@ passes, with `git commit -m "docs: record that every subagent's stash is held by
 
 ## Delivery
 
+- review-code: nothing blocking, no standards violation open (2026-11-02, base 1327bc8, re-review of 75fe56a)
 - review-code round 1: 3 blocking (2026-11-02, base 1327bc8)
   - a mutant making an empty `agent_id` count survived: no fallback case for it (hooks/review-guard:95)
   - a mutant narrowing `list|show` to `list` survived: no fallback case for `stash show` (hooks/review-guard:107)
