@@ -52,6 +52,11 @@ sentence). Every one is folded in.
   for a general-purpose subagent, `<plugin>:<agent>` for a plugin's agent), every kind of subagent
   is now seen to carry one. The ledger row is not restamped: the new observation is on 2.1.316, and
   a required row stamped above 2.1.302 would raise keel's minimum.
+- **A user's own agent, dispatched as a subagent, carries an `agent_id`.** Recorded after task 3,
+  2026-11-02, on 2.1.316: the same throwaway plugin logged `agent_type` `'helper'` and `agent_id`
+  `'a07218604e29496a9'` for the Bash call of the project agent `.claude/agents/helper.md`
+  dispatched by the main session. So keying the stash rule on a non-empty `agent_id` reaches a
+  user's own agents, as the idea record intends.
 - **The idea record's open question 2 misdescribes the reviewer's rule.** It says `review-guard`
   allows `stash list` and `stash show`. It does not: `stash` is in `SHARED`
   (`hooks/review-guard#SHARED = {"stash"`), and `judge_git` refuses every subcommand in that set
@@ -372,3 +377,15 @@ passes, with `git commit -m "docs: record that every subagent's stash is held by
 - **Not in this plan:** a hook on the main session's stash, and anything a command string hides
   (`sh -c "git stash"`, an alias, a script), which `hooks/review-guard`'s header already states as
   its limit.
+
+## Delivery
+
+- review-code round 1: 3 blocking (2026-11-02, base 1327bc8)
+  - a mutant making an empty `agent_id` count survived: no fallback case for it (hooks/review-guard:95)
+  - a mutant narrowing `list|show` to `list` survived: no fallback case for `stash show` (hooks/review-guard:107)
+  - a mutant dropping `--config-env` from the fallback's value options survived; `--super-prefix` has the same shape (hooks/review-guard:93)
+- follow-up:
+  - consider: the ledger requires only `pretooluse_agent_type` while the rule keys on `agent_id`; a separate row could follow (lib/harness/capabilities)
+  - consider: a main session started as `--agent keel:keel-reviewer` gets the reviewer rules (hooks/review-guard header)
+  - consider: the fallback's catch-all option pattern widens the reviewer's fallback too; the header says it only for a subagent (hooks/review-guard:93)
+  - consider: open question 2 in the idea record reads as a correction rather than current state (docs/ideas/implementers-run-git-stash.md)
