@@ -472,7 +472,7 @@ others="$(printf '%s\n' "$entries" | grep -v '/sensitive-guard=' | grep -v '=$' 
 
 # The ledger records the primitive as provided and required by nothing: the guard works without
 # onFailure, and a requires row would withhold the whole guard if this evidence were withdrawn.
-row='provides|claude|pretooluse_on_failure_block|vendor:code.claude.com/docs/en/hooks onFailure block on a timed-out PreToolUse command hook, probed on 2.1.316 in docs/plans/2026-11-02-adopt-the-agreed-claude-code-features.md|2.1.295|2026-11-02'
+row='provides|claude|pretooluse_on_failure_block|vendor:code.claude.com/docs/en/hooks onFailure block on a timed-out PreToolUse command hook|2.1.295|2026-11-02'
 grep -qxF "$row" lib/harness/capabilities \
   && ok "the ledger provides pretooluse_on_failure_block with source, version and date" \
   || bad "the ledger provides pretooluse_on_failure_block with source, version and date" "no such row"

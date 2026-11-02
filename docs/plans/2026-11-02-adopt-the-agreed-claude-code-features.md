@@ -149,7 +149,7 @@ Every task inherits these.
    (`lib/harness/capabilities:57-63`, with `subagent_transcript_path` as the precedent). A
    `requires` row would stop the whole guard being generated if this evidence were withdrawn.
    Example: `lib/harness/capabilities` holds
-   `provides|claude|pretooluse_on_failure_block|vendor:code.claude.com/docs/en/hooks onFailure block on a timed-out PreToolUse command hook, probed on 2.1.316 in docs/plans/2026-11-02-adopt-the-agreed-claude-code-features.md|2.1.295|2026-11-02`,
+   `provides|claude|pretooluse_on_failure_block|vendor:code.claude.com/docs/en/hooks onFailure block on a timed-out PreToolUse command hook|2.1.295|2026-11-02`,
    and no line starts `requires|sensitive-guard|pretooluse_on_failure_block`.
 3a. The generator emits the key from the ledger. `entry()` (`tests/generate-harness-artifacts.sh:125`)
    takes a hook and a timeout today; it gains an optional third argument, the failure policy, which
@@ -542,17 +542,15 @@ Paste the `git status --porcelain` output into your report.
 - review-code: nothing blocking, no standards violation open (2026-11-02, base 575b3b8, re-review of c23f68d)
 - review-code round 1: 1 blocking (2026-11-02, base 575b3b8)
   - a mutant `if added or style:` to `if added:` survived: no case covered an existing settings file that needed only the output style (lib/harness/claude.sh:374)
+- should-fix pass: the onFailure ledger row is vendor-only at 2.1.295, the probe staying in this plan's evidence; the CI comment says npm checks the registry's hash and none is pinned here (2026-11-02)
 - follow-up:
-  - should fix: the ledger row for onFailure mixes vendor and probe evidence (lib/harness/capabilities)
   - consider: the exact-row ledger test breaks on re-verification (tests/test-harness-claims.sh)
   - consider: the others check excludes sensitive-guard on every event, not only PreToolUse/Bash (tests/test-harness-claims.sh)
   - consider: "keel:keel terse" is written three times in lib/harness/claude.sh; the python3-absent message does not name the style
   - consider: the session-start settings read uses the .claude/ beside the profile, which can differ from Claude Code's project root (hooks/session-start)
   - consider: doc 04's "Never a hard failure" sits beside the new dependency cost (docs/04-plugin-strategy.md)
   - consider: decision 2 keeps "Harmless while the repository is private" inside its dated history (docs/07-open-decisions.md)
-  - should fix: the CI comment says nothing checks the integrity hash, where npm checks it against registry metadata and the gap is no local pin (.github/workflows/ci.yml)
   - consider: doc 05 still quotes keel 0.17.0 in the version-line paragraph (docs/05-token-and-memory-design.md)
-  - should fix: the CI comment (fixed in c23f68d) still says nothing checks the integrity hash; npm checks it against the registry, and the gap is that no hash is pinned in this repository (.github/workflows/ci.yml:105-106)
   - consider: the 11f comment says the guard's paths "lead nowhere"; with no profile the hook would read /.claude/ at the filesystem root (tests/test-session-start.sh:167-169)
   - consider: hooks/sensitive-guard claims a hook that cannot start is blocked; only a timeout was probed
   - owed: the manifests CI job's first run on the pull request
