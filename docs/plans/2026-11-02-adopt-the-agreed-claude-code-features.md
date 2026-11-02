@@ -210,7 +210,7 @@ The coordinator commits after both review passes, with
 - Modify: `docs/harness-support.md` (regenerated)
 - Modify: `README.md` (the output style paragraph, `README.md:85-87`)
 - Modify: `docs/05-token-and-memory-design.md` (`:357`, the style's role)
-- Modify: `docs/04-plugin-strategy.md` (the example settings `keel init` writes, `:136-151`)
+- Modify: `docs/04-plugin-strategy.md` (the example under "`.claude/settings.json` that `keel init` writes")
 - Test: `tests/test-keel-3.sh`
 
 **Interfaces:**
@@ -235,7 +235,8 @@ The coordinator commits after both review passes, with
 6. `README.md` says `keel init` selects the style for the project and that
    `.claude/settings.local.json`, which is git-ignored, overrides it for one developer. Example: the
    paragraph no longer calls the style "machine-wide rather than per-project", and the example in
-   `docs/04-plugin-strategy.md:136-151` shows the `outputStyle` key.
+   `docs/04-plugin-strategy.md`, under "`.claude/settings.json` that `keel init` writes", shows
+   the `outputStyle` key.
 
 **Done when:** `tests/test-keel-3.sh` and `tests/test-harness-claims.sh` pass, and the profile's
 lint command passes.
@@ -373,7 +374,7 @@ Paste the `git status --porcelain` output into your report.
 
 **Done when:** `tests/test-keel-4.sh` passes and `claude plugin validate .` exits 0.
 
-- [ ] **Step 4.1: Build it test first**
+- [x] **Step 4.1: Build it test first**
 
 Follow `keel:tdd` for behaviour 1 in `tests/test-keel-4.sh`: run it and watch it fail
 because `plugin.json` has no `dependencies`. Then edit both manifests and the two docs.
@@ -384,7 +385,7 @@ output in your report. Then run behaviour 4's two commands and quote their last 
 Run: `tests/run-tests.sh`
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 
-- [ ] **Step 4.2: Hand over**
+- [x] **Step 4.2: Hand over** Note: rounds: 2; routing: inherit; loop: light; spec DEVIATES (behaviour 3 test checked a subset of enabledPlugins), one fix pass, second spec COMPLIES; no quality review, review-code covers it at the end; coordinator repointed the plan citations into docs/04 that this task shifted
 
 ```bash
 git add .claude-plugin/plugin.json .claude-plugin/marketplace.json docs/04-plugin-strategy.md \
@@ -449,7 +450,7 @@ passes, with `git commit -m "ci: validate the plugin and marketplace manifests"`
 
 **Story:** item 9 of the idea record, and the records items 1 to 4 make wrong
 **Files:**
-- Modify: `docs/04-plugin-strategy.md` (`:8` and `:158`)
+- Modify: `docs/04-plugin-strategy.md` (the sentence under the scope note, and "a private repo")
 - Modify: `docs/07-open-decisions.md` (`:5-8`, the table rows 2 and 10, decision 2 at `:54`,
   decision 10's "STILL OPEN" paragraph)
 - Modify: `docs/ideas/claude-code-features-assessed-2026-10-29.md` (Status, Next, assumptions)
@@ -461,10 +462,11 @@ passes, with `git commit -m "ci: validate the plugin and marketplace manifests"`
 
 **Behaviours:**
 
-1. `docs/04-plugin-strategy.md:8` no longer says every plugin is in `claude-plugins-official`.
-   Example: it says each is listed there, and that Context7 and Playwright are external plugins the
-   official marketplace lists, matching the `(external)` marks at `:24` and `:28`. `:158` no longer
-   says "private repo".
+1. `docs/04-plugin-strategy.md`, under its scope note, no longer says every plugin is in
+   `claude-plugins-official`. Example: it says each is listed there, and that Context7 and
+   Playwright are external plugins the official marketplace lists, matching the `(external)` marks
+   in the verdicts table. The sentence naming "a private repo" no longer says the keel repo is
+   private.
 2. `docs/07-open-decisions.md` says the repository is public. Example: row 2 and decision 2 read
    public, citing `docs/plans/2026-10-22-public-first-development.md` for when it changed, and the
    original private decision stays recorded as history.

@@ -18,7 +18,7 @@
 Machine level (once per engineer)
   /plugin marketplace add gbi-solutions-ltd/keel
   /plugin install keel@gbi
-  -> installs 25 skills, the SessionStart hooks, and bin/keel on the Bash tool's PATH
+  -> installs 25 skills, the SessionStart hooks, bin/keel on the Bash tool's PATH, and the three required plugins, security-guidance, code-review and skill-creator, as its dependencies
   ln -sfn <cache-or-clone>/bin/keel ~/.local/bin/keel
   -> optional: puts keel on your login shell's PATH. The plugin already put it
      on the Bash tool's

@@ -614,6 +614,65 @@ changelog_version="$(sed -n 's/^## \([0-9][0-9.]*\).*/\1/p' "$ROOT/CHANGELOG.md"
   && ok "CHANGELOG's newest entry matches VERSION ($cli_version)" \
   || bad "version drift" "VERSION is $cli_version, newest CHANGELOG entry is $changelog_version"
 
+# ---- the required plugins, declared as dependencies -----------------------
+# docs/04-plugin-strategy.md marks three plugins **Install, required**, and plugin.json's
+# dependencies is what makes installing keel install them. Two lists of one fact drift the way the
+# two version numbers above did, so the doc's verdict rows are read and compared with the manifest.
+dep_drift="$(DOC="$ROOT/docs/04-plugin-strategy.md" MANIFEST="$ROOT/.claude-plugin/plugin.json" python3 -c "
+import json, os, re
+rows = re.findall(r'^\| [^|]+\| \`([a-z0-9-]+)\` \| \*\*Install, required\*\* \|', open(os.environ['DOC']).read(), re.M)
+want = sorted(r + '@claude-plugins-official' for r in rows)
+have = sorted(json.load(open(os.environ['MANIFEST'])).get('dependencies', []))
+if not rows: print('the doc has no Install, required row')
+elif want != have: print('doc requires %s, plugin.json depends on %s' % (want, have))
+" 2>&1)"
+[ -z "$dep_drift" ] \
+  && ok "plugin.json depends on exactly the plugins doc 04 marks Install, required" \
+  || bad "required plugins" "$dep_drift"
+
+# Without the allowlist a dependency on another marketplace installs nothing and keel then fails to
+# load, per code.claude.com/docs/en/plugins/dependencies.
+python3 -c "
+import json, sys
+m = json.load(open('$ROOT/.claude-plugin/marketplace.json'))
+sys.exit(0 if m.get('allowCrossMarketplaceDependenciesOn') == ['claude-plugins-official'] else 1)" \
+  && ok "marketplace.json allows dependencies on claude-plugins-official" \
+  || bad "required plugins" "marketplace.json has no allowCrossMarketplaceDependenciesOn naming claude-plugins-official"
+
+# The dependencies are an install-time fact; enabledPlugins is the project's own record, and it still
+# names keel, the five static plugins and the node-ts fixture's language server.
+c="$(fixture node-ts)"
+( cd "$c" && "$KEEL" init -y >/dev/null 2>&1 )
+enabled="$(plugins_of "$c")"
+missing=""
+for p in keel@gbi security-guidance@claude-plugins-official code-review@claude-plugins-official \
+         skill-creator@claude-plugins-official claude-md-management@claude-plugins-official \
+         context7@claude-plugins-official typescript-lsp@claude-plugins-official; do
+    case " $enabled " in *" $p "*) ;; *) missing="$missing $p" ;; esac
+done
+[ -z "$missing" ] && ok "init's enabledPlugins still names keel, the static plugins and the language server" \
+  || bad "required plugins" "enabledPlugins lacks$missing: $enabled"
+
+# Both manifests validate. An empty HOME needs no credentials; a machine without claude skips.
+if command -v claude >/dev/null 2>&1; then
+    vh="$(mktemp -d)"
+    ( cd "$ROOT" && HOME="$vh" claude plugin validate --strict .claude-plugin/marketplace.json >/dev/null 2>&1 ) \
+      && ok "claude plugin validate --strict passes the marketplace" \
+      || bad "required plugins" "claude plugin validate --strict .claude-plugin/marketplace.json failed"
+    ( cd "$ROOT" && HOME="$vh" claude plugin validate . >/dev/null 2>&1 ) \
+      && ok "claude plugin validate passes the plugin" \
+      || bad "required plugins" "claude plugin validate . failed"
+    rm -rf "$vh"
+else
+    printf '  SKIP  claude is absent, so the manifests were not validated\n'
+fi
+
+# The cost of declaring them is written where the verdicts are.
+grep -q 'stops keel loading' "$ROOT/docs/04-plugin-strategy.md" \
+  && grep -q 'No minimum Claude Code version' "$ROOT/docs/04-plugin-strategy.md" \
+  && ok "doc 04 states that a required plugin that cannot install stops keel loading" \
+  || bad "required plugins" "doc 04 does not state the cost of declaring the dependencies"
+
 # The reference says which keys keel writes and which a human adds. That column is derived from a
 # real init when the page is generated, and this is what stops it drifting afterwards. A
 # hand-maintained list said twelve human-only keys until the context window work moved one, and

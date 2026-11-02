@@ -7,6 +7,7 @@
     "description": "AI engineering tooling from GBi Solutions Ltd",
     "version": "0.2.0"
   },
+  "allowCrossMarketplaceDependenciesOn": ["claude-plugins-official"],
   "plugins": [
     {
       "name": "keel",

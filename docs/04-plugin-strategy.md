@@ -22,6 +22,20 @@ which is registered by default and needs no separate setup.
 | Playwright | `playwright` (external) | **Conditional** | Only where there are browser flows worth testing |
 | FeatureDev | `feature-dev` | **Do not install by default** | See below. It conflicts with our pipeline |
 
+### The required three install with keel
+
+`.claude-plugin/plugin.json` lists the three **Install, required** plugins under `dependencies`, so
+installing keel installs them at the same scope. `.claude-plugin/marketplace.json` names
+`claude-plugins-official` in `allowCrossMarketplaceDependenciesOn`; without it the install completes
+without them and keel then fails to load. `tests/test-keel-4.sh` fails when a required row above and
+that list disagree.
+
+The cost is accepted: a required plugin that cannot install stops keel loading, rather than costing
+a `keel doctor` warning. No minimum Claude Code version is documented for `dependencies` or the
+allowlist (code.claude.com/docs/en/plugins/dependencies), so keel's own minimum does not move for
+them. `keel init` still writes all of them into `enabledPlugins`, the project's record of what it
+expects, and `keel doctor` still reports the missing ones.
+
 ### Language servers, per detected language
 
 `keel init` enables one per language it detects, and a polyglot repository gets several. Every id is
