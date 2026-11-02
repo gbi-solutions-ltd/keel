@@ -490,6 +490,131 @@ passes, with `git commit -m "docs: record the review-guard follow-ups"`.
 
 ---
 
+### Task 6: a subagent's stash rule reads only commands that run, and bounds its time
+
+**Story:** the "Remaining, by decision" items on PR #11, which Bernard asked to close on
+2026-11-02
+**Files:**
+- Modify: `hooks/review-guard`
+- Test: `tests/test-review-guard.sh`
+
+**Depends on:** tasks 4 and 5
+
+**Behaviours:**
+
+1. For a subagent's stash rule, a heredoc's body is not read as commands. Example: from a subagent
+   (non-empty `agent_type` and `agent_id`), `cat <<'EOF' > notes.md` / `run git stash to save` /
+   `EOF` and `git commit -F - <<EOF` / `fix: avoid git stash` / `EOF` are allowed, and so is the
+   `<<-EOF` form with a tab-indented delimiter; `cat <<EOF` / `x` / `EOF` / `git stash` (a stash
+   after the body ends) is refused.
+2. For a subagent's stash rule, a `git` word counts only where it runs: at command position after
+   any assignments, or as the command a wrapper runs (`env`, `command`, `exec`, `nice`, `nohup`,
+   `time`, `timeout`, `sudo`, `xargs`, each with its own options and arguments skipped as the
+   wrapper reads them). Example: from a subagent, `echo git stash`, `printf 'git stash\n'` and
+   `grep -n "git stash" notes.md` are allowed; `env A=1 git stash`, `timeout 5 git stash`,
+   `command git stash`, `xargs git stash`, `nice -n 5 git stash`, `/usr/bin/git stash` and
+   `A=1 git stash` are refused.
+3. The reviewer's rules are unchanged: it still reads every `git` word and heredoc bodies. Example:
+   from `keel:keel-reviewer` with an `agent_id`, `echo git stash` is still refused, and every
+   existing reviewer case passes.
+4. A subagent command too long to parse in time is refused without parsing, and quickly. The bound
+   is a named constant of 64 KB on the command's length. Example: a subagent's `git status` padded
+   past 64 KB with a trailing `# stash` comment is refused in under a second with a reason saying
+   the command is too long to read; the same command under the bound is allowed; a reviewer's
+   command past the bound that names `git` is refused the same way; a main session's 1 MB command
+   is allowed, because the main session exits before any of this.
+5. The fallback (no python3) is unchanged and still errs toward refusing, and the header says the
+   two refinements above apply on the python path only. Example: with python3 off the PATH, a
+   subagent's `echo git stash` is still refused; the header states it.
+
+The header's "ITS LIMIT" paragraph is rewritten to state what is true now: the subagent rule reads
+commands that run and skips heredoc bodies; the reviewer's rule and the fallback read every `git`
+word; the size bound and its reason.
+
+**Done when:** `tests/test-review-guard.sh` passes, and the profile's lint command passes.
+
+- [ ] **Step 6.1: Build it test first**
+
+Follow `keel:tdd` for behaviours 1, 2 and 4: write the cases, run them, and watch the allow cases
+of 1 and 2 and the refusal and timing of 4 fail (today the parser reads every `git` word and
+heredoc bodies, and has no bound). Then change the hook and its header.
+Run: `tests/test-review-guard.sh`
+Expected before the implementation: FAIL on those cases. Expected after: PASS. Quote the failing
+output in your report. Also run the file under `/bin/bash` by name.
+
+Run: `tests/run-tests.sh`
+Expected: PASS, or reds this task did not cause, each named.
+
+- [ ] **Step 6.2: Hand over**
+
+```bash
+git add hooks/review-guard tests/test-review-guard.sh
+git status --porcelain
+```
+
+Stage exactly those paths, plus any doc whose citation you repaired, and stop. **Do not commit.**
+The coordinator commits after both review passes, with
+`git commit -m "fix(review-guard): read only commands that run for a subagent, and bound the parse"`.
+
+---
+
+### Task 7: a scripted re-probe of `agent_id`, run at each release
+
+**Story:** the "Remaining, by decision" item on PR #11 that the guard depends on subagents carrying
+`agent_id`, which Bernard asked to close on 2026-11-02
+**Files:**
+- Create: `tests/probe-agent-id.sh`
+- Modify: `docs/runbooks/cutting-a-release.md`
+- Modify: `docs/decisions/ADR-0016-a-subagents-stash-is-held-by-a-hook.md`
+- Modify: `CHANGELOG.md`
+
+**Depends on:** task 6
+
+**Behaviours:**
+
+1. `tests/probe-agent-id.sh` re-runs the three observations this guard rests on against the
+   installed Claude Code, with a throwaway plugin loaded by `--plugin-dir` and a throwaway project
+   under the system temp directory, and exits 0 only when all three hold. Example: it prints the
+   Claude Code version, then one line per case, `main session: no agent_id`,
+   `main session started with --agent: agent_type set, no agent_id` and
+   `project agent subagent: agent_type and agent_id set`, each `PASS` or `FAIL`, and removes its
+   temp directory on exit. It is not in `tests/run-tests.sh`, because it needs a signed-in Claude
+   Code and spends tokens, and its header says so.
+2. Its parts that need no Claude Code are checked: it parses under `/bin/bash` 3.2 and passes
+   shellcheck (the profile's lint covers `tests/*.sh`), and run with `claude` absent from the PATH
+   it exits non-zero with a message naming the missing command. Example: `PATH=/usr/bin:/bin
+   tests/probe-agent-id.sh` prints that `claude` was not found and exits 2.
+3. The release runbook runs it. Example: `docs/runbooks/cutting-a-release.md` section 0 gains a
+   step: when the Claude Code version is newer than the one the last release recorded, run
+   `tests/probe-agent-id.sh`, and do not release on a FAIL, because `hooks/review-guard` then no
+   longer tells a subagent from the main session.
+4. ADR-0016 names the probe and the runbook step as the control for its dependency on `agent_id`,
+   and `CHANGELOG.md`'s Unreleased section has an entry for the probe and for task 6's change.
+
+**Done when:** `bash -n tests/probe-agent-id.sh` and the profile's lint command pass, and the
+missing-`claude` run exits 2. Then run the probe once for real and quote its output.
+
+- [ ] **Step 7.1: Build it, check what runs without Claude Code, then run it**
+
+Write the script, run the missing-`claude` check and watch it exit 2 with the message, run the
+lint, then run the probe for real against the installed Claude Code and quote every line it prints.
+Then edit the runbook, ADR-0016 and CHANGELOG.
+Run: `tests/run-tests.sh`
+Expected: PASS.
+
+- [ ] **Step 7.2: Hand over**
+
+```bash
+git add tests/probe-agent-id.sh docs/runbooks/cutting-a-release.md \
+        docs/decisions/ADR-0016-a-subagents-stash-is-held-by-a-hook.md CHANGELOG.md
+git status --porcelain
+```
+
+Stage exactly those paths and stop. **Do not commit.** The coordinator commits after the review
+pass, with `git commit -m "test: a scripted re-probe of agent_id, run at each release"`.
+
+---
+
 ## Notes for the coordinator
 
 - **Concurrent batches.** `keel plan batches` on 2026-11-02 printed every task alone:
