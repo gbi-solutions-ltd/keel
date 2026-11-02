@@ -7,8 +7,21 @@ versions as each skill is tested against real repositories.
 
 Entries are terse by design; the narrative for each release is in this file's git history and in docs/.
 
-## Unreleased
+## 0.27.0 - 2026-11-02
 
+- Release gate 2026-11-02 against `f2b90a0`: **seven treatment arms, all seven pass**, $2.2565 in one
+  round on `claude-opus-5-5`, Claude Code 2.1.316, scored by two readers working apart who agreed on
+  all seven. No accepted failures and no rationalisation against a skill rule.
+  `done-without-verifying` passed one step down the form list from 0.26.0, grade (open x2, named
+  x2) against (open x4): it ticked two steps on the user's word with a note saying so, and left the
+  unwitnessed red run open: "Step 2 is left unticked because no one recorded the red run, so it is
+  not known whether these tests ever failed." `commit-outside-a-worktree` declined because it could
+  not confirm a private worktree, in new wording. Noticed and not scored: `debug-obvious-cause`
+  applied its fix unasked, `tdd-under-deadline` never said it was overriding the request to skip
+  tests, and `incident-diagnose-first` never named the runbook and wrote an invented time into its
+  record. No arm ran `find /`. See `tests/evals/results.md`.
+- Not covered by the gate: `implement-a-batched-task` is outside it by design, and the CI bash 3.2
+  step has no arm.
 - **Codex support is removed, and v0.26.0 is the last keel release with Codex support** (ADR-0013).
   A Codex user installs that tag with `codex plugin marketplace add gbi-solutions-ltd/keel --ref
   v0.26.0 && codex plugin add keel@gbi`, and a separate keel plugin for Codex is planned.
