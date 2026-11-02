@@ -37,7 +37,7 @@ What a hook can see. The 2026-10-17 probe (ADR-0010's context, and the table at
 session's. On 2026-11-02, Claude Code 2.1.316, an agent defined in a project's `.claude/agents/`
 carried its own name as `agent_type`, and `claude -p --agent helper` logged `agent_type` `helper`
 and `agent_id` `None` for the main session's own Bash call
-(`docs/plans/2026-11-02-hold-a-subagents-git-stash.md:197-199`). So `agent_type` alone does not
+(`docs/plans/2026-11-02-hold-a-subagents-git-stash.md:202-204`). So `agent_type` alone does not
 mean a subagent, and a non-empty `agent_id` does.
 
 The dominant force: the stash is shared by every worktree, so a stash made by any subagent anywhere
@@ -115,8 +115,10 @@ the stash to the prompt.
 **What must be true for this to keep working.** That Claude Code keeps putting a non-empty
 `agent_id` in every subagent's PreToolUse input and none in the main session's, including one
 started with `--agent`. `agent_id` was observed for a `general-purpose` subagent and a plugin agent
-on 2.1.302. For an agent defined in `.claude/agents/`, its `agent_type` was observed on 2.1.316 and
-its `agent_id` was not recorded. That a deny keeps holding under `bypassPermissions`.
+on 2.1.302. For an agent defined in `.claude/agents/`, a non-empty `agent_id` was observed on
+2.1.316, 2026-11-02, with `agent_type` `helper`
+(`docs/plans/2026-11-02-hold-a-subagents-git-stash.md:55`). That a deny keeps holding under
+`bypassPermissions`.
 
 ## Verification
 

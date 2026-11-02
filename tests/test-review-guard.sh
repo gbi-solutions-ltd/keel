@@ -472,6 +472,16 @@ for c in 'git -P stash' 'git --bare stash' 'git --namespace n stash'; do
 done
 run "$(event "$SUB" 'git -P stash list' "$repo")" "$repo" PATH="$shim"
 expect_allow "without python3 a subagent's git -P stash list is allowed"
+# The fallback's own edges: an empty agent_id is no subagent, show is a reading form, and
+# --config-env and --super-prefix take the next word as their value.
+run "$(event helper 'git stash' "$repo" '')" "$repo" PATH="$shim"
+expect_allow "without python3 a main session whose agent_id is empty may git stash"
+run "$(event "$SUB" 'git stash show -p stash@{0}' "$repo")" "$repo" PATH="$shim"
+expect_allow "without python3 a subagent's git stash show -p stash@{0} is allowed"
+for c in 'git --config-env a=B stash' 'git --super-prefix p/ stash'; do
+    run "$(event "$SUB" "$c" "$repo")" "$repo" PATH="$shim"
+    expect_deny "without python3 a subagent's $c is refused"
+done
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
