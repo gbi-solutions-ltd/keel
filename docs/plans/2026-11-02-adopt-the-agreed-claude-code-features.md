@@ -169,11 +169,11 @@ Every task inherits these.
 **Done when:** `tests/test-harness-claims.sh` and `tests/test-harness-resolve.sh` pass, and the
 profile's lint command passes.
 
-- [ ] **Step 1.1: Build it test first**
+- [x] **Step 1.1: Build it test first**
 
 Follow `keel:tdd` for behaviours 1 to 3a: add the cases to `tests/test-harness-claims.sh`, run it,
 and watch them fail because no entry carries `onFailure` and no row names the primitive. Then add
-the key in the generator for `sensitive-guard` alone, add the two ledger rows, regenerate
+the key in the generator for `sensitive-guard` alone, add the ledger row, regenerate
 `hooks/hooks.json` and `docs/harness-support.md` with the generator, and write behaviour 5's
 comment.
 Run: `tests/test-harness-claims.sh`
@@ -185,7 +185,7 @@ Expected: PASS, or reds this task did not cause, each named and matched against 
 This is the one boundary run the task schedules. Then confirm behaviour 4 by reading the
 regenerated `docs/harness-support.md`.
 
-- [ ] **Step 1.2: Hand over**
+- [x] **Step 1.2: Hand over** Note: rounds: 1; routing: inherit; loop: full; spec COMPLIES; quality nothing blocking, consider: the ledger row mixes vendor and probe evidence, the exact-row test is brittle to re-verification, the others check excludes sensitive-guard on every event; step 1.1 said two ledger rows where behaviour 3 says one, corrected in the plan
 
 ```bash
 git add tests/generate-harness-artifacts.sh hooks/hooks.json lib/harness/capabilities \

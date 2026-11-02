@@ -122,15 +122,20 @@ is_active() { grep -qx -e "$1" <<< "$active"; }
 # sensitive-guard or done-guard is the failure this whole design exists to prevent. The suite counts
 # entries against synchronous ones so that a silent flip is a red build rather than five gates
 # quietly becoming advice.
-entry() {
-    local hook="$1" timeout="$2"
+#
+# The optional third argument is the failure policy, printed as `onFailure` when given. Claude Code
+# runs the command when a hook times out or cannot start, and `block` makes that a blocked call.
+entry() {   # entry <hook> <timeout> [onFailure]
+    local hook="$1" timeout="$2" tail=""
+    [ -z "${3:-}" ] || tail=",
+            \"onFailure\": \"$3\""
     cat <<ENTRY
           {
             "type": "command",
             "command": "\\"\${CLAUDE_PLUGIN_ROOT}/hooks/$hook\\"",
             "shell": "bash",
             "async": false,
-            "timeout": $timeout
+            "timeout": $timeout$tail
           }
 ENTRY
 }
@@ -138,14 +143,14 @@ ENTRY
 # A matcher group, or nothing at all when the manifest withholds its gate. Printing nothing rather
 # than an empty group is what lets the caller drop the whole event: a gate the ledger withholds
 # simply has no group, with no conditional anybody has to remember.
-group() {   # group <gate> <hook> <timeout> [matcher]
+group() {   # group <gate> <hook> <timeout> [matcher] [onFailure]
     is_active "$1" || return 0
     printf '      {\n'
     if [ -n "${4:-}" ]; then
         printf '        "matcher": "%s",\n' "$4"
     fi
     printf '        "hooks": [\n'
-    entry "$2" "$3"
+    entry "$2" "$3" "${5:-}"
     printf '        ]\n      }'
 }
 
@@ -178,10 +183,17 @@ $2
     ]"
 }
 
+# sensitive-guard alone blocks when it fails to answer, and only where the ledger provides the
+# primitive. Provided and required by nothing, because the guard works without it and a requires row
+# would withhold the whole guard with the evidence. review-guard runs on every Bash call of every
+# session, so a block there on failure would stop the main session too.
+sensitive_failure=""
+harness_provides "$harness" pretooluse_on_failure_block && sensitive_failure=block
+
 add_event SessionStart     "$(join_groups "$(group session-start   session-start   30 'startup|clear|compact')")"
 add_event UserPromptSubmit "$(join_groups "$(group context-watch   context-watch   10)")"
 add_event PreToolUse       "$(join_groups "$(group context-watch   context-watch   10)" \
-                                          "$(group sensitive-guard sensitive-guard 10 'Bash')" \
+                                          "$(group sensitive-guard sensitive-guard 10 'Bash' "$sensitive_failure")" \
                                           "$(group review-guard    review-guard    10 'Bash')")"
 add_event Stop             "$(join_groups "$(group done-guard      done-guard      10)")"
 add_event SubagentStop     "$(join_groups "$(group done-guard      done-guard      10)")"
