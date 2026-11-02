@@ -87,6 +87,7 @@ schema_fingerprint_for() {
         4) printf 'd5159ecbff0b' ;;
         5) printf 'ebcd5f8fba88' ;;
         6) printf '23588273f3d2' ;;
+        7) printf 'e00a285c2923' ;;
     esac
 }
 errors=0
@@ -308,9 +309,9 @@ for style in output-styles/*.md; do
 done
 
 # A brief dispatched to a model alias that does not exist is a brief dispatched to nothing, and the
-# failure is silent. The five aliases below are the ones Claude Code accepts. A full model id is
-# also valid and is deliberately not permitted here: an id pinned in a skill goes stale without
-# anything noticing, while an alias tracks the current model.
+# failure is silent. Of the five aliases Claude Code accepts, a skill may name only `inherit`. A
+# full id is also valid and is deliberately not permitted here: an id pinned in a skill goes stale
+# without anything noticing, while an alias tracks the current model.
 #
 # The marker is the word `model` before the alias, not `on`. `on \`x\`` was the first pattern and it
 # collided with seven existing phrases, `on \`main\`` three times among them, so the rule would have
@@ -319,13 +320,13 @@ done
 # `Model \`inherit\`` at the start of a sentence. Until 2026-08-20 that pin was invisible here, so a
 # capital M was a way to hold an unchecked alias.
 #
-# UNTIL 2026-09-06 THIS ACCEPTED sonnet, opus, haiku, fable OR inherit, and four of those are
-# Anthropic model names that mean nothing on a second harness. Only `inherit` survives: it is
-# neutral and says "the driver's model", which is a real instruction on any harness. Everything else
-# is now a delegation profile, a name each harness resolves to its own model, written for Codex at
-# .codex/agents/keel-fanout.toml by lib/harness/codex.sh. ADR-0005.
+# ONLY `inherit` IS ACCEPTED, and it says "the driver's model". Every other dispatch names a
+# delegation profile such as keel-fanout, because docs/ideas/model-routing.md measured which model
+# the reading should run on: on 2026-08-20 haiku passed every structural check on repo-snapshot's
+# briefs and cited wrongly twice as often as sonnet. agents/*.md is where Claude Code turns a
+# delegation profile into a model, so the measured choice lives in one file per profile. ADR-0005.
 #
-# `inherit` IS NOT THE NEUTRAL REPLACEMENT FOR THE OTHER FOUR, and reading it as one inverts the
+# `inherit` IS NOT THE NEUTRAL REPLACEMENT FOR A VENDOR ALIAS, and reading it as one inverts the
 # routing decision: it means the driver's model, where a fan-out wants a cheaper one.
 # docs/ideas/model-routing.md is the standing evidence that the cheaper model can pass every
 # structural check and be wrong twice as often, which is why a profile is a name a harness resolves
@@ -344,11 +345,11 @@ bad_models=$(grep -rhoiE 'model `[a-z0-9.-]+`' skills/*/SKILL.md skills/*/refere
 # typo there routes every dispatch naming the profile to nothing and does it silently.
 #
 # THE VENDOR SET IS ALLOWED HERE AND REJECTED IN A SKILL BODY, deliberately. The check above exists
-# so a skill names a profile rather than a model; this file is the one place the profile becomes a
-# model, which is the indirection lib/harness/codex.sh:86-88 relies on to map keel-fanout to a Codex
-# model. Forbidding the alias here would leave the mapping nowhere to live. The set is what the
-# harness accepts, not what this tree uses: nothing here names fable, and a set narrowed to current
-# usage would reject a correct file the day somebody needs one.
+# so a skill names a profile rather than a model; agents/*.md is where Claude Code turns a
+# delegation profile into a model, the one place the measured choice is written down. Forbidding
+# the alias here would leave the mapping nowhere to live.
+# The set is what the harness accepts, not what this tree uses: nothing here names fable, and a set
+# narrowed to current usage would reject a correct file the day somebody needs one.
 #
 # THE DESCRIPTION IS CHECKED FOR PRESENCE AND NOT FOR LENGTH. The 216 character ceiling that bounds
 # a skill description is deliberately not applied: agents/keel-fanout.md's own description is 242
@@ -777,27 +778,29 @@ PY
     fi
 fi
 
-# Every key bin/keel's retirement register names is gone from the schema. cmd_doctor reads that
-# register to tell a person their profile still carries a key this keel removed, so a line naming a
-# key the schema still declares tells them to delete a setting that works.
+# Every key the retirement register in lib/retired-keys.sh names is gone from the schema. cmd_doctor
+# reads that register to tell a person their profile still carries a key this keel removed, so a
+# line naming a key the schema still declares tells them to delete a setting that works.
 #
 # WHAT THIS CANNOT SEE, STATED BECAUSE THE REGISTER IS ONLY AS GOOD AS THE HABIT: the other
 # direction, a key removed from the schema and never added to the register. The fingerprint above
 # hashes the field set, so it proves the set moved and can never say which way, and no record of
 # the previous field set exists to diff against. Whoever writes the removal commit is the only
 # reader that can catch it, which is why the register carries that instruction in its own comment.
-if [ -f templates/profile.schema.json ] && [ -f bin/keel ] && command -v python3 >/dev/null 2>&1; then
-    still_declared="$(python3 - <<'PYR'
-import json, re
+if [ -f templates/profile.schema.json ] && command -v python3 >/dev/null 2>&1; then
+    # Read by sourcing the register in a subshell and running retired_keys, rather than by
+    # parsing its source: a row printed some other way is still a row doctor shows. The file defines
+    # that function and runs nothing. A register that cannot be read, or prints no rows, is reported:
+    # read as empty, it would check nothing and pass. One that fails partway is unreadable too, so
+    # the subshell's status is tested under pipefail: its rows so far are not the register.
+    # shellcheck source=lib/retired-keys.sh
+    registered="$( set -o pipefail; . lib/retired-keys.sh && retired_keys | cut -d'|' -f1 )" \
+      && [ -n "$registered" ] \
+      || report "lib/retired-keys.sh could not be read or printed no rows, so no retired key was checked against templates/profile.schema.json. The register defines retired_keys, printing one key|version|message row per line."
+    still_declared="$(REGISTERED="$registered" python3 - <<'PYR'
+import json, os
 
-src = open("bin/keel").read()
-block = re.search(r"^retired_keys\(\) \{(.*?)^\}", src, re.S | re.M)
-registered = []
-if block:
-    for line in block.group(1).splitlines():
-        line = line.strip()
-        if line.count("|") >= 2:
-            registered.append(line.split("|")[0])
+registered = os.environ["REGISTERED"].split()
 
 d = json.load(open("templates/profile.schema.json"))
 declared = set()
@@ -810,7 +813,7 @@ print(" ".join(p for p in registered if p in declared))
 PYR
 )"
     [ -z "$still_declared" ] \
-      || report "bin/keel's retirement register names keys templates/profile.schema.json still declares: $still_declared. Doctor tells every project holding one of those to stop setting a key that still works. Either drop the line from retired_keys or remove the key from the schema, and bump SCHEMA_VERSION if it is the second."
+      || report "The retirement register names keys templates/profile.schema.json still declares: $still_declared. Doctor tells every project holding one of those to stop setting a key that still works. Either drop the line from retired_keys in lib/retired-keys.sh or remove the key from the schema, and bump SCHEMA_VERSION in bin/keel if it is the second."
 fi
 
 # Every key templates/keel-profile.example.json sets is declared in templates/profile.schema.json.
@@ -882,7 +885,7 @@ fi
 # tree before this rule was chosen. It flagged 25 of 61 keys and 7 of the 25 are genuinely read:
 # artifacts.stories, .architecture, .decisions and .plans through the `get('artifacts',{})` map
 # iteration in cmd_doctor, gates.context_warn_pct and .context_stop_pct through
-# lib/context_watch.py:497-508, and conventions.default_branch through the sed in the pre-push hook
+# lib/context_watch.py:374-385, and conventions.default_branch through the sed in the pre-push hook
 # body that `keel guard install` writes.
 # 28% false positives, against docs/standards.md's rule that a check is never stricter than correct
 # output. It under-reports too: gates.done_verified is read as (prof.get("gates") or
@@ -1064,6 +1067,15 @@ PYRB
     # is false and whose needle no test asserts is the delegation floor's mistake, which
     # tests/test-validate-skills.sh copies from nobody on purpose.
 fi
+
+# No skill or agent names Codex. Claude Code is keel's only harness, ADR-0013, and ports for other
+# harnesses translate from a pinned tag. A sentence naming another harness is one a model reads on
+# every load and has to decide does not apply, and each one held back wording that could state
+# plainly what Claude Code does. Every line is listed, so the failure says where to look.
+codex_lines=$(grep -rniI 'codex' skills agents 2>/dev/null || true)
+while IFS= read -r hit; do
+    [ -n "$hit" ] && report "$hit: names Codex, and Claude Code is the only harness (ADR-0013)"
+done <<< "$codex_lines"
 
 if [ "$errors" -eq 0 ]; then
     count=$(find skills -name SKILL.md 2>/dev/null | wc -l | tr -d ' ')

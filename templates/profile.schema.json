@@ -22,14 +22,6 @@
       "description": "Which set of profile fields this file has. Written by `keel init`, bumped only when a field is added, removed, renamed or moved. Absent means the file predates the field, which doctor treats as stale.",
       "x-keel-read-by": "code:bin/keel#sv=\"$(json_get .keel/profile.json schema_version"
     },
-    "harnesses": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "description": "Which harnesses this repository serves, as harness ids. A set and not a switch: a team with some developers on Claude Code and some on Codex works on one repository, and a switch makes that repository's configuration a running argument between them. keel init writes what it can tell from tracked files, and --harness overrides it. What each harness actually gets is in docs/harness-support.md, generated from the capability manifest; a harness listed here still only gets the gates that manifest grants it.",
-      "x-keel-read-by": "code:bin/keel#raw=\"$(json_get .keel/profile.json harnesses 2>/dev/null"
-    },
     "project": {
       "type": "object",
       "required": [
@@ -313,7 +305,7 @@
             "warn",
             "off"
           ],
-          "description": "Whether security-audit runs before a change ships, and what its findings do. required says any finding blocks shipping unless the user names an override for it; warn reports the findings and leaves accepting them to the user; off skips the audit before a ship, except on a diff touching a hard-block path, and the report says so; an audit the user asks for runs anyway. A match on a hard-block path is never overridable in conversation, whatever this says. A diff that changes this key or the hard-block paths is gated by the default branch's values. Read by `skills/security-audit/SKILL.md` and by ship's gate item 4, advisorily: it is prose the model follows, not a hook that asserts it, and it applies on both harnesses because skill bodies do.",
+          "description": "Whether security-audit runs before a change ships, and what its findings do. required says any finding blocks shipping unless the user names an override for it; warn reports the findings and leaves accepting them to the user; off skips the audit before a ship, except on a diff touching a hard-block path, and the report says so; an audit the user asks for runs anyway. A match on a hard-block path is never overridable in conversation, whatever this says. A diff that changes this key or the hard-block paths is gated by the default branch's values. Read by `skills/security-audit/SKILL.md` and by ship's gate item 4, advisorily: it is prose the model follows, not a hook that asserts it.",
           "x-keel-read-by": [
             "advisory:skills/security-audit/SKILL.md#gates.security_audit",
             "advisory:skills/ship/SKILL.md#gates.security_audit"
@@ -340,27 +332,27 @@
         "context_watch": {
           "type": "boolean",
           "description": "false turns the session context watchdog off for this project. Declared here rather than left to additionalProperties because it is not a required/warn/off gate.",
-          "x-keel-read-by": "code:lib/context_watch.py:570"
+          "x-keel-read-by": "code:lib/context_watch.py:447"
         },
         "context_window": {
           "type": "integer",
           "minimum": 1,
-          "description": "Context window in tokens for sessions in this project, written by keel init as 200000. It is a floor and not a ceiling: the watchdog raises it once a session is observed exceeding it, since the API would have refused the request otherwise, so a value that understates the window costs nothing beyond an early first estimate. It is never raised above 1000000, the largest window any current model offers, so a mistyped extra zero cannot silence the watchdog. A floor only ever raises, so setting a value at or below the window the session already has does nothing. That baseline is 200000 on a harness whose transcript does not state its own window, which is what Claude Code does; where the transcript states one, as a Codex rollout does with model_context_window, the stated number is the baseline instead. KEEL_CONTEXT_WINDOW is how a smaller window is forced deliberately, and it is used as set except that it too is capped at 1000000.",
-          "x-keel-read-by": "code:lib/context_watch.py:591"
+          "description": "Context window in tokens for sessions in this project, written by keel init as 200000. It is a floor and not a ceiling: the watchdog raises it once a session is observed exceeding it, since the API would have refused the request otherwise, so a value that understates the window costs nothing beyond an early first estimate. It is never raised above 1000000, the largest window any current model offers, so a mistyped extra zero cannot silence the watchdog. A floor only ever raises, so setting a value at or below the window the session already has does nothing. That baseline is 200000, because a Claude Code transcript does not state its own window. KEEL_CONTEXT_WINDOW is how a smaller window is forced deliberately, and it is used as set except that it too is capped at 1000000.",
+          "x-keel-read-by": "code:lib/context_watch.py:468"
         },
         "context_warn_pct": {
           "type": "integer",
           "minimum": 1,
           "maximum": 99,
           "description": "Percentage of the window at which the watchdog starts warning. Default 70.",
-          "x-keel-read-by": "code:lib/context_watch.py:507"
+          "x-keel-read-by": "code:lib/context_watch.py:384"
         },
         "context_stop_pct": {
           "type": "integer",
           "minimum": 1,
           "maximum": 100,
           "description": "Percentage of the window at which the watchdog blocks tool calls until a handoff is written. Default 85.",
-          "x-keel-read-by": "code:lib/context_watch.py:508"
+          "x-keel-read-by": "code:lib/context_watch.py:385"
         },
         "suite_warn_seconds": {
           "type": "integer",
@@ -375,7 +367,7 @@
       "items": {
         "type": "string"
       },
-      "description": "Path patterns where a security finding cannot be overridden in conversation. Intended for auth, money movement, and personal data. Enforced by hooks/sensitive-guard, which asks a human before a commit touching one. That gate is Claude Code only, because it needs a hook that can put a command to a human and Codex CLI offers none, so on Codex this key is declared and not enforced. See docs/harness-support.md. Matched with fnmatch against repository-root-relative paths, where * crosses directory separators, and a bare directory such as 'src/auth' also matches everything under it. Read second by keel plan risk, which chooses a task's review loop in execute-plan from it: a change touching none of these paths gets the light loop, as does a profile with no list, and any change that touches one gets the full loop, and a change that includes .keel/profile.json is always the full loop. review-code runs keel plan risk too and hands the sensitive files it prints to its rubric pass, which makes one mutant per changed decision line in them, where a surviving mutant blocks; security-audit takes its match for a diff touching one of these paths from the same command, or from its rule applied by hand where keel cannot run, through skills/security-audit/references/sensitive-match.md. Both are prose the model follows, not code that asserts it.",
+      "description": "Path patterns where a security finding cannot be overridden in conversation. Intended for auth, money movement, and personal data. Enforced by hooks/sensitive-guard, which asks a human before a commit touching one. Matched with fnmatch against repository-root-relative paths, where * crosses directory separators, and a bare directory such as 'src/auth' also matches everything under it. Read second by keel plan risk, which chooses a task's review loop in execute-plan from it: a change touching none of these paths gets the light loop, as does a profile with no list, and any change that touches one gets the full loop, and a change that includes .keel/profile.json is always the full loop. review-code runs keel plan risk too and hands the sensitive files it prints to its rubric pass, which makes one mutant per changed decision line in them, where a surviving mutant blocks; security-audit takes its match for a diff touching one of these paths from the same command, or from its rule applied by hand where keel cannot run, through skills/security-audit/references/sensitive-match.md. Both are prose the model follows, not code that asserts it.",
       "x-keel-read-by": [
         "code:hooks/sensitive-guard#get(\"hard_block_paths\") or []",
         "code:bin/keel#patterns = data[\"hard_block_paths\"] if \"hard_block_paths\" in data else []",
@@ -507,15 +499,15 @@
             "type": "string"
           },
           "description": "Plugins this project expects, as marketplace-qualified names such as typescript-lsp@claude-plugins-official. keel doctor names any that are not enabled, along with the command that installs them. A value here is preserved when init is re-run, so a curated list survives.",
-          "x-keel-read-by": "code:lib/harness/claude.sh:79"
+          "x-keel-read-by": "code:lib/harness/claude.sh:82"
         },
         "excluded": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "Plugins this project deliberately does not want, as marketplace-qualified names. `keel doctor` will not recommend one listed here, even where `plugins.recommended` also carries it, because an exclusion is the later and more specific decision. keel's own plugin is the exception and stays reported, since that warning is about keel not loading at all rather than a skill degrading. Claude Code only: keel prints no plugin report on Codex, so this key is declared and not honoured there.",
-          "x-keel-read-by": "code:lib/harness/claude.sh:80"
+          "description": "Plugins this project deliberately does not want, as marketplace-qualified names. `keel doctor` will not recommend one listed here, even where `plugins.recommended` also carries it, because an exclusion is the later and more specific decision. keel's own plugin is the exception and stays reported, since that warning is about keel not loading at all rather than a skill degrading.",
+          "x-keel-read-by": "code:lib/harness/claude.sh:83"
         }
       }
     },

@@ -1,5 +1,8 @@
 # Stories: tiered multi-harness support
 
+> Superseded on 2026-10-29 by ADR-0013
+> ([`ADR-0013-claude-code-is-the-only-harness.md`](../decisions/ADR-0013-claude-code-is-the-only-harness.md)).
+
 | | |
 |---|---|
 | Derived from | [`../architecture/tiered-multi-harness-support.md`](../architecture/tiered-multi-harness-support.md), accepted, and ADR-0003, ADR-0004, ADR-0005, all `accepted` 2026-09-05 |
@@ -682,7 +685,7 @@ Scenario: the catalogue agrees
   Then the plugin-delegation check passes
 ```
 
-**Notes:** `tests/validate-skills.sh:390-463` requires a plugin delegation claimed in the docs to be
+**Notes:** `tests/validate-skills.sh:391-464` requires a plugin delegation claimed in the docs to be
 named in the delegating skill's body, so body and document move together or the build fails.
 
 ## Epic E-06: Evals cover both harnesses

@@ -41,7 +41,7 @@ section must still obey them.
   counter, no file that changes. `hooks/session-start:4-8` states why: one volatile byte costs the
   prompt cache on every request of every session.
 - `NFR-01`: no combination may exceed **1,285 characters**, which the validator's `chars * 10 / 36`
-  estimate reports as 356 tokens. The 400 ceiling at `tests/validate-skills.sh:283-284` remains the
+  estimate reports as 356 tokens. The 400 ceiling at `tests/validate-skills.sh:284-285` remains the
   outer limit; 356 is the tighter rule this work adds.
 - Commit style is `conventional`. No `Co-Authored-By` trailer, no robot emoji, no attribution
   footer.

@@ -270,91 +270,69 @@ expect "an empty transcript warns rather than passing silently" warn "$(send "$t
 { row_user "go"; printf '["not","an","object"]\n'; row_edit "src/a.py" ""; } > "$tmp/tc/odd.jsonl"
 expect "a non-object row does not crash the hook" block "$(send "$tmp/tc" "$tmp/tc/odd.jsonl" Stop)"
 
-# ---- Codex rollouts --------------------------------------------------------
+# ---- a transcript in another shape ----------------------------------------
 #
-# Codex hands its hooks a rollout, not a Claude Code transcript. Before 2026-09-06 the reader
-# returned an empty list for one, which this hook cannot tell from a turn that ran no tools, so
-# every Codex turn passed in silence. These cases are what stop that returning.
-#
-# The synthetic rows below mirror the shape of tests/fixtures/transcripts/codex.jsonl, which is a
-# real capture from codex-cli 0.153.4 and is exercised at the end of this section. Synthetic here
-# for the same reason as the Claude cases above: a recording pins one turn, and what these need to
-# vary is what the turn did.
+# The reader understands a Claude Code transcript and nothing else. A file whose rows parse and none
+# of which has a Claude Code shape yields no tool calls, and reading that as a clean turn is a gate
+# saying nothing where it should warn. So the guard warns that it did not check the turn, and allows
+# the stop: the fail-open direction the header gives, a reminder rather than a turn nobody can end.
+not_checked() {   # not_checked <name> <output> <rc>
+    local name="$1" out="$2" rc="$3"
+    if [ "$rc" -eq 0 ] && [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = 1 ] \
+       && printf '%s' "$out" | grep -q '^{"systemMessage": "keel done-guard: .*not in a shape it reads.*so this turn was not checked\."}$' \
+       && ! printf '%s' "$out" | grep -q '"decision"'; then
+        printf '  PASS  %s\n' "$name"; pass=$((pass+1))
+    else
+        printf '  FAIL  %s (rc=%s, got: %s)\n' "$name" "$rc" "${out:0:120}"; fail=$((fail+1))
+    fi
+}
 
-cx_user()  { printf '{"timestamp":"2026-09-06T07:16:44Z","ordinal":%s,"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"go"}],"internal_chat_message_metadata_passthrough":{"turn_id":"%s"}}}\n' "$1" "$2"; }
-cx_call()  { printf '{"timestamp":"2026-09-06T07:16:47Z","ordinal":%s,"type":"response_item","payload":{"type":"custom_tool_call","name":"exec","input":%s,"internal_chat_message_metadata_passthrough":{"turn_id":"%s"}}}\n' "$1" "$2" "$3"; }
+fixture "$tmp/ro" '"done_verified": "required"' '"tests/run-tests.sh"'
+{
+  printf '{"timestamp":"2026-09-06T07:16:40Z","ordinal":7,"type":"turn_context","payload":{"turn_id":"t1","model":"m"}}\n'
+  printf '{"timestamp":"2026-09-06T07:16:47Z","ordinal":14,"type":"response_item","payload":{"type":"custom_tool_call","name":"apply_patch","input":"*** Begin Patch\\n*** Update File: src/a.py\\n*** End Patch","turn_id":"t1"}}\n'
+} > "$tmp/ro/rollout.jsonl"
+out="$(send "$tmp/ro" "$tmp/ro/rollout.jsonl" Stop)"; rc=$?
+not_checked "a rollout-shaped transcript warns that the turn was not checked, and exits 0" "$out" "$rc"
 
-# The exec input as Codex actually writes it: a JS snippet with the command JSON-escaped inside it.
-cx_edit_input() { printf '"const r = await tools.exec_command({\\"cmd\\":\\"apply_patch <<EOF\\\\n*** Begin Patch\\\\n*** Update File: %s\\\\n*** End Patch\\\\nEOF\\"});"' "$1"; }
-cx_test_input() { printf '"const r = await tools.exec_command({\\"cmd\\":\\"%s\\"});"' "$1"; }
+{
+  printf '{"type":"event","payload":{"nope":1}}\n'
+  printf '{"type":"event","payload":{"nope":1}}\n'
+} > "$tmp/ro/event.jsonl"
+out="$(send "$tmp/ro" "$tmp/ro/event.jsonl" Stop)"; rc=$?
+not_checked "a transcript with no Claude Code row warns that the turn was not checked, and exits 0" "$out" "$rc"
 
-fixture "$tmp/cx" '"done_verified": "required"' '"tests/run-tests.sh"'
+# A real transcript opens with metadata rows that have no Claude Code shape: measured over 500 of
+# them, the first Claude Code row was row 3 to 12. The shape check looks at every row, so those
+# rows must not turn a real transcript into a warning.
+row_type()  { printf '{"type":"%s","sessionId":"t"}\n' "$1"; }
+row_say()   { printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"%s"}]}}\n' "$1"; }
+{ row_type mode; row_type queue-operation; row_user "go"; row_say "nothing to change"; } > "$tmp/tc/meta-clean.jsonl"
+out="$(send "$tmp/tc" "$tmp/tc/meta-clean.jsonl" Stop)"; rc=$?
+if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+    printf '  PASS  %s\n' "metadata rows first and no tool call: silent, exit 0"; pass=$((pass+1))
+else
+    printf '  FAIL  %s (rc=%s, got: %s)\n' "metadata rows first and no tool call: silent, exit 0" "$rc" "${out:0:80}"; fail=$((fail+1))
+fi
+{ row_type mode; row_type queue-operation; row_user "go"; row_edit "src/x.py" ""; } > "$tmp/tc/meta-edit.jsonl"
+expect "metadata rows first, code edited and no test run: block under required" block "$(send "$tmp/tc" "$tmp/tc/meta-edit.jsonl" Stop)"
 
-# An apply_patch edit with no test run is the case the guard exists for.
-{ cx_user 8 t1; cx_call 14 "$(cx_edit_input src/a.py)" t1; } > "$tmp/cx/edit.jsonl"
-expect "a Codex apply_patch edit with no test run blocks" block "$(send "$tmp/cx" "$tmp/cx/edit.jsonl" Stop)"
-
-# ...and running the suite clears it, read from the same escaped snippet.
-{ cx_user 8 t1; cx_call 14 "$(cx_edit_input src/a.py)" t1; cx_call 15 "$(cx_test_input tests/run-tests.sh)" t1; } > "$tmp/cx/ran.jsonl"
-expect "a Codex turn that ran the suite is quiet" quiet "$(send "$tmp/cx" "$tmp/cx/ran.jsonl" Stop)"
-
-# Documentation turns pass on Codex too, the same as on Claude Code.
-{ cx_user 8 t1; cx_call 14 "$(cx_edit_input docs/a.md)" t1; } > "$tmp/cx/docs.jsonl"
-expect "a Codex documentation edit does not need the suite" quiet "$(send "$tmp/cx" "$tmp/cx/docs.jsonl" Stop)"
-
-# Turn scoping, and on Codex the boundary is STATED rather than inferred: an edit carrying an
-# earlier turn_id is not this turn's work. Without the turn_id check this blocks.
-{ cx_user 8 t1; cx_call 14 "$(cx_edit_input src/old.py)" t1; cx_user 20 t2; } > "$tmp/cx/old.jsonl"
-expect "a Codex edit from an earlier turn is not counted" quiet "$(send "$tmp/cx" "$tmp/cx/old.jsonl" Stop)"
-
-# A rollout carrying NO turn id anywhere. The header's rule is that records with no turn id are
-# pre-turn setup and are not this turn's work, and the code applied it only while a turn id had been
-# found somewhere: with none, `turn` stayed None, the filter was skipped, and every custom_tool_call
-# in the whole file counted as this turn's. So a turn that answered a question was blocked for an
-# apply_patch from twenty turns ago, on any rollout shape that carries no turn id.
-cx_user_noid() { printf '{"timestamp":"2026-09-06T07:16:44Z","ordinal":%s,"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"go"}]}}\n' "$1"; }
-cx_call_noid() { printf '{"timestamp":"2026-09-06T07:16:47Z","ordinal":%s,"type":"response_item","payload":{"type":"custom_tool_call","name":"exec","input":%s}}\n' "$1" "$2"; }
-{ cx_user_noid 8; cx_call_noid 14 "$(cx_edit_input src/ancient.py)"; cx_user_noid 20; } > "$tmp/cx/noid.jsonl"
-expect "a rollout with no turn id anywhere attributes nothing to this turn" quiet "$(send "$tmp/cx" "$tmp/cx/noid.jsonl" Stop)"
-
-# A Codex rollout with no tool calls is a clean turn, not an unreadable file. It must be quiet
-# rather than warn, or every Codex turn that only answered a question ends with a notice.
-{ cx_user 8 t1; } > "$tmp/cx/none.jsonl"
-expect "a Codex turn with no tool calls is quiet, not a warning" quiet "$(send "$tmp/cx" "$tmp/cx/none.jsonl" Stop)"
-
-# A patch BODY that mentions the test command is content, not a command run. Left unstripped, a
-# turn that edits any file quoting `tests/run-tests.sh`, and this repository is full of them, reads
-# as having run the suite and the guard goes quiet on the very edit it exists to catch.
-cx_sneaky() { printf '"const r = await tools.exec_command({\\"cmd\\":\\"apply_patch <<EOF\\\\n*** Begin Patch\\\\n*** Update File: src/a.py\\\\n+# see tests/run-tests.sh for how to check this\\\\n*** End Patch\\\\nEOF\\"});"'; }
-{ cx_user 8 t1; cx_call 14 "$(cx_sneaky)" t1; } > "$tmp/cx/sneaky.jsonl"
-expect "a test command quoted inside a patch body is not a test run" block "$(send "$tmp/cx" "$tmp/cx/sneaky.jsonl" Stop)"
-
-# THE CANARY section 10.3 of docs/architecture/tiered-multi-harness-support.md requires, and the
-# evidence behind the codex transcript_turn_tool_calls row in lib/harness/capabilities. The capture
-# ran one shell command and edited nothing, so a clean turn is the right answer; what it proves is
-# that the real shape still parses. When Codex changes its rollout format this goes red, rather
-# than the guard going quiet on every Codex turn.
-real_cx="$ROOT_DIR/tests/fixtures/transcripts/codex.jsonl"
-expect "a rollout captured from a real Codex turn still parses" quiet "$(send "$tmp/cx" "$real_cx" Stop)"
-
-# ...and the same capture with its one exec call rewritten as an edit must block. Without this the
-# case above passes just as well against a reader that returns nothing at all for a rollout, which
-# is exactly the fail-open this section was added to close.
-python3 - "$real_cx" "$tmp/cx/real-edit.jsonl" <<'EOF'
-import json, sys
-out = []
-for line in open(sys.argv[1], encoding="utf-8"):
-    r = json.loads(line)
-    p = r.get("payload") or {}
-    if p.get("type") == "custom_tool_call":
-        p["input"] = ('const r = await tools.exec_command({"cmd":"apply_patch <<EOF\\n'
-                      '*** Begin Patch\\n*** Update File: src/real.py\\n*** End Patch\\nEOF"});')
-    out.append(r)
-with open(sys.argv[2], "w", encoding="utf-8") as fh:
-    for r in out:
-        fh.write(json.dumps(r) + "\n")
-EOF
-expect "an edit in a real rollout is seen" block "$(send "$tmp/cx" "$tmp/cx/real-edit.jsonl" Stop)"
+# A row is Claude Code's when its message is an object or its type is user, assistant or summary,
+# either alone. Each side is tested without the other, so joining them with `and` would warn here.
+shape_alone() {   # shape_alone <name> <second row>; a row of no shape, then that row: silent, exit 0
+    local out rc
+    { printf '{"type":"event"}\n'; printf '%s\n' "$2"; } > "$tmp/tc/alone.jsonl"
+    out="$(send "$tmp/tc" "$tmp/tc/alone.jsonl" Stop)"; rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        printf '  PASS  %s\n' "$1"; pass=$((pass+1))
+    else
+        printf '  FAIL  %s (rc=%s, got: %s)\n' "$1" "$rc" "${out:0:80}"; fail=$((fail+1))
+    fi
+}
+shape_alone "a summary row with no message is a Claude Code row: silent, exit 0" \
+    '{"type":"summary","summary":"x"}'
+shape_alone "a message row with no type is a Claude Code row: silent, exit 0" \
+    '{"message":{"role":"user","content":"x"}}'
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

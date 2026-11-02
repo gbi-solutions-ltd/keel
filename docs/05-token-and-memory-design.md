@@ -112,15 +112,10 @@ is a check leaning the wrong way: this is the number that says whether the count
 should not quietly under-report.
 
 <!-- keel:claim property=validated_word_ceiling harness=claude -->
-**Every number in this section is a Claude Code number, and nothing has measured them on Codex.**
-Recorded 2026-09-06. The mean, the ceiling and the budget below were all derived against Claude
-Code's preload mechanism, which loads every description up front and holds them for the session.
-Codex budgets a share of the context window instead and silently shortens or drops descriptions
-under pressure, so the arithmetic does not transfer: the same corpus can cost a different amount,
-and a description that always arrives on one harness may not arrive on the other. `lib/harness/capabilities`
-carries `validated_word_ceiling` for `claude` alone, so any document claiming these hold on Codex
-fails the build. S-19 is the story that measures it, and until it runs this section is inherited and
-unvalidated there.
+**Every number in this section is a Claude Code number.** The mean, the ceiling and the budget
+below were all derived against Claude Code's preload mechanism, which loads every description up
+front and holds them for the session. `lib/harness/capabilities` carries `validated_word_ceiling`
+as a `claude` row.
 
 **The ceiling is 1,320, which is 30 skills at the measured 44-token mean.** The number is not chosen
 for headroom, it is decision 6's own trigger: `docs/07-open-decisions.md` says to revisit skill
@@ -239,7 +234,6 @@ state is summarised into a paragraph. The work continues on a worse foundation a
 whoever picks it up next.
 
 <!-- keel:claim gate=context-watch harness=claude -->
-<!-- keel:claim gate=context-watch harness=codex -->
 `hooks/context-watch` measures it instead. Registered on three events:
 
 | Event | What it does |
@@ -295,7 +289,6 @@ teammate picking up the branch from GitHub gets the branch without the note, and
 the rare case where sharing it is wanted.
 
 <!-- keel:claim gate=session-start harness=claude -->
-<!-- keel:claim gate=session-start harness=codex -->
 **`.keel/handoff.seen` is an empty marker beside it, git-ignored the same way, and it exists because
 nothing deletes a handoff.** The `session-start` gate fires on startup and clear as well as compact,
 so naming the file whenever it is present made the pointer permanent: from the first compaction
@@ -323,7 +316,6 @@ Everything above budgets **input**: what sits in the prefix of every request. Re
 carries the block also carries however many tokens the model chooses to write back.
 
 <!-- keel:claim gate=session-start harness=claude -->
-<!-- keel:claim gate=session-start harness=codex -->
 **The rule is on by default and it is not free.** `hooks/session-start` selects one paragraph from
 `conventions.response_style` and `conventions.explain_level` together, so there are four forms and
 not two. Every form also carries the loaded plugin's version since 2026-09-02. Measured 2026-09-02

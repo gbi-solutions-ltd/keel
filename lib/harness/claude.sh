@@ -1,22 +1,25 @@
 #!/usr/bin/env bash
 # Everything keel writes and reads that belongs to Claude Code, and nothing that does not.
 #
-# THE CONTRACT. Six functions, and lib/harness/codex.sh implements the same six. bin/keel calls
-# these and never a writer by name, so adding a harness is a file here rather than a branch there:
+# WHAT bin/keel CALLS. These functions, and never a writer by name, so what keel writes for Claude
+# Code lives here and bin/keel stays free of its file names:
 #
-#   harness_write_config <root>        write this harness's committed configuration
+#   harness_context_file               print the context file Claude Code reads, CLAUDE.md
+#   harness_write_config <root>        write Claude Code's committed configuration
 #   harness_write_local_config <root>  write its uncommitted, per-developer configuration
 #   harness_permission_rules           print `deny|<rule>` and `ask|<rule>` lines, one per rule
-#   harness_recommend_plugins          print the plugin ids this harness should have, one per line
-#   harness_config_paths               print the paths this harness owns, one per line
-#   harness_doctor_findings            print `level|message` lines for cmd_doctor, zero or more
+#   harness_recommend_plugins          print the plugin ids Claude Code should have, one per line
+#   harness_config_paths               print `committed|<path>` and `local|<path>` lines, one per
+#                                      path Claude Code configuration owns
+#   harness_config_dirs                print the directories those paths live in, one per line
+#   harness_doctor_findings <phase>    print `level|message` lines for cmd_doctor's phase, zero or
+#                                      more
 #
-# THE SIXTH EXISTS BECAUSE OF WHAT cmd_doctor DOES. settings_report_load, plugin_report and
-# boundary_report are Claude Code readers, and cmd_doctor stays in the neutral file. Under a
-# five-function contract cmd_doctor would call functions that exist for one harness only, which
-# breaks the moment codex.sh is the loaded one. harness_doctor_findings is the only thing it calls;
-# this file implements it over the three readers, and a harness with nothing to report implements
-# it as a no-op.
+# harness_doctor_findings EXISTS BECAUSE OF WHAT cmd_doctor DOES. It calls harness_context_file,
+# for the markers it checks, and harness_doctor_findings, which this file implements over the
+# Claude Code readers settings_report_load, plugin_report and boundary_report, so a reader added
+# here reaches the report without cmd_doctor learning its name. A phase with nothing to report
+# prints nothing.
 #
 # THE BODIES BELOW WERE MOVED, NOT REWRITTEN. Every byte of what `keel init` writes on Claude Code
 # is asserted against the pre-refactor commit by tests/test-keel-4.sh, which builds the baseline
@@ -410,9 +413,7 @@ PY
 # Thin on purpose. Each one names the writers above rather than inlining them, so the diff that
 # moved them is readable and the bodies stay comparable with the pre-refactor file.
 
-# The context file this harness reads. AGENTS.md is deliberately NOT here: keel writes it for every
-# repository because Cursor, Copilot CLI and Gemini CLI read it too, so it is neutral ground rather
-# than one harness's file. CLAUDE.md is Claude Code's alone.
+# The context file Claude Code reads, and the one keel init writes.
 harness_context_file() {
     printf 'CLAUDE.md\n'
 }
@@ -460,8 +461,8 @@ harness_config_dirs() {
 # INTERLEAVED with neutral ones: the plugin set, then the context watchdog, then the guardrails,
 # then the handoff, then the editor. Emitting every harness finding at one call point would group
 # them together and reorder a report people read top to bottom, which R-01 forbids as surely as
-# changing what init writes. The phases are doctor's own sections and mean nothing harness-specific;
-# a harness with nothing to say in one returns nothing, which is what codex.sh does for all of them.
+# changing what init writes. The phases are doctor's own sections, and a phase this file has
+# nothing to say in returns nothing.
 harness_doctor_findings() {
     case "${1:-}" in
         prime)        settings_report_load ;;

@@ -555,15 +555,13 @@ positive recipe instead, and prohibitions actively make it worse.
 
 **Plugin call, Claude Code only:** hands off to `skill-creator` for its eval harness, variance
 benchmarking, and packaging scripts. Our skill owns the capture and the authoring discipline; theirs
-owns the measurement. No Codex counterpart is published, so a skill authored there is unmeasured
-unless the project has its own harness.
+owns the measurement.
 
 ### `context-budget`
 
 **Trigger:** long sessions, repeated compaction, "this is using too many tokens", a slow or
 forgetful session, or a periodic audit.
-**Reads:** `CLAUDE.md` or `AGENTS.md`, the harness's own settings (`.claude/settings.json` on
-Claude Code, `.codex/config.toml` on Codex), `.keel/`, skill sizes.
+**Reads:** `CLAUDE.md`, `.claude/settings.json`, `.keel/`, skill sizes.
 **Writes:** `<docs_root>/context-audit.md`, and fixes.
 **Does:** the practices in [doc 05](05-token-and-memory-design.md). Measures what is in the
 always-loaded prefix, flags anything volatile that breaks the prompt cache, checks skill

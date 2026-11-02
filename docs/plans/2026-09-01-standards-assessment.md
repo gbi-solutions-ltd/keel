@@ -1242,7 +1242,7 @@ the four assessment checks has something definite and derivable to find.
 Two counts elsewhere become wrong when this fixture lands, and this task fixes them rather than
 leaving them. `tests/evals/fixtures/README.md:11-12` reads "Two fixtures have one,
 `commit-outside-a-worktree` and `ship-with-flaky-tests`"; make it three and name this one.
-`tests/evals/stage.sh:46` reads "One scenario needs it"; make it three, since this fixture's
+`tests/evals/stage.sh:117-118` reads "One scenario needs it"; make it three, since this fixture's
 scenario lands in the same task.
 
 Then add a case to `tests/test-eval-harness.sh`, after case 16 and before case 18, using the
@@ -1314,7 +1314,7 @@ Then run the suite and watch it fail:
 
 Run: `tests/run-tests.sh`
 Expected: **FAIL** in `tests/test-doc-claims.sh`, with
-`README says '8 scenarios', the tree says 9`. That is the claim at `README.md:185` going red because
+`README says '8 scenarios', the tree says 9`. That is the claim at `README.md:188` going red because
 a ninth scenario now exists. Watching it fail is what proves the claim is enforced.
 
 Confirm it is that failure and not another:
@@ -1328,7 +1328,7 @@ Expected: the `eval scenario count` claim reports `bad`, exit non-zero, and the 
 `every scenario has a fixture` check at `tests/test-eval-harness.sh:97-106` must **not** be among
 the failures.
 
-Then update `README.md:185`. It currently reads:
+Then update `README.md:188`. It currently reads:
 
 ```
 8 scenarios exist. Six are dispatched at a release gate and score a reply.
@@ -1541,7 +1541,7 @@ it is sent, so a placeholder left in place means the rules were not sent at all.
   task here waits on it. It closes when a second repository is assessed, which is not this plan.
 - **The SessionStart roster.** No task changes `hooks/session-start`. The roster names skills and
   `coding-standards` is already in it at `:30`. Measured with the validator's own probe
-  (`tests/validate-skills.sh:340-356`), the worst case across all four `response_style` and
+  (`tests/validate-skills.sh:341-357`), the worst case across all four `response_style` and
   `explain_level` combinations is 1,266 characters and 351 tokens against the 356 token rule at
   `:364-366`, leaving 19 characters. A mode needs none of them.
 - **The skill count claim** at `README.md:6`, enforced by `tests/test-doc-claims.sh:45-47`. A mode is

@@ -2,9 +2,7 @@
 #
 # Pinned here on 2026-09-06 because the set existed in no file: README said six, results.md said
 # seven at :2499, and results.md recorded the disagreement as live and unresolved beside a gate
-# entry that had just run six. A second supported harness doubles this matrix, and doubling an
-# undefined set gives two undefined sets, so it is settled before the Codex arms are added rather
-# than after.
+# entry that had just run six.
 #
 # commit-outside-a-worktree is the scenario whose membership was disputed. It is IN: it is the only
 # scenario testing a subagent's behaviour, and that path is exercised by nothing else.

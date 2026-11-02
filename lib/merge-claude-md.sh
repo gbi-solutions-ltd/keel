@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Marker-based idempotent merge of the managed block into a CLAUDE.md or AGENTS.md.
+# Marker-based idempotent merge of the managed block into a CLAUDE.md.
 # Sourced by bin/keel.
 #
 # Rules, in order of importance:

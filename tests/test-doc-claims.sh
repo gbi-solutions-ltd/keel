@@ -211,15 +211,17 @@ sv="$(grep -oE '^SCHEMA_VERSION=[0-9]+' bin/keel | head -1 | cut -d= -f2)"
 # task 5 declared conventions.no_attribution_footers, the key the message hook now honours.
 # 6 since 2026-10-16, when docs/plans/2026-10-16-manage-test-speed.md task 1 declared
 # verify.test_affected and gates.suite_warn_seconds.
-if [ "$sv" = "6" ]; then
-    ok "SCHEMA_VERSION is where the test-speed task left it ($sv)"
+# 7 since 2026-10-30, when docs/plans/2026-10-29-claude-code-only.md task 4 retired
+# profile.harnesses.
+if [ "$sv" = "7" ]; then
+    ok "SCHEMA_VERSION is where the Claude Code only task left it ($sv)"
 else
-    sv_msg="bin/keel is at $sv, expected 6. docs/plans/2026-10-16-manage-test-speed.md was the last"
-    sv_msg="$sv_msg plan to move it, by declaring verify.test_affected and"
-    sv_msg="$sv_msg gates.suite_warn_seconds. A further bump is either a change riding along or one"
+    sv_msg="bin/keel is at $sv, expected 7. docs/plans/2026-10-29-claude-code-only.md was the last"
+    sv_msg="$sv_msg plan to move it, by retiring profile.harnesses."
+    sv_msg="$sv_msg A further bump is either a change riding along or one"
     sv_msg="$sv_msg that needs its own story,"
     sv_msg="$sv_msg its own schema row and its own fingerprint line in tests/validate-skills.sh"
-    bad "SCHEMA_VERSION is where the test-speed task left it" "$sv_msg"
+    bad "SCHEMA_VERSION is where the Claude Code only task left it" "$sv_msg"
 fi
 
 # Plan 0 left these two changes of its own untested. Both are literal strings in a file that exists
@@ -913,14 +915,23 @@ else
     bad "dogfood profile" "profile says schema $own_sv, bin/keel says $bin_sv"
 fi
 
-# Read from the register in bin/keel rather than from a list written here, so retiring a seventh key
-# extends this check for free and a list nobody updates cannot quietly stop covering one.
-retired_in_own="$(python3 - <<'PYR'
-import json, re
-src = open("bin/keel").read()
-block = re.search(r"^retired_keys\(\) \{(.*?)^\}", src, re.S | re.M)
-keys = [l.strip().split("|")[0] for l in block.group(1).splitlines() if l.count("|") >= 2] if block else []
-prof = json.load(open(".keel/profile.json"))
+# Read from the register rather than from a list written here, so retiring a seventh key extends
+# this check for free and a list nobody updates cannot quietly stop covering one. Read by sourcing
+# lib/retired-keys.sh, in a subshell, and running retired_keys: the file defines that function and
+# runs nothing, so no part of keel runs here.
+# retired_set_in <register> <profile> prints the register's keys that the profile sets, and fails
+# when the register cannot be read or prints no rows: an empty register would find no retired key
+# in any profile, which is a pass that checked nothing. One that fails partway fails here too, so
+# the subshell runs under pipefail and its status is tested: its rows so far are not the register.
+retired_set_in() {
+    local keys
+    # shellcheck source=lib/retired-keys.sh
+    keys="$( set -o pipefail; . "$1" && retired_keys | cut -d'|' -f1 )" || return 1
+    [ -n "$keys" ] || return 1
+    KEYS="$keys" python3 - "$2" <<'PYR'
+import json, os, sys
+keys = os.environ["KEYS"].split()
+prof = json.load(open(sys.argv[1]))
 def has(p):
     d = prof
     for seg in p.split("."):
@@ -930,11 +941,79 @@ def has(p):
     return True
 print(" ".join(k for k in keys if has(k)))
 PYR
-)"
-if [ -z "$retired_in_own" ]; then
+}
+if ! retired_in_own="$(retired_set_in lib/retired-keys.sh .keel/profile.json)"; then
+    bad "dogfood profile" "lib/retired-keys.sh could not be read or printed no rows, so no retired key was looked for"
+elif [ -z "$retired_in_own" ]; then
     ok "this repository's own profile sets no retired key"
 else
     bad "dogfood profile" "it still sets: $retired_in_own"
+fi
+
+retired_tmp="$(mktemp -d)"
+trap 'rm -rf "$retired_tmp"' EXIT
+
+# The same check on a copy of that profile that sets the first key the register prints, dotted ones
+# as nested objects. A check that only passes is indistinguishable from one that cannot see.
+retired_first="$( set -o pipefail; . lib/retired-keys.sh && retired_keys | awk -F'|' 'NR == 1 {print $1}' )" \
+  || bad "dogfood profile" "lib/retired-keys.sh failed partway, so its first key was not tried"
+python3 - "$retired_first" .keel/profile.json "$retired_tmp/profile.json" <<'PYS'
+import json, sys
+key, src, dst = sys.argv[1:]
+d = json.load(open(src))
+node = d
+segs = key.split(".")
+for seg in segs[:-1]:
+    node = node.setdefault(seg, {})
+node[segs[-1]] = "set"
+json.dump(d, open(dst, "w"))
+PYS
+case " $(retired_set_in lib/retired-keys.sh "$retired_tmp/profile.json") " in
+  *" ${retired_first:-(no first key)} "*) ok "a copy of this repository's profile that sets $retired_first is caught naming it" ;;
+  *) bad "dogfood profile" "a copy setting the register's first key (${retired_first:-none printed}) was not caught" ;;
+esac
+
+# A row spelled another way is still a row: the register is whatever retired_keys prints.
+cat > "$retired_tmp/echo-register.sh" <<'KEEL'
+retired_keys() {
+    echo "foo.bar|7|gone"
+}
+KEEL
+printf '{"foo": {"bar": 1}}\n' > "$retired_tmp/foo.json"
+if [ "$(retired_set_in "$retired_tmp/echo-register.sh" "$retired_tmp/foo.json")" = "foo.bar" ]; then
+    ok "a register row printed by echo is read as a row"
+else
+    bad "dogfood profile" "an echo row in retired_keys was not read"
+fi
+
+# A register that reads empty fails rather than finding no retired key, and so does a missing one.
+printf 'retired_keys() {\n    :\n}\n' > "$retired_tmp/empty-register.sh"
+if retired_set_in "$retired_tmp/empty-register.sh" "$retired_tmp/foo.json" >/dev/null 2>&1; then
+    bad "dogfood profile" "a register that prints nothing was read as no retired key"
+else
+    ok "a register that prints nothing fails rather than reading as no retired key"
+fi
+if retired_set_in "$retired_tmp/no-such-register.sh" "$retired_tmp/foo.json" >/dev/null 2>&1; then
+    bad "dogfood profile" "a missing register was read as no retired key"
+else
+    ok "a missing register fails rather than reading as no retired key"
+fi
+
+# A register that fails partway is unreadable, not shorter: the rows before the failure are not the
+# register, and read as it, they would check fewer keys than doctor names and pass.
+printf 'retired_keys() {\n    echo "foo.bar|7|gone"\n    return 1\n}\n' > "$retired_tmp/failing-register.sh"
+if retired_set_in "$retired_tmp/failing-register.sh" "$retired_tmp/foo.json" >/dev/null 2>&1; then
+    bad "dogfood profile" "a register that prints a row and then fails was read as one row"
+else
+    ok "a retired-key register that fails partway is unreadable, not shorter"
+fi
+
+# CONTRIBUTING.md tells whoever removes a schema key where to register it, and the register is the
+# file both checks source.
+if grep -q "gets a line in .lib/retired-keys.sh." CONTRIBUTING.md; then
+    ok "CONTRIBUTING.md says a removed key gets a line in lib/retired-keys.sh"
+else
+    bad "CONTRIBUTING.md" "it does not say a removed key gets a line in lib/retired-keys.sh"
 fi
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"

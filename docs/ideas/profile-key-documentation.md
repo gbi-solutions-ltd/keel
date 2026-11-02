@@ -107,7 +107,7 @@ being blocked. That is weaker evidence than a complaint, and it should be record
 | Generate the page from the schema, validator-checked | **Recommended.** Cannot drift, reuses descriptions already written, and the validator rule is the same shape as the existing tool-table rule at `tests/validate-skills.sh:341-345` |
 | Hand-written reference page | Rejected. It is the variant the strongest objection is about |
 | Link the schema from the README and stop | The cheapest thing that helps. Leaves the reader parsing JSON Schema, and does not distinguish the twelve from the rest |
-| A `keel keys` command that prints them | Discoverable from the tool the user is already running, and it can mark which keys the current profile is missing. More code, and `bin/keel` deliberately does not parse the profile back (`docs/03-install-and-distribution.md:195-197`) |
+| A `keel keys` command that prints them | Discoverable from the tool the user is already running, and it can mark which keys the current profile is missing. More code, and `bin/keel` deliberately does not parse the profile back (`docs/03-install-and-distribution.md:185-187`) |
 | Have `keel doctor` name unset optional keys | Rejected. Doctor reports problems, and an unset optional key is not one. It would warn on every healthy project |
 | Expand `templates/keel-profile.example.json` to carry all twelve with comments | JSON has no comments, and an example profile with every optional key set is not an example anybody should copy |
 
@@ -133,7 +133,7 @@ being blocked. That is weaker evidence than a complaint, and it should be record
 | `plugins.recommended` is one of those five | Same measurement | The key that `stack-plugins-on-existing-repos.md` proposes writing is one nobody could currently discover. The two records should land together |
 | The repository has been bitten by schema drift before | `docs/ideas/profile-schema-drift.md`; `tests/validate-skills.sh:351-365` | A hand-written copy is the wrong shape here, more than it would be elsewhere |
 | A validator rule keyed to source-of-truth already exists | `tests/validate-skills.sh:341-345`, the tool-table rule | The enforcement pattern is proven in this repository |
-| The CLI deliberately does not read the profile back | `docs/03-install-and-distribution.md:195-197` | A `keel keys` command would be a departure worth arguing separately |
+| The CLI deliberately does not read the profile back | `docs/03-install-and-distribution.md:185-187` | A `keel keys` command would be a departure worth arguing separately |
 | Two of the undocumented keys caused today's other records | `gates.context_window`, `plugins.recommended` | The cost of the gap is demonstrated rather than theoretical |
 
 ## Open questions

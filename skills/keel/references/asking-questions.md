@@ -49,7 +49,7 @@ three of the four.
   "the safe option".
 - **Never write a fake option.** An option you would reject if chosen is not a choice, it is
   theatre, and it costs the user's trust for every later question.
-- **Never add an "Other" or "Something else" option.** The harness adds one.
+- **Never add an "Other" or "Something else" option.** Claude Code adds one.
 - **Options must be distinguishable by someone who has not read the code.** If two options differ
   only in a word, say what actually differs.
 

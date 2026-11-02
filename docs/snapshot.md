@@ -19,8 +19,10 @@ The remediation plan built from section 10 is
 ## 1. Project overview
 
 keel is a Claude Code plugin plus a per-project bootstrap that makes a house delivery process the
-default (README.md:1-3). It ships 25 skills, a bash CLI, and six hook scripts, and supports Codex
-CLI at a lower tier (README.md:21-26).
+default (README.md:1-3). It ships 25 skills, a bash CLI, and six hook scripts.
+
+Correction: as of 2026-10-30, v0.26.0 is the last keel release with Codex support, and keel now
+serves Claude Code only (ADR-0013).
 
 | | |
 |---|---|
@@ -35,12 +37,12 @@ CLI at a lower tier (README.md:21-26).
 keel has three layers. Skills carry the process as markdown the model loads on demand. Hooks
 registered by the plugin run at fixed session events and are the only part that acts without the
 model choosing to. The `keel` CLI writes and checks the per-project files: `.keel/profile.json`,
-a managed block in `CLAUDE.md` and `AGENTS.md`, `.claude/settings.json`, and a generated CI
-workflow. A capability manifest decides which hook guarantee holds on which harness.
+a managed block in `CLAUDE.md`, `.claude/settings.json`, and a generated CI workflow. A capability
+manifest decides which hook guarantee holds.
 
 ```mermaid
 flowchart LR
-    dev[Engineer] --> cc[Claude Code or Codex session]
+    dev[Engineer] --> cc[Claude Code session]
     cc -->|SessionStart| ss[session-start]
     cc -->|PreToolUse Bash| sg[sensitive-guard]
     cc -->|Stop, SubagentStop| dg[done-guard]
@@ -60,25 +62,21 @@ flowchart LR
 PreToolUse (all tools for context-watch, `Bash` only for sensitive-guard at hooks/hooks.json:43),
 Stop, SubagentStop and PreCompact. No PostToolUse hook is registered.
 
-<!-- keel:claim gate=sensitive-guard harness=claude -->
-**Codex.** `hooks/hooks.codex.json` omits sensitive-guard. This is deliberate: sensitive-guard
-requires an ask primitive (lib/harness/capabilities:118) that no Codex row provides.
-
 <!-- keel:claim gate=done-guard harness=claude -->
 **Critical path: an agent claims done.** The Stop hook runs done-guard, which reads the turn's
 transcript, finds edits to non-documentation files, and looks for `verify.test` as a substring of
 <!-- keel:claim gate=done-guard harness=claude -->
 any Bash command in the turn (hooks/done-guard:32-36). With `gates.done_verified` at `required` it
-blocks the stop (hooks/done-guard:364-366); otherwise it warns.
+blocks the stop (hooks/done-guard:267-269); otherwise it warns.
 
 ## 3. Repository structure
 
 ```
 bin/keel             CLI, 2288 lines: init, new, doctor, profile, apex-export, scan, guard, version
 bin/keel-fleet       doctor --json across many repositories
-hooks/               the four hook scripts plus hooks.json and hooks.codex.json
+hooks/               the four hook scripts plus hooks.json
 lib/detect-stack.sh  stack and verify-command detection, 956 lines
-lib/harness/         per-harness adapters and the capability manifest
+lib/harness/         the Claude Code adapter and the capability manifest
 lib/*.py             APEX export and render, context watchdog
 skills/              25 skills, each a SKILL.md plus references/
 templates/           profile schema, example profile, CLAUDE.md block
@@ -170,7 +168,7 @@ fails a profile holding one, both reading the schema (06b8ef2, 61360b3, 3c3c306,
 
 <!-- keel:claim gate=done-guard harness=claude -->
 - **A misspelled gate weakens silently.** done-guard reads any value other than `off` and
-  `required` as `warn` (hooks/done-guard:114, 364-367), so `requird` downgrades a blocking gate.
+  `required` as `warn` (hooks/done-guard:114, 267-270), so `requird` downgrades a blocking gate.
 
 Correction: as of 2026-09-26, not silently: `doctor` fails such a value and `profile set` refuses
 it (61360b3, 06b8ef2, tasks 1 and 2). The Stop hook still reads it as `warn`.
@@ -203,7 +201,7 @@ docs/plans/2026-09-26-guard-hooks-outside-the-working-tree.md.
 ### Security posture
 
 - **keel fails its own doctor.** `.claude/settings.json` lacks the `Bash(curl *)`, `Bash(wget *)`
-  and `Bash(nc *)` ask rules that `keel_ask_rules` now writes (lib/harness/claude.sh:272). The
+  and `Bash(nc *)` ask rules that `keel_ask_rules` now writes (lib/harness/claude.sh:275). The
   file was last written by `keel init` before those rules existed.
 
 Correction: as of 2026-09-26, `.claude/settings.json` has the three ask rules, and
@@ -218,9 +216,6 @@ Correction: as of 2026-09-26, `.claude/settings.json` has the three ask rules, a
 Correction: as of 2026-09-26, detect_verify sets `verify.security` for JavaScript and TypeScript
 from an npm or pnpm lockfile or a yarn 2+ `yarn.lock`, and full `doctor` runs it, `--fast` does
 not (2e0cb58, task 6). Every other stack still gets none.
-
-- On Codex, hard-blocked paths are unprotected, by design and documented
-  (docs/harness-support.md:12).
 
 ### Enforcement gaps against the stated purpose
 
@@ -297,7 +292,7 @@ defaults 9, backlog 3, sample 6, departures 4.
 
 | Metric | Value | Basis |
 |---|---|---|
-| Test coverage | 17 test files for 2 CLIs, 4 hooks, 8 lib scripts; no test executes `lib/harness/codex.sh`, and `lib/apex_render.py` has thin coverage | estimated, from a subagent's file map |
+| Test coverage | 17 test files for 2 CLIs, 4 hooks, 8 lib scripts; `lib/apex_render.py` has thin coverage | estimated, from a subagent's file map |
 | Documentation coverage | 6 of 8 section 6 artifacts accurate | measured |
 | Change difficulty | largest file `bin/keel` at 2288 lines | estimated |
 | Dependency freshness | no runtime dependencies | measured |

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | accepted |
+| Status | superseded by ADR-0014 |
 | Date | 2026-09-05 |
 | Deciders | Bernard Tebandeke, accepted 2026-09-05 |
 | Requirements | none written; driver is `docs/ideas/keel-on-codex.md` as amended 2026-09-05 |

@@ -131,7 +131,7 @@ listed at the join and repointed by task 13.
    `references/rationale.md` nor `step-detail.md` names `tests/evals`.
 8. The frontmatter is unchanged, and nothing a test pins moves. Every phrase
    `tests/validate-skills.sh` requires in a body stays in it: the profile-schema markers
-   `templates/profile.schema.json` cites (`tests/validate-skills.sh:970-976`), the plugin names
+   `templates/profile.schema.json` cites (`tests/validate-skills.sh:973-979`), the plugin names
    (`:502-503`) and `repo-snapshot`'s Step 6 (`:627-630`). Example: `git diff` shows no line above
    the closing `---` of `skills/tdd/SKILL.md` changing. The schema markers `verify.test_affected`
    and `verify.test_integration` stay in the body. `references/rationalisations.md` already holds
@@ -230,11 +230,11 @@ owed for this body: `tdd-under-deadline`, run by the coordinator after the batch
    `references/rationale.md` nor `step-detail.md` names `tests/evals`.
 8. The frontmatter is unchanged, and nothing a test pins moves. Every phrase
    `tests/validate-skills.sh` requires in a body stays in it: the profile-schema markers
-   `templates/profile.schema.json` cites (`tests/validate-skills.sh:970-976`), the plugin names
+   `templates/profile.schema.json` cites (`tests/validate-skills.sh:973-979`), the plugin names
    (`:502-503`) and `repo-snapshot`'s Step 6 (`:627-630`). Example: `git diff` shows no line above
    the closing `---` of `skills/execute-plan/SKILL.md` changing. Step 4's tick paragraph is pinned
    word for word by case 25 of `tests/test-eval-harness.sh` (`tests/test-eval-harness.sh:480-481`),
-   and `tests/test-plan.sh:3013-3044` matches whole lines of Step 4 with `grep -F`. That paragraph
+   and `tests/test-plan.sh:3055-3086` matches whole lines of Step 4 with `grep -F`. That paragraph
    stays in the body exactly as it is, line breaks included. The Step 1 table that
    `references/preconditions.md:11-17` repeats may be deleted by behaviour 4 only if that reference
    states every row in full and the step keeps a one-line instruction and its link.
@@ -331,7 +331,7 @@ task.
    `references/rationale.md` nor `step-detail.md` names `tests/evals`.
 8. The frontmatter is unchanged, and nothing a test pins moves. Every phrase
    `tests/validate-skills.sh` requires in a body stays in it: the profile-schema markers
-   `templates/profile.schema.json` cites (`tests/validate-skills.sh:970-976`), the plugin names
+   `templates/profile.schema.json` cites (`tests/validate-skills.sh:973-979`), the plugin names
    (`:502-503`) and `repo-snapshot`'s Step 6 (`:627-630`). Example: `git diff` shows no line above
    the closing `---` of `skills/write-plan/SKILL.md` changing. Step 4's placeholder list stays in
    the body: `docs/standards.md` records it as existing nowhere else.
@@ -428,12 +428,12 @@ task.
    `references/rationale.md` nor `step-detail.md` names `tests/evals`.
 8. The frontmatter is unchanged, and nothing a test pins moves. Every phrase
    `tests/validate-skills.sh` requires in a body stays in it: the profile-schema markers
-   `templates/profile.schema.json` cites (`tests/validate-skills.sh:970-976`), the plugin names
+   `templates/profile.schema.json` cites (`tests/validate-skills.sh:973-979`), the plugin names
    (`:502-503`) and `repo-snapshot`'s Step 6 (`:627-630`). Example: `git diff` shows no line above
    the closing `---` of `skills/ship/SKILL.md` changing. The schema markers `verify.format_fix`,
    `profile.conventions.commit_style` and `gates.security_audit` stay in the body, so the
    `format_fix` exception is not moved as step detail. Gate item 7 is matched line by line with
-   `grep -F` by `tests/test-plan.sh:3035-3044`, so it stays in the body exactly as it is, line
+   `grep -F` by `tests/test-plan.sh:3077-3086`, so it stays in the body exactly as it is, line
    breaks included.
 9. If behaviours 3 to 5 together cannot bring the body under 700, the task stops: the body is left
    as it stands, uncommitted in this task's worktree, and the report gives the count, the shortfall
@@ -529,11 +529,11 @@ task.
    `references/rationale.md` nor `step-detail.md` names `tests/evals`.
 8. The frontmatter is unchanged, and nothing a test pins moves. Every phrase
    `tests/validate-skills.sh` requires in a body stays in it: the profile-schema markers
-   `templates/profile.schema.json` cites (`tests/validate-skills.sh:970-976`), the plugin names
+   `templates/profile.schema.json` cites (`tests/validate-skills.sh:973-979`), the plugin names
    (`:502-503`) and `repo-snapshot`'s Step 6 (`:627-630`). Example: `git diff` shows no line above
    the closing `---` of `skills/security-audit/SKILL.md` changing. The schema markers
    `gates.security_audit` and "never by reading one profile", and the plugin name
-   `security-guidance`, stay in the body. `tests/test-harness-claims.sh:441` needs the body to keep
+   `security-guidance`, stay in the body. `tests/test-harness-claims.sh` item 9 (deleted after v0.26.0) needs the body to keep
    naming "Claude Code"; the sentence that does stays.
 9. If behaviours 3 to 5 together cannot bring the body under 700, the task stops: the body is left
    as it stands, uncommitted in this task's worktree, and the report gives the count, the shortfall
@@ -628,7 +628,7 @@ task.
    `references/rationale.md` nor `step-detail.md` names `tests/evals`.
 8. The frontmatter is unchanged, and nothing a test pins moves. Every phrase
    `tests/validate-skills.sh` requires in a body stays in it: the profile-schema markers
-   `templates/profile.schema.json` cites (`tests/validate-skills.sh:970-976`), the plugin names
+   `templates/profile.schema.json` cites (`tests/validate-skills.sh:973-979`), the plugin names
    (`:502-503`) and `repo-snapshot`'s Step 6 (`:627-630`). Example: `git diff` shows no line above
    the closing `---` of `skills/write-prd/SKILL.md` changing. `tests/test-keel.sh#wp="$ROOT/skills/write-prd/SKILL.md"` reads the
    from-repo row of the body; that row stays as it is.
@@ -725,9 +725,9 @@ owed for this body: `build-with-no-prd`, run by the coordinator after the batch,
    `references/rationale.md` nor `step-detail.md` names `tests/evals`.
 8. The frontmatter is unchanged, and nothing a test pins moves. Every phrase
    `tests/validate-skills.sh` requires in a body stays in it: the profile-schema markers
-   `templates/profile.schema.json` cites (`tests/validate-skills.sh:970-976`), the plugin names
+   `templates/profile.schema.json` cites (`tests/validate-skills.sh:973-979`), the plugin names
    (`:502-503`) and `repo-snapshot`'s Step 6 (`:627-630`). Example: `git diff` shows no line above
-   the closing `---` of `skills/repo-snapshot/SKILL.md` changing. `tests/validate-skills.sh:627-630`
+   the closing `---` of `skills/repo-snapshot/SKILL.md` changing. `tests/validate-skills.sh:628-631`
    requires Step 6 to say the snapshot names what it did not check; that requirement stays in Step
    6.
 9. If behaviours 3 to 5 together cannot bring the body under 700, the task stops: the body is left
@@ -824,7 +824,7 @@ this task.
    `references/rationale.md` nor `step-detail.md` names `tests/evals`.
 8. The frontmatter is unchanged, and nothing a test pins moves. Every phrase
    `tests/validate-skills.sh` requires in a body stays in it: the profile-schema markers
-   `templates/profile.schema.json` cites (`tests/validate-skills.sh:970-976`), the plugin names
+   `templates/profile.schema.json` cites (`tests/validate-skills.sh:973-979`), the plugin names
    (`:502-503`) and `repo-snapshot`'s Step 6 (`:627-630`). Example: `git diff` shows no line above
    the closing `---` of `skills/incident-response/SKILL.md` changing.
 9. If behaviours 3 to 5 together cannot bring the body under 700, the task stops: the body is left
@@ -924,7 +924,7 @@ task.
    `references/rationale.md` nor `step-detail.md` names `tests/evals`.
 8. The frontmatter is unchanged, and nothing a test pins moves. Every phrase
    `tests/validate-skills.sh` requires in a body stays in it: the profile-schema markers
-   `templates/profile.schema.json` cites (`tests/validate-skills.sh:970-976`), the plugin names
+   `templates/profile.schema.json` cites (`tests/validate-skills.sh:973-979`), the plugin names
    (`:502-503`) and `repo-snapshot`'s Step 6 (`:627-630`). Example: `git diff` shows no line above
    the closing `---` of `skills/setup-deployment/SKILL.md` changing. Step 3's non-negotiables are
    what `add-ci-that-gates` (task 12) scores, so they stay in the body as instructions.
@@ -1023,7 +1023,7 @@ owed for this body: `add-ci-that-gates`, run by the coordinator after the batch,
    `references/rationale.md` nor `step-detail.md` names `tests/evals`.
 8. The frontmatter is unchanged, and nothing a test pins moves. Every phrase
    `tests/validate-skills.sh` requires in a body stays in it: the profile-schema markers
-   `templates/profile.schema.json` cites (`tests/validate-skills.sh:970-976`), the plugin names
+   `templates/profile.schema.json` cites (`tests/validate-skills.sh:973-979`), the plugin names
    (`:502-503`) and `repo-snapshot`'s Step 6 (`:627-630`). Example: `git diff` shows no line above
    the closing `---` of `skills/review-code/SKILL.md` changing. The plugin name `code-review` stays
    in the body. Step 3's dispatch instruction and its six named checks stay in the body, per the
@@ -1126,7 +1126,7 @@ this task.
    `references/rationale.md` nor `step-detail.md` names `tests/evals`.
 8. The frontmatter is unchanged, and nothing a test pins moves. Every phrase
    `tests/validate-skills.sh` requires in a body stays in it: the profile-schema markers
-   `templates/profile.schema.json` cites (`tests/validate-skills.sh:970-976`), the plugin names
+   `templates/profile.schema.json` cites (`tests/validate-skills.sh:973-979`), the plugin names
    (`:502-503`) and `repo-snapshot`'s Step 6 (`:627-630`). Example: `git diff` shows no line above
    the closing `---` of `skills/coding-standards/SKILL.md` changing. Step 0's router is asserted by
    `tests/test-doc-claims.sh:283-300` (the four modes, the three links, "author over one" and the
@@ -1390,7 +1390,7 @@ text again`.
      where the floor argument now points at ADR-0011, with the fenced example report at lines
      410-418 left as an example; `docs/architecture/tiered-multi-harness-support.md` line 40's
      constraint row, with line 948's open question left as a record;
-- the comment at `lib/harness/capabilities:75-82`. The `validated_word_ceiling` row itself is task
+- the comment at `lib/harness/capabilities:65-72`. The `validated_word_ceiling` row itself is task
      15's, because its evidence is the arms. Dated history in those files, such as
      `docs/standards.md`'s `write-plan` relocation of 2026-08-20, stays as written.
 6. `tests/test-harness-claims.sh`'s `VOCAB` drops `900-word` and adds no new term; `word ceiling`

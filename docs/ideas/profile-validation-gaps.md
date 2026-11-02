@@ -18,9 +18,9 @@ never checked at all.
 **Evidence.** This repository, `bin/keel` at `06b8ef2..b7c70f9` on branch `sandbox`, unpushed as of
 2026-09-26. Task 1's execution note lists three findings not taken (`null` passes on gate keys and
 reads as `off`; `type` is not checked; `gates.additionalProperties` keys go unchecked,
-`docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md:203-204`). Task 2's
+`docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md:204-205`). Task 2's
 execution note adds a fourth, considered and not taken (a stderr line from python drops the enum
-findings, `docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md:395`). The
+findings, `docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md:396`). The
 2026-09-26 guard-hooks plan's "Not in this plan" table names two more as the review's own consider
 items, sent to `shape-idea` rather than decided inline: enum FAIL on non-gate keys, and an older
 keel against a newer profile (`docs/plans/2026-09-26-guard-hooks-outside-the-working-tree.md:1406`).

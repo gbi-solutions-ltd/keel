@@ -25,6 +25,17 @@ fail=0
 ok()   { printf '  PASS  %s\n' "$1"; pass=$((pass+1)); return 0; }
 bad()  { printf '  FAIL  %s: %s\n' "$1" "$2"; fail=$((fail+1)); return 0; }
 
+# keel doctor asks the installed Claude Code for its version through KEEL_CLAUDE, so without a stub
+# every doctor run in these files prints one line on a machine with claude and another on CI with
+# none. This one prints the ledger's current minimum, read from the ledger rather than written here,
+# so a row that moves the minimum does not leave the suite behind. Test files that run doctor
+# without this library export the same.
+KEEL_CLAUDE="$(mktemp -d)/claude"
+printf '#!/bin/sh\necho "%s (Claude Code)"\n' \
+  "$(bash -c ". '$ROOT/lib/harness/resolve.sh'; harness_min_version")" > "$KEEL_CLAUDE"
+chmod +x "$KEEL_CLAUDE"
+export KEEL_CLAUDE
+
 # Every stack is built once, committed once, and copied per case. The content and the commit are
 # identical every time and no test asserts on commit identity, so the git work is shared as well as
 # the files. fixture() hands out a copy and never the template, so nothing a case does can reach it.
@@ -335,4 +346,4 @@ plugins_of() {   # plugins_of <dir>
 }
 
 # Each part builds its own fixture cache, so each removes its own on the way out.
-trap 'rm -rf "$FIXTURE_CACHE"' EXIT
+trap 'rm -rf "$FIXTURE_CACHE" "$(dirname "$KEEL_CLAUDE")"' EXIT

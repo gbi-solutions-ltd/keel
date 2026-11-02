@@ -4,15 +4,15 @@ The structure of `<docs_root>/plans/YYYY-MM-DD-<slug>.md`. Drawn from superpower
 `writing-plans`, with the verify commands read from `.keel/profile.json` and tasks traced to
 story IDs. The task shape, behaviours with examples in place of test code, is keel's own.
 
-## Starting from the harness's plan mode
+## Starting from plan mode
 
-Where the harness has a plan mode, use it for the read-only exploration and the approval it
-gives, and treat its plan as a draft and not as the plan. Harden the draft: give each task its
-`Files`, `Behaviours` with examples, `Depends on:` and `Done when:` from the profile, and size
-the tasks as "Task granularity" says. Plan mode blocks writes until it is left, so write the
-file where `write-plan` step 3 says only after leaving it. The harness's approval covers the
-draft; the question at step 6 still carries the routing and the delivery. A harness with no plan
-mode, and a headless or scheduled run, writes the plan directly, and nothing else here changes.
+Use Claude Code's plan mode for the read-only exploration and the approval it gives, and treat
+its plan as a draft and not as the plan. Harden the draft: give each task its `Files`,
+`Behaviours` with examples, `Depends on:` and `Done when:` from the profile, and size the tasks
+as "Task granularity" says. Plan mode blocks writes until it is left, so write the file where
+`write-plan` step 3 says only after leaving it. Plan mode's approval covers the draft; the
+question at step 6 still carries the routing and the delivery. A headless or scheduled run
+writes the plan directly, and nothing else here changes.
 
 ## Header
 

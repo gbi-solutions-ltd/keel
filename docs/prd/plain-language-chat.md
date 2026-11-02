@@ -151,12 +151,12 @@ headroom survive.
 
 | ID | Constraint | Imposed by | Evidence |
 |---|---|---|---|
-| CON-01 | The always-loaded injection has a 400-token hard ceiling, and the build fails above it. | `docs/05-token-and-memory-design.md`, enforced in CI | `tests/validate-skills.sh:283-284` |
+| CON-01 | The always-loaded injection has a 400-token hard ceiling, and the build fails above it. | `docs/05-token-and-memory-design.md`, enforced in CI | `tests/validate-skills.sh:284-285` |
 | CON-02 | The rule must swap the injected paragraph, never append one. An added rule of comparable size costs about 56 tokens against 44 of headroom. | Arithmetic on CON-01 | Measured 2026-08-18: `terse` 1,284 characters, `verbose` 1,082, a 202-character difference |
 | CON-03 | `response_style` stays an enum of exactly two values. | The requester, 2026-08-18 | `docs/ideas/plain-language-chat.md`, variants table |
 | CON-04 | Artifacts stay technical. No PRD, plan, ADR, snapshot, runbook, review or audit changes vocabulary. | The requester, 2026-08-18 | `output-styles/keel-terse.md:11-14` already says the same for length |
 | CON-05 | Output styles and SessionStart context do not reach subagents, which run their own system prompt. Delegated reports stay technical whatever this key says. | Claude Code | Recorded in `docs/ideas/concise-responses.md` |
-| CON-06 | Adding a declared key to the profile schema forces a `SCHEMA_VERSION` bump, and every existing profile then reports drift until `keel init` is re-run. | `tests/validate-skills.sh`, and `bin/keel` doctor | `tests/validate-skills.sh:390, 434-439`; the drift message at `bin/keel#Re-run 'keel init' to pick up the new fields` |
+| CON-06 | Adding a declared key to the profile schema forces a `SCHEMA_VERSION` bump, and every existing profile then reports drift until `keel init` is re-run. | `tests/validate-skills.sh`, and `bin/keel` doctor | `tests/validate-skills.sh:391, 434-439`; the drift message at `bin/keel#Re-run 'keel init' to pick up the new fields` |
 | CON-07 | Nothing in the injected text may be volatile. A rule whose wording varied per reply, per date or per branch would cost the prompt cache on every request. | `hooks/session-start:4-8` | The comment block that opens the hook |
 
 `CON-06` also settles a question the idea record left undecided: `keel doctor` needs no new code for

@@ -1574,7 +1574,7 @@ keel already asserts `verify.e2e` is `null` for Dart, so without this it says th
 and recommends a browser e2e tool in the same run.
 
 **keel's own strategy document already says the right thing**, and the code disagrees with it:
-`docs/04-plugin-strategy.md:28` scopes `playwright` to "Only where there are **browser flows** worth
+`docs/04-plugin-strategy.md:22` scopes `playwright` to "Only where there are **browser flows** worth
 testing". `has_ui` is a different predicate. `apex` satisfies both, because APEX pages really are
 browser-rendered; Flutter is the first UI to reach that line that is not a browser at all. **This
 fixes the code to match the documented rule rather than inventing a new one.**
@@ -2013,7 +2013,7 @@ full-suite checkpoint.**
 
 - [x] **Step 1: Add the Dart row to the detection matrix**
 
-`docs/03-install-and-distribution.md:210-227` is a `Signal | Inferred` table with one row per
+`docs/03-install-and-distribution.md:200-217` is a `Signal | Inferred` table with one row per
 detected language. It enumerates all fourteen, so this change makes it wrong. The PL/SQL work amended
 the same table. Insert after the `.luarc.json` row and before the PL/SQL row:
 

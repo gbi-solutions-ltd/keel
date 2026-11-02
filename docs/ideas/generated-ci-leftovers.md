@@ -16,8 +16,8 @@ is testing, and nothing else in keel (not `doctor`, not a test) catches any of t
 **Evidence.** No live incident is on record for any of the three. Each is a finding from reading
 the code, and, for the branch name, from testing git's and YAML's actual behavior directly this
 session (2026-09-26). Dated references: the 2026-09-25 plan's row 6
-(`docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md:1923`); that plan's task 6
-execution note (`docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md:1182`); and
+(`docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md:1924`); that plan's task 6
+execution note (`docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md:1183`); and
 the 2026-09-26 security audit (`docs/audits/2026-09-26-security.md` lines 115 and 74). Unknown, and
 nobody could name a project that has actually hit one of these.
 
@@ -67,14 +67,14 @@ instead to wait for a release note or a sign that it is common.
 | Finding | Evidence | What it means for the idea |
 |---|---|---|
 | `write_ci` only runs when nothing already declares a CI platform; an existing workflow file is never touched again, `--force` included | `bin/keel#Only where nothing declares a CI platform yet` (the guard around the call to `write_ci`) | (a) is permanent for any repo that already has a workflow. A code fix here needs a rewrite mechanism, which is a design question, not a bug fix |
-| The 2026-09-25 plan already named this as deferred, not decided | `docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md:1923` | (a) was scoped as "a note in the release, or a doctor check if it turns out to be common." Neither exists yet |
+| The 2026-09-25 plan already named this as deferred, not decided | `docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md:1924` | (a) was scoped as "a note in the release, or a doctor check if it turns out to be common." Neither exists yet |
 | `docs/snapshot.md`'s own correction for this recommendation confirms the same limit | `docs/snapshot.md#workflow already written is not rewritten.` | Independent, dated confirmation that (a) is unresolved by design, not an oversight |
 | The branch name is interpolated into a YAML flow sequence with no quoting or escaping | `bin/keel#branches: [%s]` | (b) is confirmed at the source: nothing quotes `$branch` before it is written |
 | Git accepts branch names YAML cannot round-trip: `a]b` and `!x` fail to parse at all (`Psych::SyntaxError`, verified with `ruby -ryaml` against the exact generated line, this session); `&x` parses as a YAML anchor on a null scalar, so the filter becomes `branches: [null]`; `a,b` silently becomes two branch filters, `["a", "b"]`, instead of one literal name | Tested directly this session, 2026-09-26, against git's `check-ref-format` and Ruby's Psych parser | (b) is real and reproducible, not theoretical. The effect ranges from GitHub Actions rejecting the workflow outright to a filter that quietly matches the wrong branches |
 | The 2026-09-26 security audit already named this exact gap | `docs/audits/2026-09-26-security.md` line 115 ("`write_ci` writes the branch name into YAML unquoted") | (b) was seen and dated, and deliberately not fixed in that pass |
 | `write_ci`'s package-manager-to-audit mapping keys only on `stack.package_manager`, which reads `yarn` for any `yarn.lock` regardless of version | `bin/keel#yarn) audit='yarn npm audit --severity high' ;;`; the lockfile-agnostic package manager read at `lib/detect-stack.sh:208` | (c) is confirmed: nothing here mirrors the yarn-2-plus guard `detect_verify` already uses elsewhere |
 | `detect_verify`'s own yarn branch requires a `__metadata:` line before treating a lockfile as yarn 2+, specifically because yarn 1 has no `yarn npm` subcommand | `lib/detect-stack.sh:614-621` | The fix for (c) needs no new design: it applies a guard that already exists one function over |
-| Task 6's own execution note names this exact gap and marks it not taken | `docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md:1182` ("`write_ci`'s own yarn mapping still writes `yarn npm audit` for a yarn 1 project (pre-existing)") | (c) is a named, dated, pre-existing gap, not a new discovery |
+| Task 6's own execution note names this exact gap and marks it not taken | `docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md:1183` ("`write_ci`'s own yarn mapping still writes `yarn npm audit` for a yarn 1 project (pre-existing)") | (c) is a named, dated, pre-existing gap, not a new discovery |
 | No test in `tests/test-keel.sh` exercises a branch name with YAML-significant punctuation, and none exercises a `yarn.lock` with no `__metadata:` reaching `write_ci`'s audit step | `tests/test-keel-5.sh#generated CI runs on the default branch the profile records` (only well-formed branch names are asserted anywhere near `write_ci`) | Neither (b) nor (c) has regression coverage today. A fix landed with no failing test first would be the exact gap `tdd` exists to close |
 | Generated CI still pins `actions/checkout` by the movable tag `@v4`; keel's own hand-authored CI was moved to a pinned commit for the same class of finding | `bin/keel#actions/checkout@v4`; `docs/audits/2026-09-26-security.md` line 74 ("every `actions/checkout` is pinned to the v4.4.0 commit") | A fourth, related gap: the fix L-02 already applied to keel's own pipeline was never carried into the pipeline `write_ci` hands to every other project |
 

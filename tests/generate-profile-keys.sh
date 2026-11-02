@@ -125,23 +125,22 @@ print("|---|---|---|---|---|")
 # comment on its own line between two table rows ends the table in GitHub-flavoured markdown, and
 # the scan skips any line carrying its own tag.
 #
-# done_verified drives done-guard, which is active on both harnesses. hard_block_paths is enforced
-# by sensitive-guard, which needs a hook that can put a command to a human, and Codex offers none.
-# Claiming it for codex is what lib/harness/capabilities would refuse.
+# done_verified drives done-guard, and hard_block_paths is enforced by sensitive-guard, which needs
+# a hook that can put a command to a human.
 #
 # The last three are named by their Read by cell rather than by their description, which is why they
 # were not needed before this column existed: the column prints a citation, so those rows name
 # hooks/session-start and hooks/done-guard in a cell nobody wrote by hand. Both gates are active on
-# both harnesses, which tests/test-harness-resolve.sh pins, so both tags are granted. Deleting any
+# Claude Code, which tests/test-harness-resolve.sh pins, so both tags are granted. Deleting any
 # of the three turns tests/test-harness-claims.sh red, which is how to tell these tags are load
 # bearing rather than decoration. If a tag is ever refused, the manifest is the authority and the
 # citation is what changes, not the tag.
 CLAIMS = {
-    "gates.done_verified": ["gate=done-guard harness=claude", "gate=done-guard harness=codex"],
+    "gates.done_verified": ["gate=done-guard harness=claude"],
     "hard_block_paths": ["gate=sensitive-guard harness=claude"],
-    "conventions.response_style": ["gate=session-start harness=claude", "gate=session-start harness=codex"],
-    "conventions.explain_level": ["gate=session-start harness=claude", "gate=session-start harness=codex"],
-    "verify.test": ["gate=done-guard harness=claude", "gate=done-guard harness=codex"],
+    "conventions.response_style": ["gate=session-start harness=claude"],
+    "conventions.explain_level": ["gate=session-start harness=claude"],
+    "verify.test": ["gate=done-guard harness=claude"],
 }
 
 for path, typ, rb, desc in declared(schema):

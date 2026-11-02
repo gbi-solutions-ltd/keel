@@ -22,7 +22,7 @@ the given sources names a Python (or go, java, php, rust, dart) project that ask
 `verify.security` detection, hit a false "ok" on a missing scan, or filed a complaint about it. The
 only place this appears is the plan's own "Not in this plan" row, written by the maintainer as a
 forward-looking placeholder, not as a report of a request that arrived
-(`docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md:1924`, "a separate
+(`docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md:1925`, "a separate
 decision, if a Python project asks").
 
 ## What was asked for
@@ -30,7 +30,7 @@ decision, if a Python project asks").
 The plan's own words, from its "Not in this plan" table: "`verify.security` for pip, and for
 stacks with no lockfile audit", with the reason given as "pip-audit installs a package, and
 `doctor` executes verify commands", and the next step named as "a separate decision, if a Python
-project asks" (`docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md:1924`).
+project asks" (`docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md:1925`).
 Nobody has since asked; this record exists because the deferred row was flagged for a follow-up
 surface, not because a user raised it.
 
@@ -76,7 +76,7 @@ the reason the row exists.
 | Finding | Evidence | What it means for the idea |
 |---|---|---|
 | `detect_verify`'s python branch has no `security` case | `lib/detect-stack.sh:644-669` | The gap is real and total for pip, not partial |
-| `write_ci` already maps pip to an install-then-run audit, and the plan that shipped task 6 named that as the reason to exclude it from `detect_verify` | `bin/keel#audit='pip install pip-audit && pip-audit -r requirements.txt'`; `docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md:1203-1204` | The exclusion is a recorded decision, not an omission task 6 forgot |
+| `write_ci` already maps pip to an install-then-run audit, and the plan that shipped task 6 named that as the reason to exclude it from `detect_verify` | `bin/keel#audit='pip install pip-audit && pip-audit -r requirements.txt'`; `docs/plans/2026-09-25-close-the-enforcement-gaps-from-the-snapshot.md:1204-1205` | The exclusion is a recorded decision, not an omission task 6 forgot |
 | Full `doctor` executes every non-null `verify.*` command, including `verify.security` | `bin/keel#for k in test lint typecheck build security; do` (the loop `for k in test lint typecheck build security`) | Any pip detection that reuses the `write_ci` audit string makes every full `doctor` run install a package |
 | Every stack outside npm, pnpm and yarn 2+ gets `pm=""` in `write_ci`, so `audit=""` and the workflow gets no audit step and no "add one by hand" note | `bin/keel#*)    audit="" ;;`, `bin/keel#no dependency audit step in the CI workflow` | Go, java, php, rust and dart were never given even a CI-side mapping; detecting `verify.security` for them is a larger, separate per-stack tool decision, not a small addition alongside pip |
 | The snapshot's own correction after task 6 records the scope as final for that task, not partial pending a follow-up | `docs/snapshot.md#Every other stack still gets none.` | The maintainer already treated task 6 as done at its stated scope, consistent with no open ask to extend it |

@@ -1453,7 +1453,7 @@ validators (`tests/validate-citations.sh`, `tests/validate-skills.sh`,
 
 None that block a task. Two things the plan could not settle and does not pretend to:
 
-1. `README.md:185` says six scenarios are dispatched at the release gate; `tests/evals/gate-scenarios`
+1. `README.md:188` says six scenarios are dispatched at the release gate; `tests/evals/gate-scenarios`
    lists seven, and `tests/test-eval-harness.sh` asserts the seven against `tests/evals/README.md`
    and the runbook, not against `README.md`. Task 7 leaves the word "Six" alone and changes only
    the count it is responsible for. Worth a one-line fix in its own change.

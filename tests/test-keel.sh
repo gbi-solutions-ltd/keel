@@ -1384,12 +1384,24 @@ done
 # ---- profile ---------------------------------------------------------------
 
 d="$(fixture node-ts)"
-( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+out="$( cd "$d" && "$KEEL" init -y 2>&1 )"
 python3 -c "import json;json.load(open('$d/.keel/profile.json'))" 2>/dev/null \
   && ok "profile is valid JSON" || bad "profile JSON" "did not parse"
 [ -f "$d/docs/keel/README.md" ] && ok "scaffolds the docs root" || bad "docs root" "missing"
 [ -f "$d/docs/keel/prompting.md" ] && ok "installs the prompting cheatsheet" || bad "cheatsheet" "missing"
-[ -f "$d/AGENTS.md" ] && ok "writes AGENTS.md for other agents" || bad "AGENTS.md" "missing"
+
+# ---- init writes the managed block to CLAUDE.md only ------------------------
+# AGENTS.md is read by other harnesses, and this plugin serves Claude Code alone, so init leaves it
+# to them. The summary line is asserted too, since it is the only place a person reads what changed.
+grep -qF '<!-- keel:start' "$d/CLAUDE.md" 2>/dev/null \
+  && ok "init writes CLAUDE.md only: CLAUDE.md carries the keel block" \
+  || bad "init writes CLAUDE.md only" "CLAUDE.md has no keel block"
+[ -e "$d/AGENTS.md" ] && bad "init writes CLAUDE.md only" "init created AGENTS.md" \
+  || ok "init writes CLAUDE.md only: no AGENTS.md is created"
+block_line="$(printf '%s\n' "$out" | grep -E '^  block ' || true)"
+[ "$block_line" = "  block     CLAUDE.md" ] \
+  && ok "init writes CLAUDE.md only: the summary names CLAUDE.md alone" \
+  || bad "init writes CLAUDE.md only" "summary block line is '$block_line'"
 
 # The rendered block must carry no unsubstituted placeholder.
 grep -q '{{' "$d/CLAUDE.md" && bad "placeholders" "unsubstituted {{...}} left in CLAUDE.md" \
@@ -1413,6 +1425,61 @@ grep -q 'My own notes that must survive' "$d/CLAUDE.md" \
   && ok "existing CLAUDE.md content is preserved" || bad "preserve" "user content lost"
 grep -q 'keel:start' "$d/CLAUDE.md" && ok "block is appended to an existing file" || bad "append" "no marker"
 rm -rf "$d"
+
+# ---- an existing AGENTS.md is left exactly as it was ----------------------
+# It belongs to whichever harness reads it. An older keel block in it is that harness's business,
+# and --team stages what init wrote, which this file no longer is.
+
+d="$(fixture node-ts)"
+printf '%s\n' '<!-- keel:start v1 -->' '## An older engineering standard' '<!-- keel:end -->' '' \
+  'My own paragraph for other agents.' > "$d/AGENTS.md"
+cp "$d/AGENTS.md" "$d.agents-before"
+( cd "$d" && "$KEEL" init -y --team >/dev/null 2>&1 )
+cmp -s "$d.agents-before" "$d/AGENTS.md" \
+  && ok "an existing AGENTS.md is left exactly as it was: byte-identical after init" \
+  || bad "an existing AGENTS.md is left exactly as it was" "init changed it"
+( cd "$d" && git diff --cached --name-only ) | grep -qxF AGENTS.md \
+  && bad "an existing AGENTS.md is left exactly as it was" "init --team staged it" \
+  || ok "an existing AGENTS.md is left exactly as it was: init --team does not stage it"
+rm -rf "$d" "$d.agents-before"
+
+# ---- doctor no longer checks AGENTS.md ------------------------------------
+
+d="$(fixture node-ts)"
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+printf '%s\n' '<!-- keel:start v1 -->' '## A stale engineering standard' '<!-- keel:end -->' \
+  > "$d/AGENTS.md"
+out="$( cd "$d" && "$KEEL" doctor 2>&1 || true )"
+named="$(printf '%s\n' "$out" | grep -F 'AGENTS.md' || true)"
+[ -z "$named" ] && ok "doctor no longer checks AGENTS.md: no line names it" \
+  || bad "doctor no longer checks AGENTS.md" "printed: $named"
+rm -rf "$d"
+
+# ---- doctor's referenced-docs scan reads CLAUDE.md and not AGENTS.md -------
+# Both files link the same uncommitted document, so a missing AGENTS.md line is the scan skipping
+# that file and not the link going unseen.
+
+d="$(fixture node-ts)"
+( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
+mkdir -p "$d/docs" && printf 'not committed\n' > "$d/docs/missing.md"
+printf '\nSee [missing](docs/missing.md).\n' >> "$d/AGENTS.md"
+printf '\nSee [missing](docs/missing.md).\n' >> "$d/CLAUDE.md"
+out="$( cd "$d" && "$KEEL" doctor 2>&1 || true )"
+named="$(printf '%s\n' "$out" | grep -F 'AGENTS.md' || true)"
+[ -z "$named" ] \
+  && ok "doctor's referenced-docs scan reads no AGENTS.md: no line names it" \
+  || bad "doctor's referenced-docs scan reads no AGENTS.md" "printed: $named"
+case "$out" in *"CLAUDE.md links 'docs/missing.md'"*)
+    ok "doctor's referenced-docs scan still reads CLAUDE.md: its link gets a line" ;;
+  *) bad "doctor's referenced-docs scan still reads CLAUDE.md" "no line for its link: $out" ;; esac
+rm -rf "$d"
+
+# ---- this repository carries no AGENTS.md ---------------------------------
+# CLAUDE.md carries the same block, and keel no longer writes or reads AGENTS.md.
+
+[ -z "$(git -C "$ROOT" ls-files AGENTS.md)" ] \
+  && ok "this repository's own AGENTS.md is removed" \
+  || bad "this repository's own AGENTS.md is removed" "git ls-files AGENTS.md still lists it"
 
 # ---- marker corruption is reported, not repaired --------------------------
 
@@ -1899,7 +1966,7 @@ rm -rf "$d"
 d="$(fixture node-ts)"
 ( cd "$d" && "$KEEL" init -y --team >/dev/null 2>&1 )
 staged="$( cd "$d" && git diff --cached --name-only )"
-for want in .keel/profile.json CLAUDE.md AGENTS.md .claude/settings.json .claude/keel-nudge \
+for want in .keel/profile.json CLAUDE.md .claude/settings.json .claude/keel-nudge \
             docs/keel/README.md .gitignore; do
     printf '%s\n' "$staged" | grep -qxF "$want" && ok "--team stages $want" \
       || bad "--team staging" "$want is not in the index"

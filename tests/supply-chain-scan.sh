@@ -396,28 +396,17 @@ while IFS= read -r f; do
     fi
 done < "$ALL_LIST"
 
-# structural-orphan-hook: every file under hooks/ that is not itself a manifest is named in one. An
-# unregistered hook either does nothing, in which case it is dead weight, or it is wired up
-# somewhere else, in which case the manifests are no longer the description of what this plugin runs.
-#
-# THERE IS MORE THAN ONE MANIFEST, since 2026-09-06. hooks/hooks.json is Claude Code's and
-# hooks/hooks.codex.json is generated for Codex by tests/generate-harness-artifacts.sh, and a
-# harness gets only the gates lib/harness/capabilities grants it. Two consequences, and reading
-# hooks.json alone gets both wrong: a manifest is not an orphan hook, and a hook registered only on
-# the second harness is registered. The first is why this run went red the day hooks.codex.json was
-# generated; the second is a false positive waiting for the first gate that is Codex-only.
-manifests=()
-while IFS= read -r m; do
-    [ -n "$m" ] && manifests+=("$m")
-done < <(find hooks -maxdepth 1 -type f -name 'hooks*.json' 2>/dev/null)
-
-if [ "${#manifests[@]}" -gt 0 ]; then
+# structural-orphan-hook: every file under hooks/ other than the manifest is named in
+# hooks/hooks.json. An unregistered hook either does nothing, in which case it is dead weight, or it
+# is wired up somewhere else, in which case the manifest is no longer the description of what this
+# plugin runs.
+if [ -f hooks/hooks.json ]; then
     while IFS= read -r h; do
         [ -n "$h" ] || continue
         base="$(basename "$h")"
-        case "$base" in hooks.json|hooks.*.json) continue ;; esac
-        grep -qF "$base" "${manifests[@]}" \
-          || report "hooks/$base [structural-orphan-hook] is not referenced by any hooks manifest. Register it in one, or delete it"
+        [ "$base" = hooks.json ] && continue
+        grep -qF "$base" hooks/hooks.json \
+          || report "hooks/$base [structural-orphan-hook] is not referenced by hooks/hooks.json. Register it there, or delete it"
     done < <(find hooks -maxdepth 1 -type f 2>/dev/null)
 fi
 
