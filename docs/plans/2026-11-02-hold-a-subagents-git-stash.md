@@ -364,6 +364,123 @@ passes, with `git commit -m "docs: record that every subagent's stash is held by
 
 ---
 
+### Task 4: the review-guard follow-ups from review and audit
+
+**Story:** the follow-ups in "Delivery" below and the security audit's "worth checking" list,
+2026-11-02, which Bernard asked to handle before merging
+**Files:**
+- Modify: `hooks/review-guard`
+- Modify: `lib/harness/capabilities`
+- Modify: `docs/harness-support.md` (regenerated)
+- Test: `tests/test-review-guard.sh`
+- Test: `tests/test-harness-claims.sh`
+
+**Depends on:** tasks 1, 1b and 3
+
+**Behaviours:**
+
+1. The event reaches python3 on stdin, not in an environment variable, so an event too large for
+   the environment is still judged by the parser. Example: `hooks/review-guard` no longer sets
+   `KEEL_EVENT`; python3 is started with the script as an argument (`-c`) or from a file, and reads
+   the event from stdin; every existing case in `tests/test-review-guard.sh` still passes. There is
+   no size case, because judging a megabyte command takes seconds and would slow the suite; say so
+   in the test file.
+2. The reviewer's rules apply only to a subagent too: an event with `agent_type`
+   `keel:keel-reviewer` and no `agent_id` is a main session started as `--agent keel:keel-reviewer`
+   and is never touched. Example: that event running `git stash list` or `git commit -m x` prints
+   nothing and exits 0, on the python path and in the fallback; the same event with an `agent_id`
+   is refused, as today. The two task 1b cases "a reviewer with no agent_id is still refused" are
+   turned into allow cases.
+3. The fallback decides by `agent_id` presence and the exact reviewer name, so an odd agent name
+   cannot let a stash through. Example: with python3 off the PATH, an event whose `agent_type` is
+   `we"ird` (JSON-escaped) and which carries an `agent_id` is refused `git stash`.
+4. The ledger records `agent_id` and the guard requires it, without moving the minimum. Example:
+   `lib/harness/capabilities` holds
+   `provides|claude|pretooluse_agent_id|probe:a plugin PreToolUse hook on Bash logged an agent_id for a general-purpose subagent and a plugin agent and none for the main session, docs/plans/2026-10-17-reviewer-git-guard.md, and on 2.1.316 none for a main session started with --agent and one for a project agent from .claude/agents, docs/plans/2026-11-02-hold-a-subagents-git-stash.md|2.1.302|2026-11-02`
+   and `requires|review-guard|pretooluse_agent_id`; the comment above the rows says the guard needs
+   `agent_id` to tell a subagent from the main session; regenerated `docs/harness-support.md`
+   still reads "Minimum Claude Code version: 2.1.302"; `tests/test-harness-claims.sh` pins both
+   rows.
+5. The header states the two limits the review found, as limits: the fallback's catch-all option
+   pattern applies to the reviewer's fallback as well as a subagent's, and only refuses more; and a
+   subagent's `echo git stash` or a heredoc body that names `git stash` is refused, because the hook
+   reads every `git` word and heredoc bodies as commands, which errs toward refusing. Example: the
+   header names both, and a test pins that a subagent's `echo git stash` is refused, so the limit is
+   stated and observed rather than discovered.
+
+**Done when:** `tests/test-review-guard.sh` and `tests/test-harness-claims.sh` pass, and the
+profile's lint command passes.
+
+- [ ] **Step 4.1: Build it test first**
+
+Follow `keel:tdd` for behaviours 2 to 5: write or turn the cases, run them and watch behaviour 2's
+allow cases, behaviour 3's refusal and behaviour 4's rows fail. Behaviour 1 is a refactor that the
+existing cases cover: make it after the others pass, and run the whole file again. Then change the
+hook, its header, the ledger, and regenerate `docs/harness-support.md`.
+Run: `tests/test-review-guard.sh` and `tests/test-harness-claims.sh`
+Expected before the implementation: FAIL on those cases. Expected after: PASS. Quote the failing
+output in your report.
+Also run the hook under `/bin/bash` by name, as the existing cases do.
+
+Run: `tests/run-tests.sh`
+Expected: PASS, or reds this task did not cause, each named.
+
+- [ ] **Step 4.2: Hand over**
+
+```bash
+git add hooks/review-guard lib/harness/capabilities docs/harness-support.md \
+        tests/test-review-guard.sh tests/test-harness-claims.sh
+git status --porcelain
+```
+
+Stage exactly those paths, plus any doc whose citation you repaired, and stop. **Do not commit.**
+The coordinator commits after both review passes, with
+`git commit -m "fix(review-guard): read the event on stdin, key the reviewer on agent_id too, and record agent_id"`.
+
+---
+
+### Task 5: the records for task 4
+
+**Story:** the records task 4 makes wrong
+**Files:**
+- Modify: `docs/decisions/ADR-0016-a-subagents-stash-is-held-by-a-hook.md`
+- Modify: `docs/ideas/implementers-run-git-stash.md`
+- Modify: `CHANGELOG.md`
+
+**Depends on:** task 4
+
+**Behaviours:**
+
+1. ADR-0016 says what is true after task 4. Example: it no longer says a main session started as
+   `--agent keel:keel-reviewer` gets the reviewer's rules, nor that the ledger names only
+   `pretooluse_agent_type`; it says both rules key on `agent_id`, and names the two stated limits.
+2. The idea record's open question 2 states the two rules side by side as current state. Example:
+   it reads that the reviewer is refused every form of `stash` and other subagents may run
+   `list` and `show`, with no sentence framed as a correction.
+3. `CHANGELOG.md`'s Unreleased entry for the guard says the reviewer is held only as a subagent.
+
+There is no failing test for this task: it changes records. `tests/test-validate-citations.sh`,
+`tests/test-doc-claims.sh` and `tests/test-harness-claims.sh` check what can be checked.
+
+**Done when:** `tests/run-tests.sh` passes.
+
+- [ ] **Step 5.1: Write the records and run the suite**
+
+Make the edits, then run `tests/run-tests.sh` and quote its summary.
+
+- [ ] **Step 5.2: Hand over**
+
+```bash
+git add docs/decisions/ADR-0016-a-subagents-stash-is-held-by-a-hook.md \
+        docs/ideas/implementers-run-git-stash.md CHANGELOG.md
+git status --porcelain
+```
+
+Stage exactly those paths and stop. **Do not commit.** The coordinator commits after both review
+passes, with `git commit -m "docs: record the review-guard follow-ups"`.
+
+---
+
 ## Notes for the coordinator
 
 - **Concurrent batches.** `keel plan batches` on 2026-11-02 printed every task alone:
@@ -385,6 +502,8 @@ passes, with `git commit -m "docs: record that every subagent's stash is held by
   - a mutant making an empty `agent_id` count survived: no fallback case for it (hooks/review-guard:95)
   - a mutant narrowing `list|show` to `list` survived: no fallback case for `stash show` (hooks/review-guard:107)
   - a mutant dropping `--config-env` from the fallback's value options survived; `--super-prefix` has the same shape (hooks/review-guard:93)
+- follow-ups taken as tasks 4 and 5 (2026-11-02, Bernard asked to handle them before merging): all
+  but the heredoc and `echo` refusal, which task 4 states as a limit rather than removes
 - follow-up:
   - consider: the ledger requires only `pretooluse_agent_type` while the rule keys on `agent_id`; a separate row could follow (lib/harness/capabilities)
   - consider: a main session started as `--agent keel:keel-reviewer` gets the reviewer rules (hooks/review-guard header)
