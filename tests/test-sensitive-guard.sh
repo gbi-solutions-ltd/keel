@@ -586,8 +586,8 @@ out="$(event 'git add -A && git commit -m x' "$r" | ( cd "$r" && env -u CLAUDE_P
 asks "$out" && printf '%s' "$out" | grep -q 'profile\.json'
 verdict "a staging commit of a profile never committed asks naming the profile" $? "$out"
 rm -rf "$r"
-# Claude Code kills the hook at its 10 second timeout and the commit goes through, so git gets a
-# deadline inside that, and one that outlasts it asks. The case costs that deadline in suite time.
+# Claude Code kills the hook at its 10 second timeout and blocks the commit, which costs a retry,
+# so git gets a deadline inside that and running past it asks. The case costs that in suite time.
 # Timed to the millisecond, because bash's SECONDS counts whole seconds and a 9.2 second run can
 # read as 10.
 now() { python3 -c 'import time; print("%.3f" % time.time())'; }

@@ -443,5 +443,59 @@ for prof in $profiles; do
       || bad "agents/$prof.md is tracked, so it ships" "untracked, and the export publishes tracked files only"
 done
 
+# 9. sensitive-guard blocks the call when it fails to answer, and no other hook does.
+#
+# A crash is answered `ask` by the guard's own EXIT trap, but a timed-out hook or one that cannot
+# start answers nothing, and Claude Code then runs the command. `onFailure: "block"` closes that.
+# Only on sensitive-guard: review-guard runs on every Bash call of every session, so a failure there
+# would block the main session too. Here after the gates above so their cited lines do not move.
+# Each grep -q reads a here-string, not a pipe, for the race tests/grep-quiet.sh describes.
+on_failure_entries() {   # on_failure_entries <hooks.json>: event/matcher/hook=onFailure per entry
+    python3 -I -c '
+import json, sys
+doc = json.load(open(sys.argv[1]))
+for event, groups in doc["hooks"].items():
+    for g in groups:
+        for h in g["hooks"]:
+            name = h["command"].rstrip("\"").rsplit("/", 1)[-1]
+            print("%s/%s/%s=%s" % (event, g.get("matcher", ""), name, h.get("onFailure", "")))
+' "$1"
+}
+
+entries="$(on_failure_entries hooks/hooks.json)"
+grep -qx 'PreToolUse/Bash/sensitive-guard=block' <<< "$entries" \
+  && ok "the sensitive-guard entry carries onFailure block" \
+  || bad "the sensitive-guard entry carries onFailure block" "$(printf '%s\n' "$entries" | grep sensitive-guard)"
+others="$(printf '%s\n' "$entries" | grep -v '/sensitive-guard=' | grep -v '=$' | tr '\n' ' ')"
+[ -z "$others" ] && ok "no other hook entry carries onFailure" \
+  || bad "no other hook entry carries onFailure" "$others"
+
+# The ledger records the primitive as provided and required by nothing: the guard works without
+# onFailure, and a requires row would withhold the whole guard if this evidence were withdrawn.
+row='provides|claude|pretooluse_on_failure_block|vendor:code.claude.com/docs/en/hooks onFailure block on a timed-out PreToolUse command hook|2.1.295|2026-11-02'
+grep -qxF "$row" lib/harness/capabilities \
+  && ok "the ledger provides pretooluse_on_failure_block with source, version and date" \
+  || bad "the ledger provides pretooluse_on_failure_block with source, version and date" "no such row"
+grep -q '^requires|sensitive-guard|pretooluse_on_failure_block' lib/harness/capabilities \
+  && bad "no gate requires pretooluse_on_failure_block" "a requires row names it" \
+  || ok "no gate requires pretooluse_on_failure_block"
+
+# The generator emits the key from the ledger, in both directions, on copies of the ledger. A
+# generator that always printed the key, or never did, fails one half.
+of="$(mktemp -d)"
+grep -v '^provides|claude|pretooluse_on_failure_block|' lib/harness/capabilities > "$of/without"
+{ cat "$of/without"; printf '%s\n' "$row"; } > "$of/with"
+KEEL_CAPABILITIES="$of/with" "$GEN" claude > "$of/with.json" 2>/dev/null
+KEEL_CAPABILITIES="$of/without" "$GEN" claude > "$of/without.json" 2>/dev/null
+grep -qx 'PreToolUse/Bash/sensitive-guard=block' <<< "$(on_failure_entries "$of/with.json" 2>/dev/null)" \
+  && ok "a ledger providing pretooluse_on_failure_block generates onFailure block on sensitive-guard" \
+  || bad "a ledger providing pretooluse_on_failure_block generates onFailure block on sensitive-guard" \
+    "$(on_failure_entries "$of/with.json" 2>&1 | grep sensitive-guard)"
+grep -qx 'PreToolUse/Bash/sensitive-guard=' <<< "$(on_failure_entries "$of/without.json" 2>/dev/null)" \
+  && ok "a ledger without the row still generates sensitive-guard, with no onFailure" \
+  || bad "a ledger without the row still generates sensitive-guard, with no onFailure" \
+    "$(on_failure_entries "$of/without.json" 2>&1 | grep sensitive-guard)"
+rm -rf "$of"
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

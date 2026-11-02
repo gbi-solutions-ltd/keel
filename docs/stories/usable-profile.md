@@ -415,7 +415,7 @@ Scenario: nothing missing, nothing said
 **Notes:** `fix` rather than `build` because the message exists at `lib/harness/claude.sh:488` and says only
 "recommended plugin not enabled: X. The skill that uses it degrades to an inline fallback", which
 tells the reader what is wrong and not what to do. The pattern to copy is the marketplace nudge at
-`lib/harness/claude.sh:629`, which already names its command.
+`lib/harness/claude.sh:637`, which already names its command.
 
 ### S-11 A hand-edited plugin list survives, and settings files are left alone
 

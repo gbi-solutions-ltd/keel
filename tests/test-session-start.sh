@@ -122,6 +122,63 @@ else
     chmod 644 "$tmp/f/.keel/profile.json"
 fi
 
+# ---- the keel terse output style -------------------------------------------------------------
+#
+# output-styles/keel-terse.md carries everything the brevity paragraph says, so a project whose
+# .claude/settings.json selects it would pay 56 tokens a request for the same rule twice.
+settings() {   # settings <root> <file> <json>
+    mkdir -p "$1/.claude"
+    printf '%s\n' "$3" > "$1/.claude/$2"
+}
+
+# 11a. The style set and a terse, technical profile: the router and the version line, no BREVITY.
+fixture "$tmp/s" "" ""
+settings "$tmp/s" settings.json '{"outputStyle":"keel:keel terse"}'
+check "with the keel terse style set the brevity rule is left to the style" "$tmp/s" none
+case "$(context_of "$tmp/s")" in
+    *"
+keel "*) ok "with the keel terse style set the version line is still printed" ;;
+    *) bad "style" "with the keel terse style set the version line is missing" ;;
+esac
+
+# 11b. Settings without the key change nothing.
+fixture "$tmp/s2" "" ""
+settings "$tmp/s2" settings.json '{}'
+check "settings without outputStyle still inject the brevity rule" "$tmp/s2" brief
+
+# 11c. The local file wins when it sets the key: the developer turned the style off, and the profile
+# still asks for terse, so the rule has to come from here.
+fixture "$tmp/s3" "" ""
+settings "$tmp/s3" settings.json '{"outputStyle": "keel:keel terse"}'
+settings "$tmp/s3" settings.local.json '{"outputStyle": "default"}'
+check "settings.local.json turning the style off brings the brevity rule back" "$tmp/s3" brief
+
+# 11d. The style does not carry the plain-language rule, so the plain forms are unchanged.
+fixture "$tmp/s4" "terse" "plain"
+settings "$tmp/s4" settings.json '{"outputStyle": "keel:keel terse"}'
+check "the style set leaves the plain forms unchanged" "$tmp/s4" plain-terse
+
+# 11e. The settings are read beside the .keel/ the profile was found in, so a subdirectory sees them.
+fixture "$tmp/s5" "" ""
+settings "$tmp/s5" settings.json '{"outputStyle": "keel:keel terse"}'
+mkdir -p "$tmp/s5/src/deep"
+check "the style set is found from a subdirectory" "$tmp/s5/src/deep" none
+
+# 11f. Pins the default form only. With no profile the hook has no .keel/ to read settings beside,
+# so the guard at hooks/session-start:130 is not observable by a test: replacing it with `true`
+# still passes, because the paths it builds lead nowhere. Kept for the default form it pins.
+settings "$tmp/s6" settings.json '{"outputStyle": "keel:keel terse"}'
+check "with no profile the default brevity form is injected" "$tmp/s6" brief
+
+# 11g. The user-level file is not read. The style set only there duplicates the rule, which costs 56
+# tokens and is the safe direction. HOME is swapped in this shell, not a subshell, so the counters
+# survive.
+fixture "$tmp/s7" "" ""
+settings "$tmp/home" settings.json '{"outputStyle": "keel:keel terse"}'
+saved_home="$HOME"; HOME="$tmp/home"
+check "the style set only in the home directory still injects the brevity rule" "$tmp/s7" brief
+HOME="$saved_home"
+
 # ---- the loaded plugin version -------------------------------------------------------------
 #
 # The hook prints the version of the plugin copy the session loaded, which is the one fact a session
@@ -162,7 +219,7 @@ mkdir -p "$vroot/ok" && printf '9.9.9\n' > "$vroot/ok/VERSION"
 check_version "a plugin root's VERSION reaches the session context" "$vroot/ok" "keel 9.9.9"
 
 # 12. CLAUDE_PLUGIN_ROOT unset, which no real install produces and every test invocation does. The
-# BASH_SOURCE fallback has to resolve to this repository, or the four size assertions below are
+# BASH_SOURCE fallback has to resolve to this repository, or the five size assertions below are
 # measuring something other than what a session sees.
 check_version "with CLAUDE_PLUGIN_ROOT unset the fallback finds this repository" "" "keel $(cat "$(dirname "$HOOK")/../VERSION")"
 
@@ -233,7 +290,7 @@ mkdir -p "$vroot/eleven" && printf '100.100.100\n' > "$vroot/eleven/VERSION"
 check_version "an eleven character numeric VERSION is kept" "$vroot/eleven" "keel 100.100.100"
 
 # 19. And the longest version the cap accepts must still fit NFR-01, which is the whole reason the
-# cap is twelve rather than a round number. Measured on the worst of the four forms rather than on
+# cap is twelve rather than a round number. Measured on the worst of the five forms rather than on
 # the one this repository selects, and on a twelve character version rather than the eleven above,
 # because twelve is the boundary and eleven would leave the assertion a character of slack.
 long_chars="$( cd "$tmp/b" && CLAUDE_PLUGIN_ROOT="$vroot/twelve-pre" "$HOOK" 2>/dev/null | wc -c | tr -d ' ' )"
@@ -243,10 +300,14 @@ else
     bad "version" "a twelve character version puts the worst form at $long_chars characters, over the 1285 of NFR-01. The cap in hooks/session-start and this ceiling have to move together"
 fi
 
-# The four forms are asserted at their exact measured sizes, not as an upper bound. NFR-01 of
+# The five forms are asserted at their exact measured sizes, not as an upper bound. NFR-01 of
 # docs/prd/plain-language-chat.md caps every combination at 1285 characters and the wordings were
 # chosen against that, so a wording edit has to be a deliberate act with a re-measurement rather
 # than a drift that stays green until it does not.
+#
+# The fifth form is terse and technical with the keel terse style set, which drops the brevity
+# paragraph. It is strictly smaller than terse and technical, so its case guards against a
+# regression rather than against a budget it can break today.
 size_of() {   # size_of <cwd>
     ( cd "$1" && "$HOOK" ) 2>/dev/null | wc -c | tr -d ' '
 }
@@ -261,27 +322,28 @@ size_of() {   # size_of <cwd>
 # 13: two characters for the newline escape() renders as `\n`, five for `keel `, and six for the
 # version string itself. The worst is now 1279, 355 tokens, one inside NFR-01.
 #
-# THESE FOUR NUMBERS DEPEND ON THE LENGTH OF ./VERSION, and that is deliberate. CLAUDE_PLUGIN_ROOT
+# THESE FIVE NUMBERS DEPEND ON THE LENGTH OF ./VERSION, and that is deliberate. CLAUDE_PLUGIN_ROOT
 # is unset here, so the hook falls back to this repository and prints its real version, six
-# characters today. A bump to a seven character version moves all four by one and fails this block,
+# characters today. A bump to a seven character version moves all five by one and fails this block,
 # which is correct: it genuinely spends one of the six characters NFR-01 has left, and the point of
 # asserting exact sizes rather than an upper bound is that spending them is a deliberate act with a
 # re-measurement. Update the numbers, do not pin the version.
 for spec in "b:1279:terse and technical" "g:1278:terse and plain" \
-            "c:1077:verbose and technical" "h:1268:verbose and plain"; do
+            "c:1077:verbose and technical" "h:1268:verbose and plain" \
+            "s:1077:terse and technical with the keel terse style"; do
     dir="${spec%%:*}"; rest="${spec#*:}"; want="${rest%%:*}"; label="${rest#*:}"
     got="$(size_of "$tmp/$dir")"
     if [ "$got" = "$want" ]; then
         ok "$label injects exactly $want characters"
     else
         # Self-explaining on purpose. The likeliest cause of this failing is a VERSION whose length
-        # changed, which is a legitimate release and not a defect, and somebody meeting four red
+        # changed, which is a legitimate release and not a defect, and somebody meeting five red
         # constants with no explanation deletes the tripwire rather than reading it.
         bad "size" "$label injects $got characters, expected $want, a difference of $(( got - want )).
-        These four numbers are deliberately coupled to the length of ./VERSION, which this hook
-        prints. A release that changes the version's length by one moves all four by one, and that
+        These five numbers are deliberately coupled to the length of ./VERSION, which this hook
+        prints. A release that changes the version's length by one moves all five by one, and that
         is not a defect: it spends the headroom NFR-01 has left, which was 6 characters at 1279
-        against the 1285 ceiling. Re-measure all four, update these constants and the four-form
+        against the 1285 ceiling. Re-measure all five, update these constants and the five-form
         table under 'The rule is on by default and it is not free' in
         docs/05-token-and-memory-design.md, which NFR-05 requires to agree with them. Do not pin the
         version to keep this green: the coupling is what makes spending those characters deliberate."

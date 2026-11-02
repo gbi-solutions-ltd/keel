@@ -7,6 +7,31 @@ versions as each skill is tested against real repositories.
 
 Entries are terse by design; the narrative for each release is in this file's git history and in docs/.
 
+## Unreleased
+
+- `hooks/sensitive-guard` blocks the call when it fails to answer: its `hooks/hooks.json` entry
+  carries `"onFailure": "block"`, so a timeout or a hook that cannot start stops the tool call and
+  the user retries, where before the call ran. Probed on Claude Code 2.1.316; the capability row
+  records 2.1.295, the version the hooks reference names, so keel's minimum stays 2.1.302.
+- `keel init` selects the **keel terse** output style for the project, writing `"outputStyle":
+  "keel:keel terse"` into a new `.claude/settings.json` and adding it to an existing one that names
+  no style. The project key overrides a style set in user-level settings, and
+  `.claude/settings.local.json` overrides the project key. Decision 10 is resolved.
+- `hooks/session-start` reads `outputStyle` from the `.claude/settings.json` and
+  `.claude/settings.local.json` beside the profile, the local file winning, and with the keel terse
+  style set on a terse, technical profile injects no brevity paragraph, since the style carries it.
+  That is a fifth form, measured by `tests/validate-skills.sh` with the other four.
+- `.claude-plugin/plugin.json` declares the three required plugins, `security-guidance`,
+  `code-review` and `skill-creator`, as `dependencies` from `claude-plugins-official`, which
+  `.claude-plugin/marketplace.json` allows in `allowCrossMarketplaceDependenciesOn`, so installing
+  keel installs them. A required plugin that cannot install now stops keel loading, where before it
+  cost a `keel doctor` warning. `keel init` still writes them into `enabledPlugins`.
+- CI has an advisory `manifests` job that runs `claude plugin validate .` and `claude plugin
+  validate --strict .claude-plugin/marketplace.json` on Claude Code 2.1.316, pinned by version, with
+  no secret. Branch protection does not require it yet.
+- `docs/04-plugin-strategy.md` marks Context7 and Playwright as third-party plugins the official
+  marketplace lists, and `docs/07-open-decisions.md` records the repository as public.
+
 ## 0.27.0 - 2026-11-02
 
 - Release gate 2026-11-02 against `f2b90a0`: **seven treatment arms, all seven pass**, $2.2565 in one

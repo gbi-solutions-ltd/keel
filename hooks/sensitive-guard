@@ -17,9 +17,10 @@
 # and a commit where neither profile at HEAD nor in the tree declares a path produces no output.
 #
 # IT ASKS WHENEVER IT CANNOT ANSWER. An unreadable profile, an unparseable one, an absent python3, a
-# git that will not run: each of those used to exit 0 in silence, which is the one outcome a gate
-# must never have, because the repository declared sensitive paths and would believe it had cover.
-# The cheap filters run first, in bash, so this never becomes a prompt on every Read.
+# git that will not run, running out of its deadline, or a crash, which the EXIT trap below answers:
+# each asks, because exiting 0 in silence would leave the repository believing it had cover. A
+# timeout or a hook that cannot start answers nothing, so Claude Code blocks the call by the
+# `onFailure` in hooks/hooks.json and the user retries. The cheap filters run first, in bash.
 #
 # It guards the commit rather than the edit. Blocking every edit to auth code would make this the
 # gate people delete, and the commit is where the change stops being private to the session. It
@@ -27,8 +28,7 @@
 # -p, --patch, --pathspec-from-file, a pathspec or a `git add`, `stage`, `rm` or `mv` alongside,
 # and untracked files not ignored for an `add` or `stage`, read last and filtered by git. Git shows
 # no change for these before they run, so they pass: a `git rm` or `git mv` of an unmodified file,
-# a `git mv` into a declared path and a `git add -f` of an ignored file. Running out of the hook's
-# time, in git or in matching, asks, rather than the hook being killed with no answer.
+# a `git mv` into a declared path and a `git add -f` of an ignored file.
 #
 # ITS LIMIT, STATED RATHER THAN DISCOVERED. It reads a command string, so `sh -c`, an alias or a
 # here-doc reaches a commit without passing through here, exactly as the
@@ -203,10 +203,10 @@ KEEL_PROFILE_UNREADABLE="$unreadable" KEEL_DIR="$dir" python3 - <<'PY'
 import json, os, shlex, subprocess, sys, time
 from fnmatch import fnmatch
 
-# Claude Code kills this hook at its 10 second timeout in hooks.json, and a killed hook gives no
-# answer, so the command runs. Every git call and the matching share a deadline inside that, leaving
-# 3 seconds for the bash before this, which took over a second on a loaded machine, and the answer
-# after. Running out asks.
+# Claude Code kills this hook at its 10 second timeout in hooks.json and its `onFailure` blocks the
+# call, which costs the user a retry. Every git call and the matching share a deadline inside that,
+# so running out asks instead, in time. It leaves 3 seconds for the bash before this, which took
+# over a second on a loaded machine, and the answer after.
 DEADLINE = time.monotonic() + 7
 
 def out_of_time():

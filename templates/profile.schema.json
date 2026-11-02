@@ -402,7 +402,7 @@
           ],
           "default": "terse",
           "description": "terse keeps conversation replies short and leaves artifacts at full detail; the SessionStart hook injects the rule. verbose turns it off. Absent is treated as terse.",
-          "x-keel-read-by": "code:hooks/session-start:111"
+          "x-keel-read-by": "code:hooks/session-start:118"
         },
         "explain_level": {
           "enum": [
@@ -411,7 +411,7 @@
           ],
           "default": "technical",
           "description": "technical assumes the vocabulary of the thing being described; plain has chat replies define a technical term the first time they use it. It changes replies only: artifacts stay technical whatever this says, and the SessionStart hook picks its injected paragraph from this key and response_style together. Absent is treated as technical.",
-          "x-keel-read-by": "code:hooks/session-start:116"
+          "x-keel-read-by": "code:hooks/session-start:123"
         },
         "no_attribution_footers": {
           "type": "boolean",

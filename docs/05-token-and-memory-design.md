@@ -317,9 +317,11 @@ carries the block also carries however many tokens the model chooses to write ba
 
 <!-- keel:claim gate=session-start harness=claude -->
 **The rule is on by default and it is not free.** `hooks/session-start` selects one paragraph from
-`conventions.response_style` and `conventions.explain_level` together, so there are four forms and
-not two. Every form also carries the loaded plugin's version since 2026-09-02. Measured 2026-09-02
-against `VERSION` 0.17.0:
+`conventions.response_style` and `conventions.explain_level` together, and from `outputStyle` in
+the `.claude/settings.json` and `.claude/settings.local.json` beside the profile, so there are five
+forms and not two. The local file wins when it sets the key, and the user-level settings file in
+the home directory is not read. Every form also carries the loaded plugin's version since
+2026-09-02. Measured 2026-11-02 against `VERSION` 0.27.0:
 
 | `response_style` | `explain_level` | Injected | Chars | Tokens |
 | --- | --- | --- | --- | --- |
@@ -327,6 +329,7 @@ against `VERSION` 0.17.0:
 | `terse` | `plain` | brevity and define-on-first-use | 1,278 | 355 |
 | `verbose` | `technical` | nothing | 1,077 | 299 |
 | `verbose` | `plain` | define-on-first-use | 1,268 | 352 |
+| `terse`, with `"outputStyle": "keel:keel terse"` set | `technical` | nothing, the style carries the brevity rule | 1,077 | 299 |
 
 **These figures moved twice and the table did not follow the first time**, which is worth recording
 because NFR-05 exists to stop exactly that. It carried the 2026-08-18 measurement (1,284 / 1,283 /
@@ -342,21 +345,27 @@ reason, which is what the nineteen characters NFR-01 left will bear. Twelve is c
 rounder number because it is the largest that fits, and it accommodates a pre-release:
 `0.17.0-rc.12` is twelve and puts the worst form at 1,285 exactly.
 
-The defaults cost **355** against a 250 target and a 400 ceiling. That is 55 tokens of input in
-every request of every session, spent to shorten output in some of them, and the direction of that
-trade has never been measured. It was taken as an explicit instruction on 2026-08-16, not as an
-inference, and it is recorded here rather than buried because the 45 tokens of remaining headroom
-are now the tightest budget in this document. **Six characters of that headroom are what is left**,
-since NFR-01 caps every form at 1,285 and the worst is 1,279. `tests/validate-skills.sh` fails at
-1,286 rather than 1,285, because 1285 times 10 over 36 truncates to 356 and 356 is not over 356.
+The profile defaults cost **355** against a 250 target and a 400 ceiling. That is 55 tokens of
+input in every request of every session, spent to shorten output in some of them, and the
+direction of that trade has never been measured. It was taken as an explicit instruction on
+2026-08-16, not as an inference, and it is recorded here rather than buried because the 45 tokens
+of remaining headroom are now the tightest budget in this document. **Six characters of that
+headroom are what is left**, since NFR-01 caps every form at 1,285 and the worst is 1,279.
+`tests/validate-skills.sh` fails at 1,286 rather than 1,285, because 1285 times 10 over 36
+truncates to 356 and 356 is not over 356. A project `keel init` set up pays 299 rather than 355,
+because init also selects the keel terse style, which carries the brevity rule.
 
 `NFR-01` of `docs/prd/plain-language-chat.md` holds every combination at or under 356 for exactly
 that reason, so adding a dial did not spend the headroom. `tests/validate-skills.sh` measures all
-four rather than whichever one the local profile selects.
+five rather than whichever one the local profile and settings select.
 
-`output-styles/keel-terse.md` still ships and still costs zero, but it is now the machine-wide
-alternative for non-keel repositories rather than the mechanism. The managed block was never an
-option for either: it sits in every request, and its budget is the tightest in the table.
+`output-styles/keel-terse.md` ships with the plugin and costs zero against these budgets, and
+selecting it takes the 202-character brevity paragraph out of the prefix. `keel init` selects it
+for the project by writing `"outputStyle": "keel:keel terse"` into `.claude/settings.json`, so it
+applies beside the per-request prefix in every keel repository, and `/config` selects it for a
+non-keel one. A teammate without keel loaded gets no error, only no style, because Claude Code
+falls back silently on a style name it cannot resolve. The managed block was never an option for
+either: it sits in every request, and its budget is the tightest in the table.
 
 **What it governs.** Chat only. The rule it encodes is that artifact detail and reply length are
 separate dials: a PRD or a plan is as long as its skill requires, and the reply stops restating it.

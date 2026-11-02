@@ -8,6 +8,11 @@
   "homepage": "https://github.com/gbi-solutions-ltd/keel",
   "repository": "https://github.com/gbi-solutions-ltd/keel",
   "license": "MIT",
+  "dependencies": [
+    "security-guidance@claude-plugins-official",
+    "code-review@claude-plugins-official",
+    "skill-creator@claude-plugins-official"
+  ],
   "keywords": [
     "sop",
     "workflow",

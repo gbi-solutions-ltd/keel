@@ -396,6 +396,53 @@ sys.exit(0 if ('someone-elses@thing' in s.get('enabledPlugins',{})
   && ok "merging guardrails preserves existing settings and allow rules" \
   || bad "guardrails" "merge lost pre-existing settings"
 
+# The project selects the keel terse output style. Claude Code falls back silently on a style name
+# it cannot resolve, so a teammate without keel loses only the style, which is what makes a
+# committed key safe to write.
+python3 -c "
+import json,sys
+s=json.load(open('$d/.claude/settings.json'))
+sys.exit(0 if (s.get('outputStyle')=='keel:keel terse'
+            and s.get('enabledPlugins') and s.get('permissions') and s.get('hooks')) else 1)" 2>/dev/null \
+  && ok "a fresh project's settings select the keel terse output style" \
+  || bad "output style" "fresh .claude/settings.json has no outputStyle keel:keel terse"
+
+python3 -c "
+import json,sys
+s=json.load(open('$d2/.claude/settings.json'))
+sys.exit(0 if (s.get('outputStyle')=='keel:keel terse'
+            and s['enabledPlugins'].get('someone-elses@thing') is True) else 1)" 2>/dev/null \
+  && ok "an existing settings file gains the output style and keeps its plugins" \
+  || bad "output style" "merge did not add outputStyle, or lost an existing plugin"
+
+d5="$(fixture node-ts)"
+mkdir -p "$d5/.claude"
+printf '{ "outputStyle": "Explanatory" }\n' > "$d5/.claude/settings.json"
+( cd "$d5" && "$KEEL" init -y >/dev/null 2>&1 )
+python3 -c "
+import json,sys
+sys.exit(0 if json.load(open('$d5/.claude/settings.json')).get('outputStyle')=='Explanatory' else 1)" 2>/dev/null \
+  && ok "init never overwrites an output style the user chose" \
+  || bad "output style" "init replaced the user's outputStyle"
+rm -rf "$d5"
+
+# A file that already carries every guardrail adds no rule, so the style alone has to make the merge
+# write. Every other merge fixture also adds rules and would pass with the write gated on rules only.
+d6="$(fixture node-ts)"
+mkdir -p "$d6/.claude"
+DENY="$( . "$ROOT/lib/harness/claude.sh" && keel_deny_rules )" \
+ASK="$( . "$ROOT/lib/harness/claude.sh" && keel_ask_rules )" python3 -c "
+import json,os
+json.dump({'permissions': {'deny': os.environ['DENY'].splitlines(), 'ask': os.environ['ASK'].splitlines()}},
+          open('$d6/.claude/settings.json','w'))"
+( cd "$d6" && "$KEEL" init -y >/dev/null 2>&1 )
+python3 -c "
+import json,sys
+sys.exit(0 if json.load(open('$d6/.claude/settings.json')).get('outputStyle')=='keel:keel terse' else 1)" 2>/dev/null \
+  && ok "a settings file with every guardrail already still gains the output style" \
+  || bad "output style" "merge wrote nothing when only outputStyle was missing"
+rm -rf "$d6"
+
 # Re-running must not accumulate duplicates: doctor compares against the same lists.
 ( cd "$d2" && "$KEEL" init -y >/dev/null 2>&1 )
 python3 -c "
@@ -404,6 +451,14 @@ p=json.load(open('$d2/.claude/settings.json'))['permissions']
 sys.exit(0 if len(p['deny'])==len(set(p['deny'])) and len(p['ask'])==len(set(p['ask'])) else 1)" 2>/dev/null \
   && ok "re-running init does not duplicate guardrails" \
   || bad "guardrails" "duplicate rules after a second init"
+
+# Counted in the raw text, because json.load keeps the last of two duplicate keys and would pass.
+[ "$(grep -c '"outputStyle"' "$d2/.claude/settings.json")" = 1 ] \
+  && python3 -c "
+import json,sys
+sys.exit(0 if json.load(open('$d2/.claude/settings.json')).get('outputStyle')=='keel:keel terse' else 1)" 2>/dev/null \
+  && ok "re-running init leaves one outputStyle key with the same value" \
+  || bad "output style" "a second init duplicated or changed outputStyle"
 
 # doctor must notice both ways the design can be broken after the fact.
 # Capture doctor's output rather than piping it: doctor exits non-zero by design when it finds a

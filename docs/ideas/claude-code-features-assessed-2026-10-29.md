@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-10-29, asking for an assessment of the plugin against current Claude Code features, explored by Sonnet subagents |
-| Status | agreed 2026-10-29: items 1, 2, 3, 4 and 9, with the open questions answered by Bernard below |
+| Status | built 2026-11-02: items 1, 2, 3, 4 and 9, by `docs/plans/2026-11-02-adopt-the-agreed-claude-code-features.md`, with the open questions answered by Bernard below |
 | Recommendation | Build something smaller: items 1 to 4 and 9. Do not build items 5 and 6. Item 7 waits for its first instance. Item 8 was reassessed on 2026-11-02 and declined until a real instance (`workflows-for-the-fan-outs.md`) |
-| Next | `write-plan` for items 1 to 4 and 9 |
+| Next | nothing |
 
 ## The problem
 
@@ -25,8 +25,8 @@ the one promise `hard_block_paths` makes, on any commit where the guard does not
   hook doesn't block the tool call ... so don't count on a stalled hook to act as a gate."
   `hooks/hooks.json:47-50` gives `sensitive-guard` a 10 second timeout and no `onFailure`. **No
   timeout is on record**, so this half rests on the documented gap and not on an incident.
-- **Decision 10 has waited on one observation since 2026-08.** `docs/07-open-decisions.md:489`
-  leaves writing `outputStyle` open until someone sees how a plugin style is named. On
+- **Decision 10 has waited on one observation since 2026-08.** Decision 10 in
+  `docs/07-open-decisions.md` left `outputStyle` open until someone saw a plugin style's name. On
   2026-10-29, `claude -p "/output-style"` on 2.1.312 listed `keel:keel terse` among the styles.
 
 ## What was asked for
@@ -67,17 +67,17 @@ closed, or stops the plugin loading, which is worse than the gap.
 | 6. `userConfig` for per-user switches such as `KEEL_CONTEXT_WATCH` | A `/config` row instead of an environment variable | **Do not build.** No complaint about the variable is on record, and most of keel's switches are project facts that belong in `.keel/profile.json`, committed and shared, not per user. Compatibility is not the reason: only the `options` picker field stops older clients (before 2.1.271) loading the plugin, plain fields only lack a `/config` row before 2.1.269, and the 2.1.302 minimum from open question 4 covers both |
 | 7. `argument-hint` and `$ARGUMENTS` on user-invoked skills | `/keel:ship <branch>` style invocation | **Not yet, revisit on the first instance.** Cheap and low risk, so the only reason against is that no user passing arguments to a keel skill is on record. The cost when built is a second invocation path the evals would cover |
 | 8. Plugin `workflows/` for the review and execute-plan fan-outs | Deterministic orchestration instead of prose dispatch | **Reassessed 2026-11-02, declined.** Its first reason was ADR-0005's one skill body across harnesses, which ADR-0013 superseded. The reassessment, `docs/ideas/workflows-for-the-fan-outs.md`, found no real-use instance and recommends not building it until one is recorded |
-| 9. Two doc corrections | The docs state what is true now | **Build.** `docs/04-plugin-strategy.md:8` says every plugin named is in `claude-plugins-official`, while `:24` and `:28` mark Context7 and Playwright external. `docs/07-open-decisions.md:12` and `:54` say the repo is private, and `gh repo view` reports it `PUBLIC` |
+| 9. Two doc corrections | The docs state what is true now | **Build.** `docs/04-plugin-strategy.md:8` says every plugin named is in `claude-plugins-official`, while `:24` and `:28` mark Context7 and Playwright external. `docs/07-open-decisions.md:11` and `:53` say the repo is private, and `gh repo view` reports it `PUBLIC` |
 
 **Assumptions this rests on**
 
 | Assumption | True if | How we would know | Checked? |
 |---|---|---|---|
-| `onFailure` blocks a timed-out PreToolUse command hook | The hooks reference says so | "To block the call when a `command` or `http` hook times out, set `onFailure: \"block\"`", requires 2.1.295 | **Checked against the docs** 2026-10-29. Not probed |
+| `onFailure` blocks a timed-out PreToolUse command hook | The hooks reference says so | "To block the call when a `command` or `http` hook times out, set `onFailure: \"block\"`", requires 2.1.295 | **Probed 2026-11-02** on 2.1.316: a `sleep 20` hook with `timeout: 2` and `onFailure: "block"` stopped the `touch` it guarded, and the same hook without the key let it run. See the plan's "Evidence gathered while planning" section, `docs/plans/2026-11-02-adopt-the-agreed-claude-code-features.md` |
 | A client older than 2.1.295 ignores `onFailure` rather than refusing the hook | An unknown hook field is dropped | Load the plugin on an older client and run a commit | **Not checked.** If it refuses, item 1 needs a declared minimum first |
-| A plugin style is selected by `keel:keel terse` | The `/output-style` listing names it that way | `claude -p "/output-style"` on 2.1.312 | **Checked 2026-10-29**, listing only. Setting it in a settings file was not tried |
-| A cross-marketplace dependency installs | `marketplace.json` lists the target in `allowCrossMarketplaceDependenciesOn` | Plugin dependencies docs: without it, a `plugin.json` dependency "install completes without the dependency and your plugin then fails to load" | **Checked against the docs.** Not probed |
-| `claude plugin validate` runs in CI without signing in | It reads files only | Run it on a runner with no credentials | **Not checked** |
+| A plugin style is selected by `keel:keel terse` | The `/output-style` listing names it that way | `claude -p "/output-style"` on 2.1.312 | **Probed 2026-11-02** on 2.1.316: the key in a project's `.claude/settings.json` loaded the style and `{}` did not, and with keel not loaded the name fell back silently. See the plan's "Evidence gathered while planning" section, `docs/plans/2026-11-02-adopt-the-agreed-claude-code-features.md` |
+| A cross-marketplace dependency installs | `marketplace.json` lists the target in `allowCrossMarketplaceDependenciesOn` | Plugin dependencies docs: without it, a `plugin.json` dependency "install completes without the dependency and your plugin then fails to load" | **Checked against the docs**, and copies of both manifests with `dependencies` and the allowlist passed `claude plugin validate --strict` on 2026-11-02. No install was run. See the plan's "Evidence gathered while planning" section, `docs/plans/2026-11-02-adopt-the-agreed-claude-code-features.md` |
+| `claude plugin validate` runs in CI without signing in | It reads files only | Run it on a runner with no credentials | **Probed 2026-11-02** with `HOME` set to an empty directory on macOS: `validate .` exits 0 and `validate --strict .claude-plugin/marketplace.json` exits 0. An empty `HOME` on macOS does not rule out a Keychain credential, so the evidence is the `manifests` job on the Linux runner. See the plan's "Evidence gathered while planning" section, `docs/plans/2026-11-02-adopt-the-agreed-claude-code-features.md` |
 
 ## What the system says
 
@@ -115,8 +115,9 @@ Build something smaller: land the `EXIT` trap, then add `onFailure: "block"` to 
 behind the declared 2.1.302 minimum that `keel doctor` checks, record the output-style observation
 and have `keel init` write the style, declare the required plugins as `dependencies`, add `plugin
 validate` to CI if it runs unsigned, and correct the two docs. Do not build `if` or `userConfig`,
-assess workflows again (done 2026-11-02 in `workflows-for-the-fan-outs.md`), and build skill arguments when someone first needs them. Next is
-`write-plan` for those items.
+assess workflows again (done 2026-11-02 in `workflows-for-the-fan-outs.md`), and build skill
+arguments when someone first needs them. Built 2026-11-02 by
+`docs/plans/2026-11-02-adopt-the-agreed-claude-code-features.md`.
 
 ## Not decided here
 

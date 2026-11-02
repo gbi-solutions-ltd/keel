@@ -5,8 +5,8 @@
 > Code one. Qualifying individual rows would produce a document that is locally correct and globally
 > wrong, so the scope is stated once, here.
 
-Every plugin named below is in the official Anthropic marketplace, `claude-plugins-official`,
-which is registered by default and needs no separate setup.
+Every plugin named below is listed in `claude-plugins-official`, the official marketplace, which is
+registered by default. Context7 and Playwright, marked (external), are third-party plugins it lists.
 
 ## Verdicts
 
@@ -21,6 +21,20 @@ which is registered by default and needs no separate setup.
 | Frontend Design | `frontend-design` | **Conditional** | Only where there is a UI |
 | Playwright | `playwright` (external) | **Conditional** | Only where there are browser flows worth testing |
 | FeatureDev | `feature-dev` | **Do not install by default** | See below. It conflicts with our pipeline |
+
+### The required three install with keel
+
+`.claude-plugin/plugin.json` lists the three **Install, required** plugins under `dependencies`, so
+installing keel installs them at the same scope. `.claude-plugin/marketplace.json` names
+`claude-plugins-official` in `allowCrossMarketplaceDependenciesOn`; without it the install completes
+without them and keel then fails to load. `tests/test-keel-4.sh` fails when a required row above and
+that list disagree.
+
+The cost is accepted: a required plugin that cannot install stops keel loading, rather than costing
+a `keel doctor` warning. No minimum Claude Code version is documented for `dependencies` or the
+allowlist (code.claude.com/docs/en/plugins/dependencies), so keel's own minimum does not move for
+them. `keel init` still writes all of them into `enabledPlugins`, the project's record of what it
+expects, and `keel doctor` still reports the missing ones.
 
 ### Language servers, per detected language
 
@@ -147,7 +161,8 @@ Example for a TypeScript service with a UI:
     "typescript-lsp@claude-plugins-official": true,
     "frontend-design@claude-plugins-official": true,
     "playwright@claude-plugins-official": true
-  }
+  },
+  "outputStyle": "keel:keel terse"
 }
 ```
 
@@ -156,12 +171,11 @@ listed, and installing is one confirmation.
 
 **No `extraKnownMarketplaces`, deliberately.** A marketplace source says where a particular
 reader gets keel from, which is a fact about their machine rather than about the project. A
-committed declaration asserts one answer for everyone who clones: a reader outside the GitHub
-org cannot reach a private repo, and at project scope the declaration shadows whatever that
-reader chose at user level. Every `@claude-plugins-official` entry above is enabled without a
-declaration and resolves fine, because the marketplace is known at user level; `gbi` is no
-different. Adding the marketplace is a one-time per-machine step, and both `keel doctor` and the
-nudge hook name the command when it is missing.
+committed declaration asserts one answer for everyone who clones, and at project scope the
+declaration shadows whatever that reader chose at user level. Every `@claude-plugins-official`
+entry above is enabled without a declaration and resolves fine, because the marketplace is known
+at user level; `gbi` is no different. Adding the marketplace is a one-time per-machine step, and
+both `keel doctor` and the nudge hook name the command when it is missing.
 
 ## If superpowers is also installed
 

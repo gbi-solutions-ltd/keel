@@ -570,7 +570,9 @@ if [ -f hooks/session-start ]; then
     #
     # All four combinations of response_style and explain_level, not just the one this repository's
     # profile selects. Measuring only the local configuration is how a paragraph that fits terse and
-    # technical reaches a release while breaking verbose and plain.
+    # technical reaches a release while breaking verbose and plain. A fifth run sets the keel terse
+    # output style in .claude/settings.json beside the profile, which is the hook's fifth form. It is
+    # smaller than terse and technical today, so it guards a regression rather than a live budget.
     #
     # Split with parameter expansion rather than `set --`. This is top level, not a function, so
     # `set --` would clobber the script's own positional parameters, and it needs an unquoted
@@ -582,10 +584,18 @@ if [ -f hooks/session-start ]; then
     hook_abs="$PWD/hooks/session-start"
     if probe="$(mktemp -d)"; then
         mkdir -p "$probe/.keel"
-        for combo in "terse technical" "terse plain" "verbose technical" "verbose plain"; do
-            rs="${combo%% *}"; el="${combo##* }"
+        for combo in "terse technical" "terse plain" "verbose technical" "verbose plain" \
+                     "terse technical styled"; do
+            rs="${combo%% *}"; rest="${combo#* }"; el="${rest%% *}"
+            form="response_style=$rs explain_level=$el"
             printf '{"conventions": {"response_style": "%s", "explain_level": "%s"}}\n' "$rs" "$el" \
                 > "$probe/.keel/profile.json"
+            rm -rf "$probe/.claude"
+            case "$combo" in *styled)
+                form="$form outputStyle=keel:keel terse"
+                mkdir -p "$probe/.claude"
+                printf '{"outputStyle": "keel:keel terse"}\n' > "$probe/.claude/settings.json" ;;
+            esac
             hook_chars=$( cd "$probe" && bash "$hook_abs" 2>/dev/null | wc -c | tr -d ' ' )
             hook_tokens=$(( hook_chars * 10 / 36 ))
             # The floor first. A hook that fails to run measures 0, which is under every ceiling, so
@@ -595,7 +605,7 @@ if [ -f hooks/session-start ]; then
             # and against fixtures whose hooks legitimately emit one short line, so any positive
             # floor rejects a valid hook. Zero output is the one length that always means failure.
             if [ "$hook_chars" -eq 0 ]; then
-                report "hooks/session-start produced no output for response_style=$rs explain_level=$el. It failed to run, and a size check with no floor would have counted that as comfortably within budget."
+                report "hooks/session-start produced no output for $form. It failed to run, and a size check with no floor would have counted that as comfortably within budget."
             elif [ "$hook_chars" -gt 1285 ]; then
                 # Characters, and checked before the token bounds below, because NFR-01 is written
                 # in characters and this is the number a person can count. The token estimate is
@@ -603,11 +613,11 @@ if [ -f hooks/session-start ]; then
                 # which is not over 356, so the token bound alone first fails at 1286. Stating the
                 # limit twice in two units is deliberate, and the character one fails first so the
                 # message names the unit the requirement uses.
-                report "hooks/session-start injects $hook_chars characters for response_style=$rs explain_level=$el, over the 1285 of NFR-01 in docs/prd/plain-language-chat.md. Take words out, or re-measure and move the requirement deliberately."
+                report "hooks/session-start injects $hook_chars characters for $form, over the 1285 of NFR-01 in docs/prd/plain-language-chat.md. Take words out, or re-measure and move the requirement deliberately."
             elif [ "$hook_tokens" -gt 400 ]; then
-                report "hooks/session-start injects about $hook_tokens tokens for response_style=$rs explain_level=$el, over the 400 ceiling. It is in every request of every session."
+                report "hooks/session-start injects about $hook_tokens tokens for $form, over the 400 ceiling. It is in every request of every session."
             elif [ "$hook_tokens" -gt 356 ]; then
-                report "hooks/session-start injects about $hook_tokens tokens for response_style=$rs explain_level=$el, over the 356 rule in docs/prd/plain-language-chat.md NFR-01. The 44 tokens below the 400 ceiling are spoken for."
+                report "hooks/session-start injects about $hook_tokens tokens for $form, over the 356 rule in docs/prd/plain-language-chat.md NFR-01. The 44 tokens below the 400 ceiling are spoken for."
             fi
         done
         rm -rf "$probe"
@@ -1028,7 +1038,7 @@ for path in sorted(keys):
         # legitimate reader, and demanding the leaf on the cited line precisely would reject it,
         # pinned at tests/test-validate-skills.sh. Leaf and not the full dotted path: a single-
         # purpose read of a nested key almost never repeats the parent segment
-        # (hooks/session-start:111 reads "response_style", never "conventions.response_style"), and
+        # (hooks/session-start:118 reads "response_style", never "conventions.response_style"), and
         # demanding the parent too would reject nearly every real single-purpose citation in this
         # tree, which a dotted-path matcher measured doing at 28% false positives before this rule
         # existed in any form.

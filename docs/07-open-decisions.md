@@ -2,14 +2,13 @@
 
 Twelve calls, each with the recommendation taken and the reasoning behind it.
 
-**12 of 12 resolved, two with a named part still open:** decision 10's optimisation (writing
-`outputStyle` directly instead of through the per-request prefix) and decision 12's residual
-(listed in full under that decision) are both tracked rather than closed silently.
+**12 of 12 resolved, one with a named part still open:** decision 12's residual, listed in full
+under that decision, is tracked rather than closed silently.
 
 | # | Decision | Status |
 | --- | --- | --- |
 | 1 | Distribution model | **Resolved:** plugin plus thin bootstrap |
-| 2 | Where keel lives | **Resolved:** `gbi-solutions-ltd/keel`, GitHub, private |
+| 2 | Where keel lives | **Resolved:** `gbi-solutions-ltd/keel`, GitHub, public. Decided private 2026-08-11; development has been in the public repository since 2026-10-22, `docs/plans/2026-10-22-public-first-development.md` |
 | 3 | Gate strength | **Resolved:** enforced with escape hatches, payments hard block |
 | 4 | Commit guard hook | **Resolved:** off by default, fast subset when on |
 | 5 | Superpowers | **Resolved:** full replacement, uninstall at Phase 3 |
@@ -17,7 +16,7 @@ Twelve calls, each with the recommendation taken and the reasoning behind it.
 | 7 | Artifact location | **Resolved:** `docs/keel/`, configurable via `profile.docs_root` |
 | 8 | FeatureDev | **Resolved:** excluded |
 | 9 | Ownership | **Resolved:** Bernard or `gfsekamanya` reviews, monthly release, evals before the pilot |
-| 10 | `keel init` and `outputStyle` | **Partly resolved 2026-08-16:** see decision 10 |
+| 10 | `keel init` and `outputStyle` | **Resolved 2026-11-02:** `keel init` writes `"outputStyle": "keel:keel terse"` |
 | 11 | The un-witnessed step | **Resolved 2026-08-17:** implemented as specified |
 | 12 | `keel init` and `permissions.defaultMode` | **Resolved 2026-08-20:** keep `bypassPermissions`, residual recorded |
 
@@ -51,9 +50,10 @@ explicitly.
 
 ---
 
-## 2. Where does keel live. RESOLVED 2026-08-11: `gbi-solutions-ltd/keel` on GitHub, private.
+## 2. Where does keel live. RESOLVED 2026-08-11, revised 2026-10-22: `gbi-solutions-ltd/keel` on GitHub, public.
 
-**Decision:** private GitHub repo at `gbi-solutions-ltd/keel`. Marketplace source:
+**Decision:** public GitHub repo `gbi-solutions-ltd/keel`. Decided private 2026-08-11, developed in
+public since 2026-10-22 (`docs/plans/2026-10-22-public-first-development.md`). Marketplace source:
 
 ```json
 { "source": "github", "repo": "gbi-solutions-ltd/keel" }
@@ -450,46 +450,41 @@ applies in every project without anyone re-stating it.
 
 ---
 
-## 10. Should `keel init` set `outputStyle` for a project? PARTLY RESOLVED 2026-08-16.
+## 10. Should `keel init` set `outputStyle` for a project? RESOLVED 2026-11-02.
 
-The plugin now ships `output-styles/keel-terse.md`. Selecting it is a user action in `/config`, so
-on a fresh machine nothing is shorter until someone chooses it. `keel init` already writes
-`enabledPlugins`, permission rules and a hook into `.claude/settings.json`, so writing `outputStyle`
-there is the same class of act and would make the style the project default.
+**Decision:** yes. The plugin ships `output-styles/keel-terse.md`, and `keel init` selects it for
+the project by writing `"outputStyle": "keel:keel terse"` into `.claude/settings.json`, beside the
+`enabledPlugins`, permission rules and hook it already writes there.
 
-**What blocks it is a fact nobody has checked.** A plugin skill is addressed `keel:tdd`. Whether a
-plugin output style is addressed `keel terse`, `keel-terse` or `keel:terse` has not been observed.
-`bin/keel:470` already records what a wrong name costs, in the comment written when init stopped
-declaring a marketplace source: it "lands in settings.json, fails to resolve, and the user distrusts
-the whole file". A settings key naming a style that does not resolve is worse than no key, because
-the reader cannot tell which of the other keys are also wrong.
+**The name is observed.** A plugin style is addressed `keel:keel terse`. The
+`plugin_output_style_setting` row in `lib/harness/capabilities` records the probe: that value in a
+project's `.claude/settings.json` loaded the style on Claude Code 2.1.316, and `{}` did not. A
+session without keel installed falls back to the default style with no warning, so a teammate
+without the plugin loses the style and nothing else. The name has a space in it, so a rename of the
+style has to migrate the setting in every initialised project.
 
-**What settles it.** Restart a session with this version installed, open `/config`, and read the
-name listed under Output style. One observation, then this becomes a one-line change to
-`write_settings` in `bin/keel`.
+**What `keel init` writes.** `write_settings` in `lib/harness/claude.sh` puts the key in a new
+`.claude/settings.json`. An existing file goes through `merge_permissions_into_settings`, which adds
+the key only when the file names no `outputStyle`, so a style the project already chose stays. The
+project key overrides a style a developer set in their user-level settings.
+`.claude/settings.local.json` is git-ignored and overrides the committed value, so a developer who
+wants another style sets it there without editing a shared file.
 
-**If it is taken.** Two things follow. `write_settings` only writes the full file when
-`settings.json` is absent; an existing file goes through `merge_permissions_into_settings`, which
-touches permissions and nothing else, so a project that already has settings would not receive the
-key without extending that function too. And the escape hatch should be documented rather than
-assumed: `.claude/settings.local.json` is gitignored and overrides the committed value, so a
-developer who wants the default style back does not have to edit a shared file.
-
-**RESOLVED, the part that mattered.** Terse by default was instructed on 2026-08-16 and ships, but
-not through `outputStyle`. `keel init` writes `conventions.response_style: "terse"` into
+**What the hook does with it.** Terse by default is carried two ways. `keel init` writes
+`conventions.response_style: "terse"` into `.keel/profile.json`, and
 <!-- keel:claim gate=session-start harness=claude -->
-`.keel/profile.json` and `hooks/session-start` injects the rule unless it reads `verbose`. That is
-the mechanism `claude-plugins-official/explanatory-output-style` uses for the same problem, and it
-needs no style name.
+`hooks/session-start` injects the brevity rule unless it reads `verbose`, the mechanism
+`claude-plugins-official/explanatory-output-style` uses for the same problem. The hook also reads
+`outputStyle` from the `.claude/settings.json` and `.claude/settings.local.json` beside the profile,
+the local file winning when it names the key. With `terse`, `technical` and the keel terse style
+set, it injects no brevity paragraph, because the style carries every rule that paragraph states,
+which saves the 56 tokens the paragraph costs on every request. The user-level settings file is not
+read, so a style set only there still gets the paragraph, which duplicates the rule rather than
+dropping it.
 
-Extended on 2026-08-18: the hook now reads `conventions.explain_level` alongside `response_style`
-and selects one of four paragraphs rather than one of two. Length and vocabulary are separate dials,
-and the same reasoning applies to both.
-
-**STILL OPEN, and now an optimisation rather than the mechanism.** Writing `outputStyle` into
-`.claude/settings.json` would move the rule out of the per-request prefix and save the 56 tokens the
-injection now costs. It waits on the same single observation, and the behaviour no longer depends on
-it, so there is no pressure to guess.
+The hook reads `conventions.explain_level` alongside `response_style`, so length and vocabulary are
+separate dials, and the five forms it can print are measured in
+`docs/05-token-and-memory-design.md`.
 
 ---
 
@@ -572,7 +567,7 @@ score that case as a partial so it is visible if it persists.
 
 Raised because the posture every engineer gets had never been recorded as a decision. `keel init`
 writes `permissions.defaultMode: bypassPermissions` into `.claude/settings.local.json`
-(`lib/harness/claude.sh:386-409`), and `init` runs on every machine, so a per-machine file written by a shared
+(`lib/harness/claude.sh:394-417`), and `init` runs on every machine, so a per-machine file written by a shared
 tool is a team default by another name.
 
 **One correction to the framing this was raised under.** The argument is not confined to a code
@@ -633,7 +628,7 @@ sources, and that `keel init` announces what it did:
   mode      .claude/settings.local.json: bypassPermissions, not committed
 ```
 
-**The comment's framing is corrected in the same change.** `lib/harness/claude.sh:381-383` said the mode "is a
+**The comment's framing is corrected in the same change.** `lib/harness/claude.sh:389-391` said the mode "is a
 decision each engineer makes about their own machine, not one a repository makes on their behalf".
 The second half is true and is the whole point of the file split: the mode never propagates to
 anyone else's clone. The first half was not, because keel picks the default and the engineer only
@@ -659,6 +654,6 @@ any of those reached through `sh -c` or `xargs`. **This is defence in depth and 
 machine that must not talk to the internet needs a sandbox or a firewall, not a rule list.
 
 **It changes what `doctor` says on every project initialised before it.** Missing guardrails are a
-`fail` rather than a warning (`lib/harness/claude.sh:554-558`), by design, since these rules are what make the
+`fail` rather than a warning (`lib/harness/claude.sh:562-566`), by design, since these rules are what make the
 bypass default defensible. So an older project reports three missing rules until `keel init` is
 re-run, which merges and leaves existing rules and settings alone.
