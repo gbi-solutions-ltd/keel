@@ -80,10 +80,10 @@ report or by an unexpected diff, not by a check.
 | Finding | Evidence | What it means for the idea |
 |---|---|---|
 | review-guard's cheap filter passes only the reviewer's calls | The "cheap filter" in `hooks/review-guard` returns at once unless the input names `keel:keel-reviewer` | Widening the scope to every subagent means a check on every subagent Bash call, which is the cost to measure |
-| review-guard already parses where a git command acts and refuses `stash` in any form for the reviewer | `hooks/review-guard:28-33`, and its word list at `:109-112` | The parsing exists. An implementer must keep `add` and `commit` in its own worktree, so the reviewer's list cannot be reused as it stands, only its `stash` entry |
+| review-guard already parses where a git command acts and refuses `stash` in any form for the reviewer | `hooks/review-guard:31-36`, and its word list at `:116-119` | The parsing exists. An implementer must keep `add` and `commit` in its own worktree, so the reviewer's list cannot be reused as it stands, only its `stash` entry |
 | The implementer brief and agent carry no stash rule | `skills/execute-plan/references/subagent-prompts.md` section 1 (`:15-84`) and `agents/keel-implementer.md` name `git add` and commit rules only. Stash is forbidden only in the two review prompts (`:100-101`, `:152-153`) | The "do it manually" alternative has never been tried in the standing brief, only in one dispatch on 2026-09-19 |
 | Implementers do commit, in a concurrent batch's private worktree | `skills/write-plan/references/plan-template.md`, "the one exception is a declared concurrent batch" | Any guard for implementers has to leave `commit` alone there. A stash-only guard does |
-| `review-guard` denies, it does not ask | `hooks/review-guard:35-37`, decided by Bernard on 2026-10-17 | The same choice applies here, and a `deny` reaches the agent as a reason it can read |
+| `review-guard` denies, it does not ask | `hooks/review-guard:38-40`, decided by Bernard on 2026-10-17 | The same choice applies here, and a `deny` reaches the agent as a reason it can read |
 
 ## Open questions
 

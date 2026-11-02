@@ -2,20 +2,23 @@
 # Refuses a keel reviewer the git commands that would change the author's checkout or the state
 # every worktree of a repository shares, and refuses every other subagent a stash-writing `git
 # stash`. Registered on PreToolUse, matcher Bash. Task 1 of
-# docs/plans/2026-10-17-reviewer-git-guard.md and task 1 of
+# docs/plans/2026-10-17-reviewer-git-guard.md and tasks 1 and 1b of
 # docs/plans/2026-11-02-hold-a-subagents-git-stash.md.
 #
 # WHY A HOOK AND NOT ONLY THE PROMPT. On 2026-10-12 a spec reviewer ran `git stash` on the tree it
 # was judging, to measure a baseline. The prompts forbid that now, and a prompt binds only as far as
 # the model follows it; the next reviewer that reaches for a habit is stopped here instead.
 #
-# WHO IT TOUCHES, by the agent_type its hook input carries. The reviewer, `keel:keel-reviewer` (the
-# plugin name, a colon and the agent name, which is how the 2026-10-17 probe saw a plugin's own
-# agent), is held to the full list below. Every other subagent, keel's or the user's own (a
-# general-purpose agent carries `general-purpose`, an agent in a project's .claude/agents/ its own
-# name), is held to the stash rule alone. The main session's calls carry no agent_type at all, so
-# the author and the coordinator are never touched. lib/harness/capabilities records that probe as
-# the primitive this gate requires, which is why it is registered on Claude Code only.
+# WHO IT TOUCHES, by the agent_type and agent_id its hook input carries. The reviewer, by its
+# agent_type `keel:keel-reviewer` (the plugin name, a colon and the agent name, which is how the
+# 2026-10-17 probe saw a plugin's own agent), is held to the full list below. Every other subagent,
+# keel's or the user's own (a general-purpose agent carries `general-purpose`, an agent in a
+# project's .claude/agents/ its own name), is held to the stash rule alone, and is told by a
+# non-empty agent_id, not by agent_type: on 2026-11-02, Claude Code 2.1.316, `claude -p --agent
+# helper` logged agent_type `helper` and no agent_id for the main session's own Bash call. The main
+# session carries no agent_id, and without `--agent` no agent_type either, so the author and the
+# coordinator are never touched. lib/harness/capabilities records the 2026-10-17 probe as the
+# primitive this gate requires, which is why it is registered on Claude Code only.
 #
 # WHY THE STASH AND NOTHING ELSE for every other subagent. Implementers ran `git stash` on a shared
 # tree four times between 2026-09-19 and 2026-10-29 (docs/ideas/implementers-run-git-stash.md), and
@@ -73,22 +76,26 @@ deny() {
 
 # THE FALLBACK, for when the JSON cannot be read: python3 is absent, the input will not parse, or
 # the command will not split. It refuses a command in which a listed word directly follows `git` and
-# its global options, and allows the rest, so `git diff` and `rm -rf /tmp/x` still run. Without the
+# any option words, and allows the rest, so `git diff` and `rm -rf /tmp/x` still run. Without the
 # parser it cannot tell where a command acts, so the reviewer's own worktree steps are refused too.
 #
-# It acts only on the input's agent_type field, not on a name appearing anywhere: the substring
-# filter above also passes a main-session command that merely mentions `keel:keel-reviewer` or
-# `"agent_type"`, and this guard must never block the main session. A field inside the command
-# string is JSON-escaped (`\"agent_type\"`), so it cannot match this pattern. The reviewer gets the
-# word list; any other subagent the stash alone.
+# It acts only on the input's agent_type and agent_id fields, not on a name appearing anywhere: the
+# substring filter above also passes a main-session command that merely mentions
+# `keel:keel-reviewer` or `"agent_type"`, and this guard must never block the main session. A field
+# inside the command string is JSON-escaped (`\"agent_type\"`), so it cannot match these patterns.
+# The reviewer gets the word list, and any other subagent (a non-empty agent_id) the stash alone.
 blind() {
-    local why="$1" after="$2" named sp opt w re rest m
+    local why="$1" after="$2" named sp opt w re rest m with_id
     # Spaces or a JSON-escaped tab separate words; a JSON-escaped newline may precede `git`.
     sp='([[:space:]]|\\t)+'
-    opt='(-C|-c|--git-dir|--work-tree)'"$sp"'[^[:space:]]+|--(git-dir|work-tree)=[^[:space:]]+|--no-pager'
+    # git's options that take the next word as their value, then any other option word, so an
+    # option it does not know can only make it refuse more.
+    opt='(-C|-c|--git-dir|--work-tree|--namespace|--super-prefix|--config-env|--attr-source)'"$sp"'[^[:space:]]+|-[^[:space:]]+'
     named='"agent_type"[[:space:]]*:[[:space:]]*"([^"\\]*)"'
+    with_id='"agent_id"[[:space:]]*:[[:space:]]*"[^"]'
     [[ $event =~ $named ]] || exit 0
     if [ "${BASH_REMATCH[1]}" != keel:keel-reviewer ]; then
+        [[ $event =~ $with_id ]] || exit 0
         # An ERE has no lookahead to tell `stash` from `stash list`, so each `git stash` is matched
         # with the word after it, which is its subcommand as git reads it, and the matches are
         # walked one at a time. Each step keeps the match's last character, the boundary after it,
@@ -140,8 +147,10 @@ if not isinstance(ev, dict):
     sys.exit(3)
 AGENT = ev.get("agent_type")
 if not AGENT:
-    sys.exit(0)                         # the main session carries none, and is never touched
+    sys.exit(0)                         # none: the main session, started without --agent
 REVIEWING = AGENT == REVIEWER           # any other subagent is held to the stash rule alone
+if not REVIEWING and not ev.get("agent_id"):
+    sys.exit(0)                         # the main session started with --agent: no agent_id
 cmd = (ev.get("tool_input") or {}).get("command")
 if not isinstance(cmd, str):
     sys.exit(3)
@@ -194,7 +203,7 @@ GIT_ENV = {"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"}
 # git's global options that take their value as the next word, so it is never read as the
 # subcommand.
 GIT_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--super-prefix",
-                  "--config-env"}
+                  "--config-env", "--attr-source"}
 
 # The temp directory. `${TMPDIR:-/tmp}` is the form the dispatch instructions ask for, because
 # TMPDIR is often unset on Linux; the two bare forms are accepted as the same expansion. Both the

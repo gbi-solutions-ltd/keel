@@ -3,8 +3,8 @@
 # Tests for hooks/review-guard, which refuses a keel reviewer the git commands that would change the
 # author's checkout or the state every worktree shares, and refuses every other subagent a
 # stash-writing `git stash`. Task 1 of docs/plans/2026-10-17-reviewer-git-guard.md, behaviours 2 to
-# 6, and task 1 of docs/plans/2026-11-02-hold-a-subagents-git-stash.md, behaviours 1 to 7, one case
-# per example there.
+# 6, and tasks 1 and 1b of docs/plans/2026-11-02-hold-a-subagents-git-stash.md, behaviours 1 to 7
+# and 1 to 3, one case per example there.
 #
 # Every case feeds the hook a PreToolUse event as JSON on stdin, as tests/test-sensitive-guard.sh
 # feeds its hook, and asserts on what it prints. A refusal is checked by its JSON and an allowance
@@ -21,17 +21,21 @@ fail=0
 ok()  { printf '  PASS  %s\n' "$1"; pass=$((pass+1)); return 0; }
 bad() { printf '  FAIL  %s: %s\n' "$1" "$2"; fail=$((fail+1)); return 0; }
 
-# A PreToolUse event for one Bash call, in the shape the 2026-10-17 probe logged. An agent type of
-# `-` leaves agent_id and agent_type out, which is what a call from the main session looks like.
+# A PreToolUse event for one Bash call, in the shape the 2026-10-17 probe logged:
+# event <agent_type> <command> <cwd> [agent_id]. An agent type of `-` leaves agent_id and
+# agent_type out, which is what a call from the main session looks like. A subagent's event carries
+# agent_id `a1` unless a fourth argument names another; `-` there leaves agent_id out, which is what
+# the main session started with `--agent` looks like: its own agent_type, and no agent_id.
 # Built with json.dumps, because a command carrying quotes or newlines is invalid JSON written by
 # hand, and the hook would then refuse it as unreadable while the case passed for the wrong reason.
 event() {
-    AT="$1" CMD="$2" CWD="$3" python3 -c '
+    AT="$1" CMD="$2" CWD="$3" AID="${4-a1}" python3 -c '
 import json, os
 ev = {"session_id": "s", "hook_event_name": "PreToolUse", "tool_name": "Bash",
       "tool_input": {"command": os.environ["CMD"]}, "cwd": os.environ["CWD"]}
 if os.environ["AT"] != "-":
-    ev["agent_id"] = "a1"
+    if os.environ["AID"] != "-":
+        ev["agent_id"] = os.environ["AID"]
     ev["agent_type"] = os.environ["AT"]
 print(json.dumps(ev))'
 }
@@ -107,9 +111,9 @@ if [ -x /bin/bash ]; then
 fi
 
 # --- behaviour 2: the main session is never touched, and every other subagent loses the stash ---
-# The main session's calls carry no agent_type at all, and it must never be blocked: it is the
-# author and the coordinator. A subagent that is not the reviewer is refused the stash and nothing
-# else; its cases are in their own section below.
+# The main session's calls carry no agent_id, and no agent_type unless it was started with
+# `--agent`, and it must never be blocked: it is the author and the coordinator. A subagent that is
+# not the reviewer is refused the stash and nothing else; its cases are in their own section below.
 allow "the main session's git stash is untouched"          -                   'git stash' "$repo"
 deny  "a general-purpose agent's git stash is refused"     general-purpose     'git stash' "$repo"
 deny  "keel-fanout's git stash is refused"                 keel:keel-fanout    'git stash' "$repo"
@@ -435,6 +439,39 @@ run "$(event "$SUB" 'git stash' "$repo")" "$repo" PATH="$pyrec"
 if [ -e "$pyrec/ran" ]; then ok "a subagent's git stash starts python3"
 else bad "a subagent's git stash starts python3" "the shim recorded no run"; fi
 expect_deny "and, with that python3 failing, the subagent's git stash is still refused"
+
+# --- a subagent is told by agent_id, and two more git forms are read ----------------------------
+# Task 1b of docs/plans/2026-11-02-hold-a-subagents-git-stash.md. `claude -p --agent helper` logged
+# agent_type `helper` and no agent_id for the main session's own Bash call, so agent_type alone does
+# not mean a subagent.
+# Behaviour 1: the stash rule needs a non-empty agent_id, on the python path and in the fallback.
+run "$(event helper 'git stash' "$repo" -)" "$repo"
+expect_allow "a main session started with --agent may git stash"
+run "$(event helper 'git stash' "$repo" '')" "$repo"
+expect_allow "a main session whose agent_id is empty may git stash"
+run "$(event helper 'git stash' "$repo" a7)" "$repo"
+expect_deny "the same event with an agent_id is refused git stash"
+run "$(event helper 'git stash' "$repo" -)" "$repo" PATH="$shim"
+expect_allow "without python3 a main session started with --agent may git stash"
+run "$(event helper 'git stash' "$repo" a7)" "$repo" PATH="$shim"
+expect_deny "without python3 the same event with an agent_id is refused git stash"
+# The reviewer's rules keep keying on agent_type.
+run "$(event "$REVIEWER" 'git stash list' "$repo" -)" "$repo"
+expect_deny "a reviewer with no agent_id is still refused git stash list"
+run "$(event "$REVIEWER" 'git commit -m x' "$repo" -)" "$repo" PATH="$shim"
+expect_deny "without python3 a reviewer with no agent_id is still refused git commit"
+# Behaviour 2: --attr-source takes a value, so the word after it is not the subcommand.
+deny "a subagent's git --attr-source HEAD stash is refused"  "$SUB" 'git --attr-source HEAD stash' "$repo"
+deny "a reviewer's git --attr-source HEAD commit is refused" "$REVIEWER" 'git --attr-source HEAD commit -m x' "$repo"
+run "$(event "$SUB" 'git --attr-source HEAD stash' "$repo")" "$repo" PATH="$shim"
+expect_deny "without python3 a subagent's git --attr-source HEAD stash is refused"
+# Behaviour 3: the fallback reads any option word between git and stash.
+for c in 'git -P stash' 'git --bare stash' 'git --namespace n stash'; do
+    run "$(event "$SUB" "$c" "$repo")" "$repo" PATH="$shim"
+    expect_deny "without python3 a subagent's $c is refused"
+done
+run "$(event "$SUB" 'git -P stash list' "$repo")" "$repo" PATH="$shim"
+expect_allow "without python3 a subagent's git -P stash list is allowed"
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

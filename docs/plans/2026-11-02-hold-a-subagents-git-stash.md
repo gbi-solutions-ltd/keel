@@ -211,7 +211,7 @@ The header comment says the subagent test is `agent_id`, and why (the `--agent` 
 
 **Done when:** `tests/test-review-guard.sh` passes, and the profile's lint command passes.
 
-- [ ] **Step 1b.1: Build it test first**
+- [x] **Step 1b.1: Build it test first**
 
 Follow `keel:tdd` for behaviours 1 to 3 in `tests/test-review-guard.sh`; the event builder gains an
 `agent_id` the subagent cases set. Run it and watch behaviour 1's main-session case, behaviour 2 and
@@ -223,7 +223,7 @@ output in your report.
 Run: `tests/run-tests.sh`
 Expected: PASS, or reds this task did not cause, each named.
 
-- [ ] **Step 1b.2: Hand over**
+- [x] **Step 1b.2: Hand over** Note: rounds: 1; routing: inherit; loop: full; spec COMPLIES; quality nothing blocking, consider: a main session started as --agent keel:keel-reviewer still gets the reviewer rules; the ledger records only pretooluse_agent_type though the rule reads agent_id; no fallback case for an empty agent_id
 
 ```bash
 git add hooks/review-guard tests/test-review-guard.sh
@@ -300,7 +300,8 @@ passes, with `git commit -m "docs(execute-plan): tell the implementer never to s
 - Modify: `docs/01-architecture.md` (the layer 1 sentence naming `review-guard`)
 - Modify: `docs/06-repo-layout.md` (the `review-guard` comment)
 - Modify: `docs/ideas/implementers-run-git-stash.md` (Status, Next, open question 2, and the
-  "cheap filter passes only the reviewer's calls" finding)
+  "cheap filter passes only the reviewer's calls" finding, and the rows that scope by `agent_type`,
+  which task 1b changed to `agent_id`)
 - Modify: `docs/ideas/workflows-for-the-fan-outs.md` (`:88`, "No hook refuses an implementer's
   tree-changing git")
 - Modify: `CHANGELOG.md` (an Unreleased section)
@@ -313,7 +314,10 @@ passes, with `git commit -m "docs(execute-plan): tell the implementer never to s
    status accepted, deciders Bernard 2026-11-02, it extends ADR-0010 without superseding it, its
    context cites the four instances by `path:line` from the idea record, its decision is the stash
    rule for every subagent and the two reading forms, its consequences name that a user's own agents
-   lose the stash-writing forms, and its verification cites `tests/test-review-guard.sh`.
+   lose the stash-writing forms, and its verification cites `tests/test-review-guard.sh`. It says the
+   rule keys on a non-empty `agent_id`, citing the 2026-10-17 probe (ADR-0010's context: subagents
+   carry `agent_id`, the main session does not) and the 2026-11-02 `--agent` probe in this plan's
+   task 1b (a main session started with `--agent` carries `agent_type` but no `agent_id`).
 2. `docs/07-open-decisions.md`, `docs/01-architecture.md` and `docs/06-repo-layout.md` say the hook
    holds the reviewer's git and every subagent's stash. Example: none of them says the hook touches
    keel reviewers only, and each cites ADR-0016 beside ADR-0010.
