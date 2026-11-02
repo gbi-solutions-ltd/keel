@@ -493,11 +493,11 @@ There is no failing test for this task: it changes records. `tests/test-validate
 
 **Done when:** `tests/run-tests.sh` passes.
 
-- [ ] **Step 6.1: Edit the records and run the suite**
+- [x] **Step 6.1: Edit the records and run the suite**
 
 Make the edits, then run `tests/run-tests.sh` and quote its summary.
 
-- [ ] **Step 6.2: Hand over**
+- [x] **Step 6.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES; no quality review, review-code covers it at the end; consider: decision 2 keeps "Harmless while the repository is private" inside its dated history
 
 ```bash
 git add docs/04-plugin-strategy.md docs/07-open-decisions.md \

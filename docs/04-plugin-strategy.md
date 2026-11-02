@@ -5,8 +5,8 @@
 > Code one. Qualifying individual rows would produce a document that is locally correct and globally
 > wrong, so the scope is stated once, here.
 
-Every plugin named below is in the official Anthropic marketplace, `claude-plugins-official`,
-which is registered by default and needs no separate setup.
+Every plugin named below is listed in `claude-plugins-official`, the official marketplace, which is
+registered by default. Context7 and Playwright, marked (external), are third-party plugins it lists.
 
 ## Verdicts
 
@@ -171,12 +171,11 @@ listed, and installing is one confirmation.
 
 **No `extraKnownMarketplaces`, deliberately.** A marketplace source says where a particular
 reader gets keel from, which is a fact about their machine rather than about the project. A
-committed declaration asserts one answer for everyone who clones: a reader outside the GitHub
-org cannot reach a private repo, and at project scope the declaration shadows whatever that
-reader chose at user level. Every `@claude-plugins-official` entry above is enabled without a
-declaration and resolves fine, because the marketplace is known at user level; `gbi` is no
-different. Adding the marketplace is a one-time per-machine step, and both `keel doctor` and the
-nudge hook name the command when it is missing.
+committed declaration asserts one answer for everyone who clones, and at project scope the
+declaration shadows whatever that reader chose at user level. Every `@claude-plugins-official`
+entry above is enabled without a declaration and resolves fine, because the marketplace is known
+at user level; `gbi` is no different. Adding the marketplace is a one-time per-machine step, and
+both `keel doctor` and the nudge hook name the command when it is missing.
 
 ## If superpowers is also installed
 
