@@ -513,6 +513,7 @@ passes, with `git commit -m "docs: record the review-guard follow-ups"`.
   - a mutant dropping `--config-env` from the fallback's value options survived; `--super-prefix` has the same shape (hooks/review-guard:93)
 - follow-ups taken as tasks 4 and 5 (2026-11-02, Bernard asked to handle them before merging): all
   but the heredoc and `echo` refusal, which task 4 states as a limit rather than removes
+- tasks 4 and 5: spec and quality passes on task 4 (one fix pass), spec pass on task 5, a security audit of the hook change with 0 findings; not re-run through review-code (2026-11-02)
 - follow-up:
   - consider: the ledger requires only `pretooluse_agent_type` while the rule keys on `agent_id`; a separate row could follow (lib/harness/capabilities)
   - consider: a main session started as `--agent keel:keel-reviewer` gets the reviewer rules (hooks/review-guard header)
