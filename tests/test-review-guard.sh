@@ -3,8 +3,8 @@
 # Tests for hooks/review-guard, which refuses a keel reviewer the git commands that would change the
 # author's checkout or the state every worktree shares, and refuses every other subagent a
 # stash-writing `git stash`. Task 1 of docs/plans/2026-10-17-reviewer-git-guard.md, behaviours 2 to
-# 6, and tasks 1 and 1b of docs/plans/2026-11-02-hold-a-subagents-git-stash.md, behaviours 1 to 7
-# and 1 to 3, one case per example there.
+# 6, and tasks 1, 1b and 4 of docs/plans/2026-11-02-hold-a-subagents-git-stash.md, behaviours 1
+# to 7, 1 to 3 and 1 to 5, one case per example there.
 #
 # Every case feeds the hook a PreToolUse event as JSON on stdin, as tests/test-sensitive-guard.sh
 # feeds its hook, and asserts on what it prints. A refusal is checked by its JSON and an allowance
@@ -368,10 +368,10 @@ reason_has  "and the reason says python3 failed" 'python3 failed'
 rm -rf "$pyfail"
 
 # Input that will not parse takes the same fallback with python3 present.
-run '{"agent_type":"keel:keel-reviewer","tool_input":{"command":"git stash"' "$repo"
+run '{"agent_id":"a1","agent_type":"keel:keel-reviewer","tool_input":{"command":"git stash"' "$repo"
 expect_deny "unparseable input naming the reviewer refuses git stash"
 reason_has  "and says it could not read its input" 'could not read its input'
-run '{"agent_type":"keel:keel-reviewer","tool_input":{"command":"git diff"' "$repo"
+run '{"agent_id":"a1","agent_type":"keel:keel-reviewer","tool_input":{"command":"git diff"' "$repo"
 expect_allow "unparseable input naming the reviewer allows git diff"
 run '{"tool_input":{"command":"git stash"' "$repo"
 expect_allow "unparseable input not naming the reviewer is untouched"
@@ -455,11 +455,6 @@ run "$(event helper 'git stash' "$repo" -)" "$repo" PATH="$shim"
 expect_allow "without python3 a main session started with --agent may git stash"
 run "$(event helper 'git stash' "$repo" a7)" "$repo" PATH="$shim"
 expect_deny "without python3 the same event with an agent_id is refused git stash"
-# The reviewer's rules keep keying on agent_type.
-run "$(event "$REVIEWER" 'git stash list' "$repo" -)" "$repo"
-expect_deny "a reviewer with no agent_id is still refused git stash list"
-run "$(event "$REVIEWER" 'git commit -m x' "$repo" -)" "$repo" PATH="$shim"
-expect_deny "without python3 a reviewer with no agent_id is still refused git commit"
 # Behaviour 2: --attr-source takes a value, so the word after it is not the subcommand.
 deny "a subagent's git --attr-source HEAD stash is refused"  "$SUB" 'git --attr-source HEAD stash' "$repo"
 deny "a reviewer's git --attr-source HEAD commit is refused" "$REVIEWER" 'git --attr-source HEAD commit -m x' "$repo"
@@ -482,6 +477,61 @@ for c in 'git --config-env a=B stash' 'git --super-prefix p/ stash'; do
     run "$(event "$SUB" "$c" "$repo")" "$repo" PATH="$shim"
     expect_deny "without python3 a subagent's $c is refused"
 done
+
+# --- the reviewer is a subagent too, the fallback keys on agent_id, the limits are observed ---------
+# Task 4 of docs/plans/2026-11-02-hold-a-subagents-git-stash.md.
+# Behaviour 1: the event reaches python3 on stdin, so an event too large for the environment is
+# still judged by the parser. The size case pads a subagent's `git stash` past 1 MB, beyond Linux's
+# 128 KB limit on one environment string and macOS's 1 MB ARG_MAX for all of them, in
+# tool_input.description rather than in the command, so the parser stays fast; the parser's own
+# reason, not the fallback's, shows it was judged in full.
+big="$(CWD="$repo" python3 -c '
+import json, os
+print(json.dumps({"session_id": "s", "hook_event_name": "PreToolUse", "tool_name": "Bash",
+                  "tool_input": {"command": "git stash", "description": "x" * 1100000},
+                  "cwd": os.environ["CWD"], "agent_id": "a7", "agent_type": "general-purpose"}))')"
+run "$big" "$repo"
+expect_deny "a subagent's git stash in an event past 1 MB is refused"
+reason_has  "and refused by the parser, not the fallback" 'is refused to a subagent'
+if ! grep -q KEEL_EVENT "$GUARD"; then ok "the hook passes the event in no environment variable"
+else bad "the hook passes the event in no environment variable" "$(grep -n KEEL_EVENT "$GUARD")"; fi
+# An agent_id that is not a non-empty string is no subagent on either path: the fallback needs a
+# quoted value, and the parser matches it.
+num="$(event general-purpose 'git stash' "$repo" -)"
+num="${num%\}}"', "agent_id": 7}'
+run "$num" "$repo"
+expect_allow "a subagent whose agent_id is the number 7 may git stash"
+run "$num" "$repo" PATH="$shim"
+expect_allow "without python3 a subagent whose agent_id is the number 7 may git stash"
+# Behaviour 2: a main session started as `--agent keel:keel-reviewer` carries the reviewer's
+# agent_type and no agent_id, and is never touched; with an agent_id it is the reviewer.
+for c in 'git stash list' 'git commit -m x'; do
+    run "$(event "$REVIEWER" "$c" "$repo" -)" "$repo"
+    expect_allow "a main session started as the reviewer may $c"
+    run "$(event "$REVIEWER" "$c" "$repo" -)" "$repo" PATH="$shim"
+    expect_allow "without python3 a main session started as the reviewer may $c"
+    run "$(event "$REVIEWER" "$c" "$repo" a7)" "$repo"
+    expect_deny "the reviewer with an agent_id is refused $c"
+    run "$(event "$REVIEWER" "$c" "$repo" a7)" "$repo" PATH="$shim"
+    expect_deny "without python3 the reviewer with an agent_id is refused $c"
+done
+if [ -x /bin/bash ]; then
+    run "$(event "$REVIEWER" 'git commit -m x' "$repo" -)" "$repo" PATH="$shim" /bin/bash
+    expect_allow "under /bin/bash without python3, a main session started as the reviewer may git commit"
+fi
+# Behaviour 3: the fallback decides by agent_id and the exact reviewer name, so an agent_type it
+# cannot read as a plain string is still a subagent.
+run "$(event 'we"ird' 'git stash' "$repo" a7)" "$repo" PATH="$shim"
+expect_deny "without python3 a subagent named we\"ird is refused git stash"
+run "$(event 'we"ird' 'git stash list' "$repo" a7)" "$repo" PATH="$shim"
+expect_allow "without python3 a subagent named we\"ird may git stash list"
+if [ -x /bin/bash ]; then
+    run "$(event 'we"ird' 'git stash' "$repo" a7)" "$repo" PATH="$shim" /bin/bash
+    expect_deny "under /bin/bash without python3, a subagent named we\"ird is refused git stash"
+fi
+# Behaviour 5: every git word and every heredoc body is read as a command, so a subagent's
+# `echo git stash` is refused. The header states this limit; this case observes it.
+deny "a subagent's echo git stash is refused, a stated limit" "$SUB" 'echo git stash' "$repo"
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

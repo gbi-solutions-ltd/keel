@@ -132,7 +132,7 @@ Every task inherits these.
    cases, and the comments at `:3-5`, `:106-108` and `:307-309` that describe a reviewer-only scope
    are rewritten.
 6. The fallback, when python3 is absent or the input will not parse, holds the same line. `blind()`
-   (`hooks/review-guard:69-70`) exits today unless `agent_type` names the reviewer, and refuses by
+   (`hooks/review-guard#blind() {`) exits today unless `agent_type` names the reviewer, and refuses by
    word with a bash ERE, which has no lookahead, so telling `stash` from `stash list` needs a second
    pattern or a loop over the matches. Example: with python3 off the PATH and `agent_type`
    `general-purpose`, `git stash` and `git stash list && git stash` are refused, `git stash list`
@@ -382,9 +382,9 @@ passes, with `git commit -m "docs: record that every subagent's stash is held by
 1. The event reaches python3 on stdin, not in an environment variable, so an event too large for
    the environment is still judged by the parser. Example: `hooks/review-guard` no longer sets
    `KEEL_EVENT`; python3 is started with the script as an argument (`-c`) or from a file, and reads
-   the event from stdin; every existing case in `tests/test-review-guard.sh` still passes. There is
-   no size case, because judging a megabyte command takes seconds and would slow the suite; say so
-   in the test file.
+   the event from stdin; every existing case in `tests/test-review-guard.sh` still passes. (Added
+   by a fix pass after review: a 1.1 MB event, its padding in `tool_input.description`, is refused by the parser in
+   under half a second.)
 2. The reviewer's rules apply only to a subagent too: an event with `agent_type`
    `keel:keel-reviewer` and no `agent_id` is a main session started as `--agent keel:keel-reviewer`
    and is never touched. Example: that event running `git stash list` or `git commit -m x` prints
@@ -411,7 +411,7 @@ passes, with `git commit -m "docs: record that every subagent's stash is held by
 **Done when:** `tests/test-review-guard.sh` and `tests/test-harness-claims.sh` pass, and the
 profile's lint command passes.
 
-- [ ] **Step 4.1: Build it test first**
+- [x] **Step 4.1: Build it test first**
 
 Follow `keel:tdd` for behaviours 2 to 5: write or turn the cases, run them and watch behaviour 2's
 allow cases, behaviour 3's refusal and behaviour 4's rows fail. Behaviour 1 is a refactor that the
@@ -425,7 +425,7 @@ Also run the hook under `/bin/bash` by name, as the existing cases do.
 Run: `tests/run-tests.sh`
 Expected: PASS, or reds this task did not cause, each named.
 
-- [ ] **Step 4.2: Hand over**
+- [x] **Step 4.2: Hand over** Note: rounds: 2; routing: inherit; loop: full; spec COMPLIES; quality nothing blocking, should fix: the stdin case was only a grep; a fix pass on top of the reviewed attempt added a real 1.1 MB case, made agent_id string-only and corrected the header, checked COMPLIES; consider left: a non-string agent_type with a string agent_id differs between paths (live events carry strings)
 
 ```bash
 git add hooks/review-guard lib/harness/capabilities docs/harness-support.md \

@@ -497,5 +497,15 @@ grep -qx 'PreToolUse/Bash/sensitive-guard=' <<< "$(on_failure_entries "$of/witho
     "$(on_failure_entries "$of/without.json" 2>&1 | grep sensitive-guard)"
 rm -rf "$of"
 
+# 10. review-guard requires agent_id, which tells a subagent from the main session. The row keeps
+# the 2.1.302 stamp of the first probe, so requiring it leaves keel's minimum where it was.
+row='provides|claude|pretooluse_agent_id|probe:a plugin PreToolUse hook on Bash logged an agent_id for a general-purpose subagent and a plugin agent and none for the main session, docs/plans/2026-10-17-reviewer-git-guard.md, and on 2.1.316 none for a main session started with --agent and one for a project agent from .claude/agents, docs/plans/2026-11-02-hold-a-subagents-git-stash.md|2.1.302|2026-11-02'
+grep -qxF "$row" lib/harness/capabilities \
+  && ok "the ledger provides pretooluse_agent_id with source, version and date" \
+  || bad "the ledger provides pretooluse_agent_id with source, version and date" "no such row"
+grep -qx 'requires|review-guard|pretooluse_agent_id' lib/harness/capabilities \
+  && ok "review-guard requires pretooluse_agent_id" \
+  || bad "review-guard requires pretooluse_agent_id" "no such row"
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
