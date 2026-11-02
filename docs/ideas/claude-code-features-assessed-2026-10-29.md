@@ -4,7 +4,7 @@
 |---|---|
 | Raised by | Bernard, 2026-10-29, asking for an assessment of the plugin against current Claude Code features, explored by Sonnet subagents |
 | Status | agreed 2026-10-29: items 1, 2, 3, 4 and 9, with the open questions answered by Bernard below |
-| Recommendation | Build something smaller: items 1 to 4 and 9. Do not build items 5 and 6. Item 7 waits for its first instance. Item 8 is reopened |
+| Recommendation | Build something smaller: items 1 to 4 and 9. Do not build items 5 and 6. Item 7 waits for its first instance. Item 8 was reassessed on 2026-11-02 and declined until a real instance (`workflows-for-the-fan-outs.md`) |
 | Next | `write-plan` for items 1 to 4 and 9 |
 
 ## The problem
@@ -66,7 +66,7 @@ closed, or stops the plugin loading, which is worse than the gap.
 | 5. An `if` condition on `sensitive-guard`, such as `Bash(git commit*)` | Spares a process on Bash calls that are not commits | **Do not build.** The docs call `if` best-effort, and a commit written `cd x && git commit` or `git -C x commit` could skip a gate the hook's own parser already handles |
 | 6. `userConfig` for per-user switches such as `KEEL_CONTEXT_WATCH` | A `/config` row instead of an environment variable | **Do not build.** No complaint about the variable is on record, and most of keel's switches are project facts that belong in `.keel/profile.json`, committed and shared, not per user. Compatibility is not the reason: only the `options` picker field stops older clients (before 2.1.271) loading the plugin, plain fields only lack a `/config` row before 2.1.269, and the 2.1.302 minimum from open question 4 covers both |
 | 7. `argument-hint` and `$ARGUMENTS` on user-invoked skills | `/keel:ship <branch>` style invocation | **Not yet, revisit on the first instance.** Cheap and low risk, so the only reason against is that no user passing arguments to a keel skill is on record. The cost when built is a second invocation path the evals would cover |
-| 8. Plugin `workflows/` for the review and execute-plan fan-outs | Deterministic orchestration instead of prose dispatch | **Reopened.** Its reason was ADR-0005's one skill body across harnesses, and ADR-0013 supersedes ADR-0005, so the reason is gone and the item needs a fresh assessment |
+| 8. Plugin `workflows/` for the review and execute-plan fan-outs | Deterministic orchestration instead of prose dispatch | **Reassessed 2026-11-02, declined.** Its first reason was ADR-0005's one skill body across harnesses, which ADR-0013 superseded. The reassessment, `docs/ideas/workflows-for-the-fan-outs.md`, found no real-use instance and recommends not building it until one is recorded |
 | 9. Two doc corrections | The docs state what is true now | **Build.** `docs/04-plugin-strategy.md:8` says every plugin named is in `claude-plugins-official`, while `:24` and `:28` mark Context7 and Playwright external. `docs/07-open-decisions.md:12` and `:54` say the repo is private, and `gh repo view` reports it `PUBLIC` |
 
 **Assumptions this rests on**
@@ -115,7 +115,7 @@ Build something smaller: land the `EXIT` trap, then add `onFailure: "block"` to 
 behind the declared 2.1.302 minimum that `keel doctor` checks, record the output-style observation
 and have `keel init` write the style, declare the required plugins as `dependencies`, add `plugin
 validate` to CI if it runs unsigned, and correct the two docs. Do not build `if` or `userConfig`,
-assess workflows again, and build skill arguments when someone first needs them. Next is
+assess workflows again (done 2026-11-02 in `workflows-for-the-fan-outs.md`), and build skill arguments when someone first needs them. Next is
 `write-plan` for those items.
 
 ## Not decided here
