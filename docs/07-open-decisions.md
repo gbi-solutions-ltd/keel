@@ -572,7 +572,7 @@ score that case as a partial so it is visible if it persists.
 
 Raised because the posture every engineer gets had never been recorded as a decision. `keel init`
 writes `permissions.defaultMode: bypassPermissions` into `.claude/settings.local.json`
-(`lib/harness/claude.sh:386-409`), and `init` runs on every machine, so a per-machine file written by a shared
+(`lib/harness/claude.sh:394-417`), and `init` runs on every machine, so a per-machine file written by a shared
 tool is a team default by another name.
 
 **One correction to the framing this was raised under.** The argument is not confined to a code
@@ -633,7 +633,7 @@ sources, and that `keel init` announces what it did:
   mode      .claude/settings.local.json: bypassPermissions, not committed
 ```
 
-**The comment's framing is corrected in the same change.** `lib/harness/claude.sh:381-383` said the mode "is a
+**The comment's framing is corrected in the same change.** `lib/harness/claude.sh:389-391` said the mode "is a
 decision each engineer makes about their own machine, not one a repository makes on their behalf".
 The second half is true and is the whole point of the file split: the mode never propagates to
 anyone else's clone. The first half was not, because keel picks the default and the engineer only
@@ -659,6 +659,6 @@ any of those reached through `sh -c` or `xargs`. **This is defence in depth and 
 machine that must not talk to the internet needs a sandbox or a firewall, not a rule list.
 
 **It changes what `doctor` says on every project initialised before it.** Missing guardrails are a
-`fail` rather than a warning (`lib/harness/claude.sh:554-558`), by design, since these rules are what make the
+`fail` rather than a warning (`lib/harness/claude.sh:562-566`), by design, since these rules are what make the
 bypass default defensible. So an older project reports three missing rules until `keel init` is
 re-run, which merges and leaves existing rules and settings alone.

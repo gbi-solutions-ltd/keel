@@ -147,7 +147,8 @@ Example for a TypeScript service with a UI:
     "typescript-lsp@claude-plugins-official": true,
     "frontend-design@claude-plugins-official": true,
     "playwright@claude-plugins-official": true
-  }
+  },
+  "outputStyle": "keel:keel terse"
 }
 ```
 

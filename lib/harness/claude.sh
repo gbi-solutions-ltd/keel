@@ -334,6 +334,7 @@ write_settings() {
 $(expected_plugins)
 EOF_PLUGINS
       printf '\n  },\n'
+      printf '  "outputStyle": "keel:keel terse",\n'
       printf '  "permissions": {\n    "deny": '
       keel_deny_rules | json_rule_array
       printf ',\n    "ask": '
@@ -347,7 +348,8 @@ EOF_PLUGINS
 
 # An existing settings.json is the common case on a mature repo, and it is exactly the case that
 # most needs the guardrails. Add only what is missing: rules the project already lists are left
-# alone, and nothing else in the file is touched.
+# alone, an outputStyle already set is the user's choice and stays, and nothing else in the file is
+# touched.
 merge_permissions_into_settings() {
     have_python || { err "python3 absent: could not add permission guardrails to the existing .claude/settings.json. Add them by hand, or delete the file and re-run."; return 0; }
     local deny ask
@@ -366,9 +368,15 @@ for key, env in (("deny", "DENY"), ("ask", "ASK")):
     for rule in os.environ[env].splitlines():
         if rule and rule not in have:
             have.append(rule); added += 1
-if added:
+style = "outputStyle" not in d
+if style:
+    d["outputStyle"] = "keel:keel terse"
+if added or style:
     json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
+if added:
     print(f"  added {added} permission guardrail(s) to .claude/settings.json")
+if style:
+    print("  set outputStyle to keel:keel terse in .claude/settings.json")
 PY
 }
 

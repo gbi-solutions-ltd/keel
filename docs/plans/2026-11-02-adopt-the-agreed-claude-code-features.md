@@ -240,7 +240,7 @@ The coordinator commits after both review passes, with
 **Done when:** `tests/test-keel-3.sh` and `tests/test-harness-claims.sh` pass, and the profile's
 lint command passes.
 
-- [ ] **Step 2.1: Build it test first**
+- [x] **Step 2.1: Build it test first**
 
 Follow `keel:tdd` for behaviours 1 to 4 in `tests/test-keel-3.sh`, beside the existing case at
 `tests/test-keel-3.sh:385`: run it and watch them fail because no `outputStyle` is written. Then
@@ -253,7 +253,7 @@ failing output in your report.
 Run: `tests/run-tests.sh`
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 
-- [ ] **Step 2.2: Hand over**
+- [x] **Step 2.2: Hand over** Note: rounds: 1; routing: inherit; loop: full; spec DEVIATES on process only, overruled by the coordinator: the porcelain output was in the report and dropped in transcription, the test-keel-4 red compares against HEAD by default and clears on commit, the five extra paths are citation repairs the global constraints require; quality nothing blocking, should fix: a user-level outputStyle is overridden by the project key, carried to task 6
 
 ```bash
 git add lib/harness/claude.sh lib/harness/capabilities docs/harness-support.md README.md \

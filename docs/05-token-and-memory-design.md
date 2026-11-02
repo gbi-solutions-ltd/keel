@@ -354,9 +354,13 @@ since NFR-01 caps every form at 1,285 and the worst is 1,279. `tests/validate-sk
 that reason, so adding a dial did not spend the headroom. `tests/validate-skills.sh` measures all
 four rather than whichever one the local profile selects.
 
-`output-styles/keel-terse.md` still ships and still costs zero, but it is now the machine-wide
-alternative for non-keel repositories rather than the mechanism. The managed block was never an
-option for either: it sits in every request, and its budget is the tightest in the table.
+`output-styles/keel-terse.md` ships with the plugin and costs zero against these budgets.
+`keel init` selects it for the project by writing `"outputStyle": "keel:keel terse"` into
+`.claude/settings.json`, so it applies beside the per-request prefix in every keel repository, and
+`/config` selects it for a non-keel one. A teammate without keel loaded gets no error, only no
+style, because Claude Code falls back silently on a style name it cannot resolve. The managed block
+was never an option for either: it sits in every request, and its budget is the tightest in the
+table.
 
 **What it governs.** Chat only. The rule it encodes is that artifact detail and reply length are
 separate dials: a PRD or a plan is as long as its skill requires, and the reply stops restating it.

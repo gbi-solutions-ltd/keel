@@ -83,8 +83,10 @@ their skill requires. Both are dials in `.keel/profile.json`, independent of eac
 `keel init` writes `terse` and `technical` explicitly, so a project with no keys at all is also
 treated as terse and technical. Full behaviour of each value is in
 [`docs/profile-keys.md`](docs/profile-keys.md). The plugin also ships a **keel terse** output
-style, selectable in `/config`; it is machine-wide rather than per-project, so it is the option
-for a non-keel repository.
+style, and `keel init` selects it for the project by writing `"outputStyle": "keel:keel terse"`
+into `.claude/settings.json`, leaving alone a style the file already names. One developer
+overrides it in `.claude/settings.local.json`, which is git-ignored, and a non-keel repository
+selects it in `/config`.
 
 ## Upgrading
 
