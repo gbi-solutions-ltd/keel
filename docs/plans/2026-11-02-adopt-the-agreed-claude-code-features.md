@@ -309,7 +309,7 @@ passes, with `git commit -m "feat(init): select the keel terse output style"`. P
    and `docs/05-token-and-memory-design.md` and the PRD's FR-04, NFR-02 and NFR-05 say five forms
    and that the form depends on the settings file as well as the profile.
 7. The size check covers the new form. Example: `tests/validate-skills.sh` sizes the output with
-   the style set as well as the four profile combinations, and `tests/test-session-start.sh:246`
+   the style set as well as the four profile combinations, and `tests/test-session-start.sh:303`
    measures five forms. The new form is strictly smaller than the terse technical one, so this case
    guards against a regression rather than one that can fail today; say so in your report.
 
@@ -539,6 +539,7 @@ Paste the `git status --porcelain` output into your report.
 
 ## Delivery
 
+- review-code: nothing blocking, no standards violation open (2026-11-02, base 575b3b8, re-review of c23f68d)
 - review-code round 1: 1 blocking (2026-11-02, base 575b3b8)
   - a mutant `if added or style:` to `if added:` survived: no case covered an existing settings file that needed only the output style (lib/harness/claude.sh:374)
 - follow-up:
@@ -551,6 +552,7 @@ Paste the `git status --porcelain` output into your report.
   - consider: decision 2 keeps "Harmless while the repository is private" inside its dated history (docs/07-open-decisions.md)
   - should fix: the CI comment says nothing checks the integrity hash, where npm checks it against registry metadata and the gap is no local pin (.github/workflows/ci.yml)
   - consider: doc 05 still quotes keel 0.17.0 in the version-line paragraph (docs/05-token-and-memory-design.md)
+  - should fix: the CI comment (fixed in c23f68d) still says nothing checks the integrity hash; npm checks it against the registry, and the gap is that no hash is pinned in this repository (.github/workflows/ci.yml:105-106)
+  - consider: the 11f comment says the guard's paths "lead nowhere"; with no profile the hook would read /.claude/ at the filesystem root (tests/test-session-start.sh:167-169)
   - consider: hooks/sensitive-guard claims a hook that cannot start is blocked; only a timeout was probed
-  - should fix: the plan cites tests/test-session-start.sh:246 for the five-form case, now near :303
   - owed: the manifests CI job's first run on the pull request
