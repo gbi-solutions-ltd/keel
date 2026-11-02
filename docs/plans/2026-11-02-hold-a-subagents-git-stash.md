@@ -339,11 +339,11 @@ There is no failing test for this task: it changes records. `tests/test-validate
 
 **Done when:** `tests/run-tests.sh` passes.
 
-- [ ] **Step 3.1: Write the records and run the suite**
+- [x] **Step 3.1: Write the records and run the suite**
 
 Make the edits, then run `tests/run-tests.sh` and quote its summary.
 
-- [ ] **Step 3.2: Hand over**
+- [x] **Step 3.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES; no quality review, review-code covers it
 
 ```bash
 git add docs/decisions/ADR-0016-a-subagents-stash-is-held-by-a-hook.md \

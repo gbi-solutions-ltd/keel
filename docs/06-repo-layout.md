@@ -33,8 +33,8 @@ keel/
 │   │                                   # Auto-discovered from the plugin root
 │   ├── keel-implementer.md             # the profile a plan may route its implementer to (ADR-0008).
 │   │                                   # Same discovery
-│   └── keel-reviewer.md                # the agent type every judging dispatch runs as, which
-│                                       # hooks/review-guard holds (ADR-0010). Claude Code only
+│   └── keel-reviewer.md                # what every judging dispatch runs as. hooks/review-guard holds
+│                                       # its git (ADR-0010) and every subagent's stash (ADR-0016)
 │
 ├── skills/                             # 25 skills, flat namespace
 │   ├── apex-export/

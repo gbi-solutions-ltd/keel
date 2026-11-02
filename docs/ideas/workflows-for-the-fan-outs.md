@@ -85,7 +85,7 @@ never in real use.
 |---|---|---|
 | The one hook-held review guarantee keys on the agent type in the hook input | `hooks/review-guard:12-14`, `:67`; ADR-0010 | Any workflow review is only as safe as the first assumption above |
 | The guard is a speed bump, and leaves reviewer worktree clean-up to the prompt | `docs/decisions/ADR-0010-a-reviewers-git-is-held-by-a-hook.md:112-118` | A workflow does not change either. Both are agent behaviour |
-| No hook refuses an implementer's tree-changing git | `hooks/review-guard:67` acts for `keel:keel-reviewer` only; the three plan notes above | The recorded failures point at a hook, not at orchestration |
+| A hook refuses every subagent the stash-writing forms of `git stash`, and no hook refuses an implementer's other tree-changing git | `hooks/review-guard:152` holds any call with a non-empty `agent_id` to the stash rule (ADR-0016); its full list acts for `keel:keel-reviewer` only (`:67`); the three plan notes above | The recorded failures point at a hook, not at orchestration |
 | Dispatch is already graded where the plugin loads | `tests/plugin-evals/` cases `review-code-dispatches-rubric-subagent` and `review-code-leaves-the-tree-alone` | The inline-review failure is measurable today, without workflows, by running that case more often |
 | The release gate exercises a subagent in one scenario, and loads no plugin | `tests/evals/gate-scenarios:6-8`; `docs/ideas/plugin-delegation-eval-gap.md:37-41` | A workflow path would be covered only by plugin evals, at their cost per run |
 | A workflow script has no filesystem or shell | Workflows page, "Behavior and limits" | Everything `execute-plan` does between dispatches goes through an agent or through `args` |

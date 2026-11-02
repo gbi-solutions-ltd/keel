@@ -24,9 +24,9 @@ Layer 1  HARNESS GATES   hooks registered with the harness
 ```
 
 <!-- keel:claim gate=review-guard harness=claude -->
-Layer 1 is five gates in `.claude/settings.json`, the fifth `review-guard` (ADR-0010). keel serves
-Claude Code only (ADR-0013), and `docs/harness-support.md` lists the gates and the Claude Code
-version each needs.
+Layer 1 is five gates in `.claude/settings.json`, the fifth `review-guard`, which holds a keel
+reviewer's git (ADR-0010) and every subagent's `git stash` (ADR-0016). keel serves Claude Code only
+(ADR-0013), and `docs/harness-support.md` lists the gates and the Claude Code version each needs.
 
 The split matters. Anything the model can rationalise its way out of belongs in Layer 1.
 Anything every session needs belongs in Layer 2 and must stay small and byte-stable so

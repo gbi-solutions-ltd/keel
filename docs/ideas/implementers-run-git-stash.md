@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | Raised by | Bernard, 2026-11-02, as a follow-up: "implementers running git stash. It has recurred three times and no hook covers implementers" |
-| Status | agreed 2026-11-02 by Bernard: any subagent, with open question 1 confirmed |
-| Recommendation | Build something smaller than a second review-guard: refuse the stash-writing forms of `git stash` to every subagent call, and add the rule to the implementer brief. Open question 1 asks Bernard to confirm the reach |
-| Next | `write-plan` (short path) |
+| Status | built 2026-11-02: `hooks/review-guard` refuses every subagent a stash-writing `git stash`, and the implementer brief and agent carry the rule (ADR-0016, `docs/plans/2026-11-02-hold-a-subagents-git-stash.md`) |
+| Recommendation | Build something smaller than a second review-guard: refuse the stash-writing forms of `git stash` to every subagent call, told by a non-empty `agent_id`, and add the rule to the implementer brief. Bernard confirmed the reach in open question 1 |
+| Next | nothing |
 
 ## The problem
 
@@ -46,9 +46,9 @@ reads a command string, so `sh -c "git stash"` or a script still gets through, a
 | Option | What it costs | Why not this |
 |---|---|---|
 | Do nothing | An audit of the stash and tree after each instance, about one every ten days so far | The 2026-09-19 stash held a whole plan's staged work until someone looked. The next one may not be found before a `git stash drop` or a `git stash clear` |
-| Do it manually | Add "never `git stash`" to the implementer brief (`subagent-prompts.md` section 1) and `agents/keel-implementer.md`, neither of which says it today | The 2026-09-19 second instance was told not to and stashed anyway. A prompt binds only as far as the model follows it, the reason `hooks/review-guard:8-10` gives for existing |
+| Do it manually | Add "never `git stash`" to the implementer brief (`subagent-prompts.md` section 1) and `agents/keel-implementer.md`, both of which now say it beside the hook | The 2026-09-19 second instance was told not to and stashed anyway. A prompt binds only as far as the model follows it, the reason `hooks/review-guard:8-10` gives for existing |
 | Buy it | A Claude Code permission rule such as `deny: Bash(git stash:*)` | A permission rule cannot tell a subagent from the main session, so it would also refuse the person their own `git stash`. Matching is on the string, with the same `sh -c` gap as a hook |
-| Build something smaller | Refuse only the stash-writing forms of `git stash` to every call that carries an `agent_type`, and add the rule to the brief | **The recommendation.** See the variants below |
+| Build something smaller | Refuse only the stash-writing forms of `git stash` to every call that carries a non-empty `agent_id`, and add the rule to the brief | **The recommendation.** See the variants below |
 
 **Variants of building it**, kept apart from the alternatives above:
 
@@ -62,7 +62,7 @@ reads a command string, so `sh -c "git stash"` or a script still gets through, a
 
 | Assumption | True if | How we would know | Checked? |
 |---|---|---|---|
-| Every subagent's Bash call carries an `agent_type`, and the main session's never does | The 2026-10-17 probe generalises | `docs/harness-support.md:34`: "no agent_type for the main session, general-purpose for a general-purpose subagent" | **Checked** on 2.1.302 for general-purpose and plugin agents. Not checked for agents a user defines in `.claude/agents/` |
+| Every subagent's Bash call carries a non-empty `agent_id`, and the main session's never does, even when started with `--agent` | The 2026-10-17 probe generalises | `docs/plans/2026-10-17-reviewer-git-guard.md:51-53`: `agent_id` absent for the main session, present for a general-purpose subagent and a plugin agent; `docs/plans/2026-11-02-hold-a-subagents-git-stash.md:197-199`: `claude -p --agent helper` logged `agent_type` `helper` and `agent_id` `None` for the main session | **Checked** on 2.1.302 for general-purpose and plugin agents, and on 2.1.316 for a main session started with `--agent`. An agent a user defines in `.claude/agents/` carries its name as `agent_type` on 2.1.316; its `agent_id` is not recorded |
 | No subagent has a legitimate use for the stash-writing forms | Nothing keel dispatches is told to stash | `grep -rn stash skills agents` finds stash only as something forbidden or the user's call | **Checked** for keel's own prompts. A user's own agents are unknown |
 | `git stash list` and `git stash show` are harmless to allow | They only read | git documentation | Believed, not checked against a case where the reading forms matter |
 | The habit is a model reaching for a baseline, not an adversary | Each report gives a test-isolation or baseline reason | The four plan notes above | **Checked**: the 09-19 reason is test isolation; the others give none |
@@ -79,9 +79,9 @@ report or by an unexpected diff, not by a check.
 
 | Finding | Evidence | What it means for the idea |
 |---|---|---|
-| review-guard's cheap filter passes only the reviewer's calls | The "cheap filter" in `hooks/review-guard` returns at once unless the input names `keel:keel-reviewer` | Widening the scope to every subagent means a check on every subagent Bash call, which is the cost to measure |
+| review-guard's cheap filter passes the reviewer's calls and any call carrying `"agent_type"` whose event contains `stash` | The "cheap filter" at `hooks/review-guard:66-70` returns at once for every other call, without starting `python3` | A subagent's Bash call starts `python3` only when its event names `stash` somewhere, its `cwd` or `transcript_path` included |
 | review-guard already parses where a git command acts and refuses `stash` in any form for the reviewer | `hooks/review-guard:31-36`, and its word list at `:116-119` | The parsing exists. An implementer must keep `add` and `commit` in its own worktree, so the reviewer's list cannot be reused as it stands, only its `stash` entry |
-| The implementer brief and agent carry no stash rule | `skills/execute-plan/references/subagent-prompts.md` section 1 (`:15-84`) and `agents/keel-implementer.md` name `git add` and commit rules only. Stash is forbidden only in the two review prompts (`:100-101`, `:152-153`) | The "do it manually" alternative has never been tried in the standing brief, only in one dispatch on 2026-09-19 |
+| The implementer brief and agent carry a stash rule | `skills/execute-plan/references/subagent-prompts.md` section 1's `=== RULES ===` (`:62-64`) and `agents/keel-implementer.md:23-25` forbid `git stash` other than `list` or `show`, and say a hook refuses it. The two review prompts forbid every `stash` (`:104`, `:156`) | The prompt and the hook state the same line, so a refusal reads as expected |
 | Implementers do commit, in a concurrent batch's private worktree | `skills/write-plan/references/plan-template.md`, "the one exception is a declared concurrent batch" | Any guard for implementers has to leave `commit` alone there. A stash-only guard does |
 | `review-guard` denies, it does not ask | `hooks/review-guard:38-40`, decided by Bernard on 2026-10-17 | The same choice applies here, and a `deny` reaches the agent as a reason it can read |
 
@@ -92,19 +92,20 @@ report or by an unexpected diff, not by a check.
    the scope to weigh on 2026-11-02. Building it means a keel project's own agents, defined by the
    user, lose the stash-writing forms too. The default offered: yes, because the stash is shared by
    every worktree and the refusal reason names the hook, so a user who needs it can see why.
-2. **Which forms are refused?** The default: every form except `list` and `show`, the same line
-   `review-guard` draws.
+2. **Which forms are refused?** Every form except `list` and `show`, judged by the first word after
+   `stash`. That is not the reviewer's line: `review-guard` refuses the reviewer every form of
+   `stash`, `list` and `show` included, and lets other subagents read.
 3. **Does the brief change land first, on its own?** The default: yes, in the same plan, because it
    costs nothing and the hook is not a boundary.
 
 ## Recommendation
 
-**Build something smaller:** refuse the stash-writing forms of `git stash`
-to every call carrying an `agent_type`, and add the never-stash rule to the implementer brief and
+**Build something smaller:** refuse the stash-writing forms of `git stash` to every call carrying a
+non-empty `agent_id`, and add the never-stash rule to the implementer brief and
 `agents/keel-implementer.md`. A hook keyed on the implementer type would have caught none of the four
 instances, a stated rule failed once already, and no boundary check would find a stash. Bernard chose
-this scope knowing it reaches a user's own agents; question 1 asks him to confirm it before the
-plan. Next: `write-plan`, short path.
+this scope knowing it reaches a user's own agents, and confirmed it in question 1. Built 2026-11-02,
+recorded in ADR-0016.
 
 ## Not decided here
 

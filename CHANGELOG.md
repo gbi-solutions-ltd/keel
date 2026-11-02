@@ -9,6 +9,15 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- `hooks/review-guard` refuses every subagent a stash-writing `git stash`, wherever it runs, and
+  allows `git stash list` and `git stash show` (ADR-0016). A subagent is told by a non-empty
+  `agent_id`, so the main session, which carries none even when started with `--agent`, is never
+  touched. A user's own agents lose the stash-writing forms too. The reviewer's rules are unchanged,
+  and `--attr-source` and any option word between `git` and `stash` are now read, the second in the
+  fallback without `python3`.
+- The implementer prompt in `skills/execute-plan/references/subagent-prompts.md` and
+  `agents/keel-implementer.md` say never to run `git stash` other than `list` or `show`, and why;
+  the agent's rules that hold whatever the brief says are five. `tests/test-agents.sh` pins both.
 - `hooks/sensitive-guard` blocks the call when it fails to answer: its `hooks/hooks.json` entry
   carries `"onFailure": "block"`, so a timeout or a hook that cannot start stops the tool call and
   the user retries, where before the call ran. Probed on Claude Code 2.1.316; the capability row
