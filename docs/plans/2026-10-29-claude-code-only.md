@@ -2735,23 +2735,26 @@ at once, was slow enough is inferred.
 1. The holder writes its process id to `<plan>.lock/owner` after taking the lock, and a waiter
    restarts its count of 100 polls each time it reads an owner it has not seen, so it gives up
    only after 100 polls behind one holder. Every release removes `owner` and then the directory.
-   Example: a lock whose `owner` changes every 0.3 seconds for 11 seconds, then is removed, lets a
-   waiting tick land. Before the change the tick gives up after about 10 seconds. The case costs
-   about 11 seconds of suite time.
+   Example: with a shim `sleep` standing in for the clock, one call a poll, a lock whose `owner`
+   changes every 30th poll and is removed at the 150th lets a waiting tick land. Before the change
+   the tick gives up at the 100th poll. The shim takes the wall clock out of the case, which a 12
+   second version left exposed: under load the old code passed it (changed 2026-11-01 from the
+   review).
 2. A lock that stays behind one owner still gives up after 100 polls, naming the lock, and changes
    nothing. Example: the existing stale-lock case, with an `owner` file as a killed tick now leaves
-   one. The message says to remove the directory. This holds today and passes on arrival.
+   one, and a lock with no `owner`, as an older keel leaves it. The message says to remove it with
+   `rm -r`. Both hold today and pass on arrival.
 3. The concurrent-ticks case keeps the ticks' errors and prints them when it fails, so the next
    failure names its cause. No test of its own.
 
 **Done when:** `tests/test-plan.sh` passes, and `tests/validate-citations.sh` reports OK.
 
-- [ ] **Step 21.1: Build it test first**
+- [x] **Step 21.1: Build it test first** Note: built by the coordinator; red seen for the queued-tick case on HEAD's keel, first as a 12s wall-clock case and then, after the review showed old code passing it under load, as a shim sleep counting polls, red under 14 busy CPU loops too; the stale case with an owner and the no-owner case passed on arrival; 150 concurrent ticks: 0 lost in 2 runs, 91 and 101 lost before
 
 Follow `keel:tdd`: write behaviour 1's case and watch it fail, then implement. Behaviour 2 is
 `verify`. Run: `tests/test-plan.sh`, then `tests/run-tests.sh`.
 
-- [ ] **Step 21.2: Hand over**
+- [x] **Step 21.2: Hand over** Note: rounds: 2; routing: inherit; loop: light; review: one should-fix (the wall-clock case passed on old code under load) and five nits, all fixed; re-review: resolved, its missed citation at prune-to-the-target:237 fixed on top
 
 Stage `bin/keel`, `tests/test-plan.sh`, `CHANGELOG.md` and each file whose citation this task
 repaired, by name. The coordinator commits after review, with

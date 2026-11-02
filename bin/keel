@@ -4671,24 +4671,31 @@ plan_batches() {
 # plan_lock <plan>: holds <plan>.lock until plan_unlock, so two ticks on one plan cannot each
 # read it before the other writes and drop one's change, which a concurrent batch's ticks otherwise
 # do. mkdir is the lock because it is atomic on every filesystem keel runs on and needs no flock,
-# which macOS lacks. It waits about ten seconds, then fails naming the lock, because a tick killed
-# with SIGKILL leaves it behind and nothing else would say so. A mkdir that fails with no lock
-# present is retried once, since a lock released between the failed mkdir and the check is not an
-# error; if that fails with still no lock, as in a directory it cannot write, it fails at once.
+# which macOS lacks. The holder writes its process id to `owner` inside it. A waiter gives up after
+# about ten seconds behind one owner, naming the lock, because a tick killed with SIGKILL leaves it
+# behind and nothing else would say so; a new owner restarts the count, because a waiter behind a
+# busy queue is not behind a stale lock, and a count that ignored that lost ticks on a loaded CI
+# runner. A lock with no owner, from a tick killed before writing it, counts as one owner. A mkdir
+# that fails with no lock present is retried once, since a lock released between the failed mkdir
+# and the check is not an error; if that fails with still no lock, as in a directory it cannot
+# write, it fails at once.
 plan_lock() {
-    local n=0
+    local n=0 owner seen=""
     until mkdir "$1.lock" 2>/dev/null; do
         if [ ! -e "$1.lock" ]; then
             mkdir "$1.lock" 2>/dev/null && break
             [ -e "$1.lock" ] || die "cannot create $1.lock, so the plan cannot be locked: check its \
 directory is writable"
         fi
+        owner=""; { read -r owner < "$1.lock/owner"; } 2>/dev/null
+        [ -n "$owner" ] && [ "$owner" != "$seen" ] && { seen="$owner"; n=0; }
         n=$((n + 1))
-        [ "$n" -lt 100 ] || die "$1.lock is held by another keel plan tick. If none is running, one was killed: remove $1.lock"
+        [ "$n" -lt 100 ] || die "$1.lock is held by another keel plan tick. If none is running, one was killed: remove it with rm -r $1.lock"
         sleep 0.1
     done
+    { printf '%s\n' "$$" > "$1.lock/owner"; } 2>/dev/null
     PLAN_LOCK="$1.lock"
-    trap 'rmdir "$PLAN_LOCK" 2>/dev/null' EXIT
+    trap 'rm -f "$PLAN_LOCK/owner"; rmdir "$PLAN_LOCK" 2>/dev/null' EXIT
     trap 'exit 130' INT TERM
 }
 
@@ -4697,6 +4704,7 @@ directory is writable"
 # 20 concurrent ticks landed until the traps were cleared first.
 plan_unlock() {
     trap - EXIT INT TERM
+    rm -f "$PLAN_LOCK/owner"
     rmdir "$PLAN_LOCK"
 }
 

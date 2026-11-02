@@ -111,6 +111,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
   The hook does not read which paths an `add` names, so an `add` of a harmless file widens too.
 - `hooks/done-guard` warns on a transcript whose rows parse and none has a Claude Code shape,
   saying the turn was not checked. It read such a transcript as a clean turn and said nothing.
+- `keel plan tick` waiting on a plan's lock gives up only after about ten seconds behind one holder,
+  read from an `owner` file the holder writes in the lock. It gave up after ten seconds however
+  many holders it queued behind, so a batch of concurrent ticks on a busy machine lost ticks.
 
 ## 0.26.0 - 2026-10-22
 

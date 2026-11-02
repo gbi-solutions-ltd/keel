@@ -623,23 +623,65 @@ out="$("$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
 p="$d/batch.md"
 { printf '# A plan\n\n'; i=1; while [ "$i" -le 20 ]; do printf -- '- [ ] **Step 1.%s: a step**\n' "$i"; i=$((i+1)); done; } > "$p"
 i=1
-while [ "$i" -le 20 ]; do "$KEEL" plan tick "$p" "1.$i" >/dev/null 2>&1 & i=$((i+1)); done
+# Their errors are kept, so a failure names its cause: one on CI showed only a count.
+while [ "$i" -le 20 ]; do "$KEEL" plan tick "$p" "1.$i" >/dev/null 2>>"$d/batch.err" & i=$((i+1)); done
 wait
 n="$(grep -c '^- \[x\] \*\*Step 1\.' "$p")"
 [ "$n" -eq 20 ] && [ ! -e "$p.lock" ] \
   && ok "twenty ticks started together all land, and the lock is gone after" \
-  || bad "concurrent ticks" "$n of 20 landed; lock left: $([ -e "$p.lock" ] && echo yes || echo no)"
+  || bad "concurrent ticks" "$n of 20 landed; lock left: $([ -e "$p.lock" ] && echo yes || echo no); \
+errors: $(sort "$d/batch.err" | uniq -c | tr '\n' ' ')"
 
-# A lock left by a killed tick: the tick waits, then names the lock and changes nothing.
+# A busy queue is not a stale lock: a waiter counts its polls only behind one holder, so it lands
+# however many it waited behind. A shim sleep stands in for the clock, one call a poll, so a loaded
+# machine cannot stretch the count: every 30th call writes a new owner, as a queue of holders would,
+# and the 150th releases the lock, past the 100 polls a waiter gives one holder. Without
+# KEEL_TEST_ROTATE it only counts, a holder that never changes.
+sl="$d/sleepshim"
+mkdir "$sl"
+# Resolved before PATH holds the shim, or the shim finds itself and never sleeps.
+real_sleep="$(command -v sleep)"
+# shellcheck disable=SC2016  # the shim's own variables, expanded when it runs
+printf '%s\n' '#!/bin/sh' 'n=0; [ -f "$KEEL_TEST_POLLS" ] && read -r n < "$KEEL_TEST_POLLS"' \
+  'n=$((n + 1)); echo "$n" > "$KEEL_TEST_POLLS"' \
+  'if [ -n "$KEEL_TEST_ROTATE" ] && [ $((n % 30)) -eq 0 ]; then echo "$n" > "$KEEL_TEST_LOCK/owner"; fi' \
+  'if [ -n "$KEEL_TEST_ROTATE" ] && [ "$n" -ge 150 ]; then' \
+  '  rm -f "$KEEL_TEST_LOCK/owner"; rmdir "$KEEL_TEST_LOCK"; fi' \
+  'exec "$KEEL_TEST_SLEEP" 0.01' > "$sl/sleep"
+chmod 755 "$sl/sleep"
+p="$d/queue.md"
+mkplan "$p" '- [ ] **Step 1.1: a**'
+mkdir "$p.lock"; echo 1 > "$p.lock/owner"
+out="$(PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/queue.polls" \
+  KEEL_TEST_LOCK="$p.lock" KEEL_TEST_ROTATE=1 "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
+[ "$rc" -eq 0 ] && grep -qxF -e '- [x] **Step 1.1: a**' "$p" && [ ! -e "$p.lock" ] \
+  && ok "a tick behind a lock changing hands waits for it, past 100 polls" \
+  || bad "queued tick" "rc=$rc out=$out"
+
+# A lock with no owner, as an older keel or a tick killed before writing one leaves it, counts as
+# one holder: the tick gives up after 100 polls, naming the lock, and changes nothing.
+p="$d/noowner.md"
+mkplan "$p" '- [ ] **Step 1.1: a**'
+cp "$p" "$d/noowner.before"
+mkdir "$p.lock"
+out="$(PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/noowner.polls" \
+  "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && cmp -s "$p" "$d/noowner.before" && case "$out" in *"$p.lock"*) true ;; *) false ;; esac \
+  && ok "tick facing a lock with no owner gives up naming it, and changes nothing" \
+  || bad "lock with no owner" "rc=$rc out=$out"
+rmdir "$p.lock"
+
+# A lock left by a killed tick, with the owner it wrote: the tick waits, then names the lock and
+# changes nothing.
 p="$d/stale.md"
 mkplan "$p" '- [ ] **Step 1.1: a**'
 cp "$p" "$d/stale.before"
-mkdir "$p.lock"
+mkdir "$p.lock"; echo 12345 > "$p.lock/owner"
 out="$("$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
 [ "$rc" -ne 0 ] && cmp -s "$p" "$d/stale.before" && case "$out" in *"$p.lock"*) true ;; *) false ;; esac \
   && ok "tick facing a held lock gives up naming it, and changes nothing" \
   || bad "stale lock" "rc=$rc out=$out"
-rmdir "$p.lock"
+rm -f "$p.lock/owner"; rmdir "$p.lock"
 
 # A lock that cannot be created is not a lock that is held: waiting ten seconds and then blaming a
 # killed tick sends the reader after a lock that does not exist. Root can write any directory.

@@ -465,8 +465,8 @@ rather than read as a plan without ids.
 reason. Parking replaces anything after the title, a note included, and a reason must start with a
 non-blank character, since `plan status` reads one that starts with a space, tab or CR as missing.
 Ticks on one plan take turns through a lock, the directory `<plan>.lock`, so a concurrent batch's
-ticks all land. A tick waits about ten seconds for it, then fails naming it, since a killed tick can
-leave it behind.
+ticks all land. A tick fails naming the lock once one holder, named in the lock's `owner` file,
+has kept it about ten seconds, since a killed tick can leave it behind.
 
 ```bash
 keel plan report <plan> [--json]

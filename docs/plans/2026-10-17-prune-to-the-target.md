@@ -234,7 +234,7 @@ owed for this body: `tdd-under-deadline`, run by the coordinator after the batch
    (`:502-503`) and `repo-snapshot`'s Step 6 (`:627-630`). Example: `git diff` shows no line above
    the closing `---` of `skills/execute-plan/SKILL.md` changing. Step 4's tick paragraph is pinned
    word for word by case 25 of `tests/test-eval-harness.sh` (`tests/test-eval-harness.sh:480-481`),
-   and `tests/test-plan.sh:3013-3044` matches whole lines of Step 4 with `grep -F`. That paragraph
+   and `tests/test-plan.sh:3055-3086` matches whole lines of Step 4 with `grep -F`. That paragraph
    stays in the body exactly as it is, line breaks included. The Step 1 table that
    `references/preconditions.md:11-17` repeats may be deleted by behaviour 4 only if that reference
    states every row in full and the step keeps a one-line instruction and its link.
@@ -433,7 +433,7 @@ task.
    the closing `---` of `skills/ship/SKILL.md` changing. The schema markers `verify.format_fix`,
    `profile.conventions.commit_style` and `gates.security_audit` stay in the body, so the
    `format_fix` exception is not moved as step detail. Gate item 7 is matched line by line with
-   `grep -F` by `tests/test-plan.sh:3035-3044`, so it stays in the body exactly as it is, line
+   `grep -F` by `tests/test-plan.sh:3077-3086`, so it stays in the body exactly as it is, line
    breaks included.
 9. If behaviours 3 to 5 together cannot bring the body under 700, the task stops: the body is left
    as it stands, uncommitted in this task's worktree, and the report gives the count, the shortfall
