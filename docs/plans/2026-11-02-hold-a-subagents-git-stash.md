@@ -383,8 +383,8 @@ passes, with `git commit -m "docs: record that every subagent's stash is held by
    the environment is still judged by the parser. Example: `hooks/review-guard` no longer sets
    `KEEL_EVENT`; python3 is started with the script as an argument (`-c`) or from a file, and reads
    the event from stdin; every existing case in `tests/test-review-guard.sh` still passes. (Added
-   by a fix pass after review: a 1.1 MB event, its padding in `tool_input.description`, is refused by the parser in
-   under half a second.)
+   by a fix pass after review: a 1.1 MB event, its padding in `tool_input.description`, is refused
+   by the parser in under half a second.)
 2. The reviewer's rules apply only to a subagent too: an event with `agent_type`
    `keel:keel-reviewer` and no `agent_id` is a main session started as `--agent keel:keel-reviewer`
    and is never touched. Example: that event running `git stash list` or `git commit -m x` prints
@@ -445,6 +445,10 @@ The coordinator commits after both review passes, with
 **Files:**
 - Modify: `docs/decisions/ADR-0016-a-subagents-stash-is-held-by-a-hook.md`
 - Modify: `docs/ideas/implementers-run-git-stash.md`
+- Modify: `docs/ideas/workflows-for-the-fan-outs.md` (the row near `:86` that says the guarantee
+  keys on the agent type)
+- Modify: `tests/test-harness-resolve.sh` (the comment saying `pretooluse_agent_type` alone sets the
+  2.1.302 minimum)
 - Modify: `CHANGELOG.md`
 
 **Depends on:** task 4
@@ -458,6 +462,10 @@ The coordinator commits after both review passes, with
    it reads that the reviewer is refused every form of `stash` and other subagents may run
    `list` and `show`, with no sentence framed as a correction.
 3. `CHANGELOG.md`'s Unreleased entry for the guard says the reviewer is held only as a subagent.
+4. Task 4's review found three more sentences made wrong. Example: ADR-0016 and the idea record say
+   "a non-empty `agent_id` string" where they say the subagent test; the workflows row says the
+   guarantee keys on `agent_id`; the `tests/test-harness-resolve.sh` comment names both
+   `pretooluse_agent_type` and `pretooluse_agent_id` as setting the 2.1.302 minimum.
 
 There is no failing test for this task: it changes records. `tests/test-validate-citations.sh`,
 `tests/test-doc-claims.sh` and `tests/test-harness-claims.sh` check what can be checked.
@@ -472,7 +480,8 @@ Make the edits, then run `tests/run-tests.sh` and quote its summary.
 
 ```bash
 git add docs/decisions/ADR-0016-a-subagents-stash-is-held-by-a-hook.md \
-        docs/ideas/implementers-run-git-stash.md CHANGELOG.md
+        docs/ideas/implementers-run-git-stash.md docs/ideas/workflows-for-the-fan-outs.md \
+        tests/test-harness-resolve.sh CHANGELOG.md
 git status --porcelain
 ```
 
