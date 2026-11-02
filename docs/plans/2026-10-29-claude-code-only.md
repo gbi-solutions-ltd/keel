@@ -2666,8 +2666,9 @@ matching every untracked path, and `files()`'s own 10 second `subprocess` timeou
    `:(top).keel/profile.json`, so git lists only candidates and `judge` still decides. git's
    pathspec matching without glob magic lets `*` cross `/` as `fnmatch` does, so it lists every
    file `matches` takes: checked on 22 patterns (`**`, brackets, `?`, a backslash, a leading `-`,
-   `:` or `/`, a space) on macOS git 2.50, one platform. Examples: a shim git recording its
-   arguments sees `:(top)src/auth` and `:(top).keel/profile.json` after `--` for
+   `:` or `/`, a space) on macOS git 2.50, then on 64 patterns, case twins and NFC and NFD names on
+   Linux git 2.39 and 2.54, case-sensitive, with no miss (2026-11-02). Examples: a shim git
+   recording its arguments sees `:(top)src/auth` and `:(top).keel/profile.json` after `--` for
    `git add -A && git commit -m x`, and no `:/`; an untracked `.keel/profile.json` in a repository
    whose profile was never committed still asks naming the profile. Before the change the first
    fails (the read passes `:/`); the second passes on arrival.
