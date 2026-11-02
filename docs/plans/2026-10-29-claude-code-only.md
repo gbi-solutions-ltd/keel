@@ -2671,11 +2671,20 @@ matching every untracked path, and `files()`'s own 10 second `subprocess` timeou
    `git add -A && git commit -m x`, and no `:/`; an untracked `.keel/profile.json` in a repository
    whose profile was never committed still asks naming the profile. Before the change the first
    fails (the read passes `:/`); the second passes on arrival.
-2. Every git call shares one deadline, 8 seconds after the Python part starts, inside the hook's 10.
-   A call that outlasts it asks, saying git did not answer within the hook's time, not that git
-   could not run. Example: a shim git whose `ls-files` sleeps 30 seconds asks within the deadline
-   with that message. Before the change it asks after 10 seconds saying git could not be run. The
-   case costs one deadline, about 8 seconds, of suite time.
+2. Every git call and the matching share one deadline, 7 seconds after the Python part starts,
+   inside the hook's 10, leaving 3 for the bash before it (over a second on a loaded machine).
+   Running out asks, saying the guard ran out of the hook's time, not that git could not run.
+   Examples: a shim git whose `ls-files` sleeps 30 seconds asks in under 10 seconds with that
+   message; a shim git listing three million candidates under a declared path does the same.
+   Before the change the first asks after 10 seconds saying git could not be run, and the second
+   after about a minute. Each case costs one deadline, about 7 seconds, of suite time. (Matching
+   under the deadline and 7 rather than 8 seconds were added 2026-11-01 from the review.)
+2b. A pattern holding `[` or `\` is not handed to git, which reads `[^...]`, `[[:class:]]` and `\`
+   unlike `fnmatch`: the read lists the whole tree, as `:/` did, and the deadline bounds it. git
+   runs without any `GIT_*_PATHSPECS` variable, which changes how it reads every pathspec.
+   Examples: `secrets/[^.]*` with an untracked `secrets/.env` asks naming it; `*.pem` with an
+   untracked `a/k.pem` and `GIT_NOGLOB_PATHSPECS=1` in the session asks naming it. Before the change
+   both print nothing. (Added 2026-11-01 from the review.)
 3. The hook header, `docs/07-open-decisions.md` and the `CHANGELOG.md` sentence stop saying an
    untracked file passes on a very large tree, and say a git that outlasts the hook's time asks.
    `docs/07` keeps its line count or repoints its later citations by content. The reader's check.
@@ -2685,14 +2694,14 @@ matching every untracked path, and `files()`'s own 10 second `subprocess` timeou
 the no-hit `git add -A && git commit -m x` finishes under the deadline with one plain pattern, 15,
 and one wildcard pattern (`*.pem`) that makes git walk the whole tree.
 
-- [ ] **Step 20.1: Build it test first**
+- [x] **Step 20.1: Build it test first** Note: built by the coordinator; red seen for the pathspec and deadline cases; the untracked-profile case passed on arrival and went red with its pathspec removed; the review's cases red first (3M matching 66s, bracket pattern and GIT_NOGLOB_PATHSPECS silent); 1M fixture HEAD vs new: 15 patterns 14.70s vs 0.15s, *.pem 2.63s vs 0.75s, a bracket pattern asks at 7.13s
 
 Follow `keel:tdd` for behaviours 1 and 2: write each case, watch the first case of behaviour 1 and
 the case of behaviour 2 fail for the reason named, then implement. Behaviour 1's second case is
 `verify`. Run: `tests/test-sensitive-guard.sh`, then `tests/test-plan.sh`, then the fixture
 timings, then `tests/run-tests.sh`.
 
-- [ ] **Step 20.2: Hand over**
+- [x] **Step 20.2: Hand over** Note: rounds: 2; routing: inherit; loop: full; review: one blocking (matching outside the deadline) and three should-fix, all fixed red first; re-review: none blocking, its citation and changelog points fixed on top; the timeout cases timed to the millisecond after one unexplained failure in a reviewer's loaded run
 
 Stage `hooks/sensitive-guard`, `tests/test-sensitive-guard.sh`, `CHANGELOG.md`,
 `docs/07-open-decisions.md` and each file whose citation this task repaired, by name. The

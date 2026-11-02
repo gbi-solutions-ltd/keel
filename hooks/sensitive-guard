@@ -25,10 +25,10 @@
 # gate people delete, and the commit is where the change stops being private to the session. It
 # reads the staged set and what these commit unstaged: tracked changes against HEAD for -a, --all,
 # -p, --patch, --pathspec-from-file, a pathspec or a `git add`, `stage`, `rm` or `mv` alongside,
-# and untracked files not ignored for an `add` or `stage`, read last because it is slow on a big
-# tree. Git shows no change for these before they run, so they pass: a `git rm` or `git mv` of an
-# unmodified file, a `git mv` into a declared path and a `git add -f` of an ignored file. On a very
-# large tree an untracked file passes too, once reading them all outlasts the hook's timeout.
+# and untracked files not ignored for an `add` or `stage`, read last and filtered by git. Git shows
+# no change for these before they run, so they pass: a `git rm` or `git mv` of an unmodified file,
+# a `git mv` into a declared path and a `git add -f` of an ignored file. Running out of the hook's
+# time, in git or in matching, asks, rather than the hook being killed with no answer.
 #
 # ITS LIMIT, STATED RATHER THAN DISCOVERED. It reads a command string, so `sh -c`, an alias or a
 # here-doc reaches a commit without passing through here, exactly as the
@@ -200,8 +200,19 @@ fi
 
 KEEL_EVENT="$event" KEEL_PROFILE_TEXT="$profile_text" KEEL_HEAD_PROFILE_TEXT="$head_text" \
 KEEL_PROFILE_UNREADABLE="$unreadable" KEEL_DIR="$dir" python3 - <<'PY'
-import json, os, shlex, subprocess, sys
+import json, os, shlex, subprocess, sys, time
 from fnmatch import fnmatch
+
+# Claude Code kills this hook at its 10 second timeout in hooks.json, and a killed hook gives no
+# answer, so the command runs. Every git call and the matching share a deadline inside that, leaving
+# 3 seconds for the bash before this, which took over a second on a loaded machine, and the answer
+# after. Running out asks.
+DEADLINE = time.monotonic() + 7
+
+def out_of_time():
+    emit("this repository declares hard_block_paths and the guard ran out of the hook's time, so "
+         "it cannot tell whether this commit touches a sensitive path. Approving is a human "
+         "decision.")
 
 def emit(reason):
     print(json.dumps({"hookSpecificOutput": {
@@ -320,10 +331,17 @@ while i < len(rest):
 def files(*args):
     # -z, because splitting git's output on whitespace tears `src/auth/two words/k.go` into two
     # paths, and it stops git quoting anything unusual. A non-zero exit is not "nothing changed":
-    # git missing, a locked index or a timeout would otherwise read as a clean commit.
+    # git missing, a locked index or a timeout would otherwise read as a clean commit. The
+    # GIT_*_PATHSPECS variables are dropped, since one in the session changes how git reads every
+    # pathspec: GIT_NOGLOB_PATHSPECS made `*.pem` a literal name and hid the files it declares.
+    env = {k: v for k, v in os.environ.items() if not (k.startswith("GIT_")
+                                                        and k.endswith("_PATHSPECS"))}
     try:
-        r = subprocess.run(["git", args[0], "-z"] + list(args[1:]),
-                           cwd=os.environ["KEEL_DIR"], capture_output=True, text=True, timeout=10)
+        r = subprocess.run(["git", args[0], "-z"] + list(args[1:]), env=env,
+                           cwd=os.environ["KEEL_DIR"], capture_output=True, text=True,
+                           timeout=max(DEADLINE - time.monotonic(), 0.01))
+    except subprocess.TimeoutExpired:
+        out_of_time()
     except (OSError, subprocess.SubprocessError):
         emit("this repository declares hard_block_paths and git could not be run, so the guard "
              "cannot tell whether this commit touches a sensitive path. Approving is a human "
@@ -348,8 +366,14 @@ def matches(f, p):
     return fnmatch(f, p) or fnmatch(f, p + "/*")
 
 def judge(changed):
-    hit = sorted({f for f in changed for p in patterns if matches(f, p)}) if start is not None \
-        else []
+    hit = set()
+    for k, f in enumerate(changed if start is not None else ()):
+        # Matching a million paths outlasts the hook, so it keeps to the deadline too.
+        if k % 1000 == 0 and time.monotonic() > DEADLINE:
+            out_of_time()
+        if any(matches(f, p) for p in patterns):
+            hit.add(f)
+    hit = sorted(hit)
     if hit:
         shown = ", ".join(hit[:5]) + (" and %d more" % (len(hit) - 5) if len(hit) > 5 else "")
         emit("this commit includes %d file(s) under hard_block_paths: %s. Decision 3 makes this "
@@ -369,10 +393,19 @@ if unreadable:
     emit(unreadable + ". The guard cannot tell whether this commit touches a sensitive path. "
          "Approving is a human decision.")
 # A `git add` or `git stage` can also add a file git does not track yet, which `git diff HEAD` does
-# not list; `git rm` and `git mv` cannot, so they do not read them. This runs after every other ask
-# because it is slow on a big tree: matching a million untracked files takes seconds, and a hook
-# killed at its 10 second timeout gives no answer. `--full-name` and `:/` list the whole repository
-# root-relative, as `git diff` does: from a subdirectory git lists only the files under it.
+# not list; `git rm` and `git mv` cannot, so they do not read them. It runs after every other ask,
+# and git, not Python, filters it, because matching each of a million untracked paths here outlasted
+# the hook. Each declared pattern goes to git as a pathspec, with the `/*` that `matches` adds, and
+# git matches `*` across `/` as fnmatch does, so it lists every file `matches` takes and `judge`
+# still decides. The profile goes too, since `judge` asks about it. git reads `[^...]`,
+# `[[:class:]]` and `\` unlike fnmatch, so a pattern holding `[` or `\` lists the whole tree, as
+# `:/` does, and the deadline bounds it. `:(top)` reads each from the root from any directory, and
+# `--full-name` prints root-relative paths, as `git diff` does.
 if adds and start is not None:
-    judge(files("ls-files", "--others", "--exclude-standard", "--full-name", ":/"))
+    specs = [":(top)" + q + s for q in sorted({p.rstrip("/") for p in patterns}) if q
+             for s in ("", "/*")]
+    if any("[" in p or "\\" in p for p in patterns):
+        specs = [":/"]
+    judge(files("ls-files", "--others", "--exclude-standard", "--full-name", "--",
+                ":(top).keel/profile.json", *specs))
 PY

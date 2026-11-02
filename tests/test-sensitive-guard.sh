@@ -560,6 +560,77 @@ asks "$out" && printf '%s' "$out" | grep -q 'src/auth/t\.go' \
     && ! printf '%s' "$out" | grep -q 'new\.go'
 verdict "a tracked hit asks before untracked files are read" $? "$out"
 rm -rf "$r"
+# The untracked read hands git the declared patterns, and the profile, as pathspecs, so git filters
+# a big tree: matching every one of a million untracked paths in Python outlasted the hook's time.
+r="$(mktemp -d)"; untracked_fixture "$r"; shim="$(mktemp -d)"
+# shellcheck disable=SC2016  # the shim's own arguments, expanded when it runs
+printf '#!/bin/sh\nprintf "%%s\\n" "$*" >> "%s/argv"\nexec "%s" "$@"\n' "$shim" "$(command -v git)" \
+    > "$shim/git"; chmod +x "$shim/git"
+event 'git add -A && git commit -m x' "$r" \
+    | ( cd "$r" && PATH="$shim:$PATH" env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) >/dev/null 2>&1
+line="$(grep '^ls-files' "$shim/argv")"
+case "$line" in
+    *' -- '*':(top)src/auth '*) case "$line" in
+        *':(top).keel/profile.json'*) case "$line" in *' :/'*) false ;; *) true ;; esac ;;
+        *) false ;; esac ;;
+    *) false ;;
+esac
+verdict "the untracked read passes the declared paths and the profile to git as pathspecs" $? "$line"
+rm -rf "$r" "$shim"
+# A profile never committed is untracked, and a staging commit adds it, so the pathspecs carry it.
+r="$(mktemp -d)"; mkdir -p "$r/.keel" "$r/src/ui"; git -C "$r" init -q
+git -C "$r" config user.email t@example.com; git -C "$r" config user.name Test
+: > "$r/src/ui/a.tsx"; git -C "$r" add src/ui/a.tsx; git -C "$r" commit -qm init
+printf '{"hard_block_paths": ["src/auth"]}\n' > "$r/.keel/profile.json"
+out="$(event 'git add -A && git commit -m x' "$r" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
+asks "$out" && printf '%s' "$out" | grep -q 'profile\.json'
+verdict "a staging commit of a profile never committed asks naming the profile" $? "$out"
+rm -rf "$r"
+# Claude Code kills the hook at its 10 second timeout and the commit goes through, so git gets a
+# deadline inside that, and one that outlasts it asks. The case costs that deadline in suite time.
+# Timed to the millisecond, because bash's SECONDS counts whole seconds and a 9.2 second run can
+# read as 10.
+now() { python3 -c 'import time; print("%.3f" % time.time())'; }
+within10() { python3 -c 'import sys; sys.exit(float(sys.argv[2]) - float(sys.argv[1]) >= 10)' "$1" "$(now)"; }
+r="$(mktemp -d)"; untracked_fixture "$r"; shim="$(mktemp -d)"
+# shellcheck disable=SC2016  # the shim's own arguments, expanded when it runs
+printf '#!/bin/sh\n[ "$1" = ls-files ] && exec sleep 30\nexec "%s" "$@"\n' "$(command -v git)" \
+    > "$shim/git"; chmod +x "$shim/git"
+t0="$(now)"
+out="$(event 'git add -A && git commit -m x' "$r" | ( cd "$r" && PATH="$shim:$PATH" env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
+asks "$out" && printf '%s' "$out" | grep -q "ran out of the hook's time" && within10 "$t0"
+verdict "git outlasting the hook's deadline asks inside the hook's 10 seconds, saying so" $? \
+    "$out"
+rm -rf "$r" "$shim"
+# Matching is held to the same deadline: git can return a million candidates under a declared path,
+# and matching them outlasted the hook. The shim returns three million at once.
+r="$(mktemp -d)"; untracked_fixture "$r"; shim="$(mktemp -d)"
+printf '{"hard_block_paths": [%s"data"]}\n' "$(printf '"p%s", ' 1 2 3 4 5 6 7 8 9 10 11 12 13 14)" \
+    > "$r/.keel/profile.json"; git -C "$r" commit -qam profile
+# shellcheck disable=SC2016  # the shim's own arguments, expanded when it runs
+printf '#!/bin/sh\n[ "$1" = ls-files ] && exec python3 -c %s\nexec "%s" "$@"\n' \
+    "'import sys; sys.stdout.write(\"data/x\\0\" * 3000000)'" "$(command -v git)" \
+    > "$shim/git"; chmod +x "$shim/git"
+t0="$(now)"
+out="$(event 'git add -A && git commit -m x' "$r" | ( cd "$r" && PATH="$shim:$PATH" env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
+asks "$out" && printf '%s' "$out" | grep -q "ran out of the hook's time" && within10 "$t0"
+verdict "matching three million candidates asks inside the hook's 10 seconds, saying so" $? \
+    "$out"
+rm -rf "$r" "$shim"
+# git reads `[^...]`, `[[:class:]]` and `\` in a pattern unlike fnmatch, so such a pattern is not
+# handed to git as a pathspec: fnmatch takes `[^.]` as `^` or `.`, and git as anything but `.`.
+r="$(mktemp -d)"; fixture "$r" '"secrets/[^.]*"'; mkdir "$r/secrets"; : > "$r/secrets/.env"
+out="$(event 'git add -A && git commit -m x' "$r" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
+asks "$out" && printf '%s' "$out" | grep -q 'secrets/\.env'
+verdict "a bracket pattern git reads differently still sees the untracked file it names" $? "$out"
+rm -rf "$r"
+# A GIT_*_PATHSPECS variable in the session changes how git reads every pathspec, so git runs
+# without them: GIT_NOGLOB_PATHSPECS made `*.pem` a literal name.
+r="$(mktemp -d)"; fixture "$r" '"*.pem"'; mkdir "$r/a"; : > "$r/a/k.pem"
+out="$(event 'git add -A && git commit -m x' "$r" | ( cd "$r" && GIT_NOGLOB_PATHSPECS=1 env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
+asks "$out" && printf '%s' "$out" | grep -q 'a/k\.pem'
+verdict "GIT_NOGLOB_PATHSPECS in the session does not hide an untracked file" $? "$out"
+rm -rf "$r"
 
 # A hard_block_paths that is present and not a list of strings is an unparseable profile. A string
 # was iterated character by character, so `"src/auth"` declared s, r, c and so on, and a commit

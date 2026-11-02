@@ -105,9 +105,10 @@ Entries are terse by design; the narrative for each release is in this file's gi
   are not ignored, so a new file it adds is seen. These still pass, because git shows no change for
   them before the command runs: a `git rm` or `git mv` of an unmodified file, a `git mv` into a
   declared path and a `git add -f` of an ignored file. The untracked read runs after every other
-  ask, so it never delays one, but on a very large tree an untracked file passes once reading them
-  all outlasts the hook's timeout. The hook does not read which paths an `add` names, so an `add`
-  of a harmless file widens too.
+  ask, with git listing only files a declared path could match unless a pattern holds `[` or `\`,
+  which git reads unlike fnmatch; git and the matching share a deadline inside the hook's timeout,
+  asking when it runs out rather than being killed with no answer.
+  The hook does not read which paths an `add` names, so an `add` of a harmless file widens too.
 - `hooks/done-guard` warns on a transcript whose rows parse and none has a Claude Code shape,
   saying the turn was not checked. It read such a transcript as a clean turn and said nothing.
 
