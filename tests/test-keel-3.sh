@@ -426,6 +426,23 @@ sys.exit(0 if json.load(open('$d5/.claude/settings.json')).get('outputStyle')=='
   || bad "output style" "init replaced the user's outputStyle"
 rm -rf "$d5"
 
+# A file that already carries every guardrail adds no rule, so the style alone has to make the merge
+# write. Every other merge fixture also adds rules and would pass with the write gated on rules only.
+d6="$(fixture node-ts)"
+mkdir -p "$d6/.claude"
+DENY="$( . "$ROOT/lib/harness/claude.sh" && keel_deny_rules )" \
+ASK="$( . "$ROOT/lib/harness/claude.sh" && keel_ask_rules )" python3 -c "
+import json,os
+json.dump({'permissions': {'deny': os.environ['DENY'].splitlines(), 'ask': os.environ['ASK'].splitlines()}},
+          open('$d6/.claude/settings.json','w'))"
+( cd "$d6" && "$KEEL" init -y >/dev/null 2>&1 )
+python3 -c "
+import json,sys
+sys.exit(0 if json.load(open('$d6/.claude/settings.json')).get('outputStyle')=='keel:keel terse' else 1)" 2>/dev/null \
+  && ok "a settings file with every guardrail already still gains the output style" \
+  || bad "output style" "merge wrote nothing when only outputStyle was missing"
+rm -rf "$d6"
+
 # Re-running must not accumulate duplicates: doctor compares against the same lists.
 ( cd "$d2" && "$KEEL" init -y >/dev/null 2>&1 )
 python3 -c "

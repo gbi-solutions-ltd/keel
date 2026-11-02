@@ -164,9 +164,11 @@ settings "$tmp/s5" settings.json '{"outputStyle": "keel:keel terse"}'
 mkdir -p "$tmp/s5/src/deep"
 check "the style set is found from a subdirectory" "$tmp/s5/src/deep" none
 
-# 11f. No profile, nothing read: settings without a .keel/ beside them do not count.
+# 11f. Pins the default form only. With no profile the hook has no .keel/ to read settings beside,
+# so the guard at hooks/session-start:130 is not observable by a test: replacing it with `true`
+# still passes, because the paths it builds lead nowhere. Kept for the default form it pins.
 settings "$tmp/s6" settings.json '{"outputStyle": "keel:keel terse"}'
-check "with no profile the settings files are not read" "$tmp/s6" brief
+check "with no profile the default brevity form is injected" "$tmp/s6" brief
 
 # 11g. The user-level file is not read. The style set only there duplicates the rule, which costs 56
 # tokens and is the safe direction. HOME is swapped in this shell, not a subshell, so the counters

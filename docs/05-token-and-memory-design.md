@@ -321,7 +321,7 @@ carries the block also carries however many tokens the model chooses to write ba
 the `.claude/settings.json` and `.claude/settings.local.json` beside the profile, so there are five
 forms and not two. The local file wins when it sets the key, and the user-level settings file in
 the home directory is not read. Every form also carries the loaded plugin's version since
-2026-09-02. Measured 2026-11-02 against `VERSION` 0.17.0:
+2026-09-02. Measured 2026-11-02 against `VERSION` 0.27.0:
 
 | `response_style` | `explain_level` | Injected | Chars | Tokens |
 | --- | --- | --- | --- | --- |

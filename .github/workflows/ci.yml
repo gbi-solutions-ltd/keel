@@ -102,8 +102,9 @@ jobs:
   # root CLAUDE.md is this repository's development guide, not shipped context, and --strict turns
   # the warning that it is not loaded as project context into an error; the marketplace check has
   # no such warning and runs --strict. Claude Code is pinned by an exact version, not by hash as
-  # the ruff install is, so a release cannot turn this red on its own but a replaced tarball on the
-  # registry is not caught. It installs under the runner's temp directory and uses no secret.
+  # the ruff install is, so a release cannot turn this red on its own, but nothing checks the
+  # tarball's integrity hash and `npm install` runs the package's lifecycle (postinstall) scripts.
+  # It installs under the runner's temp directory and uses no secret.
   manifests:
     name: Plugin manifests
     runs-on: ubuntu-latest

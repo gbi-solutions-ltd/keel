@@ -536,3 +536,21 @@ Paste the `git status --porcelain` output into your report.
   why; each Done when line names lint where the task edits shell.
 - **Not in this plan:** items 5 to 8 of the idea record, and the implementer `git stash` question,
   which is `docs/ideas/implementers-run-git-stash.md`.
+
+## Delivery
+
+- review-code round 1: 1 blocking (2026-11-02, base 575b3b8)
+  - a mutant `if added or style:` to `if added:` survived: no case covered an existing settings file that needed only the output style (lib/harness/claude.sh:374)
+- follow-up:
+  - should fix: the ledger row for onFailure mixes vendor and probe evidence (lib/harness/capabilities)
+  - consider: the exact-row ledger test breaks on re-verification (tests/test-harness-claims.sh)
+  - consider: the others check excludes sensitive-guard on every event, not only PreToolUse/Bash (tests/test-harness-claims.sh)
+  - consider: "keel:keel terse" is written three times in lib/harness/claude.sh; the python3-absent message does not name the style
+  - consider: the session-start settings read uses the .claude/ beside the profile, which can differ from Claude Code's project root (hooks/session-start)
+  - consider: doc 04's "Never a hard failure" sits beside the new dependency cost (docs/04-plugin-strategy.md)
+  - consider: decision 2 keeps "Harmless while the repository is private" inside its dated history (docs/07-open-decisions.md)
+  - should fix: the CI comment says nothing checks the integrity hash, where npm checks it against registry metadata and the gap is no local pin (.github/workflows/ci.yml)
+  - consider: doc 05 still quotes keel 0.17.0 in the version-line paragraph (docs/05-token-and-memory-design.md)
+  - consider: hooks/sensitive-guard claims a hook that cannot start is blocked; only a timeout was probed
+  - should fix: the plan cites tests/test-session-start.sh:246 for the five-form case, now near :303
+  - owed: the manifests CI job's first run on the pull request
