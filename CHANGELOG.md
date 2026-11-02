@@ -11,10 +11,12 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 - `hooks/review-guard` refuses every subagent a stash-writing `git stash`, wherever it runs, and
   allows `git stash list` and `git stash show` (ADR-0016). A subagent is told by a non-empty
-  `agent_id`, so the main session, which carries none even when started with `--agent`, is never
-  touched. A user's own agents lose the stash-writing forms too. The reviewer's rules are unchanged,
-  and `--attr-source` and any option word between `git` and `stash` are now read, the second in the
-  fallback without `python3`.
+  `agent_type` and a non-empty `agent_id` string, so the main session, which carries no `agent_id`
+  even when started with `--agent`, is never touched. A user's own agents lose the stash-writing
+  forms too. The reviewer is held to its rules only as a subagent, so a main session started as
+  `--agent keel:keel-reviewer` is not. The event reaches `python3` on stdin, `--attr-source` and any
+  option word between `git` and `stash` are read, the second in the fallback without `python3`, and
+  the ledger records `pretooluse_agent_id`, which the guard requires, at 2.1.302.
 - The implementer prompt in `skills/execute-plan/references/subagent-prompts.md` and
   `agents/keel-implementer.md` say never to run `git stash` other than `list` or `show`, and why;
   the agent's rules that hold whatever the brief says are five. `tests/test-agents.sh` pins both.

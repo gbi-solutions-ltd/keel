@@ -6,7 +6,7 @@
 | Date | 2026-11-02 |
 | Deciders | Bernard Tebandeke, decided 2026-11-02 |
 | Requirements | none; driver is [`docs/ideas/implementers-run-git-stash.md`](../ideas/implementers-run-git-stash.md) |
-| Supersedes | none; extends [ADR-0010](ADR-0010-a-reviewers-git-is-held-by-a-hook.md), whose reviewer rule stands unchanged |
+| Supersedes | none; extends [ADR-0010](ADR-0010-a-reviewers-git-is-held-by-a-hook.md), whose reviewer rule now holds the reviewer only as a subagent |
 
 ## Context
 
@@ -38,7 +38,7 @@ session's. On 2026-11-02, Claude Code 2.1.316, an agent defined in a project's `
 carried its own name as `agent_type`, and `claude -p --agent helper` logged `agent_type` `helper`
 and `agent_id` `None` for the main session's own Bash call
 (`docs/plans/2026-11-02-hold-a-subagents-git-stash.md:202-204`). So `agent_type` alone does not
-mean a subagent, and a non-empty `agent_id` does.
+mean a subagent, and a non-empty `agent_id` string does.
 
 The dominant force: the stash is shared by every worktree, so a stash made by any subagent anywhere
 can hide a task's whole diff from the coordinator, and no check finds it afterwards.
@@ -46,14 +46,18 @@ can hide a task's whole diff from the coordinator, and no check finds it afterwa
 ## Decision
 
 **`hooks/review-guard` refuses every subagent a stash-writing `git stash`, wherever the command
-runs, and tells a subagent by a non-empty `agent_id` in its PreToolUse input.** A `git stash` is
-allowed to a subagent only when the first word after `stash`, which is its subcommand as git reads
-it, is `list` or `show`, so `git stash -m list` is a push and is refused. Every other git command a
-subagent runs is left alone, because an implementer keeps `add` and `commit` in its own worktree.
-The reviewer's rules from ADR-0010 stand, keyed on `agent_type` `keel:keel-reviewer`, and refuse it
-every form of `stash`. The main session carries no `agent_id`, with or without `--agent`, and is
-never touched. Without `python3`, the fallback refuses any `git stash` whose following word is not
-`list` or `show`, reading any option words between `git` and `stash`. The implementer prompt
+runs, and tells a subagent by its PreToolUse input carrying a non-empty `agent_type` and a non-empty
+`agent_id` string.** A `git stash` is allowed to a subagent only when the first word after `stash`,
+which is its subcommand as git reads it, is `list` or `show`, so `git stash -m list` is a push and
+is refused. Every other git command a subagent runs is left alone, because an implementer keeps
+`add` and `commit` in its own worktree. The reviewer's rules from ADR-0010 stand for the subagent
+whose `agent_type` is `keel:keel-reviewer`, and refuse it every form of `stash`. Both rules key on
+`agent_id`: the main session carries none, with or without `--agent`, so it is never touched, and a
+main session started as `--agent keel:keel-reviewer` is not held to the reviewer's rules. The hook
+hands the event to `python3` on stdin, so an event too large for the environment is still judged by
+the parser. Without `python3`, the fallback applies the same two tests and the exact reviewer name,
+and refuses any `git stash` whose following word is not `list` or `show`, reading any option words
+between `git` and `stash`. The implementer prompt
 (`skills/execute-plan/references/subagent-prompts.md` section 1) and `agents/keel-implementer.md`
 carry the same rule, with its reason.
 
@@ -89,7 +93,7 @@ refused its own `git stash`.
 **Why the chosen option won:** the harm is the shared stash, not an implementer's git in general,
 and it is the same whoever dispatched the subagent. `agent_id` is the one field that marks every
 subagent and no main session, so the narrowest rule that would have caught all four instances is the
-stash's writing forms for any call carrying it.
+stash's writing forms for any call carrying a non-empty `agent_id` string.
 
 ## Consequences
 
@@ -101,19 +105,24 @@ with `git add` and `git commit`.
 the stash-writing forms in a project with keel installed. The refusal names `keel review-guard`, so
 the user can see where it comes from. The cheap filter in `hooks/review-guard` passes every call
 that carries `"agent_type"` and contains `stash` anywhere in its event, including its `cwd` or
-`transcript_path`, so those calls start `python3`. The reviewer rule keys on `agent_type`, so a
-main session started as `--agent keel:keel-reviewer` gets the reviewer's rules. The capability
-ledger's `requires` row for `review-guard` names `pretooluse_agent_type`, which records the
-2026-10-17 probe; no row names `agent_id` on its own.
+`transcript_path`, so those calls start `python3`. The capability ledger's `requires` rows for
+`review-guard` name `pretooluse_agent_type` and `pretooluse_agent_id`. The `agent_id` row is stamped
+2.1.302, the version of the 2026-10-17 probe that first saw the field, so keel's minimum stays
+2.1.302.
 
 **It is a speed bump, not a security boundary**, as ADR-0010 says of the reviewer rule. `sh -c "git
-stash"`, an alias or a script reaches git without passing through the hook.
+stash"`, an alias or a script reaches git without passing through the hook. It states two more
+limits, both erring toward refusing. It reads every `git` word and every heredoc body as a command,
+so a subagent's `echo git stash`, or a heredoc body that names `git stash`, is refused. The
+fallback without `python3` takes any word starting with `-` between `git` and the subcommand as an
+option, for the reviewer's word list as for a subagent's stash, so an option it does not know can
+only make it refuse more.
 
 **What this forecloses.** Little. The rule is one branch in an existing hook; removing it returns
 the stash to the prompt.
 
 **What must be true for this to keep working.** That Claude Code keeps putting a non-empty
-`agent_id` in every subagent's PreToolUse input and none in the main session's, including one
+`agent_id` string in every subagent's PreToolUse input and none in the main session's, including one
 started with `--agent`. `agent_id` was observed for a `general-purpose` subagent and a plugin agent
 on 2.1.302. For an agent defined in `.claude/agents/`, a non-empty `agent_id` was observed on
 2.1.316, 2026-11-02, with `agent_type` `helper`
@@ -126,9 +135,12 @@ on 2.1.302. For an agent defined in `.claude/agents/`, a non-empty `agent_id` wa
 `stash push`, `stash pop`, `stash apply`, `stash drop`, `stash clear`, `stash -u` and `stash -m
 list` are refused, and its `stash list` and `stash show` allowed. With `python3` off the `PATH` its
 `git stash` is refused and its `stash list` allowed. A user-defined `helper` agent is refused. An
-event with `agent_type` `helper` and no `agent_id`, or an empty one, is allowed `git stash`. The
-reviewer is refused `git stash list` with or without an `agent_id`. Some cases run the hook under
-`/bin/bash` by name.
+event with `agent_type` `helper` and no `agent_id`, an empty one, or the number 7, is allowed `git
+stash`. An event with `agent_type` `keel:keel-reviewer` and no `agent_id` is allowed `git stash
+list` and `git commit -m x`, and the same event with an `agent_id` is refused both, with and
+without `python3`. Without `python3`, a subagent whose `agent_type` is `we"ird` is refused `git
+stash`. A subagent's `git stash` in an event past 1 MB is refused by the parser, and a subagent's
+`echo git stash` is refused, a stated limit. Some cases run the hook under `/bin/bash` by name.
 
 Holding if no implementer's stash turns up in a plan's notes or in `git stash list` at a task
 boundary. Not holding if a subagent's stash-writing `git stash` runs without a refusal, or if the

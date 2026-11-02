@@ -4,7 +4,7 @@
 |---|---|
 | Raised by | Bernard, 2026-11-02, as a follow-up: "implementers running git stash. It has recurred three times and no hook covers implementers" |
 | Status | built 2026-11-02: `hooks/review-guard` refuses every subagent a stash-writing `git stash`, and the implementer brief and agent carry the rule (ADR-0016, `docs/plans/2026-11-02-hold-a-subagents-git-stash.md`) |
-| Recommendation | Build something smaller than a second review-guard: refuse the stash-writing forms of `git stash` to every subagent call, told by a non-empty `agent_id`, and add the rule to the implementer brief. Bernard confirmed the reach in open question 1 |
+| Recommendation | Build something smaller than a second review-guard: refuse the stash-writing forms of `git stash` to every subagent call, told by a non-empty `agent_id` string, and add the rule to the implementer brief. Bernard confirmed the reach in open question 1 |
 | Next | nothing |
 
 ## The problem
@@ -48,7 +48,7 @@ reads a command string, so `sh -c "git stash"` or a script still gets through, a
 | Do nothing | An audit of the stash and tree after each instance, about one every ten days so far | The 2026-09-19 stash held a whole plan's staged work until someone looked. The next one may not be found before a `git stash drop` or a `git stash clear` |
 | Do it manually | Add "never `git stash`" to the implementer brief (`subagent-prompts.md` section 1) and `agents/keel-implementer.md`, both of which now say it beside the hook | The 2026-09-19 second instance was told not to and stashed anyway. A prompt binds only as far as the model follows it, the reason `hooks/review-guard:8-10` gives for existing |
 | Buy it | A Claude Code permission rule such as `deny: Bash(git stash:*)` | A permission rule cannot tell a subagent from the main session, so it would also refuse the person their own `git stash`. Matching is on the string, with the same `sh -c` gap as a hook |
-| Build something smaller | Refuse only the stash-writing forms of `git stash` to every call that carries a non-empty `agent_id`, and add the rule to the brief | **The recommendation.** See the variants below |
+| Build something smaller | Refuse only the stash-writing forms of `git stash` to every call that carries a non-empty `agent_id` string, and add the rule to the brief | **The recommendation.** See the variants below |
 
 **Variants of building it**, kept apart from the alternatives above:
 
@@ -92,16 +92,17 @@ report or by an unexpected diff, not by a check.
    the scope to weigh on 2026-11-02. Building it means a keel project's own agents, defined by the
    user, lose the stash-writing forms too. The default offered: yes, because the stash is shared by
    every worktree and the refusal reason names the hook, so a user who needs it can see why.
-2. **Which forms are refused?** Every form except `list` and `show`, judged by the first word after
-   `stash`. That is not the reviewer's line: `review-guard` refuses the reviewer every form of
-   `stash`, `list` and `show` included, and lets other subagents read.
+2. **Which forms are refused?** Two rules, one for each kind of subagent. `review-guard` refuses
+   the reviewer every form of `stash`, `list` and `show` included. Every other subagent is refused
+   every form except `list` and `show`, judged by the first word after `stash`, so it may run
+   `git stash list` and `git stash show`.
 3. **Does the brief change land first, on its own?** The default: yes, in the same plan, because it
    costs nothing and the hook is not a boundary.
 
 ## Recommendation
 
 **Build something smaller:** refuse the stash-writing forms of `git stash` to every call carrying a
-non-empty `agent_id`, and add the never-stash rule to the implementer brief and
+non-empty `agent_id` string, and add the never-stash rule to the implementer brief and
 `agents/keel-implementer.md`. A hook keyed on the implementer type would have caught none of the four
 instances, a stated rule failed once already, and no boundary check would find a stash. Bernard chose
 this scope knowing it reaches a user's own agents, and confirmed it in question 1. Built 2026-11-02,

@@ -472,11 +472,11 @@ There is no failing test for this task: it changes records. `tests/test-validate
 
 **Done when:** `tests/run-tests.sh` passes.
 
-- [ ] **Step 5.1: Write the records and run the suite**
+- [x] **Step 5.1: Write the records and run the suite**
 
 Make the edits, then run `tests/run-tests.sh` and quote its summary.
 
-- [ ] **Step 5.2: Hand over**
+- [x] **Step 5.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES; consider: ADR-0016 attaches the 2.1.302 stamp to the requires rows where it is the provides row that carries it; ADR-0010 left as written, ADR-0016 records the change
 
 ```bash
 git add docs/decisions/ADR-0016-a-subagents-stash-is-held-by-a-hook.md \
