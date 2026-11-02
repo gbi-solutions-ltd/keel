@@ -120,5 +120,26 @@ else
     fi
 fi
 
+# An implementer is told never to stash, in its agent body and in the brief every routing sends.
+# On 2026-09-19 a subagent's stash held a whole plan's staged diff while status read clean, and the
+# stash is shared by every worktree. Only section 1's RULES block is read: the review prompts in the
+# same file already name `git stash`, so a grep over the whole file would pass with the rule gone.
+if [ -f "$impl" ] && grep -q 'git stash' "$impl"; then
+    ok "keel-implementer names the git stash rule"
+else
+    bad "keel-implementer names the git stash rule" "$impl does not name \`git stash\`"
+fi
+prompts=skills/execute-plan/references/subagent-prompts.md
+rules="$(awk '/^=== RULES ===$/{r=1} /^=== REPORT ===$/{if(r) exit} r' "$prompts")"
+if [ -z "$rules" ]; then
+    bad "the implementer prompt's RULES name the git stash rule" \
+        "no \`=== RULES ===\` block found in $prompts"
+elif grep -q 'git stash' <<<"$rules"; then
+    ok "the implementer prompt's RULES name the git stash rule"
+else
+    bad "the implementer prompt's RULES name the git stash rule" \
+        "section 1's RULES block of $prompts does not name \`git stash\`"
+fi
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

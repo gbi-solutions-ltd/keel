@@ -243,6 +243,11 @@ The coordinator commits after both review passes, with
 - Modify: `skills/execute-plan/references/subagent-prompts.md` (section 1, the implementer prompt's
   `=== RULES ===`)
 - Modify: `agents/keel-implementer.md`
+- Modify: `tests/evals/scenarios/commit-outside-a-worktree.md`,
+  `tests/evals/scenarios/implement-a-five-step-task.md`,
+  `tests/evals/scenarios/implement-a-two-step-task.md` and
+  `tests/evals/scenarios/implement-a-batched-task.md` (added during execution: each carries section
+  1's `=== RULES ===` block verbatim, which `tests/test-eval-harness.sh` checks)
 - Test: `tests/test-agents.sh`
 
 **Depends on:** none
@@ -266,7 +271,7 @@ The coordinator commits after both review passes, with
 
 **Done when:** `tests/test-agents.sh` and `tests/validate-skills.sh` pass.
 
-- [ ] **Step 2.1: Build it test first**
+- [x] **Step 2.1: Build it test first**
 
 Follow `keel:tdd` for behaviour 3: add the case to `tests/test-agents.sh`, run it, and watch it fail
 because neither file names `git stash` for the implementer. Then add the two rules.
@@ -277,7 +282,7 @@ output in your report.
 Run: `tests/run-tests.sh`
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 
-- [ ] **Step 2.2: Hand over**
+- [x] **Step 2.2: Hand over** Note: rounds: 2; routing: inherit; loop: light; first pass left tests/test-eval-harness.sh red (four eval scenarios carry the RULES block verbatim), so the coordinator added them to the Files list and a fix pass copied the rule in; spec COMPLIES; no quality review, review-code covers it
 
 ```bash
 git add skills/execute-plan/references/subagent-prompts.md agents/keel-implementer.md \

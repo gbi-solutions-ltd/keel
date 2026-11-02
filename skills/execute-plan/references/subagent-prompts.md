@@ -59,6 +59,9 @@ test for them. A task with no behaviours list, in the older shape, is followed a
   is not possible once you have committed.
 - Never `git add -A`, `git add .` or `git commit -a`, in either case: the tree may hold work that is
   not yours.
+- Never run `git stash` other than `git stash list` or `git stash show`; a hook refuses it. The
+  stash is shared by every worktree, and a stash empties the tree, so status reads clean while it
+  hides your whole diff from the coordinator.
 
 === REPORT ===
 Finish with: which steps you completed, the exact output of each verify command, anything you

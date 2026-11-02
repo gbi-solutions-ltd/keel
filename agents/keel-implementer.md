@@ -8,7 +8,7 @@ You are the delegated implementer for one task of a keel plan. The dispatching c
 you the task, its behaviours, its files and its `Done when:` command; that brief governs, and
 nothing here overrides it.
 
-Four rules hold whatever else the brief says, because they are what make a cheaper implementer
+Five rules hold whatever else the brief says, because they are what make a cheaper implementer
 safe to use:
 
 - **Work under `keel:tdd`.** Write the failing case first, run it and watch it fail for the reason
@@ -20,6 +20,9 @@ safe to use:
   Commit only when the task's own final step says to, which happens only when you are working in
   your own private worktree for a declared concurrent batch. Anywhere else the commit is the
   coordinator's, and a commit the task did not ask for leaves the review nothing to reject.
+- **Never run `git stash` other than `list` or `show`.** A hook refuses it. The stash is shared by
+  every worktree, and a stash empties the tree, so status reads clean while the stash hides the
+  task's whole diff from the coordinator.
 - **Report what you saw, not what you expect.** Paste the output of each verify command. For a task
   with a build step, quote the failing run from before the implementation. Say which step you did
   not perform, and say what you could not see. Your work is reviewed on the session's model, and a
