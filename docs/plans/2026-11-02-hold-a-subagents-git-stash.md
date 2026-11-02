@@ -109,7 +109,7 @@ Every task inherits these.
    `keel review-guard`.
 2. The two reading forms are allowed to it, read as git reads them: only the first word after
    `stash` is a subcommand, so the test is that word, not the first non-option word (`action` at
-   `hooks/review-guard:355` is the latter, and would read `git stash -m list` as `list`). Example:
+   `hooks/review-guard:405` is the latter, and would read `git stash -m list` as `list`). Example:
    `git stash list` and `git stash show -p stash@{0}` from `general-purpose` print nothing and exit
    0.
 3. The forms the parser already follows are followed for it too. Example: from `general-purpose`,
@@ -152,7 +152,7 @@ their own worktrees), and that the main session is never touched.
 
 **Done when:** `tests/test-review-guard.sh` passes, and the profile's lint command passes.
 
-- [ ] **Step 1.1: Build it test first**
+- [x] **Step 1.1: Build it test first**
 
 Follow `keel:tdd` for behaviours 1 to 7 in `tests/test-review-guard.sh`, using its existing event
 builder, with an agent type other than `-` and other than the reviewer's, and turn
@@ -169,7 +169,7 @@ Run: `tests/run-tests.sh`
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 1.2: Hand over**
+- [x] **Step 1.2: Hand over** Note: rounds: 1; routing: inherit; loop: full; spec COMPLIES; quality nothing blocking; a coordinator probe after it showed a main session started with --agent carries agent_type, which the staged rule would refuse, so task 1b keys on agent_id and also takes the --attr-source and fallback gaps; committed rather than discarded because the rest of the work stands, a departure from the full loop recorded here; the implementer ran a read-only git stash list against its dispatch
 
 ```bash
 git add hooks/review-guard tests/test-review-guard.sh
@@ -180,6 +180,59 @@ Stage exactly those paths, plus any doc whose citation you repaired, and stop. *
 The coordinator commits after both review passes, with
 `git commit -m "feat(review-guard): refuse a stash-writing git stash to every subagent"`. Paste the
 `git status --porcelain` output into your report.
+
+---
+
+### Task 1b: tell a subagent from the main session by `agent_id`, and close two parser gaps
+
+**Story:** task 1's quality review, 2026-11-02, and a probe the coordinator ran after it
+**Files:**
+- Modify: `hooks/review-guard`
+- Test: `tests/test-review-guard.sh`
+
+**Depends on:** task 1
+
+**Behaviours:**
+
+1. A main session started with `--agent` is never touched. Probe, Claude Code 2.1.316, 2026-11-02:
+   `claude -p --agent helper` logged `agent_type` `'helper'` and `agent_id` `None` for the main
+   session's own Bash call, so `agent_type` alone does not mean a subagent. The stash rule applies
+   only when the event carries a non-empty `agent_id`, on the python path and in the fallback.
+   Example: an event with `agent_type` `helper` and no `agent_id` running `git stash` prints nothing
+   and exits 0; the same event with an `agent_id` is refused. The reviewer's rules keep keying on
+   `agent_type`, unchanged.
+2. `--attr-source` takes a value, so `git --attr-source HEAD stash` is read as a stash. Example: from
+   a subagent it is refused; from the reviewer, `git --attr-source HEAD commit -m x` is refused.
+3. The fallback reads any option word between `git` and `stash`, so it can only refuse more.
+   Example: with python3 off the PATH, a subagent's `git -P stash`, `git --bare stash` and
+   `git --namespace n stash` are refused, and `git -P stash list` is allowed.
+
+The header comment says the subagent test is `agent_id`, and why (the `--agent` probe).
+
+**Done when:** `tests/test-review-guard.sh` passes, and the profile's lint command passes.
+
+- [ ] **Step 1b.1: Build it test first**
+
+Follow `keel:tdd` for behaviours 1 to 3 in `tests/test-review-guard.sh`; the event builder gains an
+`agent_id` the subagent cases set. Run it and watch behaviour 1's main-session case, behaviour 2 and
+behaviour 3's refusals fail. Then change the hook and its header.
+Run: `tests/test-review-guard.sh`
+Expected before the implementation: FAIL on those cases. Expected after: PASS. Quote the failing
+output in your report.
+
+Run: `tests/run-tests.sh`
+Expected: PASS, or reds this task did not cause, each named.
+
+- [ ] **Step 1b.2: Hand over**
+
+```bash
+git add hooks/review-guard tests/test-review-guard.sh
+git status --porcelain
+```
+
+Stage exactly those paths, plus any doc whose citation you repaired, and stop. **Do not commit.**
+The coordinator commits after both review passes, with
+`git commit -m "fix(review-guard): key the stash rule on agent_id, and read two more git forms"`.
 
 ---
 
@@ -246,12 +299,13 @@ passes, with `git commit -m "docs(execute-plan): tell the implementer never to s
 - Modify: `docs/07-open-decisions.md` (section 3, the sentence on `hooks/review-guard`)
 - Modify: `docs/01-architecture.md` (the layer 1 sentence naming `review-guard`)
 - Modify: `docs/06-repo-layout.md` (the `review-guard` comment)
-- Modify: `docs/ideas/implementers-run-git-stash.md` (Status, Next, open question 2)
+- Modify: `docs/ideas/implementers-run-git-stash.md` (Status, Next, open question 2, and the
+  "cheap filter passes only the reviewer's calls" finding)
 - Modify: `docs/ideas/workflows-for-the-fan-outs.md` (`:88`, "No hook refuses an implementer's
   tree-changing git")
 - Modify: `CHANGELOG.md` (an Unreleased section)
 
-**Depends on:** tasks 1 and 2
+**Depends on:** tasks 1, 1b and 2
 
 **Behaviours:**
 

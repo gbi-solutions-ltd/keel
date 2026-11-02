@@ -46,7 +46,7 @@ reads a command string, so `sh -c "git stash"` or a script still gets through, a
 | Option | What it costs | Why not this |
 |---|---|---|
 | Do nothing | An audit of the stash and tree after each instance, about one every ten days so far | The 2026-09-19 stash held a whole plan's staged work until someone looked. The next one may not be found before a `git stash drop` or a `git stash clear` |
-| Do it manually | Add "never `git stash`" to the implementer brief (`subagent-prompts.md` section 1) and `agents/keel-implementer.md`, neither of which says it today | The 2026-09-19 second instance was told not to and stashed anyway. A prompt binds only as far as the model follows it, the reason `hooks/review-guard:6-8` gives for existing |
+| Do it manually | Add "never `git stash`" to the implementer brief (`subagent-prompts.md` section 1) and `agents/keel-implementer.md`, neither of which says it today | The 2026-09-19 second instance was told not to and stashed anyway. A prompt binds only as far as the model follows it, the reason `hooks/review-guard:8-10` gives for existing |
 | Buy it | A Claude Code permission rule such as `deny: Bash(git stash:*)` | A permission rule cannot tell a subagent from the main session, so it would also refuse the person their own `git stash`. Matching is on the string, with the same `sh -c` gap as a hook |
 | Build something smaller | Refuse only the stash-writing forms of `git stash` to every call that carries an `agent_type`, and add the rule to the brief | **The recommendation.** See the variants below |
 
@@ -80,10 +80,10 @@ report or by an unexpected diff, not by a check.
 | Finding | Evidence | What it means for the idea |
 |---|---|---|
 | review-guard's cheap filter passes only the reviewer's calls | The "cheap filter" in `hooks/review-guard` returns at once unless the input names `keel:keel-reviewer` | Widening the scope to every subagent means a check on every subagent Bash call, which is the cost to measure |
-| review-guard already parses where a git command acts and refuses `stash` in any form for the reviewer | `hooks/review-guard:16-21`, and its word list at `:75-78` | The parsing exists. An implementer must keep `add` and `commit` in its own worktree, so the reviewer's list cannot be reused as it stands, only its `stash` entry |
+| review-guard already parses where a git command acts and refuses `stash` in any form for the reviewer | `hooks/review-guard:28-33`, and its word list at `:109-112` | The parsing exists. An implementer must keep `add` and `commit` in its own worktree, so the reviewer's list cannot be reused as it stands, only its `stash` entry |
 | The implementer brief and agent carry no stash rule | `skills/execute-plan/references/subagent-prompts.md` section 1 (`:15-84`) and `agents/keel-implementer.md` name `git add` and commit rules only. Stash is forbidden only in the two review prompts (`:100-101`, `:152-153`) | The "do it manually" alternative has never been tried in the standing brief, only in one dispatch on 2026-09-19 |
 | Implementers do commit, in a concurrent batch's private worktree | `skills/write-plan/references/plan-template.md`, "the one exception is a declared concurrent batch" | Any guard for implementers has to leave `commit` alone there. A stash-only guard does |
-| `review-guard` denies, it does not ask | `hooks/review-guard:23-25`, decided by Bernard on 2026-10-17 | The same choice applies here, and a `deny` reaches the agent as a reason it can read |
+| `review-guard` denies, it does not ask | `hooks/review-guard:35-37`, decided by Bernard on 2026-10-17 | The same choice applies here, and a `deny` reaches the agent as a reason it can read |
 
 ## Open questions
 

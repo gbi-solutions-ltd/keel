@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2016  # commands are single-quoted, so $TMPDIR and $wt reach the hook
 # Tests for hooks/review-guard, which refuses a keel reviewer the git commands that would change the
-# author's checkout or the state every worktree shares. Task 1 of
-# docs/plans/2026-10-17-reviewer-git-guard.md, behaviours 2 to 6, one case per example there.
+# author's checkout or the state every worktree shares, and refuses every other subagent a
+# stash-writing `git stash`. Task 1 of docs/plans/2026-10-17-reviewer-git-guard.md, behaviours 2 to
+# 6, and task 1 of docs/plans/2026-11-02-hold-a-subagents-git-stash.md, behaviours 1 to 7, one case
+# per example there.
 #
 # Every case feeds the hook a PreToolUse event as JSON on stdin, as tests/test-sensitive-guard.sh
 # feeds its hook, and asserts on what it prints. A refusal is checked by its JSON and an allowance
@@ -89,7 +91,8 @@ shim="$(mktemp -d)"
 ln -s "$(command -v bash)" "$shim/bash"
 # pyfail is made further down; it is named here, empty until then, so an early exit still cleans it.
 pyfail=""
-trap 'rm -rf "$repo" "$tmprepo" "$shim" ${pyfail:+"$pyfail"}' EXIT
+pyrec=""
+trap 'rm -rf "$repo" "$tmprepo" "$shim" ${pyfail:+"$pyfail"} ${pyrec:+"$pyrec"}' EXIT
 
 if [ -x "$GUARD" ]; then ok "hooks/review-guard exists and is executable"
 else bad "hooks/review-guard exists and is executable" "missing or not executable, so every allow below proves nothing"; fi
@@ -103,12 +106,13 @@ if [ -x /bin/bash ]; then
     expect_deny "under /bin/bash ($(/bin/bash -c 'echo "$BASH_VERSION"')), git stash is refused"
 fi
 
-# --- behaviour 2: nobody but a keel reviewer is touched -----------------------------------------
+# --- behaviour 2: the main session is never touched, and every other subagent loses the stash ---
 # The main session's calls carry no agent_type at all, and it must never be blocked: it is the
-# author and the coordinator.
+# author and the coordinator. A subagent that is not the reviewer is refused the stash and nothing
+# else; its cases are in their own section below.
 allow "the main session's git stash is untouched"          -                   'git stash' "$repo"
-allow "a general-purpose agent's git stash is untouched"   general-purpose     'git stash' "$repo"
-allow "keel-fanout's git stash is untouched"               keel:keel-fanout    'git stash' "$repo"
+deny  "a general-purpose agent's git stash is refused"     general-purpose     'git stash' "$repo"
+deny  "keel-fanout's git stash is refused"                 keel:keel-fanout    'git stash' "$repo"
 
 # --- behaviour 3: shared state is refused wherever it runs --------------------------------------
 deny  "git stash list && git stash is refused"             "$REVIEWER" 'git stash list && git stash' "$repo"
@@ -305,8 +309,8 @@ reason_has "the tree reason names the command"           'git reset'
 reason_has "the tree reason says where to work instead"  'cd <worktree> &&'
 
 # Without python3 it cannot read the JSON, so it falls back to a word check on the raw input, and
-# only when that input says the agent type is a keel reviewer: it cannot tell a reviewer from
-# anyone else otherwise, and must not block the main session.
+# only when that input carries an agent_type field: the full word list when it names a keel
+# reviewer, the stash alone for any other subagent, and nothing for the main session.
 ev="$(event "$REVIEWER" 'git stash' "$repo")"
 run "$ev" "$repo" PATH="$shim"
 expect_deny "without python3 a reviewer's git stash is refused"
@@ -367,6 +371,70 @@ run '{"agent_type":"keel:keel-reviewer","tool_input":{"command":"git diff"' "$re
 expect_allow "unparseable input naming the reviewer allows git diff"
 run '{"tool_input":{"command":"git stash"' "$repo"
 expect_allow "unparseable input not naming the reviewer is untouched"
+
+# --- every other subagent: the stash alone ------------------------------------------------------
+# Task 1 of docs/plans/2026-11-02-hold-a-subagents-git-stash.md. Implementers ran `git stash` on a
+# shared tree four times; the stash is shared by every worktree, so it is refused to any subagent.
+SUB=general-purpose
+# Behaviour 1: every stash-writing form is refused, in the subagent's own wording.
+for c in 'git stash' 'git stash push -m x' 'git stash pop' 'git stash apply' 'git stash drop' \
+         'git stash clear' 'git stash -u' 'git stash -m list'; do
+    deny "a subagent's $c is refused" "$SUB" "$c" "$repo"
+done
+deny       "a subagent's git stash, for the reason check"     "$SUB" 'git stash' "$repo"
+reason_has "the subagent reason says the stash is shared"     'shared by every worktree'
+reason_has "the subagent reason names keel review-guard"      'keel review-guard'
+r="$(reason)"
+if [ -n "$r" ] && [[ $r != *"keel reviewer"* ]]; then ok "the subagent reason is its own, not the reviewer's"
+else bad "the subagent reason is its own, not the reviewer's" "${r:0:160}"; fi
+# Behaviour 2: the two reading forms, read as git reads them, by the first word after `stash`.
+allow "a subagent's git stash list is allowed"                "$SUB" 'git stash list' "$repo"
+allow "a subagent's git stash show -p stash@{0} is allowed"   "$SUB" 'git stash show -p stash@{0}' "$repo"
+# Behaviour 3: the forms the parser follows are followed for a subagent too.
+for c in 'cd /tmp/x && git stash' 'git -C /tmp/x stash' 'env A=1 git stash' 'git status && git stash'; do
+    deny "a subagent's $c is refused" "$SUB" "$c" "$repo"
+done
+# Behaviour 4: nothing else changes, and an agent type a user defined is a subagent like any other.
+for c in 'git add a.txt' 'git commit -m x' 'git reset --hard' 'git checkout -b x'; do
+    allow "a subagent's $c is allowed" "$SUB" "$c" "$repo"
+done
+deny  "a user-defined agent's git stash is refused"           helper 'git stash' "$repo"
+# Behaviour 5: the main session and the reviewer are unchanged.
+deny  "the reviewer's git stash list is still refused"        "$REVIEWER" 'git stash list' "$repo"
+if [ -x /bin/bash ]; then
+    run "$(event "$SUB" 'git stash' "$repo")" "$repo" /bin/bash
+    expect_deny "under /bin/bash, a subagent's git stash is refused"
+    run "$(event "$SUB" 'git stash list && git stash' "$repo")" "$repo" PATH="$shim" /bin/bash
+    expect_deny "under /bin/bash without python3, a subagent's git stash list && git stash is refused"
+    run "$(event "$SUB" 'git stash list' "$repo")" "$repo" PATH="$shim" /bin/bash
+    expect_allow "under /bin/bash without python3, a subagent's git stash list is allowed"
+fi
+# Behaviour 6: the fallback holds the same line.
+for c in 'git stash' 'git stash list && git stash' $'git stash list\ngit stash'; do
+    run "$(event "$SUB" "$c" "$repo")" "$repo" PATH="$shim"
+    expect_deny "without python3 a subagent's $c is refused"
+done
+run "$(event "$SUB" 'git stash' "$repo")" "$repo" PATH="$shim"
+reason_has  "and the fallback's subagent reason says the stash is shared" 'shared by every worktree'
+for c in 'git stash list' 'git commit -m x'; do
+    run "$(event "$SUB" "$c" "$repo")" "$repo" PATH="$shim"
+    expect_allow "without python3 a subagent's $c is allowed"
+done
+run "$(event - "echo '\"agent_type\": \"general-purpose\"'; git stash" "$repo")" "$repo" PATH="$shim"
+expect_allow "without python3 a main-session command naming a subagent's agent_type is untouched"
+# Behaviour 7: a subagent call without the word `stash` starts no python3. The shim only records
+# that it ran, and fails, so the hook falls back for the call that does start it.
+pyrec="$(mktemp -d)"
+ln -s "$(command -v bash)" "$pyrec/bash"
+printf '#!/bin/sh\n: > "%s/ran"\nexit 1\n' "$pyrec" > "$pyrec/python3"
+chmod +x "$pyrec/python3"
+run "$(event "$SUB" 'git commit -m x' "$repo")" "$repo" PATH="$pyrec"
+if [ ! -e "$pyrec/ran" ]; then ok "a subagent's git commit starts no python3"
+else bad "a subagent's git commit starts no python3" "the shim recorded a run"; fi
+run "$(event "$SUB" 'git stash' "$repo")" "$repo" PATH="$pyrec"
+if [ -e "$pyrec/ran" ]; then ok "a subagent's git stash starts python3"
+else bad "a subagent's git stash starts python3" "the shim recorded no run"; fi
+expect_deny "and, with that python3 failing, the subagent's git stash is still refused"
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
