@@ -425,15 +425,15 @@ passes, with `git commit -m "feat(plugin): declare the required plugins as depen
 There is no failing test for this task: the evidence is a CI run. `tests/supply-chain-scan.sh`
 already reads workflows; if it flags the install line, fix the line rather than suppressing it.
 
-**Done when:** there is no local command. The `validate` job passes on the pull request with no
+**Done when:** there is no local command. The `manifests` job passes on the pull request with no
 secrets, and the job log shows both `Validation passed` lines.
 
-- [ ] **Step 5.1: Add the step and run what can run locally**
+- [x] **Step 5.1: Add the step and run what can run locally** Note: local validate commands and suite passed; the CI run itself is owed on the pull request
 
 Add the step. Run the two validate commands and `tests/run-tests.sh` locally, and quote the last
 lines. The job's own pass is checked on the pull request.
 
-- [ ] **Step 5.2: Hand over**
+- [x] **Step 5.2: Hand over** Note: rounds: 1; routing: inherit; loop: full; spec COMPLIES; quality nothing blocking, should fix: the comment says a replaced registry tarball is not caught, where npm forbids republishing and the real gap is no hash check plus a postinstall script; Done when corrected from validate to manifests job
 
 ```bash
 git add .github/workflows/ci.yml
@@ -456,6 +456,7 @@ passes, with `git commit -m "ci: validate the plugin and marketplace manifests"`
 - Modify: `docs/ideas/claude-code-features-assessed-2026-10-29.md` (Status, Next, assumptions)
 - Modify: `CHANGELOG.md` (an Unreleased section)
 - Modify: `README.md` (the output style paragraph)
+- Modify: `docs/06-repo-layout.md` (the `ci.yml` line, which does not name the `manifests` job)
 - Modify: `docs/prd/plain-language-chat.md` (NFR-03 and the NFR-01 evidence cell)
 
 **Depends on:** tasks 1 to 5
@@ -473,6 +474,8 @@ passes, with `git commit -m "ci: validate the plugin and marketplace manifests"`
 3. Decision 10 is fully resolved. Example: the summary at `:5-8` no longer lists it as open, row 10
    reads resolved 2026-11-02, and decision 10's "What blocks it", "What settles it", "If it is
    taken" and "STILL OPEN" paragraphs are rewritten from the code to state what tasks 2 and 3 do.
+3c. `docs/06-repo-layout.md` describes `ci.yml` with the `manifests` job (task 5's quality review).
+   Example: its `ci.yml` line names the advisory manifests check.
 3b. `docs/prd/plain-language-chat.md` agrees with task 3 (its quality review): NFR-03 names a
    settings edit beside a profile edit and a plugin upgrade as acts that move the bytes, and the
    NFR-01 evidence cell says "five-form table". Example: neither "nothing else may move the bytes"
@@ -499,7 +502,7 @@ Make the edits, then run `tests/run-tests.sh` and quote its summary.
 ```bash
 git add docs/04-plugin-strategy.md docs/07-open-decisions.md \
         docs/ideas/claude-code-features-assessed-2026-10-29.md CHANGELOG.md README.md \
-        docs/prd/plain-language-chat.md
+        docs/prd/plain-language-chat.md docs/06-repo-layout.md
 git status --porcelain
 ```
 

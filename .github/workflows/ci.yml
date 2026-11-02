@@ -95,6 +95,32 @@ jobs:
           "$RUNNER_TEMP/ruff/bin/pip" install --require-hashes --no-deps -r .github/ruff-requirements.txt
           "$RUNNER_TEMP/ruff/bin/ruff" check --isolated --no-cache --select E4,E7,E9,F lib/
 
+  # The plugin and marketplace manifests, checked by Claude Code's own validator. A separate job
+  # rather than a step in `validate`, so the required "Validate skills and templates" check does not
+  # come to depend on the npm registry. Advisory until it has a week of green runs, as `test-macos`
+  # was: branch protection does not list it yet. The directory check is not --strict because the
+  # root CLAUDE.md is this repository's development guide, not shipped context, and --strict turns
+  # the warning that it is not loaded as project context into an error; the marketplace check has
+  # no such warning and runs --strict. Claude Code is pinned by an exact version, not by hash as
+  # the ruff install is, so a release cannot turn this red on its own but a replaced tarball on the
+  # registry is not caught. It installs under the runner's temp directory and uses no secret.
+  manifests:
+    name: Plugin manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install Claude Code
+        run: npm install --prefix "$RUNNER_TEMP/claude" --no-audit --no-fund @anthropic-ai/claude-code@2.1.316
+
+      - name: Validate the plugin
+        run: |
+          "$RUNNER_TEMP/claude/node_modules/.bin/claude" plugin validate .
+
+      - name: Validate the marketplace
+        run: |
+          "$RUNNER_TEMP/claude/node_modules/.bin/claude" plugin validate --strict .claude-plugin/marketplace.json
+
   # A separate job, deliberately, rather than one more line inside `validate`. This is the check that
   # decides whether code reaching other people's machines is safe, so it must be selectable as a
   # required status check on its own and must not be able to pass because an unrelated step was
