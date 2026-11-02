@@ -245,7 +245,8 @@ lint command passes.
 Follow `keel:tdd` for behaviours 1 to 4 in `tests/test-keel-3.sh`, beside the existing case at
 `tests/test-keel-3.sh:385`: run it and watch them fail because no `outputStyle` is written. Then
 change both writers, add behaviour 5's row, regenerate `docs/harness-support.md`, and make the doc
-edits in behaviour 6 and `docs/05-token-and-memory-design.md:357`.
+edits in behaviour 6 and
+`docs/05-token-and-memory-design.md#ships with the plugin and costs zero against these budgets`.
 Run: `tests/test-keel-3.sh`
 Expected before the implementation: FAIL on behaviours 1 and 2. Expected after: PASS. Quote the
 failing output in your report.
@@ -314,7 +315,7 @@ passes, with `git commit -m "feat(init): select the keel terse output style"`. P
 **Done when:** `tests/test-session-start.sh` and `tests/validate-skills.sh` pass, and the profile's
 lint command passes.
 
-- [ ] **Step 3.1: Build it test first**
+- [x] **Step 3.1: Build it test first**
 
 Follow `keel:tdd` for behaviours 1 to 5a in `tests/test-session-start.sh`: run it and watch
 behaviours 1 and 5 fail because `BREVITY` is always injected for a terse profile. Then change the
@@ -326,7 +327,7 @@ failing output in your report.
 Run: `tests/run-tests.sh`
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 
-- [ ] **Step 3.2: Hand over**
+- [x] **Step 3.2: Hand over** Note: rounds: 1; routing: inherit; loop: full; spec COMPLIES; quality nothing blocking, should fix: NFR-03 and a four-form leftover in the PRD, carried to task 6; coordinator staged two citation repairs the implementer left unstaged and repaired the plan citation the doc 05 edit shifted; full suite green on the staged tree
 
 ```bash
 git add hooks/session-start tests/validate-skills.sh tests/test-session-start.sh \
@@ -454,6 +455,7 @@ passes, with `git commit -m "ci: validate the plugin and marketplace manifests"`
 - Modify: `docs/ideas/claude-code-features-assessed-2026-10-29.md` (Status, Next, assumptions)
 - Modify: `CHANGELOG.md` (an Unreleased section)
 - Modify: `README.md` (the output style paragraph)
+- Modify: `docs/prd/plain-language-chat.md` (NFR-03 and the NFR-01 evidence cell)
 
 **Depends on:** tasks 1 to 5
 
@@ -469,6 +471,10 @@ passes, with `git commit -m "ci: validate the plugin and marketplace manifests"`
 3. Decision 10 is fully resolved. Example: the summary at `:5-8` no longer lists it as open, row 10
    reads resolved 2026-11-02, and decision 10's "What blocks it", "What settles it", "If it is
    taken" and "STILL OPEN" paragraphs are rewritten from the code to state what tasks 2 and 3 do.
+3b. `docs/prd/plain-language-chat.md` agrees with task 3 (its quality review): NFR-03 names a
+   settings edit beside a profile edit and a plugin upgrade as acts that move the bytes, and the
+   NFR-01 evidence cell says "five-form table". Example: neither "nothing else may move the bytes"
+   without the settings edit nor "four-form" remains in the PRD.
 3a. `README.md` says the project key overrides a style a developer set in their user-level
    settings, and that `.claude/settings.local.json` is the way back (task 2's quality review).
    Example: the output style paragraph names both.
@@ -490,7 +496,8 @@ Make the edits, then run `tests/run-tests.sh` and quote its summary.
 
 ```bash
 git add docs/04-plugin-strategy.md docs/07-open-decisions.md \
-        docs/ideas/claude-code-features-assessed-2026-10-29.md CHANGELOG.md README.md
+        docs/ideas/claude-code-features-assessed-2026-10-29.md CHANGELOG.md README.md \
+        docs/prd/plain-language-chat.md
 git status --porcelain
 ```
 

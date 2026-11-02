@@ -865,7 +865,8 @@ the `CLAIMS` tag at `:100-101` rides at the end of the description cell, and a c
 it would sit between the tag and the row's closing pipe, where the regex below expects the
 description to end.
 
-Then widen the row regex at **`tests/validate-skills.sh:628`** from four columns to five:
+Then widen the row regex at **`tests/validate-skills.sh#row = re.compile(`** from four columns to
+five:
 
 ```python
 row = re.compile("^\\| \x60([^\x60]+)\x60 \\| [^|]* \\| [^|]* \\| [^|]* \\| (.*) \\|$", re.M)

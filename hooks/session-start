@@ -13,10 +13,16 @@
 # NFR-03 of docs/prd/plain-language-chat.md carries the same rule and was amended the same day.
 #
 # First, it reads `conventions.response_style` and `conventions.explain_level` from the project
-# profile. That is a file that changes, which the rule above forbids, so the bound matters: the
-# output has exactly four forms, and it moves between them only when a person deliberately edits a
-# key. That costs one cache miss on the session after the edit, the same as editing CLAUDE.md. A
-# key read for its value would be volatile; a key read for which of four paragraphs to print is not.
+# profile, and `outputStyle` from the settings.json and settings.local.json in the .claude/ beside
+# the .keel/ the profile was found in. Those are files that change, which the rule above forbids, so
+# the bound matters: the output has exactly five forms, and it moves between them only when a person
+# deliberately edits a profile key or a settings file. That costs one cache miss on the session
+# after the edit, the same as editing CLAUDE.md. A key read for its value would be volatile; a key
+# read for which of the paragraphs to print is not. The fifth form is terse and technical with
+# `"outputStyle": "keel:keel terse"` set: output-styles/keel-terse.md carries every rule BREVITY
+# states, so BREVITY is dropped rather than paid for twice. settings.local.json wins when it sets
+# the key. The user-level settings file in the home directory is not read: the style set only there
+# still gets BREVITY, which duplicates the rule and costs its 56 tokens, the safe direction.
 #
 # Second, it prints the version of the plugin copy this session loaded. That is the one fact a
 # session cannot learn any other way: CLAUDE_PLUGIN_ROOT is set only for hooks a plugin itself
@@ -102,7 +108,8 @@ done
 # like keel is not installed is expensive.
 #
 # Four combinations, four outcomes, and the silent one is deliberate: verbose plus technical is the
-# project that asked for neither rule.
+# project that asked for neither rule. The style below adds the fifth form, terse and technical
+# with the rule left to the style.
 style_text=""
 [ -n "$profile" ] && [ -r "$profile" ] && style_text="$(<"$profile")"
 
@@ -116,10 +123,26 @@ case "$style_text" in
     *'"explain_level": "plain"'*|*'"explain_level":"plain"'*) plain=yes ;;
 esac
 
+# The keel terse output style, read from the .claude/ beside the profile's .keel/ and not by a
+# second walk. The local file is read last so that it wins whenever it names the key at all; a file
+# that does not name it leaves the answer where it was. Same `-r` guard as the profile, same reason.
+styled=no
+if [ -n "$profile" ]; then
+    for f in "${profile%/.keel/profile.json}/.claude/settings.json" \
+             "${profile%/.keel/profile.json}/.claude/settings.local.json"; do
+        [ -f "$f" ] && [ -r "$f" ] || continue
+        s="$(<"$f")" || continue
+        case "$s" in *'"outputStyle"'*) styled=no ;; *) continue ;; esac
+        case "$s" in
+            *'"outputStyle": "keel:keel terse"'*|*'"outputStyle":"keel:keel terse"'*) styled=yes ;;
+        esac
+    done
+fi
+
 if [ "$plain" = yes ]; then
     if [ "$verbose" = yes ]; then CONTEXT="$CONTEXT$PLAIN_VERBOSE"
     else CONTEXT="$CONTEXT$PLAIN_TERSE"; fi
-elif [ "$verbose" = no ]; then
+elif [ "$verbose" = no ] && [ "$styled" = no ]; then
     CONTEXT="$CONTEXT$BREVITY"
 fi
 

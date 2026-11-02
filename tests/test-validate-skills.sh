@@ -1105,7 +1105,7 @@ check_reports "generic: naming a file that does not exist is reported" yes \
 # Three above and not zero, because a jq read three lines above the marker's own line is a
 # legitimate reader and must not fail; the fixture below pins that directly. Leaf and not the full
 # dotted path, because a single-purpose read of a nested key almost never repeats the parent segment
-# (hooks/session-start:111 reads "response_style", not "conventions.response_style"), and demanding
+# (hooks/session-start:118 reads "response_style", not "conventions.response_style"), and demanding
 # the parent too would reject every real single-purpose citation in this tree bar none.
 m_readby_code_leaf_present() {
     local root="$1"

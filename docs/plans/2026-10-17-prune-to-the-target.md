@@ -727,9 +727,9 @@ owed for this body: `build-with-no-prd`, run by the coordinator after the batch,
    `tests/validate-skills.sh` requires in a body stays in it: the profile-schema markers
    `templates/profile.schema.json` cites (`tests/validate-skills.sh:973-979`), the plugin names
    (`:502-503`) and `repo-snapshot`'s Step 6 (`:627-630`). Example: `git diff` shows no line above
-   the closing `---` of `skills/repo-snapshot/SKILL.md` changing. `tests/validate-skills.sh:628-631`
-   requires Step 6 to say the snapshot names what it did not check; that requirement stays in Step
-   6.
+   the closing `---` of `skills/repo-snapshot/SKILL.md` changing.
+   `tests/validate-skills.sh#does not require the snapshot to say what it did not check` requires
+   Step 6 to say the snapshot names what it did not check; that requirement stays in Step 6.
 9. If behaviours 3 to 5 together cannot bring the body under 700, the task stops: the body is left
    as it stands, uncommitted in this task's worktree, and the report gives the count, the shortfall
    and every passage left, each marked instruction, duplicate or detail. No instruction is cut or
