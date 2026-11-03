@@ -108,7 +108,13 @@ that carries `"agent_type"` and contains `stash` anywhere in its event, includin
 `transcript_path`, so those calls start `python3`. The capability ledger's `requires` rows for
 `review-guard` name `pretooluse_agent_type` and `pretooluse_agent_id`. The `agent_id` row is stamped
 2.1.302, the version of the 2026-10-17 probe that first saw the field, so keel's minimum stays
-2.1.302.
+2.1.302. Its `hooks/hooks.json` entry carries `"onFailure": "block"`, as `sensitive-guard`'s does,
+so a timed-out or unstartable hook blocks the call instead of letting it run. Like
+`sensitive-guard`, it does not require `pretooluse_on_failure_block`: a ledger without that row still
+generates the hook, only without the key. The main session is unaffected in practice: its call ends
+in the bash filter, or, when its event contains `keel:keel-reviewer` (or, started with `--agent`,
+carries an `agent_type` and the word `stash`), in `python3`, which exits straight after reading the
+JSON, before it reads the command.
 
 **It is a speed bump, not a security boundary**, as ADR-0010 says of the reviewer rule. `sh -c "git
 stash"`, an alias or a script reaches git without passing through the hook, and so does text
@@ -124,9 +130,15 @@ in its body, is refused. The reviewer's rule and the fallback without `python3` 
 word and every heredoc body, so the reviewer's `echo git stash` is refused, and so is a subagent's
 without `python3`; both err toward refusing. The fallback takes any word starting with `-` between
 `git` and the subcommand as an option, for the reviewer's word list as for a subagent's stash, so
-an option it does not know can only make it refuse more. A command longer than 64 KB that names
-`git` for the reviewer or `stash` for another subagent is refused unread, because a hook killed at
-its 10-second timeout gives no decision; the bound caps size, not time.
+an option it does not know can only make it refuse more. On the `python3` path every rule drops each
+redirection before reading git's words, its fd number or `{name}` only when attached to the `<` or
+`>`, so `git 2>/dev/null stash` is refused to the reviewer and to any other subagent while
+`git tag 2 >/dev/null`, which creates a tag named `2`, is still refused to the reviewer. The fallback
+skips a redirection, its target quoted or not, only between `git` and its subcommand, so it refuses
+`git 2>/dev/null stash` too, and `git stash 2>/dev/null list`, erring toward refusing. A command longer than 64 KB that names `git` for
+the reviewer or `stash` for another subagent is refused unread, with a reason, where a hook killed
+at its 10-second timeout blocks the call with none; the bound caps size, not time, and a slower
+command is blocked by the timeout, not run.
 
 **What this forecloses.** Little. The rule is one branch in an existing hook; removing it returns
 the stash to the prompt.
@@ -158,7 +170,14 @@ stash`. A subagent's `git stash` in an event past 1 MB is refused by the parser.
 sh` and a `bash <<'EOF'` body naming `git stash` are refused, and without `python3` its `echo git
 stash` is refused. The reviewer's `echo git stash` is refused. A command past 64 KB is refused
 unread, with a reason saying it is too long to read, and a main session's 1 MB command is allowed.
-Some cases run the hook under `/bin/bash` by name.
+The reviewer's `git 2>/dev/null stash`, `git >/dev/null push` and `git 2>/dev/null commit -m x` are
+refused and its `git 2>/dev/null status` allowed, and its `git tag 2 >/dev/null` and
+`git branch 2 >/dev/null` are refused; `git {fd}>/dev/null stash` is refused to the reviewer and a
+subagent; without `python3`, a subagent's `git 2>/dev/null stash`, `git 2> /dev/null stash` and
+`git 2>"a b" stash` are refused and its `git 2>/dev/null stash list` allowed.
+`tests/test-harness-claims.sh` checks that the `review-guard` entry carries `"onFailure": "block"`
+and that a ledger without the row still generates it, without the key. Some cases run the hook under `/bin/bash` by
+name.
 
 Holding if no implementer's stash turns up in a plan's notes or in `git stash list` at a task
 boundary. Not holding if a subagent's stash-writing `git stash` runs without a refusal, or if the

@@ -28,16 +28,28 @@ Entries are terse by design; the narrative for each release is in this file's gi
   so `echo git stash | sh` and `bash <<'EOF'` are refused. A command longer than 64 KB that names
   `git` for the reviewer or `stash` for another subagent is refused unread, where before a long
   parse could outlast the 10-second hook timeout and let it run; a subagent's substitutions are
-  read 32 deep. The bounds cap size and depth, not time: some commands under 64 KB still outlast
-  the timeout, a follow-up. The reviewer's rule and the fallback without `python3` still read every
-  `git` word. Text written and then run (`echo git stash > f; ./f`) is a stated limit, as decided
+  read 32 deep. The bounds cap size and depth, not time: a command under 64 KB that outlasts the
+  timeout is blocked by it, not run. The reviewer's rule and the fallback without `python3` still
+  read every `git` word. Text written and then run (`echo git stash > f; ./f`) is a stated limit, as decided
   on 2026-11-03 (ADR-0016).
 - `hooks/review-guard` reads a line continued with a backslash as one line, for every subagent and
   for the reviewer, so `git \` followed by `stash` on the next line is refused, as bash runs it. It
   also judges each command a second time with every `#` that begins a word cut to the end of its
   line, and refuses if either judgement refuses, so quotes in two comments can no longer join into
-  one word that hides a `git stash` between them. The reviewer's rule, and the fallback for every
-  subagent, keep redirections, so `git 2>/dev/null stash` passes there, a stated limit.
+  one word that hides a `git stash` between them.
+- `hooks/review-guard` blocks the call when it times out or cannot start: its `hooks/hooks.json`
+  entry carries `"onFailure": "block"`, as `sensitive-guard`'s does, and like it the guard does not
+  require `pretooluse_on_failure_block`, so a ledger without that row still generates the hook,
+  only without the key. The main session is unaffected in practice: its call ends in the bash
+  filter, or, when its event contains `keel:keel-reviewer` (or, started with `--agent`, carries an
+  `agent_type` and `stash`), in `python3`, which exits straight after reading the JSON. On the
+  `python3` path the reviewer's rule now drops redirections too, as a subagent's does, with an fd
+  number or `{name}` dropped only when attached to the `<` or `>`, so `git 2>/dev/null stash` and
+  `git {fd}>/dev/null stash` are refused and `git tag 2 >/dev/null`, a tag named `2` to bash, still
+  is. The fallback without `python3` skips a redirection, its target quoted or not, only between
+  `git` and its subcommand, so it refuses `git 2>/dev/null stash` and `git stash 2>/dev/null list`,
+  and a subagent's `git 2>/dev/null stash list` still runs. The `pretooluse_agent_id` row records the
+  2.1.317 probe by `tests/probe-agent-id.sh`.
 - `tests/probe-agent-id.sh` re-runs the three observations `hooks/review-guard` rests on against the
   installed Claude Code: no `agent_id` for the main session, with or without `--agent`, and one for
   a project agent dispatched as a subagent. It needs a signed-in Claude Code and spends tokens, so it

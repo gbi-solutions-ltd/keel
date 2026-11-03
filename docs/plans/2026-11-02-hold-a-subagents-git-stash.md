@@ -728,7 +728,8 @@ pass, with `git commit -m "fix(review-guard): read a backslash-continued line as
 
 1. A `review-guard` call that times out or fails to start blocks the tool call instead of letting it
    run. Example: its `hooks/hooks.json` entry carries `"onFailure": "block"`, as `sensitive-guard`'s
-   does, and `lib/harness/capabilities` gains `requires|review-guard|pretooluse_on_failure_block`.
+   does, and like `sensitive-guard` it does not require `pretooluse_on_failure_block`, so a ledger
+   without that row still runs the hook, only without the block.
    The main session is unaffected in practice, because the hook exits before parsing for it.
 2. The reviewer's rule and the fallback without `python3` drop redirections before reading git's
    words, as a subagent's python path does. Example: from `keel:keel-reviewer`,
@@ -739,16 +740,24 @@ pass, with `git commit -m "fix(review-guard): read a backslash-continued line as
 4. The hook header, ADR-0016 and CHANGELOG say what is true now: the redirection limit and the
    timeout gap are gone, and the timeout blocks.
 
+**Changed after review, 2026-11-03.** The review found that dropping redirections for the reviewer
+reads `git tag 2 >/dev/null` as `git tag`, since the word split cannot tell `2>` from `2 >`, where
+bash creates a tag named `2`; HEAD refused it. So an fd number counts only when it is attached to
+`<` or `>`, and a `{name}>` fd prefix counts as part of the redirection too. The fallback skips a
+`{name}>` prefix and a quoted target with a space (`git 2>"a b" stash`) among git's options too. The `requires` row of behaviour 1 is
+dropped, as above, because without it the hook runs, where with it a ledger lacking the row withholds
+the whole hook.
+
 **Done when:** `tests/test-review-guard.sh` passes, also under `/bin/bash`, and the profile's lint
 command passes.
 
-- [ ] **Step 9.1: Build it test first**
+- [x] **Step 9.1: Build it test first**
 
 Write the cases, watch them fail, then implement.
 Run: `tests/run-tests.sh`
 Expected: PASS.
 
-- [ ] **Step 9.2: Hand over**
+- [x] **Step 9.2: Hand over** Note: rounds: 2; routing: inherit; loop: full; review found the reviewer's new redirection drop read `git tag 2 >/dev/null` as `git tag` (blocking) and the `{fd}>` and quoted-target gaps; a fix pass counted an fd number only when attached, handled `{name}>` and quoted targets, and dropped the `requires` row; 12 new cases failed first, 566 passed after; checked by the coordinator, not re-reviewed
 
 Stage exactly the files above and stop. **Do not commit.** The coordinator commits after the review
 pass, with `git commit -m "fix(review-guard): block on a timeout, and drop redirections on every path"`.
@@ -785,6 +794,4 @@ pass, with `git commit -m "fix(review-guard): block on a timeout, and drop redir
   - consider: a main session started as `--agent keel:keel-reviewer` gets the reviewer rules (hooks/review-guard header)
   - consider: the fallback's catch-all option pattern widens the reviewer's fallback too; the header says it only for a subagent (hooks/review-guard:128)
   - consider: open question 2 in the idea record reads as a correction rather than current state (docs/ideas/implementers-run-git-stash.md)
-  - follow-up: a command under 64 KB with about 16,000 `git` words outlasts the hook's 10 s timeout, which then allows it, as at HEAD; a bound on `git` words would close it (hooks/review-guard, decided 2026-11-03)
-  - consider: record 2.1.317 on the `pretooluse_agent_id` row (lib/harness/capabilities)
-  - follow-up: the reviewer's rule, and the fallback for every subagent, keep redirections, so `git 2>/dev/null stash` passes there (hooks/review-guard header)
+- task 9: the three follow-ups above closed (2026-11-03): `onFailure: block` on review-guard, redirections dropped on every path, the 2.1.317 probe recorded; one review, one fix pass

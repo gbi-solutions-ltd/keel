@@ -443,12 +443,14 @@ for prof in $profiles; do
       || bad "agents/$prof.md is tracked, so it ships" "untracked, and the export publishes tracked files only"
 done
 
-# 9. sensitive-guard blocks the call when it fails to answer, and no other hook does.
+# 9. sensitive-guard and review-guard block the call when they fail to answer, and no other hook does.
 #
-# A crash is answered `ask` by the guard's own EXIT trap, but a timed-out hook or one that cannot
-# start answers nothing, and Claude Code then runs the command. `onFailure: "block"` closes that.
-# Only on sensitive-guard: review-guard runs on every Bash call of every session, so a failure there
-# would block the main session too. Here after the gates above so their cited lines do not move.
+# A crash is answered `ask` by sensitive-guard's own EXIT trap, but a timed-out hook or one that
+# cannot start answers nothing, and Claude Code then runs the command. `onFailure: "block"` closes
+# that. review-guard carries it too (task 9 of docs/plans/2026-11-02-hold-a-subagents-git-stash.md):
+# for a main-session call it exits in bash, or in python3 straight after reading the JSON, so in
+# practice only a subagent's call can time out. Here after the gates above so their cited lines do
+# not move.
 # Each grep -q reads a here-string, not a pipe, for the race tests/grep-quiet.sh describes.
 on_failure_entries() {   # on_failure_entries <hooks.json>: event/matcher/hook=onFailure per entry
     python3 -I -c '
@@ -466,17 +468,20 @@ entries="$(on_failure_entries hooks/hooks.json)"
 grep -qx 'PreToolUse/Bash/sensitive-guard=block' <<< "$entries" \
   && ok "the sensitive-guard entry carries onFailure block" \
   || bad "the sensitive-guard entry carries onFailure block" "$(printf '%s\n' "$entries" | grep sensitive-guard)"
-others="$(printf '%s\n' "$entries" | grep -v '/sensitive-guard=' | grep -v '=$' | tr '\n' ' ')"
+grep -qx 'PreToolUse/Bash/review-guard=block' <<< "$entries" \
+  && ok "the review-guard entry carries onFailure block" \
+  || bad "the review-guard entry carries onFailure block" "$(printf '%s\n' "$entries" | grep review-guard)"
+others="$(printf '%s\n' "$entries" | grep -v '/sensitive-guard=' | grep -v '/review-guard=' | grep -v '=$' | tr '\n' ' ')"
 [ -z "$others" ] && ok "no other hook entry carries onFailure" \
   || bad "no other hook entry carries onFailure" "$others"
 
-# The ledger records the primitive as provided and required by nothing: the guard works without
+# The ledger records the primitive as provided and required by nothing: each guard works without
 # onFailure, and a requires row would withhold the whole guard if this evidence were withdrawn.
 row='provides|claude|pretooluse_on_failure_block|vendor:code.claude.com/docs/en/hooks onFailure block on a timed-out PreToolUse command hook|2.1.295|2026-11-02'
 grep -qxF "$row" lib/harness/capabilities \
   && ok "the ledger provides pretooluse_on_failure_block with source, version and date" \
   || bad "the ledger provides pretooluse_on_failure_block with source, version and date" "no such row"
-grep -q '^requires|sensitive-guard|pretooluse_on_failure_block' lib/harness/capabilities \
+grep -q '^requires|.*|pretooluse_on_failure_block' lib/harness/capabilities \
   && bad "no gate requires pretooluse_on_failure_block" "a requires row names it" \
   || ok "no gate requires pretooluse_on_failure_block"
 
@@ -495,11 +500,20 @@ grep -qx 'PreToolUse/Bash/sensitive-guard=' <<< "$(on_failure_entries "$of/witho
   && ok "a ledger without the row still generates sensitive-guard, with no onFailure" \
   || bad "a ledger without the row still generates sensitive-guard, with no onFailure" \
     "$(on_failure_entries "$of/without.json" 2>&1 | grep sensitive-guard)"
+grep -qx 'PreToolUse/Bash/review-guard=block' <<< "$(on_failure_entries "$of/with.json" 2>/dev/null)" \
+  && ok "a ledger providing pretooluse_on_failure_block generates onFailure block on review-guard" \
+  || bad "a ledger providing pretooluse_on_failure_block generates onFailure block on review-guard" \
+    "$(on_failure_entries "$of/with.json" 2>&1 | grep review-guard)"
+grep -qx 'PreToolUse/Bash/review-guard=' <<< "$(on_failure_entries "$of/without.json" 2>/dev/null)" \
+  && ok "a ledger without the row still generates review-guard, with no onFailure" \
+  || bad "a ledger without the row still generates review-guard, with no onFailure" \
+    "$(on_failure_entries "$of/without.json" 2>&1 | grep review-guard)"
 rm -rf "$of"
 
 # 10. review-guard requires agent_id, which tells a subagent from the main session. The row keeps
-# the 2.1.302 stamp of the first probe, so requiring it leaves keel's minimum where it was.
-row='provides|claude|pretooluse_agent_id|probe:a plugin PreToolUse hook on Bash logged an agent_id for a general-purpose subagent and a plugin agent and none for the main session, docs/plans/2026-10-17-reviewer-git-guard.md, and on 2.1.316 none for a main session started with --agent and one for a project agent from .claude/agents, docs/plans/2026-11-02-hold-a-subagents-git-stash.md|2.1.302|2026-11-02'
+# the 2.1.302 stamp of the first probe, so requiring it leaves keel's minimum where it was; the
+# 2.1.317 re-probe by tests/probe-agent-id.sh moved only the evidence and the date.
+row='provides|claude|pretooluse_agent_id|probe:a plugin PreToolUse hook on Bash logged an agent_id for a general-purpose subagent and a plugin agent and none for the main session, docs/plans/2026-10-17-reviewer-git-guard.md, and on 2.1.316 none for a main session started with --agent and one for a project agent from .claude/agents, docs/plans/2026-11-02-hold-a-subagents-git-stash.md, and on 2.1.317 all three again by tests/probe-agent-id.sh|2.1.302|2026-11-03'
 grep -qxF "$row" lib/harness/capabilities \
   && ok "the ledger provides pretooluse_agent_id with source, version and date" \
   || bad "the ledger provides pretooluse_agent_id with source, version and date" "no such row"

@@ -3,8 +3,8 @@
 # Tests for hooks/review-guard, which refuses a keel reviewer the git commands that would change the
 # author's checkout or the state every worktree shares, and refuses every other subagent a
 # stash-writing `git stash`. Task 1 of docs/plans/2026-10-17-reviewer-git-guard.md, behaviours 2 to
-# 6, and tasks 1, 1b, 4, 6 and 8 of docs/plans/2026-11-02-hold-a-subagents-git-stash.md, behaviours
-# 1 to 7, 1 to 3, 1 to 5, 1 to 5 and 1 to 3, one case per example there.
+# 6, and tasks 1, 1b, 4, 6, 8 and 9 of docs/plans/2026-11-02-hold-a-subagents-git-stash.md,
+# behaviours 1 to 7, 1 to 3, 1 to 5, 1 to 5, 1 to 3 and 2 to 4, one case per example there.
 #
 # Every case feeds the hook a PreToolUse event as JSON on stdin, as tests/test-sensitive-guard.sh
 # feeds its hook, and asserts on what it prints. A refusal is checked by its JSON and an allowance
@@ -746,13 +746,15 @@ run "$(event "$REVIEWER" $'git \\\ncommit -m x' "$repo")" "$repo" PATH="$shim"
 expect_deny "without python3 a reviewer's git \\, commit -m x is refused"
 run "$(event "$SUB" $'git \\\nstash \\\nlist' "$repo")" "$repo" PATH="$shim"
 expect_allow "without python3 a subagent's git \\, stash \\, list is allowed"
-# Behaviour 3: the header counts its refinements and states the reviewer's redirection limit.
-if grep -q 'Three refinements' "$GUARD"; then bad "the header no longer says three refinements" "it still does"
-else ok "the header no longer says three refinements"; fi
-if grep -q 'Four refinements' "$GUARD"; then ok "the header says four refinements"
-else bad "the header says four refinements" "no 'Four refinements' in the header"; fi
-if grep -q "reviewer's \`git 2>/dev/null stash\` is allowed" "$GUARD"; then ok "the header states the reviewer's redirection limit"
-else bad "the header states the reviewer's redirection limit" "not found"; fi
+# Behaviour 3 of task 8: the header counts its refinements, as task 9 left them.
+# Task 9 moved the redirection rule out of the python-only list, which leaves three again.
+if grep -q 'Four refinements' "$GUARD"; then bad "the header no longer says four refinements" "it still does"
+else ok "the header no longer says four refinements"; fi
+if grep -q 'Three refinements' "$GUARD"; then ok "the header says three refinements"
+else bad "the header says three refinements" "no 'Three refinements' in the header"; fi
+# Task 9 lifted the reviewer's redirection limit, so the header no longer states it.
+if grep -q "reviewer's \`git 2>/dev/null stash\` is allowed" "$GUARD"; then bad "the header no longer states a reviewer's redirection limit" "it still does"
+else ok "the header no longer states a reviewer's redirection limit"; fi
 if [ -x /bin/bash ]; then
     run "$(event "$SUB" $'git \\\nstash' "$repo")" "$repo" /bin/bash
     expect_deny "under /bin/bash, a subagent's git \\, stash is refused"
@@ -778,6 +780,65 @@ for c in "echo hi # don't stash anything" "git status # it's fine" \
          $'cat <<EOF <<\'X\'\na \\\\\nEOF\ngit stash\nX' $'true a#b\'\ngit stash\n\''; do
     allow "a subagent's ${c//$'\n'/ / } is allowed" "$SUB" "$c" "$repo"
 done
+
+# Task 9, behaviour 2: every path drops redirections before reading git's words.
+for c in 'git 2>/dev/null stash' 'git >/dev/null push' 'git 2>/dev/null commit -m x'; do
+    deny "a reviewer's $c is refused" "$REVIEWER" "$c" "$repo"
+done
+allow "a reviewer's git 2>/dev/null status is allowed" "$REVIEWER" 'git 2>/dev/null status' "$repo"
+for c in 'git 2>/dev/null stash' 'git 2> /dev/null stash' 'git >/dev/null stash' 'git >> f stash' \
+         'git 2>&1 stash' 'git &>/dev/null stash' 'git &> /dev/null stash' 'git <f stash' \
+         'git -P 2>/dev/null stash' 'git 2>/dev/null -P stash' 'git 2>/dev/null stash -m list' \
+         'git >& /dev/null stash' 'git stash 2>/dev/null list'; do
+    run "$(event "$SUB" "$c" "$repo")" "$repo" PATH="$shim"
+    expect_deny "without python3 a subagent's $c is refused"
+done
+for c in 'git 2>/dev/null stash list' 'git 2> /dev/null stash show' 'git 2>&1 stash list' \
+         'git 2>/dev/null status'; do
+    run "$(event "$SUB" "$c" "$repo")" "$repo" PATH="$shim"
+    expect_allow "without python3 a subagent's $c is allowed"
+done
+run "$(event "$REVIEWER" 'git 2>/dev/null commit -m x' "$repo")" "$repo" PATH="$shim"
+expect_deny "without python3 a reviewer's git 2>/dev/null commit -m x is refused"
+run "$(event "$REVIEWER" 'git 2>/dev/null status' "$repo")" "$repo" PATH="$shim"
+expect_allow "without python3 a reviewer's git 2>/dev/null status is allowed"
+if [ -x /bin/bash ]; then
+    run "$(event "$SUB" 'git 2> /dev/null stash' "$repo")" "$repo" PATH="$shim" /bin/bash
+    expect_deny "under /bin/bash without python3, a subagent's git 2> /dev/null stash is refused"
+    run "$(event "$SUB" 'git 2>/dev/null stash list' "$repo")" "$repo" PATH="$shim" /bin/bash
+    expect_allow "under /bin/bash without python3, a subagent's git 2>/dev/null stash list is allowed"
+fi
+# Changed after review: an fd number is a redirection's only when attached to `<` or `>`, so in
+# `git tag 2 >/dev/null` bash creates a tag named 2; and a `{name}>` prefix is part of one.
+for c in 'git tag 2 >/dev/null' 'git tag 2 > /dev/null' 'git branch 2 >/dev/null' \
+         'git branch 2 > /dev/null' 'git {fd}>/dev/null stash' 'git {fd}> /dev/null stash'; do
+    deny "a reviewer's $c is refused" "$REVIEWER" "$c" "$repo"
+done
+for c in 'git tag 2>/dev/null' 'git branch 2>/dev/null' 'git {fd}>/dev/null status'; do
+    allow "a reviewer's $c is allowed" "$REVIEWER" "$c" "$repo"
+done
+# `git stash 2` is not a push to git, which stops at the unknown word, but the rule refuses any
+# first word after stash other than list or show, so it errs toward refusing.
+for c in 'git {fd}>/dev/null stash' 'git {fd}> /dev/null stash' 'git stash 2 >/dev/null'; do
+    deny "a subagent's $c is refused" "$SUB" "$c" "$repo"
+done
+allow "a subagent's git {fd}>/dev/null stash list is allowed" "$SUB" 'git {fd}>/dev/null stash list' "$repo"
+allow "a subagent's git stash list 2 >/dev/null is allowed" "$SUB" 'git stash list 2 >/dev/null' "$repo"
+for c in 'git {fd}>/dev/null stash' 'git 2>"a b" stash' "git 2>'a b' stash" 'git 2>"a"b stash'; do
+    run "$(event "$SUB" "$c" "$repo")" "$repo" PATH="$shim"
+    expect_deny "without python3 a subagent's $c is refused"
+done
+for c in 'git {fd}>/dev/null stash list' 'git 2>"a b" stash list'; do
+    run "$(event "$SUB" "$c" "$repo")" "$repo" PATH="$shim"
+    expect_allow "without python3 a subagent's $c is allowed"
+done
+run "$(event "$REVIEWER" 'git {fd}>/dev/null stash' "$repo")" "$repo" PATH="$shim"
+expect_deny "without python3 a reviewer's git {fd}>/dev/null stash is refused"
+# Behaviour 4: the header says the timeout blocks.
+if grep -qE 'keeps? (them|redirections)' "$GUARD"; then bad "the header no longer says any rule keeps redirections" "it still does"
+else ok "the header no longer says any rule keeps redirections"; fi
+if grep -q 'onFailure' "$GUARD"; then ok "the header names the onFailure that blocks a timed-out call"
+else bad "the header names the onFailure that blocks a timed-out call" "no 'onFailure' in the hook"; fi
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
