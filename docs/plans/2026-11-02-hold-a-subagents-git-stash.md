@@ -711,6 +711,48 @@ git status --porcelain
 Stage exactly those paths and stop. **Do not commit.** The coordinator commits after the review
 pass, with `git commit -m "fix(review-guard): read a backslash-continued line as one line"`.
 
+### Task 9: close the three follow-ups
+
+**Story:** the follow-ups in this plan's Delivery section, which Bernard asked to close in PR #11 on
+2026-11-03.
+**Files:**
+- Modify: `hooks/hooks.json`
+- Modify: `hooks/review-guard`
+- Modify: `lib/harness/capabilities`
+- Test: `tests/test-review-guard.sh`
+- Modify: `docs/decisions/ADR-0016-a-subagents-stash-is-held-by-a-hook.md`, `CHANGELOG.md`
+
+**Depends on:** task 8
+
+**Behaviours:**
+
+1. A `review-guard` call that times out or fails to start blocks the tool call instead of letting it
+   run. Example: its `hooks/hooks.json` entry carries `"onFailure": "block"`, as `sensitive-guard`'s
+   does, and `lib/harness/capabilities` gains `requires|review-guard|pretooluse_on_failure_block`.
+   The main session is unaffected in practice, because the hook exits before parsing for it.
+2. The reviewer's rule and the fallback without `python3` drop redirections before reading git's
+   words, as a subagent's python path does. Example: from `keel:keel-reviewer`,
+   `git 2>/dev/null stash`, `git >/dev/null push` and `git 2>/dev/null commit -m x` are refused;
+   without `python3`, a subagent's `git 2>/dev/null stash` and `git 2> /dev/null stash` are refused,
+   and its `git 2>/dev/null stash list` is allowed.
+3. The `pretooluse_agent_id` row records the 2.1.317 probe by `tests/probe-agent-id.sh`.
+4. The hook header, ADR-0016 and CHANGELOG say what is true now: the redirection limit and the
+   timeout gap are gone, and the timeout blocks.
+
+**Done when:** `tests/test-review-guard.sh` passes, also under `/bin/bash`, and the profile's lint
+command passes.
+
+- [ ] **Step 9.1: Build it test first**
+
+Write the cases, watch them fail, then implement.
+Run: `tests/run-tests.sh`
+Expected: PASS.
+
+- [ ] **Step 9.2: Hand over**
+
+Stage exactly the files above and stop. **Do not commit.** The coordinator commits after the review
+pass, with `git commit -m "fix(review-guard): block on a timeout, and drop redirections on every path"`.
+
 ## Notes for the coordinator
 
 - **Concurrent batches.** `keel plan batches` on 2026-11-02 printed every task alone:
