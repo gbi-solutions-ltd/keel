@@ -60,7 +60,8 @@
             "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/review-guard\"",
             "shell": "bash",
             "async": false,
-            "timeout": 10
+            "timeout": 10,
+            "onFailure": "block"
           }
         ]
       }

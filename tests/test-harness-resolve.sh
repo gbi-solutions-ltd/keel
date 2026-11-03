@@ -516,7 +516,8 @@ done
 
 # The regression pin, like the five gates above: a row that raises it is a row that changed what
 # keel needs, and this is where that shows. validated_word_ceiling is at 2.1.302 too and has no
-# requires row, so it is pretooluse_agent_type, which review-guard requires, that sets it.
+# requires row, so it is pretooluse_agent_type and pretooluse_agent_id, which review-guard requires,
+# that set it.
 got="$(harness_min_version)"
 [ "$got" = 2.1.302 ] \
   && ok "the minimum is derived from the ledger: 2.1.302 with today's rows" \

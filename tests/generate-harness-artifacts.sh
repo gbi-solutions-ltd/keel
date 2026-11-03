@@ -183,18 +183,19 @@ $2
     ]"
 }
 
-# sensitive-guard alone blocks when it fails to answer, and only where the ledger provides the
-# primitive. Provided and required by nothing, because the guard works without it and a requires row
-# would withhold the whole guard with the evidence. review-guard runs on every Bash call of every
-# session, so a block there on failure would stop the main session too.
-sensitive_failure=""
-harness_provides "$harness" pretooluse_on_failure_block && sensitive_failure=block
+# sensitive-guard and review-guard block when they fail to answer, only where the ledger provides
+# the primitive. Provided and required by nothing, because each guard works without it and a
+# requires row would withhold the whole guard with the evidence. review-guard exits for a
+# main-session call in bash, or in python3 straight after reading the JSON, so in practice only a
+# subagent's call can time out.
+on_failure=""
+harness_provides "$harness" pretooluse_on_failure_block && on_failure=block
 
 add_event SessionStart     "$(join_groups "$(group session-start   session-start   30 'startup|clear|compact')")"
 add_event UserPromptSubmit "$(join_groups "$(group context-watch   context-watch   10)")"
 add_event PreToolUse       "$(join_groups "$(group context-watch   context-watch   10)" \
-                                          "$(group sensitive-guard sensitive-guard 10 'Bash' "$sensitive_failure")" \
-                                          "$(group review-guard    review-guard    10 'Bash')")"
+                                          "$(group sensitive-guard sensitive-guard 10 'Bash' "$on_failure")" \
+                                          "$(group review-guard    review-guard    10 'Bash' "$on_failure")")"
 add_event Stop             "$(join_groups "$(group done-guard      done-guard      10)")"
 add_event SubagentStop     "$(join_groups "$(group done-guard      done-guard      10)")"
 add_event PreCompact       "$(join_groups "$(group context-watch   context-watch   10)")"
