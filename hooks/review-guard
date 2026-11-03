@@ -2,7 +2,7 @@
 # Refuses a keel reviewer the git commands that would change the author's checkout or the state
 # every worktree of a repository shares, and refuses every other subagent a stash-writing `git
 # stash`. Registered on PreToolUse, matcher Bash. Task 1 of
-# docs/plans/2026-10-17-reviewer-git-guard.md and tasks 1, 1b and 4 of
+# docs/plans/2026-10-17-reviewer-git-guard.md and tasks 1, 1b, 4 and 6 of
 # docs/plans/2026-11-02-hold-a-subagents-git-stash.md.
 #
 # WHY A HOOK AND NOT ONLY THE PROMPT. On 2026-10-12 a spec reviewer ran `git stash` on the tree it
@@ -42,15 +42,41 @@
 # logged: a reviewer has no business running one, and a prompt mid-review hands the human a
 # decision the plan already made. The probe saw a deny hold under bypassPermissions.
 #
-# ITS LIMITS, STATED RATHER THAN DISCOVERED. It reads a command string, so `sh -c "git stash"`, an
-# alias or a script reaches git without passing through here. It stops a model following a habit,
-# which is what the incidents were, and is not a boundary against an adversary. It reads every
-# `git` word as a git command and a heredoc's body as commands, so a subagent's `echo git stash`,
-# or a heredoc body that names `git stash`, is refused: that errs toward refusing, and telling an
-# argument or a body from a command would need a second quoting-aware parser to get right. The
-# fallback's option pattern takes any word starting with `-` between `git` and the subcommand as an
-# option, for the reviewer's word list as for a subagent's stash, so an option it does not know can
-# only make it refuse more.
+# ITS LIMITS, STATED RATHER THAN DISCOVERED. It reads a command string, so `sh -c 'git stash'`, an
+# alias, a script, a file written by one command and run by the next, or text fed to a shell
+# through a coproc or a fifo reaches git without passing through here. It stops a model following a
+# habit, which is what the incidents were, and is not a boundary against an adversary. It reads
+# every `git` word as a git command, whatever runs it, so an unknown wrapper (`setsid git stash`)
+# is refused, as is an unquoted heredoc body naming `git stash`: that errs toward refusing. Three
+# refinements apply to a subagent's stash rule, on the python path only. A segment whose command,
+# after assignments, is `echo`, `printf`, `grep`, `egrep` or `fgrep` (not `rg`, whose `--pre` runs
+# a program) does not have its arguments read as git, but only at the top level, with no `|` or
+# `|&` anywhere after it in the command, no process substitution anywhere in it, and for printf no
+# `-v`: so `echo git stash` passes, while `echo git stash | sh`, `$(echo git stash)` and even
+# `echo git stash | grep stash` are refused, as is `echo git stash; ls | wc`. A heredoc body is
+# taken out before reading only when its delimiter word is wholly `'WORD'`, or `"WORD"` with no
+# backslash (`<<-` allowed), and the line it starts on ends with no open quote, `$(`, `${`,
+# backtick or `((`, so `git commit -F - <<'EOF'` passes and a body inside `git commit -m "$(cat
+# <<'EOF'` is read; after a delimiter such as `$'EOF'` or `\EOF` nothing more is taken out. Neither
+# of those two applies to a command in which any segment's command word, after redirections and
+# assignments, is a shell or evaluator (`sh`, `bash`, `zsh`, `dash`, `ksh`, `fish`, `eval`,
+# `source`, `.`, `exec` or `xargs`, also by path, such as `/bin/sh`), inside a substitution or
+# first in a process substitution too, or that nests substitutions past the depth below: that
+# command is read by the every-word scan alone, so `bash <<'EOF'` with `git stash` in its body and
+# `echo git stash > f; sh f` are refused. The shell is looked for only there, so one behind a
+# wrapper or keyword (`env sh f`, `{ sh f; }`), a script run by path (`./f`), or another
+# interpreter reading the file (`python3 f`) still runs text a reader wrote or a heredoc held,
+# unread. And redirections are dropped before git's words are read, so `git 2>/dev/null stash` is
+# a stash. The reviewer's rule, and the fallback for every subagent, read every `git` word and
+# every heredoc body, so the reviewer's `echo git stash` is refused. The fallback's option
+# pattern takes any word starting with `-` between `git` and the subcommand as an option, for the
+# reviewer's word list as for a subagent's stash, so an unknown one refuses more.
+# Two bounds cap what it reads, since a hook killed at the 10-second timeout in hooks/hooks.json
+# gives no decision at all. A command longer than 64 KB is refused unread when it names `git` for
+# the reviewer or `stash` for any other subagent: the parse of one 1 MB word took 11 seconds. And a
+# subagent's substitutions are read 32 deep, each level read again whole; past that, one naming
+# `stash` is refused unread. The bounds cap size and depth, not time: the scan grows faster than
+# linearly in `git` words, so some commands under 64 KB still run past the timeout.
 # Two more it does not see, as known gaps: `export GIT_DIR=...` or `export GIT_WORK_TREE=...` in an
 # earlier command moves git's target without the guard following it, since it reads only the
 # assignments written in front of git itself; and `reflog expire`, `submodule deinit` and
@@ -479,9 +505,40 @@ def judge_git(args, here, env):
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
 
+# For a subagent, the commands that only read or print their arguments, so a `git` among them is
+# text: `echo git stash` and `grep -n "git stash" notes.md` run no git. Not rg: `rg --pre` runs a
+# program. judge() says where the exemption holds, and segment() takes printf's -v out of it.
+READERS = {"echo", "printf", "grep", "egrep", "fgrep"}
+# The shells and evaluators, which run text as commands: a heredoc body or a file fed to one is
+# commands. A subagent's command in which any segment's command word is one of these, or a path
+# ending in one, is read whole: no reader exemption and no heredoc body taken out. `.` counts only
+# as the word itself, so `grep -rn x .` is not a source.
+SHELLS = {"sh", "bash", "zsh", "dash", "ksh", "fish", "eval", "source", "exec", "xargs"}
+COLLECTING = False                      # the first pass, which only looks for a shell
+SHELLED = False                         # what it found
+
+
+def without_redirections(words):
+    # A redirection is an operator word, its target, and an fd number in front of it, none of
+    # which is an argument to git: `git 2>/dev/null stash` runs `git stash`.
+    out, skip = [], False
+    for w in words:
+        if skip:
+            skip = False
+        elif w and set(w) <= set("<>&|") and set(w) & set("<>"):
+            if out and out[-1].isdigit():
+                out.pop()
+            skip = True
+        else:
+            out.append(w)
+    return out
+
+
 def scan_git(words, here):
     # Every git word in the command, not only the first, so `env X=1 git stash` and
     # `timeout 5 git stash` are read too, each with the GIT_ assignments written before it.
+    if not REVIEWING:
+        words = without_redirections(words)
     for k, w in enumerate(words):
         if w == "git" or w.endswith("/git"):
             env = [tuple(a.split("=", 1)) for a in words[:k]
@@ -489,10 +546,23 @@ def scan_git(words, here):
             judge_git(words[k + 1:], here, env)
 
 
-def segment(words, here, carries, after_or):
+def segment(words, here, carries, after_or, reads):
     # One simple command; returns the target after it and whether a cd moved it. A cd moves the
     # target of the commands after it, unless it runs in a pipeline or in the background, where
-    # bash gives it a subshell of its own.
+    # bash gives it a subshell of its own. reads says a reader here may keep its exemption.
+    global SHELLED
+    if COLLECTING:
+        # The command word after redirections and assignments, and the first word inside a
+        # process substitution, which shlex leaves among the words of the command around it.
+        plain = without_redirections(words)
+        k = 0
+        while k < len(plain) and ASSIGNMENT.match(plain[k]):
+            k += 1
+        heads = plain[k:k + 1] + [words[n + 1] for n in range(len(words) - 1)
+                                  if words[n].endswith(("<(", ">("))]
+        if any(w == "." or os.path.basename(w) in SHELLS for w in heads):
+            SHELLED = True
+        return here, False
     i = 0
     while i < len(words) and ASSIGNMENT.match(words[i]):
         i += 1
@@ -510,6 +580,11 @@ def segment(words, here, carries, after_or):
         if words[i] == "popd" or not args or args[0] == "-":
             return None, True           # a directory stack or $HOME: not one it can name
         return expand(args[0], here), True
+    if (not REVIEWING and not SHELLED and reads and i < len(words) and words[i] in READERS
+            and not (words[i] == "printf" and any(w.startswith("-v") for w in words[i + 1:]))):
+        # A reader's arguments are text, unless it is `printf -v`, which sets a variable a later
+        # `$x` can run.
+        return here, False
     scan_git(words, here)
     return here, False
 
@@ -566,10 +641,146 @@ DETACHED = {"|", "|&", "&"}
 UNCHAINED = {";", ";;", "\n", "||", "&"}
 
 
-def judge(text, here):
+def delimiter(text, i):
+    # The heredoc word after `<<` or `<<-` at i: (word, strips tabs, how, index after it). how is
+    # "quoted" for a word wholly 'WORD', or "WORD" with no backslash, "plain" for one with no
+    # quote, backslash, `$` or backtick, and None for any other, such as `$'EOF'` or `'E'"OF"`,
+    # whose end bash may find where this would not.
+    strip = text.startswith("-", i)
+    i += strip
+    while i < len(text) and text[i] in " \t":
+        i += 1
+    start = i
+    while i < len(text) and text[i] not in " \t\n;&|<>()":
+        c = text[i]
+        if c in "'\"":
+            k = text.find(c, i + 1)
+            i = len(text) if k < 0 else k + 1
+        else:
+            i += 2 if c == "\\" else 1
+    raw = text[start:i]
+    if (len(raw) >= 2 and raw[0] in "'\"" and raw.find(raw[0], 1) == len(raw) - 1
+            and not (raw[0] == '"' and "\\" in raw)):
+        return raw[1:-1], strip, "quoted", i
+    if any(c in raw for c in "'\"\\$`"):
+        return raw, strip, None, i
+    return raw, strip, "plain", i
+
+
+def unheredoc(text):
+    # A subagent's command with each quoted heredoc body taken out, since such a body is data, not
+    # commands, and nothing in it expands. Only a `<<` bash reads as one counts: outside quotes,
+    # comments, substitutions and arithmetic, and not `<<<`. Its body is taken out only when its
+    # delimiter is wholly 'WORD' or "WORD" and the line it starts on ends with nothing open: no
+    # quote, `$(`, `${`, backtick or `((`. Any other body stays in place, read as commands, which
+    # can only refuse more, and so does a body with no closing line. From a delimiter neither plain
+    # nor wholly quoted, such as `$'EOF'`, nothing more is taken out, since its end is not certain.
+    # A body is copied or dropped whole, never read for a `<<` of its own. The stack holds what is
+    # open, each entry its closer and its paren depth.
+    out, i, stack, pending = [], 0, [], []
+    while i < len(text):
+        c = text[i]
+        top = stack[-1][0] if stack else None
+        if c == "\n" and stack:
+            pending = []                # the line ends with something open: its bodies are read
+        elif top == "'":
+            if c == "'":
+                stack.pop()
+        elif c == "\\":
+            out.append(text[i:i + 2])
+            i += 2
+            continue
+        elif c == "\n" and not stack and pending:
+            out.append(c)
+            i += 1
+            for word, strip, quoted in pending:
+                body = i
+                while i < len(text):
+                    end = text.find("\n", i)
+                    end = len(text) if end < 0 else end
+                    line = text[i:end]
+                    i = end + 1
+                    if (line.lstrip("\t") if strip else line) == word:
+                        break
+                else:
+                    return "".join(out) + text[body:]
+                if not quoted:
+                    out.append(text[body:i])
+            pending = []
+            continue
+        elif text.startswith("$((", i) or (text.startswith("((", i) and top != '"'):
+            stack.append(["))", 0])
+            out.append(text[i:i + 3 if c == "$" else i + 2])
+            i += 3 if c == "$" else 2
+            continue
+        elif text.startswith(("$(", "${"), i):
+            stack.append([")" if text[i + 1] == "(" else "}", 0])
+            out.append(text[i:i + 2])
+            i += 2
+            continue
+        elif c == "`":
+            if top == "`":
+                stack.pop()
+            else:
+                stack.append(["`", 0])
+        elif top == '"':
+            if c == '"':
+                stack.pop()
+        elif c in "'\"":
+            stack.append([c, 0])
+        elif top and c in "({":
+            stack[-1][1] += 1
+        elif top and c in ")}":
+            if stack[-1][1]:
+                stack[-1][1] -= 1
+            elif top == "))" and text.startswith("))", i):
+                stack.pop()
+                out.append("))")
+                i += 2
+                continue
+            elif top == c:
+                stack.pop()
+        elif c == "#" and (i == 0 or text[i - 1] in " \t\n;&|()"):
+            end = text.find("\n", i)
+            end = len(text) if end < 0 else end
+            out.append(text[i:end])
+            i = end
+            continue
+        elif text.startswith("<<", i) and not stack:
+            # `<<<` is a here-string, taken whole so its last two characters do not read as `<<`.
+            word, strip, how, end = ("", 0, "plain", i + 3) if text.startswith("<<<", i) \
+                else delimiter(text, i + 2)
+            if word and how is None:
+                return "".join(out) + text[i:]  # its end is not certain: read the rest whole
+            if word:
+                pending.append((word, strip, how == "quoted"))
+            out.append(text[i:end])
+            i = end
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
+
+
+# The deepest substitution a subagent's command is read to. Each level is read again whole, so the
+# time grows with depth times length: 400 levels in 64 KB took seconds, where 32 takes a fraction of
+# one. Deeper than this, a subagent's command naming `stash` is refused unread.
+MAX_NESTING = 32
+
+
+def judge(text, here, depth=0):
+    global SHELLED
+    if not REVIEWING and depth > MAX_NESTING:
+        if COLLECTING:
+            SHELLED = True              # unread, so it may hold a shell: read the rest whole
+        elif "stash" in text:
+            refuse("this command nests substitutions more than %d deep, past the depth it reads,"
+                   " and names `stash`, so it is refused unread. Write the inner "
+                   "commands to a script file, or run them as separate commands." % MAX_NESTING)
+        return
     text, inner = lift(text)
     for sub in inner:
-        judge(sub, here)
+        judge(sub, here, depth + 1)
     # shlex splits words as the shell does, so a quoted `-m "a; b"` stays one word.
     # punctuation_chars makes the operators their own tokens; the newline is made one of them, and
     # taken out of the whitespace, because a newline separates commands as `;` does and shlex would
@@ -601,14 +812,19 @@ def judge(text, here):
                 items.append((False, t[k:]))
         else:
             items.append((False, t))
+    # A subagent's reader keeps its exemption only at the top level, never inside a substitution,
+    # with no pipe anywhere after it, so that a group or loop piped into a shell is caught too, and
+    # with no process substitution anywhere in the command, whose own commands sit among these.
+    last_pipe = max([k for k, (op, v) in enumerate(items) if op and v in ("|", "|&")] or [-1])
+    procsub = any(not op and ("<(" in v or ">(" in v) for op, v in items)
     stack, words, before, moved = [], [], None, False
-    for is_op, v in items + [(True, "\n")]:
+    for k, (is_op, v) in enumerate(items + [(True, "\n")]):
         if not is_op:
             words.append(v)
             continue
         if words:
             here, cd = segment(words, here, before not in DETACHED and v not in DETACHED,
-                               before == "||")
+                               before == "||", depth == 0 and k > last_pipe and not procsub)
             moved = moved or cd
             words = []
         if v == "(":
@@ -623,7 +839,26 @@ def judge(text, here):
         before = v
 
 
-judge(cmd, cwd)
+# The longest command read. Parsing grows faster than the command: one 1 MB word took 11 seconds,
+# past the hook's 10 in hooks/hooks.json, and a hook the harness kills gives no decision at all. A
+# longer command naming the word its rule acts on is refused unread. The bound caps size, not time:
+# the scan grows faster than linearly in `git` words, so some commands under it still pass the 10
+# seconds (16,000 `git` words then `; git stash` took about 13).
+MAX_COMMAND = 64 * 1024
+if len(cmd) > MAX_COMMAND and ("git" if REVIEWING else "stash") in cmd:
+    refuse("this command is %d characters, past the %d it reads, so it is "
+           "too long to read and is refused unread. Write long text to a file first and keep the "
+           "command itself short." % (len(cmd), MAX_COMMAND))
+if REVIEWING:
+    judge(cmd, cwd)
+else:
+    # Two passes over the same split, because a shell may come after the reader whose output it
+    # runs, as in `echo git stash > f; sh f`: the first finds any shell, the second judges.
+    stripped = unheredoc(cmd)
+    COLLECTING = True
+    judge(stripped, cwd)
+    COLLECTING = False
+    judge(cmd if SHELLED else stripped, cwd)
 PY
 decision="$(python3 -I -c "$script" <<<"$event")"
 status=$?

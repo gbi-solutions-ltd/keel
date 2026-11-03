@@ -114,7 +114,7 @@ Every task inherits these.
    `keel review-guard`.
 2. The two reading forms are allowed to it, read as git reads them: only the first word after
    `stash` is a subcommand, so the test is that word, not the first non-option word (`action` at
-   `hooks/review-guard:405` is the latter, and would read `git stash -m list` as `list`). Example:
+   `hooks/review-guard:453` is the latter, and would read `git stash -m list` as `list`). Example:
    `git stash list` and `git stash show -p stash@{0}` from `general-purpose` print nothing and exit
    0.
 3. The forms the parser already follows are followed for it too. Example: from `general-purpose`,
@@ -527,6 +527,43 @@ passes, with `git commit -m "docs: record the review-guard follow-ups"`.
    two refinements above apply on the python path only. Example: with python3 off the PATH, a
    subagent's `echo git stash` is still refused; the header states it.
 
+**Redesigned during execution, 2026-11-02.** The first build counted a subagent's `git` only at
+command position or after a closed list of wrappers. Its quality review found real stashes it newly
+allowed: a `<<` inside arithmetic read as a heredoc, a second `find -exec` action, `{fd}>`
+redirections, a heredoc whose line opens `$(`, wrappers such as `arch` and `caffeinate`, and nested
+`$(` pushing a sub-64 KB parse past 10 s. So the design is inverted, so that the unknown is refused:
+a subagent's commands keep the old every-`git`-word scan, with one exemption, a segment whose command
+(after assignments) is a known non-executing reader, `echo`, `printf`, `grep`, `egrep`, `fgrep` or
+`rg`, whose arguments are not read as git; and a heredoc body is skipped only when its delimiter is
+quoted (`<<'EOF'` or `<<"EOF"`) and the line it starts on ends balanced. Heredoc stripping runs once,
+at the top level, and substitution nesting is capped, so a command under the bound parses quickly.
+Behaviour 1's unquoted `<<EOF` example is therefore refused when its body names `git stash`, which
+errs toward refusing; behaviour 2's wrapper refusals hold through the every-word scan. The size bound
+applies to the reviewer too, which refuses a long command where it once timed out and let it run.
+
+**Second review of the redesign, 2026-11-03.** It found three real stashes the redesign allowed
+and HEAD refused, so three rules tighten it: the reader exemption applies only to a top-level segment
+not piped onward (`|` or `|&`), and never inside a substitution, so `$(echo git stash)`,
+`x=$(echo git stash); $x`, `eval "$(echo git stash)"` and `echo git stash | sh` are refused; `rg` is
+not a reader, because `rg --pre` runs a program; and a heredoc body is skipped only when the
+delimiter word is wholly `'WORD'` or `"WORD"`, so `<<$'EOF'` and `<<$"EOF"` keep their bodies read.
+Its timing finding is HEAD's too: the scan grows faster than linearly in `git` words, and some
+commands under 64 KB pass the 10 s hook timeout, so the bound does not promise a fast parse.
+Its fix pass left two allowed that HEAD refused, `bash <<'EOF'` with a body naming `git stash`
+and `echo git stash > f; sh f`, so a fourth rule closes them: a command in which any segment's
+command word (after assignments) is a shell or evaluator, `sh`, `bash`, `zsh`, `dash`, `ksh`,
+`fish`, `eval`, `source`, `.`, `exec` or `xargs`, gets neither the reader exemption nor heredoc
+stripping, and is read by the every-word scan alone.
+
+**Decided, 2026-11-03, Bernard.** Its review still found about 30 forms that write text naming
+`git stash` and then run it (`echo git stash > f; ./f`, `env bash <<'EOF'`, `crontab f`) allowed
+where HEAD refused them. Task 6 lands as staged, and the bar is restated to match ADR-0016's threat,
+a habit and not an adversary: every direct `git … stash` form, and every form HEAD's tests refuse,
+is refused; text written and then run is a stated limit, named in the hook's header, of the same
+class as `sh -c 'git stash'`, which HEAD allows. The 10 s timeout gap (a command under 64 KB with
+about 16,000 `git` words outlasts the hook, which then allows it, as at HEAD) is a follow-up, not
+part of this plan.
+
 The header's "ITS LIMIT" paragraph is rewritten to state what is true now: the subagent rule reads
 commands that run and skips heredoc bodies; the reviewer's rule and the fallback read every `git`
 word; the size bound and its reason.
@@ -590,6 +627,15 @@ The coordinator commits after both review passes, with
    longer tells a subagent from the main session.
 4. ADR-0016 names the probe and the runbook step as the control for its dependency on `agent_id`,
    and `CHANGELOG.md`'s Unreleased section has an entry for the probe and for task 6's change.
+5. ADR-0016 says what task 6 made true. Example: where it says the hook reads every `git` word and
+   heredoc body so a subagent's `echo git stash` is refused, it says a subagent's rule, on the
+   python path, keeps the every-word scan with two exemptions, a top-level `echo`, `printf`, `grep`,
+   `egrep` or `fgrep` not piped onward, and a heredoc body under a wholly quoted delimiter, both
+   dropped when the command runs a shell or evaluator; that text written and then run is a stated
+   limit; and that the reviewer's rule and the fallback read every `git` word. Its verification list
+   says a subagent's `echo git stash` and `git commit -F - <<'EOF'` body are allowed, its
+   `echo git stash | sh` and `bash <<'EOF'` body are refused, the reviewer's `echo git stash` is
+   refused, and a command past 64 KB is refused unread.
 
 **Done when:** `bash -n tests/probe-agent-id.sh` and the profile's lint command pass, and the
 missing-`claude` run exits 2. Then run the probe once for real and quote its output.
@@ -633,14 +679,14 @@ pass, with `git commit -m "test: a scripted re-probe of agent_id, run at each re
 
 - review-code: nothing blocking, no standards violation open (2026-11-02, base 1327bc8, re-review of 75fe56a)
 - review-code round 1: 3 blocking (2026-11-02, base 1327bc8)
-  - a mutant making an empty `agent_id` count survived: no fallback case for it (hooks/review-guard:95)
-  - a mutant narrowing `list|show` to `list` survived: no fallback case for `stash show` (hooks/review-guard:107)
-  - a mutant dropping `--config-env` from the fallback's value options survived; `--super-prefix` has the same shape (hooks/review-guard:93)
+  - a mutant making an empty `agent_id` count survived: no fallback case for it (hooks/review-guard:133)
+  - a mutant narrowing `list|show` to `list` survived: no fallback case for `stash show` (hooks/review-guard:143)
+  - a mutant dropping `--config-env` from the fallback's value options survived; `--super-prefix` has the same shape (hooks/review-guard:128)
 - follow-ups taken as tasks 4 and 5 (2026-11-02, Bernard asked to handle them before merging): all
   but the heredoc and `echo` refusal, which task 4 states as a limit rather than removes
 - tasks 4 and 5: spec and quality passes on task 4 (one fix pass), spec pass on task 5, a security audit of the hook change with 0 findings; not re-run through review-code (2026-11-02)
 - follow-up:
   - consider: the ledger requires only `pretooluse_agent_type` while the rule keys on `agent_id`; a separate row could follow (lib/harness/capabilities)
   - consider: a main session started as `--agent keel:keel-reviewer` gets the reviewer rules (hooks/review-guard header)
-  - consider: the fallback's catch-all option pattern widens the reviewer's fallback too; the header says it only for a subagent (hooks/review-guard:93)
+  - consider: the fallback's catch-all option pattern widens the reviewer's fallback too; the header says it only for a subagent (hooks/review-guard:128)
   - consider: open question 2 in the idea record reads as a correction rather than current state (docs/ideas/implementers-run-git-stash.md)

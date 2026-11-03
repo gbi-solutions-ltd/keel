@@ -3,8 +3,8 @@
 # Tests for hooks/review-guard, which refuses a keel reviewer the git commands that would change the
 # author's checkout or the state every worktree shares, and refuses every other subagent a
 # stash-writing `git stash`. Task 1 of docs/plans/2026-10-17-reviewer-git-guard.md, behaviours 2 to
-# 6, and tasks 1, 1b and 4 of docs/plans/2026-11-02-hold-a-subagents-git-stash.md, behaviours 1
-# to 7, 1 to 3 and 1 to 5, one case per example there.
+# 6, and tasks 1, 1b, 4 and 6 of docs/plans/2026-11-02-hold-a-subagents-git-stash.md, behaviours 1
+# to 7, 1 to 3, 1 to 5 and 1 to 5, one case per example there.
 #
 # Every case feeds the hook a PreToolUse event as JSON on stdin, as tests/test-sensitive-guard.sh
 # feeds its hook, and asserts on what it prints. A refusal is checked by its JSON and an allowance
@@ -529,9 +529,188 @@ if [ -x /bin/bash ]; then
     run "$(event 'we"ird' 'git stash' "$repo" a7)" "$repo" PATH="$shim" /bin/bash
     expect_deny "under /bin/bash without python3, a subagent named we\"ird is refused git stash"
 fi
-# Behaviour 5: every git word and every heredoc body is read as a command, so a subagent's
-# `echo git stash` is refused. The header states this limit; this case observes it.
-deny "a subagent's echo git stash is refused, a stated limit" "$SUB" 'echo git stash' "$repo"
+# Behaviour 5 there, a subagent's `echo git stash` refused as a stated limit, is replaced by task 6.
+
+# --- a subagent's stash rule skips readers and quoted heredoc bodies, and bounds its time ---------
+# Task 6 of docs/plans/2026-11-02-hold-a-subagents-git-stash.md, as redesigned during execution.
+# Behaviour 1: a heredoc body is skipped only when its delimiter is quoted and the line it starts on
+# ends with nothing open; any other body is read as commands, which errs toward refusing.
+for c in $'cat <<\'EOF\' > notes.md\nrun git stash to save\nEOF' \
+         $'git commit -F - <<\'EOF\'\nfix: avoid git stash\nEOF' \
+         $'cat <<-\'EOF\' > notes.md\n\tgit stash\n\tEOF' \
+         $'cat <<\'EOF\'\ngit stash\nEOF' \
+         $'cat <<"EOF"\ngit stash\nEOF' \
+         $'cat <<\'A\' <<"B"\ngit stash\nA\ngit stash\nB'; do
+    allow "a subagent's quoted heredoc body naming git stash is allowed: ${c//$'\n'/ / }" "$SUB" "$c" "$repo"
+done
+for c in $'git commit -F - <<EOF\nfix: avoid git stash\nEOF' \
+         $'cat <<-EOF > notes.md\n\tgit stash\n\tEOF' \
+         $'cat <<EOF\ngit stash\nEOF' \
+         $'cat <<\'A\' <<B\nx\nA\ngit stash\nB' \
+         $'git commit -m "$(cat <<\'EOF\'\nfix(x): git stash\nEOF\n)"' \
+         $'x=$(cat <<\'EOF\'\ngit stash\nEOF\n)' \
+         $'cat <<\'EOF\' $(\ngit stash\n)\nx\nEOF' \
+         $'(( y = 1 <<\'X\' ))\ngit stash\nX' \
+         $'echo ${x:-<<\'X\'}\ngit stash\nX' \
+         $'echo "<<\'X\'"\ngit stash\nX' \
+         $'# <<\'X\'\ngit stash\nX'; do
+    deny "a subagent's heredoc body read as commands is refused: ${c//$'\n'/ / }" "$SUB" "$c" "$repo"
+done
+for c in $'cat <<\'EOF\'\nx\nEOF\ngit stash' \
+         $'cat <<-\'EOF\'\n\tx\n\tEOF\ngit stash' \
+         $'cat <<\'EOF\' | git stash\nx\nEOF' \
+         $'cat <<\'A\' <<\'B\'\nx\nA\ny\nB\ngit stash' \
+         $'cat <<\'EOF\'\ngit stash' \
+         $'cat <<EOF\nx\nEOF\ngit stash' \
+         $'cat <<-EOF\n\tx\n\tEOF\ngit stash' \
+         $'cat <<EOF | git stash\nx\nEOF' \
+         $'cat <<A <<B\nx\nA\ny\nB\ngit stash' \
+         $'cat <<EOF\ngit stash' \
+         $'cat <<EOF\ndon\'t $(git stash)\nEOF' \
+         $'cat <<EOF\n`git stash`\nEOF' \
+         $'echo \'<<EOF\'\ngit stash\nEOF' \
+         $'cat <<<"hi"\ngit stash\nhi'; do
+    deny "a subagent's stash outside a quoted heredoc body is refused: ${c//$'\n'/ / }" "$SUB" "$c" "$repo"
+done
+# Behaviour 2: a segment whose command is echo, printf, grep, egrep or fgrep does not have its
+# arguments read as git; every other segment has every git word read, as the reviewer's does. rg is
+# not a reader, and `rg "git stash" docs` passes only because its quoted text is one word.
+for c in 'echo git stash' "printf 'git stash\n'" 'grep -n "git stash" notes.md' \
+         'egrep "git stash" notes.md' 'fgrep "git stash" notes.md' 'rg "git stash" docs' \
+         'A=1 echo git stash' 'git log --grep stash' 'echo x # git stash'; do
+    allow "a subagent's $c is allowed" "$SUB" "$c" "$repo"
+done
+for c in 'env A=1 git stash' 'timeout 5 git stash' 'command git stash' 'xargs git stash' \
+         'nice -n 5 git stash' '/usr/bin/git stash' 'A=1 git stash' 'exec git stash' \
+         'nohup git stash' 'time git stash' 'sudo -Eu root git stash' 'env - git stash' \
+         'stdbuf -oL git stash' "find . -exec git stash \;" 'eval git stash' \
+         'if true; then git stash; fi' '{ git stash; }' '! git stash' \
+         '2>/dev/null git stash' 'git 2>/dev/null stash' 'git stash 2>/dev/null' \
+         'true && git stash' 'echo x | git stash' 'echo x; git stash' 'diff <(git stash) x' \
+         'cat < <(git stash)' '"git" stash' 'echo $(git stash)' 'echo `git stash`' \
+         'echo <(git stash)' 'grep x <(git stash)' 'printf %s >(git stash)' '(git stash)' \
+         'function f { git stash; }; f' 'coproc git stash' 'coproc c { git stash; }' \
+         'while git stash; do :; done' 'time -p git stash' 'sudo git stash' 'sudo -ur git stash' \
+         'nice -n5 git stash' 'nice -5 git stash' 'timeout -s KILL 5 git stash' \
+         'timeout --signal=KILL 5 git stash' '/usr/bin/env git stash' 'env -u X git stash' \
+         'env -- git stash' 'sudo env A=1 nice git stash' 'xargs -I{} git stash' \
+         'xargs -n 1 git stash' 'flock /tmp/l git stash' 'ionice -c3 git stash' 'watch git stash' \
+         'watch -n 1 git stash' 'noglob git stash' 'nocorrect git stash' \
+         "find . -maxdepth 0 -execdir git stash \\;" "find . -maxdepth 0 -ok git stash \\;" \
+         "find . -maxdepth 0 -okdir git stash \\;"; do
+    deny "a subagent's $c is refused" "$SUB" "$c" "$repo"
+done
+# The quality review's examples against the first build: each ran a real stash and was let through.
+for c in $'echo $(( 1 << 2 ))\ngit stash\n2' $'(( y = 1 << 3 ))\ngit stash\n3' \
+         $'for ((i=0; i<<1; i++)); do :; done\ngit stash\n1' \
+         'find . -exec echo {} \; -exec git stash +' '{fd}>/tmp/x git stash' \
+         $'cat <<EOF $(\ngit stash\n)\nx\nEOF' 'arch -arm64 git stash' 'caffeinate -i git stash' \
+         'script -q /dev/null git stash' 'setsid git stash' 'doas git stash'; do
+    deny "a subagent's ${c//$'\n'/ / } is refused" "$SUB" "$c" "$repo"
+done
+allow "a subagent's stdbuf -oL git stash list is allowed" "$SUB" 'stdbuf -oL git stash list' "$repo"
+allow "a subagent's find . -name '*.md' is allowed" "$SUB" "find . -name '*.md'" "$repo"
+allow "a subagent's git stash list 2>/dev/null is allowed" "$SUB" 'git stash list 2>/dev/null' "$repo"
+allow "a subagent's timeout 5 git stash list is allowed"   "$SUB" 'timeout 5 git stash list' "$repo"
+# The second review of the redesign, 2026-11-03: each ran a real stash and was let through. A
+# reader is exempt only at the top level, with no pipe after it, no process substitution in the
+# command, and, for printf, no -v; and only a delimiter wholly 'WORD' or "WORD" has its body skipped.
+for c in '$(echo git stash)' '`echo git stash`' '$(echo git stash) list' \
+         'x=$(echo git stash); $x' 'eval "$(echo git stash)"' 'sh -c "$(echo git stash)"' \
+         'bash <<<"$(echo git stash)"' 'echo git stash | sh' 'echo git stash |& sh' \
+         'echo git stash | grep stash' '{ true; echo git stash; } | sh' \
+         '(true; echo git stash) | sh' 'for i in 1; do :; echo git stash; done | sh' \
+         'sh <(true; echo git stash)' '{ true; echo git stash; } > >(sh)' \
+         "printf -v x '%s %s' git stash; \$x" 'rg --pre git stash stash' \
+         $'cat <<$\'EOF\'\nx\nEOF\ngit stash\n$EOF' $'cat <<$"EOF"\nx\nEOF\ngit stash\n$EOF' \
+         $'cat <<$\'E\'"OF"\nx\nEOF\ngit stash\n$EOF' $'cat <<"E\\\\F"\nx\nE\\F\ngit stash\nE\\\\F' \
+         $'cat <<$\'A\' <<\'B\'\nA\nB\n$A\ngit stash\nB'; do
+    deny "a subagent's ${c//$'\n'/ / } is refused" "$SUB" "$c" "$repo"
+done
+for c in "printf '%s\n' 'git stash'" 'cat notes.md | grep git stash'; do
+    allow "a subagent's $c is allowed" "$SUB" "$c" "$repo"
+done
+# The fourth rule, from the fix pass's review: a command in which any segment's command word, after
+# redirections and assignments, is a shell or evaluator gets neither the reader exemption nor
+# heredoc stripping, so a body or a file fed to one is read as commands.
+for c in $'bash <<\'EOF\'\ngit stash\nEOF' 'echo git stash > f; sh f' \
+         $'zsh <<\'EOF\'\ngit stash\nEOF' $'/bin/sh <<\'EOF\'\ngit stash\nEOF' \
+         "printf '%s %s' git stash > f; . f" 'echo git stash > f; source f' \
+         $'cat <<\'EOF\' | sh\ngit stash\nEOF' 'echo git stash > f; 2>/dev/null A=1 sh f' \
+         $'cat <<\'EOF\' > >(sh)\ngit stash\nEOF' 'echo git stash > f; x=$(bash f)'; do
+    deny "a subagent's ${c//$'\n'/ / } is refused" "$SUB" "$c" "$repo"
+done
+for c in $'cat <<\'EOF\' > notes.md\nrun git stash to save\nEOF' 'echo git stash' \
+         'grep -rn "git stash" .'; do
+    allow "a subagent's ${c//$'\n'/ / } is allowed" "$SUB" "$c" "$repo"
+done
+# Behaviour 3: the reviewer still reads every git word and every heredoc body.
+deny "the reviewer's echo git stash is still refused" "$REVIEWER" 'echo git stash' "$repo"
+deny "the reviewer's heredoc body naming git stash is still refused" "$REVIEWER" \
+     $'cat <<\'EOF\'\ngit stash\nEOF' "$repo"
+# Behaviour 4: a command past 64 KB is refused unread, and quickly. sized <agent> <agent_id> <bytes>
+# prints an event whose command is a `git status` padded to that length with one long word and a
+# trailing `# stash`, built in python because a command that long cannot pass through the
+# environment on Linux. One long word is what made the unbounded parse take 11 seconds at 1 MB.
+sized() {
+    AT="$1" AID="$2" N="$3" CWD="$repo" python3 -c '
+import json, os
+tail = " # stash"
+pad = "x" * int(os.environ["N"])
+cmd = ("git status " + pad)[:int(os.environ["N"]) - len(tail)] + tail
+ev = {"session_id": "s", "hook_event_name": "PreToolUse", "tool_name": "Bash",
+      "tool_input": {"command": cmd}, "cwd": os.environ["CWD"]}
+if os.environ["AT"] != "-":
+    ev["agent_type"], ev["agent_id"] = os.environ["AT"], os.environ["AID"]
+print(json.dumps(ev))'
+}
+now() { python3 -c 'import time; print(time.time())'; }
+ev="$(sized "$SUB" a7 1100000)"
+t0="$(now)"; run "$ev" "$repo"; t1="$(now)"
+expect_deny "a subagent's command past 64 KB is refused"
+reason_has  "and the reason says it is too long to read" 'too long to read'
+if python3 -c 'import sys; sys.exit(float(sys.argv[2]) - float(sys.argv[1]) >= 1)' "$t0" "$t1"; then
+    ok "and it is refused in under a second"
+else bad "and it is refused in under a second" "took $t0 to $t1"; fi
+run "$(sized "$SUB" a7 70000)" "$repo"
+expect_deny "a subagent's command just past 64 KB is refused"
+run "$(sized "$SUB" a7 60000)" "$repo"
+expect_allow "the same subagent command under 64 KB is allowed"
+run "$(sized "$REVIEWER" a7 70000)" "$repo"
+expect_deny "a reviewer's command past 64 KB naming git is refused"
+reason_has  "and the reviewer's reason says it is too long to read" 'too long to read'
+run "$(sized - - 1100000)" "$repo"
+expect_allow "a main session's 1 MB command is allowed"
+# Substitutions nested 400 deep, under 64 KB, are decided in under 3 seconds: the first build reran
+# its heredoc pass at every level and took 15. Past the nesting cap a subagent's stash is refused.
+ev="$(CWD="$repo" python3 -c '
+import json, os
+cmd = "echo " + ("$(echo " + "x" * 150 + " ") * 400 + "git stash" + ")" * 400
+assert len(cmd) < 65536, len(cmd)
+print(json.dumps({"session_id": "s", "hook_event_name": "PreToolUse", "tool_name": "Bash",
+                  "tool_input": {"command": cmd}, "cwd": os.environ["CWD"],
+                  "agent_type": "general-purpose", "agent_id": "a7"}))')"
+t0="$(now)"; run "$ev" "$repo"; t1="$(now)"
+expect_deny "a subagent's stash under 400 nested substitutions is refused"
+reason_has  "and the reason names the nesting" 'nests substitutions'
+if python3 -c 'import sys; sys.exit(float(sys.argv[2]) - float(sys.argv[1]) >= 3)' "$t0" "$t1"; then
+    ok "and it is decided in under 3 seconds"
+else bad "and it is decided in under 3 seconds" "took $t0 to $t1"; fi
+# Behaviour 5: the fallback still reads every git word, and the header says the refinements are the
+# python path's only.
+run "$(event "$SUB" 'echo git stash' "$repo")" "$repo" PATH="$shim"
+expect_deny "without python3 a subagent's echo git stash is still refused"
+if grep -q 'on the python path only' "$GUARD"; then ok "the header says the refinements are the python path's only"
+else bad "the header says the refinements are the python path's only" "no 'on the python path only' in the header"; fi
+if grep -q 'parses in a fraction of' "$GUARD"; then
+    bad "the hook no longer says 64 KB parses in a fraction of a second" "it still does"
+else ok "the hook no longer says 64 KB parses in a fraction of a second"; fi
+if [ -x /bin/bash ]; then
+    run "$(event "$SUB" $'cat <<\'EOF\'\ngit stash\nEOF' "$repo")" "$repo" /bin/bash
+    expect_allow "under /bin/bash, a subagent's heredoc body naming git stash is allowed"
+    run "$(event "$SUB" 'env A=1 git stash' "$repo")" "$repo" /bin/bash
+    expect_deny "under /bin/bash, a subagent's env A=1 git stash is refused"
+fi
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
