@@ -570,7 +570,7 @@ word; the size bound and its reason.
 
 **Done when:** `tests/test-review-guard.sh` passes, and the profile's lint command passes.
 
-- [ ] **Step 6.1: Build it test first**
+- [x] **Step 6.1: Build it test first**
 
 Follow `keel:tdd` for behaviours 1, 2 and 4: write the cases, run them, and watch the allow cases
 of 1 and 2 and the refusal and timing of 4 fail (today the parser reads every `git` word and
@@ -582,7 +582,7 @@ output in your report. Also run the file under `/bin/bash` by name.
 Run: `tests/run-tests.sh`
 Expected: PASS, or reds this task did not cause, each named.
 
-- [ ] **Step 6.2: Hand over**
+- [x] **Step 6.2: Hand over** Note: rounds: 4; routing: inherit; loop: full; the first build's quality review found real stashes it newly allowed, so the design was inverted; two adversarial reviews and two fix passes tightened it; Bernard then restated the bar (text written and then run is a stated limit) on 2026-11-03; the last fix pass was not re-reviewed; committed as 04b259c with a message stating the final design, not the plan's
 
 ```bash
 git add hooks/review-guard tests/test-review-guard.sh
@@ -640,7 +640,7 @@ The coordinator commits after both review passes, with
 **Done when:** `bash -n tests/probe-agent-id.sh` and the profile's lint command pass, and the
 missing-`claude` run exits 2. Then run the probe once for real and quote its output.
 
-- [ ] **Step 7.1: Build it, check what runs without Claude Code, then run it**
+- [x] **Step 7.1: Build it, check what runs without Claude Code, then run it**
 
 Write the script, run the missing-`claude` check and watch it exit 2 with the message, run the
 lint, then run the probe for real against the installed Claude Code and quote every line it prints.
@@ -648,7 +648,7 @@ Then edit the runbook, ADR-0016 and CHANGELOG.
 Run: `tests/run-tests.sh`
 Expected: PASS.
 
-- [ ] **Step 7.2: Hand over**
+- [x] **Step 7.2: Hand over** Note: rounds: 2; routing: inherit; loop: full; spec DEVIATES on one CHANGELOG clause and quality found the probe ran under bypassPermissions with the user's whole config; a fix pass narrowed it to the two marker commands and Agent in dontAsk mode, project settings only, no MCP servers, and re-ran the probe on 2.1.317, 3 of 3 PASS; committed as 655bd6f
 
 ```bash
 git add tests/probe-agent-id.sh docs/runbooks/cutting-a-release.md \
@@ -685,8 +685,12 @@ pass, with `git commit -m "test: a scripted re-probe of agent_id, run at each re
 - follow-ups taken as tasks 4 and 5 (2026-11-02, Bernard asked to handle them before merging): all
   but the heredoc and `echo` refusal, which task 4 states as a limit rather than removes
 - tasks 4 and 5: spec and quality passes on task 4 (one fix pass), spec pass on task 5, a security audit of the hook change with 0 findings; not re-run through review-code (2026-11-02)
+- tasks 6 and 7: spec and adversarial quality passes on each, four rounds on task 6 and two on
+  task 7; the probe ran for real on Claude Code 2.1.317, 3 of 3 PASS (2026-11-03)
 - follow-up:
   - consider: the ledger requires only `pretooluse_agent_type` while the rule keys on `agent_id`; a separate row could follow (lib/harness/capabilities)
   - consider: a main session started as `--agent keel:keel-reviewer` gets the reviewer rules (hooks/review-guard header)
   - consider: the fallback's catch-all option pattern widens the reviewer's fallback too; the header says it only for a subagent (hooks/review-guard:128)
   - consider: open question 2 in the idea record reads as a correction rather than current state (docs/ideas/implementers-run-git-stash.md)
+  - follow-up: a command under 64 KB with about 16,000 `git` words outlasts the hook's 10 s timeout, which then allows it, as at HEAD; a bound on `git` words would close it (hooks/review-guard, decided 2026-11-03)
+  - consider: record 2.1.317 on the `pretooluse_agent_id` row (lib/harness/capabilities)
