@@ -3,8 +3,8 @@
 # Tests for hooks/review-guard, which refuses a keel reviewer the git commands that would change the
 # author's checkout or the state every worktree shares, and refuses every other subagent a
 # stash-writing `git stash`. Task 1 of docs/plans/2026-10-17-reviewer-git-guard.md, behaviours 2 to
-# 6, and tasks 1, 1b, 4 and 6 of docs/plans/2026-11-02-hold-a-subagents-git-stash.md, behaviours 1
-# to 7, 1 to 3, 1 to 5 and 1 to 5, one case per example there.
+# 6, and tasks 1, 1b, 4, 6 and 8 of docs/plans/2026-11-02-hold-a-subagents-git-stash.md, behaviours
+# 1 to 7, 1 to 3, 1 to 5, 1 to 5 and 1 to 3, one case per example there.
 #
 # Every case feeds the hook a PreToolUse event as JSON on stdin, as tests/test-sensitive-guard.sh
 # feeds its hook, and asserts on what it prints. A refusal is checked by its JSON and an allowance
@@ -711,6 +711,73 @@ if [ -x /bin/bash ]; then
     run "$(event "$SUB" 'env A=1 git stash' "$repo")" "$repo" /bin/bash
     expect_deny "under /bin/bash, a subagent's env A=1 git stash is refused"
 fi
+
+# --- a line continued with a backslash is read as one line --------------------------------------
+# Task 8 of docs/plans/2026-11-02-hold-a-subagents-git-stash.md. bash removes a backslash and the
+# newline after it, outside single quotes, comments and quoted heredoc bodies, before it reads the
+# words; shlex instead kept the newline inside the next word, so `git \`, `stash` reached git unread.
+# Behaviour 1: on the python path, for a subagent and for the reviewer.
+deny  "a subagent's git \\, stash is refused"            "$SUB"      $'git \\\nstash' "$repo"
+deny  "a subagent's true &&\\, git stash is refused"     "$SUB"      $'true &&\\\ngit stash' "$repo"
+deny  "a subagent's grep x f |\\, git stash is refused"  "$SUB"      $'grep x f |\\\ngit stash' "$repo"
+deny  "a subagent's gi\\, t stash is refused"            "$SUB"      $'gi\\\nt stash' "$repo"
+deny  "a reviewer's git \\, commit -m x is refused"      "$REVIEWER" $'git \\\ncommit -m x' "$repo"
+allow "a subagent's git \\, status is allowed"           "$SUB"      $'git \\\nstatus' "$repo"
+allow "a subagent's git stash \\, list is allowed"       "$SUB"      $'git stash \\\nlist' "$repo"
+allow "a quoted heredoc body line ending in \\ stays data" "$SUB" $'cat <<\'EOF\' > notes.md\nrun git stash \\\nEOF\ngit status' "$repo"
+allow "a continued line's quoted heredoc starts after it" "$SUB" $'cat <<\'EOF\' \\\n> notes.md\ngit stash\nEOF' "$repo"
+# Joined before the heredoc pass, `a \` would swallow the first EOF, and the second would close the
+# body over the stash.
+deny  "a stash after a quoted body whose line ends in \\ is refused" "$SUB" $'cat <<\'EOF\'\na \\\nEOF\ngit stash\nEOF' "$repo"
+# A comment is not continued by bash, so its trailing backslash does not join the next line to it.
+deny  "a comment ending in \\ does not hide the next line"  "$SUB" $'echo hi # x \\\ngit stash' "$repo"
+# A `#` that a join or a substitution puts mid-word starts no comment, so its line still joins.
+deny  "a # after a joined line is not a comment"           "$SUB" $'echo a\\\n#b; git \\\nstash' "$repo"
+deny  "a # after a substitution is not a comment"          "$SUB" $'echo $(true)#b; git \\\nstash' "$repo"
+# In an unquoted heredoc body bash does join a continued line, so the line after it cannot close it.
+deny  "an unquoted body's continued line does not close it" "$SUB" $'cat <<EOF\na \\\nEOF\ntee <<\'X\'\nEOF\ngit stash\nX' "$repo"
+deny  "a shell's quoted body with git \\, stash is refused" "$SUB" $'bash <<\'EOF\'\ngit \\\nstash\nEOF' "$repo"
+# Behaviour 2: the fallback refuses the same subagent examples.
+for c in $'git \\\nstash' $'true &&\\\ngit stash' $'grep x f |\\\ngit stash'; do
+    run "$(event "$SUB" "$c" "$repo")" "$repo" PATH="$shim"
+    expect_deny "without python3 a subagent's ${c//$'\n'/ } is refused"
+done
+run "$(event "$REVIEWER" $'git \\\ncommit -m x' "$repo")" "$repo" PATH="$shim"
+expect_deny "without python3 a reviewer's git \\, commit -m x is refused"
+run "$(event "$SUB" $'git \\\nstash \\\nlist' "$repo")" "$repo" PATH="$shim"
+expect_allow "without python3 a subagent's git \\, stash \\, list is allowed"
+# Behaviour 3: the header counts its refinements and states the reviewer's redirection limit.
+if grep -q 'Three refinements' "$GUARD"; then bad "the header no longer says three refinements" "it still does"
+else ok "the header no longer says three refinements"; fi
+if grep -q 'Four refinements' "$GUARD"; then ok "the header says four refinements"
+else bad "the header says four refinements" "no 'Four refinements' in the header"; fi
+if grep -q "reviewer's \`git 2>/dev/null stash\` is allowed" "$GUARD"; then ok "the header states the reviewer's redirection limit"
+else bad "the header states the reviewer's redirection limit" "not found"; fi
+if [ -x /bin/bash ]; then
+    run "$(event "$SUB" $'git \\\nstash' "$repo")" "$repo" /bin/bash
+    expect_deny "under /bin/bash, a subagent's git \\, stash is refused"
+fi
+# Decided after review: no comment detector. A command is judged as written, and again with each
+# `#` that begins a word stripped to the end of its line, and is refused if either refuses. As
+# written, a `#` after an escaped blank or symbol, or inside `${`, starts no comment, so the git in
+# its substitution is read; stripped, quotes in two comments cannot join the lines between them.
+for c in $'true ${KEEL_NOPE_X:- #`git stash`}' $'true \\ #`git stash`' $'true x\\;#`git stash`' \
+         $'true \\\t#`git stash`' $'true ${KEEL_NOPE_X:-\n#`git stash`}' \
+         $'true ${KEEL_NOPE_X:- #`git stash` \\\n}' \
+         $'# don\'t\ngit stash\n# won\'t' $'true # don\'t\ngit stash\ntrue # won\'t' \
+         $'true a#b # don\'t\ngit stash\ntrue a#b # won\'t' $'# say "hi\ngit stash\n# "' \
+         $'true\n# don\'t\ngit stash\n# won\'t' "git 2>/dev/null stash # don't" \
+         $'true;# don\'t\ngit stash\ntrue;# won\'t'; do
+    deny "a subagent's ${c//$'\n'/ / } is refused" "$SUB" "$c" "$repo"
+done
+for c in $'true ${KEEL_NOPE_X:- #`git commit -m x`}' $'# don\'t\ngit commit -m x\n# won\'t'; do
+    deny "a reviewer's ${c//$'\n'/ / } is refused" "$REVIEWER" "$c" "$repo"
+done
+for c in "echo hi # don't stash anything" "git status # it's fine" \
+         $'cat <<\'EOF\' > notes.md\n# don\'t run git stash\nit\'s #1: don\'t git stash\nEOF\ngit status' \
+         $'cat <<EOF <<\'X\'\na \\\\\nEOF\ngit stash\nX' $'true a#b\'\ngit stash\n\''; do
+    allow "a subagent's ${c//$'\n'/ / } is allowed" "$SUB" "$c" "$repo"
+done
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

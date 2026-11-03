@@ -684,16 +684,24 @@ asked to fix it in this PR on 2026-11-03.
 3. The header counts its subagent refinements correctly, and says the reviewer's rule does not drop
    redirections, so a reviewer's `git 2>/dev/null stash` is allowed, as a stated limit.
 
+**Decided after review, 2026-11-03, Bernard.** The re-review found that the comment detector the
+first build added lets `true \ #`git stash`` and `true ${X:- #`git stash`}` through, which HEAD
+refused, and that quotes in two comments (`# don't`, `git stash`, `# won't`) join into one word
+that hides a stash, as at 132ff89. So the hook keeps the backslash join, drops the comment detector,
+and judges a command twice: as written, and with each `#` that begins a word stripped to the end of
+its line; it refuses if either judgement refuses. A second judgement can only add refusals, so no
+exact comment detector is needed. Each form the re-review named gets a case.
+
 **Done when:** `tests/test-review-guard.sh` passes, also under `/bin/bash`, and the profile's lint
 command passes.
 
-- [ ] **Step 8.1: Build it test first**
+- [x] **Step 8.1: Build it test first**
 
 Write the cases, watch them fail, then implement.
 Run: `tests/run-tests.sh`
 Expected: PASS.
 
-- [ ] **Step 8.2: Hand over**
+- [x] **Step 8.2: Hand over** Note: rounds: 2; routing: inherit; loop: full; the review-code re-review found the first build's comment detector let backtick forms through that HEAD refused, and quotes in two comments hid a stash (pre-existing); Bernard chose judging twice, a fix pass built it, 14 new cases failed first, 518 passed after; the coordinator checked it by the test file, the lint and seven probes rather than a further review round
 
 ```bash
 git add hooks/review-guard tests/test-review-guard.sh
@@ -727,6 +735,7 @@ pass, with `git commit -m "fix(review-guard): read a backslash-continued line as
 - follow-ups taken as tasks 4 and 5 (2026-11-02, Bernard asked to handle them before merging): all
   but the heredoc and `echo` refusal, which task 4 states as a limit rather than removes
 - tasks 4 and 5: spec and quality passes on task 4 (one fix pass), spec pass on task 5, a security audit of the hook change with 0 findings; not re-run through review-code (2026-11-02)
+- task 8: review-code's blocking finding (backslash-newline continuation hid git, pre-existing), fixed with the two-judgement rule after one re-review, 2026-11-03
 - tasks 6 and 7: spec and adversarial quality passes on each, four rounds on task 6 and two on
   task 7; the probe ran for real on Claude Code 2.1.317, 3 of 3 PASS (2026-11-03)
 - follow-up:
@@ -736,3 +745,4 @@ pass, with `git commit -m "fix(review-guard): read a backslash-continued line as
   - consider: open question 2 in the idea record reads as a correction rather than current state (docs/ideas/implementers-run-git-stash.md)
   - follow-up: a command under 64 KB with about 16,000 `git` words outlasts the hook's 10 s timeout, which then allows it, as at HEAD; a bound on `git` words would close it (hooks/review-guard, decided 2026-11-03)
   - consider: record 2.1.317 on the `pretooluse_agent_id` row (lib/harness/capabilities)
+  - follow-up: the reviewer's rule, and the fallback for every subagent, keep redirections, so `git 2>/dev/null stash` passes there (hooks/review-guard header)

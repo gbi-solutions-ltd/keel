@@ -2,7 +2,7 @@
 # Refuses a keel reviewer the git commands that would change the author's checkout or the state
 # every worktree of a repository shares, and refuses every other subagent a stash-writing `git
 # stash`. Registered on PreToolUse, matcher Bash. Task 1 of
-# docs/plans/2026-10-17-reviewer-git-guard.md and tasks 1, 1b, 4 and 6 of
+# docs/plans/2026-10-17-reviewer-git-guard.md and tasks 1, 1b, 4, 6 and 8 of
 # docs/plans/2026-11-02-hold-a-subagents-git-stash.md.
 #
 # WHY A HOOK AND NOT ONLY THE PROMPT. On 2026-10-12 a spec reviewer ran `git stash` on the tree it
@@ -43,34 +43,34 @@
 # decision the plan already made. The probe saw a deny hold under bypassPermissions.
 #
 # ITS LIMITS, STATED RATHER THAN DISCOVERED. It reads a command string, so `sh -c 'git stash'`, an
-# alias, a script, a file written by one command and run by the next, or text fed to a shell
-# through a coproc or a fifo reaches git without passing through here. It stops a model following a
-# habit, which is what the incidents were, and is not a boundary against an adversary. It reads
-# every `git` word as a git command, whatever runs it, so an unknown wrapper (`setsid git stash`)
-# is refused, as is an unquoted heredoc body naming `git stash`: that errs toward refusing. Three
-# refinements apply to a subagent's stash rule, on the python path only. A segment whose command,
-# after assignments, is `echo`, `printf`, `grep`, `egrep` or `fgrep` (not `rg`, whose `--pre` runs
-# a program) does not have its arguments read as git, but only at the top level, with no `|` or
-# `|&` anywhere after it in the command, no process substitution anywhere in it, and for printf no
-# `-v`: so `echo git stash` passes, while `echo git stash | sh`, `$(echo git stash)` and even
-# `echo git stash | grep stash` are refused, as is `echo git stash; ls | wc`. A heredoc body is
-# taken out before reading only when its delimiter word is wholly `'WORD'`, or `"WORD"` with no
-# backslash (`<<-` allowed), and the line it starts on ends with no open quote, `$(`, `${`,
-# backtick or `((`, so `git commit -F - <<'EOF'` passes and a body inside `git commit -m "$(cat
-# <<'EOF'` is read; after a delimiter such as `$'EOF'` or `\EOF` nothing more is taken out. Neither
-# of those two applies to a command in which any segment's command word, after redirections and
-# assignments, is a shell or evaluator (`sh`, `bash`, `zsh`, `dash`, `ksh`, `fish`, `eval`,
-# `source`, `.`, `exec` or `xargs`, also by path, such as `/bin/sh`), inside a substitution or
-# first in a process substitution too, or that nests substitutions past the depth below: that
-# command is read by the every-word scan alone, so `bash <<'EOF'` with `git stash` in its body and
-# `echo git stash > f; sh f` are refused. The shell is looked for only there, so one behind a
-# wrapper or keyword (`env sh f`, `{ sh f; }`), a script run by path (`./f`), or another
-# interpreter reading the file (`python3 f`) still runs text a reader wrote or a heredoc held,
-# unread. And redirections are dropped before git's words are read, so `git 2>/dev/null stash` is
-# a stash. The reviewer's rule, and the fallback for every subagent, read every `git` word and
-# every heredoc body, so the reviewer's `echo git stash` is refused. The fallback's option
-# pattern takes any word starting with `-` between `git` and the subcommand as an option, for the
-# reviewer's word list as for a subagent's stash, so an unknown one refuses more.
+# alias, a script, a file one command writes and the next runs, or text fed to a shell through a
+# coproc or a fifo reaches git unread. It stops a model's habit, as in the incidents, and is no
+# boundary against an adversary. It reads each `git` word as git, so an unknown wrapper (`setsid git
+# stash`) is refused, as is an unquoted heredoc body naming `git stash`: that errs toward refusing.
+# On the python path, for every subagent, a backslash-newline outside single quotes and quoted
+# heredoc bodies is removed, as bash joins the lines, and a command is judged twice, as written and
+# with each `#` that begins a word cut to its line's end, and refused if either refuses, so no `#`
+# hides a line. Four refinements apply to a subagent's stash rule, on the python path only. A
+# segment whose command, after assignments, is `echo`, `printf`, `grep`, `egrep` or `fgrep` (not
+# `rg`: its `--pre` runs a program) has no argument read as git, but only at the top level, with no
+# `|` or `|&` after it, no process substitution in the command, for printf no `-v`: so `echo git
+# stash` passes, and `echo git stash | sh` and `$(echo git stash)` do not. A heredoc body is skipped
+# only when its delimiter word is wholly `'WORD'`, or `"WORD"` with no backslash, and the line it
+# starts on ends with no open quote, `$(`, `${`, backtick or `((`, so `git commit -F - <<'EOF'`
+# passes and a body inside `git commit -m "$(cat <<'EOF'` is read; after a delimiter such as
+# `$'EOF'` or `\EOF` nothing more is skipped. Neither applies to a command in which any segment's
+# command word, after redirections and assignments, is a shell or evaluator (`sh`, `bash`, `zsh`,
+# `dash`, `ksh`, `fish`, `eval`, `source`, `.`, `exec` or `xargs`, also by path), inside a
+# substitution or first in a process substitution too, or that nests substitutions past the depth
+# below: it is read by the every-word scan alone, so `bash <<'EOF'` with `git stash` in its body and
+# `echo git stash > f; sh f` are refused. The shell is looked for only there: one behind a wrapper
+# or keyword (`env sh f`, `{ sh f; }`), a script (`./f`) or an interpreter (`python3 f`) still runs
+# text a reader wrote or a heredoc held, unread. And redirections are dropped before git's words
+# are read, so `git 2>/dev/null stash` is a stash; the reviewer's rule keeps them, so a
+# reviewer's `git 2>/dev/null stash` is allowed. The reviewer's rule and the fallback read every
+# `git` word and heredoc body, so a reviewer's `echo git stash` is refused. The fallback reads a
+# backslash-newline between words as a space, not inside one, and allows `gi\`, `t stash`. It reads
+# any `-` word after `git` as an option, for the reviewer too, so an unknown one refuses more.
 # Two bounds cap what it reads, since a hook killed at the 10-second timeout in hooks/hooks.json
 # gives no decision at all. A command longer than 64 KB is refused unread when it names `git` for
 # the reviewer or `stash` for any other subagent: the parse of one 1 MB word took 11 seconds. And a
@@ -121,8 +121,8 @@ deny() {
 # subagent. The reviewer gets the word list, and any other subagent the stash alone.
 blind() {
     local why="$1" after="$2" typed reviewer sp opt w re rest m with_id
-    # Spaces or a JSON-escaped tab separate words; a JSON-escaped newline may precede `git`.
-    sp='([[:space:]]|\\t)+'
+    # Spaces, a JSON-escaped tab or a backslash-newline separate words; a newline may precede `git`.
+    sp='([[:space:]]|\\t|\\\\\\n)+'
     # git's options that take the next word as their value, then any other option word, so an
     # option it does not know can only make it refuse more.
     opt='(-C|-c|--git-dir|--work-tree|--namespace|--super-prefix|--config-env|--attr-source)'"$sp"'[^[:space:]]+|-[^[:space:]]+'
@@ -593,6 +593,8 @@ def lift(text):
     # Command substitutions run, so their commands are judged, and their output is not a path the
     # guard can name, so each is replaced by `$S`, which expand() treats as unresolvable. Done
     # before shlex because shlex would split `$(pwd)` into words that read as the next command.
+    # A backslash and newline outside single quotes are removed, as bash joins the lines, since
+    # shlex would keep the newline inside the next word and `git \`, `stash` would not read as git.
     out, inner, i, q = [], [], 0, None
     while i < len(text):
         c = text[i]
@@ -600,6 +602,8 @@ def lift(text):
             q = None if c == "'" else q
             out.append(c)
             i += 1
+        elif c == "\\" and text.startswith("\n", i + 1):
+            i += 2
         elif c == "\\" and i + 1 < len(text):
             out.append(text[i:i + 2])
             i += 2
@@ -695,13 +699,15 @@ def unheredoc(text):
             i += 1
             for word, strip, quoted in pending:
                 body = i
+                joined = False          # an unquoted body's line continued: the next is not its end
                 while i < len(text):
                     end = text.find("\n", i)
                     end = len(text) if end < 0 else end
                     line = text[i:end]
                     i = end + 1
-                    if (line.lstrip("\t") if strip else line) == word:
+                    if not joined and (line.lstrip("\t") if strip else line) == word:
                         break
+                    joined = not quoted and (len(line) - len(line.rstrip("\\"))) % 2 == 1
                 else:
                     return "".join(out) + text[body:]
                 if not quoted:
@@ -785,15 +791,13 @@ def judge(text, here, depth=0):
     # punctuation_chars makes the operators their own tokens; the newline is made one of them, and
     # taken out of the whitespace, because a newline separates commands as `;` does and shlex would
     # otherwise swallow it. No comment character: a `#` inside a word would end the line early and
-    # hide what follows it, so a comment is read as words, which can only refuse more.
+    # hide what follows it, so a comment is read as words here, and the second judgement below
+    # reads the command with its comments stripped, so a quote in one cannot hide the next lines.
     lex = shlex.shlex(text, posix=True, punctuation_chars=PUNCT)
     lex.whitespace = " \t\r"
     lex.whitespace_split = True
     lex.commenters = ""
-    try:
-        tokens = list(lex)
-    except ValueError:
-        sys.exit(4)                     # an unclosed quote: the bash fallback reads it instead
+    tokens = list(lex)                  # an unclosed quote raises ValueError, caught below
     # Its limit: shlex does not say whether a token was quoted, so a quoted argument made only of
     # operator characters, `";"`, reads as an operator. That splits a command early and can only
     # cost a cd its reach.
@@ -849,16 +853,29 @@ if len(cmd) > MAX_COMMAND and ("git" if REVIEWING else "stash") in cmd:
     refuse("this command is %d characters, past the %d it reads, so it is "
            "too long to read and is refused unread. Write long text to a file first and keep the "
            "command itself short." % (len(cmd), MAX_COMMAND))
-if REVIEWING:
-    judge(cmd, cwd)
-else:
-    # Two passes over the same split, because a shell may come after the reader whose output it
-    # runs, as in `echo git stash > f; sh f`: the first finds any shell, the second judges.
-    stripped = unheredoc(cmd)
-    COLLECTING = True
-    judge(stripped, cwd)
-    COLLECTING = False
-    judge(cmd if SHELLED else stripped, cwd)
+# Two judgements, refused if either refuses: the command as written, and with each `#` that begins
+# a word stripped to the end of its line. Neither reads comments exactly: as written, quotes in two
+# comments join the lines between them into one word; stripped, a `#` inside quotes or `${` ends
+# the line early. A second judgement can only add refusals. One that will not split (an unclosed
+# quote) sends the command to the bash fallback, unless the other refuses.
+unsplit = False
+for text in dict.fromkeys([cmd, re.sub(r"(?<![^ \t\n;&|()])#[^\n]*", "", cmd)]):
+    COLLECTING = SHELLED = False
+    try:
+        if REVIEWING:
+            judge(text, cwd)
+        else:
+            # Two passes over the same split, because a shell may come after the reader whose output
+            # it runs, as in `echo git stash > f; sh f`: the first finds any shell, the second judges.
+            stripped = unheredoc(text)
+            COLLECTING = True
+            judge(stripped, cwd)
+            COLLECTING = False
+            judge(text if SHELLED else stripped, cwd)
+    except ValueError:
+        unsplit = True
+if unsplit:
+    sys.exit(4)                         # the bash fallback reads it instead
 PY
 decision="$(python3 -I -c "$script" <<<"$event")"
 status=$?
