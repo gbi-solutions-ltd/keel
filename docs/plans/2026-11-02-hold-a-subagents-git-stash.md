@@ -661,6 +661,48 @@ pass, with `git commit -m "test: a scripted re-probe of agent_id, run at each re
 
 ---
 
+### Task 8: a line continued with a backslash is read as one line
+
+**Story:** review-code's blocking finding on tasks 6 and 7, 2026-11-03: `git \` then `stash` on the
+next line reaches git unread, for a subagent and for the reviewer, at base and at HEAD. Bernard
+asked to fix it in this PR on 2026-11-03.
+**Files:**
+- Modify: `hooks/review-guard`
+- Test: `tests/test-review-guard.sh`
+
+**Depends on:** task 7
+
+**Behaviours:**
+
+1. On the python path, a backslash followed by a newline outside single quotes and outside a heredoc
+   body is removed before the command is read, for every subagent and for the reviewer, as bash
+   joins the lines. Example: from a subagent, `git \`⏎`stash`, `true &&\`⏎`git stash` and
+   `grep x f |\`⏎`git stash` are refused; from `keel:keel-reviewer`, `git \`⏎`commit -m x` is
+   refused; from a subagent, `git \`⏎`status` is allowed, and so is a quoted heredoc body whose line
+   ends in a backslash.
+2. The fallback (no python3) refuses the same subagent examples, or the header says it does not.
+3. The header counts its subagent refinements correctly, and says the reviewer's rule does not drop
+   redirections, so a reviewer's `git 2>/dev/null stash` is allowed, as a stated limit.
+
+**Done when:** `tests/test-review-guard.sh` passes, also under `/bin/bash`, and the profile's lint
+command passes.
+
+- [ ] **Step 8.1: Build it test first**
+
+Write the cases, watch them fail, then implement.
+Run: `tests/run-tests.sh`
+Expected: PASS.
+
+- [ ] **Step 8.2: Hand over**
+
+```bash
+git add hooks/review-guard tests/test-review-guard.sh
+git status --porcelain
+```
+
+Stage exactly those paths and stop. **Do not commit.** The coordinator commits after the review
+pass, with `git commit -m "fix(review-guard): read a backslash-continued line as one line"`.
+
 ## Notes for the coordinator
 
 - **Concurrent batches.** `keel plan batches` on 2026-11-02 printed every task alone:
