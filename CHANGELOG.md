@@ -20,6 +20,23 @@ Entries are terse by design; the narrative for each release is in this file's gi
 - The implementer prompt in `skills/execute-plan/references/subagent-prompts.md` and
   `agents/keel-implementer.md` say never to run `git stash` other than `list` or `show`, and why;
   the agent's rules that hold whatever the brief says are five. `tests/test-agents.sh` pins both.
+- `hooks/review-guard` lets a subagent's readers and quoted heredocs name `git stash`. On the
+  `python3` path a subagent's stash rule keeps the every-word scan with two exemptions: the
+  arguments of a top-level `echo`, `printf`, `grep`, `egrep` or `fgrep` not piped onward, and a
+  heredoc body under a wholly quoted delimiter, so `echo git stash` and a `git commit -F - <<'EOF'`
+  body naming it are allowed. Both drop when any segment's command word is a shell or evaluator,
+  so `echo git stash | sh` and `bash <<'EOF'` are refused. A command longer than 64 KB that names
+  `git` for the reviewer or `stash` for another subagent is refused unread, where before a long
+  parse could outlast the 10-second hook timeout and let it run; a subagent's substitutions are
+  read 32 deep. The bounds cap size and depth, not time: some commands under 64 KB still outlast
+  the timeout, a follow-up. The reviewer's rule and the fallback without `python3` still read every
+  `git` word. Text written and then run (`echo git stash > f; ./f`) is a stated limit, as decided
+  on 2026-11-03 (ADR-0016).
+- `tests/probe-agent-id.sh` re-runs the three observations `hooks/review-guard` rests on against the
+  installed Claude Code: no `agent_id` for the main session, with or without `--agent`, and one for
+  a project agent dispatched as a subagent. It needs a signed-in Claude Code and spends tokens, so it
+  is not in `tests/run-tests.sh`; the release runbook runs it when Claude Code is newer than the last
+  release recorded, and a `FAIL` blocks the release. It passed all three on 2.1.317.
 - `hooks/sensitive-guard` blocks the call when it fails to answer: its `hooks/hooks.json` entry
   carries `"onFailure": "block"`, so a timeout or a hook that cannot start stops the tool call and
   the user retries, where before the call ran. Probed on Claude Code 2.1.316; the capability row

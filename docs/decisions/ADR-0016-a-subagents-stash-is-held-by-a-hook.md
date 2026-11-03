@@ -111,12 +111,22 @@ that carries `"agent_type"` and contains `stash` anywhere in its event, includin
 2.1.302.
 
 **It is a speed bump, not a security boundary**, as ADR-0010 says of the reviewer rule. `sh -c "git
-stash"`, an alias or a script reaches git without passing through the hook. It states two more
-limits, both erring toward refusing. It reads every `git` word and every heredoc body as a command,
-so a subagent's `echo git stash`, or a heredoc body that names `git stash`, is refused. The
-fallback without `python3` takes any word starting with `-` between `git` and the subcommand as an
-option, for the reviewer's word list as for a subagent's stash, so an option it does not know can
-only make it refuse more.
+stash"`, an alias or a script reaches git without passing through the hook, and so does text
+written and then run (`echo git stash > f; ./f`, `env bash <<'EOF'` with `git stash` in its body):
+Bernard decided on 2026-11-03 that this is a stated limit of the same class, named in the hook's
+header, because the threat is a habit and not an adversary. A subagent's rule, on the `python3`
+path, reads every `git` word as a command with two exemptions: the arguments of a top-level `echo`,
+`printf`, `grep`, `egrep` or `fgrep` not piped onward, and a heredoc body under a wholly quoted
+delimiter (`<<'EOF'` or `<<"EOF"`). Both exemptions drop when any segment's command word is a shell
+or evaluator (`sh`, `bash`, `eval`, `source`, `xargs` and the rest the header lists), so a
+subagent's `echo git stash` passes while `echo git stash | sh`, or `bash <<'EOF'` with `git stash`
+in its body, is refused. The reviewer's rule and the fallback without `python3` read every `git`
+word and every heredoc body, so the reviewer's `echo git stash` is refused, and so is a subagent's
+without `python3`; both err toward refusing. The fallback takes any word starting with `-` between
+`git` and the subcommand as an option, for the reviewer's word list as for a subagent's stash, so
+an option it does not know can only make it refuse more. A command longer than 64 KB that names
+`git` for the reviewer or `stash` for another subagent is refused unread, because a hook killed at
+its 10-second timeout gives no decision; the bound caps size, not time.
 
 **What this forecloses.** Little. The rule is one branch in an existing hook; removing it returns
 the stash to the prompt.
@@ -127,7 +137,11 @@ started with `--agent`. `agent_id` was observed for a `general-purpose` subagent
 on 2.1.302. For an agent defined in `.claude/agents/`, a non-empty `agent_id` was observed on
 2.1.316, 2026-11-02, with `agent_type` `helper`
 (`docs/plans/2026-11-02-hold-a-subagents-git-stash.md:55`). That a deny keeps holding under
-`bypassPermissions`.
+`bypassPermissions`. The control for the `agent_id` dependency is `tests/probe-agent-id.sh`, which
+re-runs the three observations (the main session without and with `--agent`, and a project agent as
+a subagent) against the installed Claude Code; section 0 of `docs/runbooks/cutting-a-release.md`
+runs it when Claude Code is newer than the last release recorded, and a `FAIL` blocks the release.
+It passed all three on 2.1.317, 2026-11-03.
 
 ## Verification
 
@@ -139,8 +153,12 @@ event with `agent_type` `helper` and no `agent_id`, an empty one, or the number 
 stash`. An event with `agent_type` `keel:keel-reviewer` and no `agent_id` is allowed `git stash
 list` and `git commit -m x`, and the same event with an `agent_id` is refused both, with and
 without `python3`. Without `python3`, a subagent whose `agent_type` is `we"ird` is refused `git
-stash`. A subagent's `git stash` in an event past 1 MB is refused by the parser, and a subagent's
-`echo git stash` is refused, a stated limit. Some cases run the hook under `/bin/bash` by name.
+stash`. A subagent's `git stash` in an event past 1 MB is refused by the parser. A subagent's
+`echo git stash` and the body of its `git commit -F - <<'EOF'` are allowed, its `echo git stash |
+sh` and a `bash <<'EOF'` body naming `git stash` are refused, and without `python3` its `echo git
+stash` is refused. The reviewer's `echo git stash` is refused. A command past 64 KB is refused
+unread, with a reason saying it is too long to read, and a main session's 1 MB command is allowed.
+Some cases run the hook under `/bin/bash` by name.
 
 Holding if no implementer's stash turns up in a plan's notes or in `git stash list` at a task
 boundary. Not holding if a subagent's stash-writing `git stash` runs without a refusal, or if the

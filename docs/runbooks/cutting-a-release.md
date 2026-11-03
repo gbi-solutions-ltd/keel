@@ -11,15 +11,16 @@ publication of a repository is [`going-public.md`](going-public.md).
 
 The commands of sections 0 and 1 and the version-bump steps of section 2 were run end to end for
 0.17.0 on 2026-09-01 and their output is what is quoted. The branch step in section 2 and all of
-sections 3 and 4 have not yet been run on a release. The symptoms table is wider than one release:
-rows marked *recorded* come from the 2026-08-17 and 2026-08-19 runs and were not reproduced on that
-one.
+sections 3 and 4 have not yet been run on a release. The probe in section 0 was run once, on
+2026-11-03 against Claude Code 2.1.317, and not yet on a release. The symptoms table is wider than
+one release: rows marked *recorded* come from the 2026-08-17 and 2026-08-19 runs and were not
+reproduced on that one.
 
 There is one repository, `gbi-solutions-ltd/keel`, and it is public. Every branch pushed to it is
 public the moment it lands, so nothing goes onto a branch that is not fit to read, and the leak
 guard in section 3 runs on every push.
 
-## 0. Before anything: three decisions
+## 0. Before anything: three decisions and a probe
 
 1. **Is a release due?** Entries accumulate under `CHANGELOG.md`'s `## Unreleased` and a release is
    a decision about a set of changes, not a side effect of the last PR to merge. Do not bump because
@@ -27,6 +28,12 @@ guard in section 3 runs on every push.
 2. **Which number?** Semver. Note that 1.0.0 is held back pending two team pilots and a verified
    install from a second machine.
 3. **Does the gate transfer, or is it owed?** See section 1.
+4. **Does a subagent still carry an `agent_id`?** When `claude --version` is newer than the Claude
+   Code version in the last release gate entry of `tests/evals/results.md`, run
+   `tests/probe-agent-id.sh` with a signed-in Claude Code. It costs three short haiku sessions and
+   prints one `PASS` or `FAIL` line per case. Do not release on a `FAIL`: `hooks/review-guard` then
+   no longer tells a subagent from the main session (ADR-0016).
+   <!-- keel:claim gate=review-guard harness=claude -->
 
 ## 1. The eval gate
 
