@@ -32,6 +32,12 @@ Entries are terse by design; the narrative for each release is in this file's gi
   the timeout, a follow-up. The reviewer's rule and the fallback without `python3` still read every
   `git` word. Text written and then run (`echo git stash > f; ./f`) is a stated limit, as decided
   on 2026-11-03 (ADR-0016).
+- `hooks/review-guard` reads a line continued with a backslash as one line, for every subagent and
+  for the reviewer, so `git \` followed by `stash` on the next line is refused, as bash runs it. It
+  also judges each command a second time with every `#` that begins a word cut to the end of its
+  line, and refuses if either judgement refuses, so quotes in two comments can no longer join into
+  one word that hides a `git stash` between them. The reviewer's rule, and the fallback for every
+  subagent, keep redirections, so `git 2>/dev/null stash` passes there, a stated limit.
 - `tests/probe-agent-id.sh` re-runs the three observations `hooks/review-guard` rests on against the
   installed Claude Code: no `agent_id` for the main session, with or without `--agent`, and one for
   a project agent dispatched as a subagent. It needs a signed-in Claude Code and spends tokens, so it
