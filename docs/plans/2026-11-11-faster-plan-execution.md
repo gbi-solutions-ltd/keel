@@ -57,6 +57,9 @@ the harness backgrounding a command) were reported to Bernard before this direct
 **Review fixes:** tasks 11 and 12 were added on 2026-11-11 from `review-code` on 76211ec (three
 surviving mutants on sensitive paths, and should-fix findings), as `review-code` step 5 sends a
 blocking finding back to the author before its one re-review.
+**Re-review:** the `review-code` re-review on a79c22c still blocked (one surviving mutant). Per
+`review-code` step 5 it went to Bernard, who chose on 2026-11-11 to fix it and the three should-fix
+findings as task 13, then ship; task 13 gets its per-task review, and no third `review-code` round.
 **Shape:** behaviours with examples.
 **Reviewed:** by a dispatched plan reviewer on 2026-11-11: two blocking findings (`done-guard`
 undoing the checkpoints; task 1 used a `block` value the gate does not have), five should-fix (the
@@ -968,3 +971,67 @@ git status --porcelain
 Stage exactly those paths, and any citation repairs by name, and stop. **Do not commit.** The
 coordinator commits after both review passes, with
 `git commit -m "fix(context-watch): measure nothing past a compaction, pin the equal-mtime keep"`.
+
+---
+
+### Task 13: re-review fixes
+
+**Story:** `review-code` re-review on a79c22c, 2026-11-11: blocking finding 1 and should-fix 2 to 4,
+taken on by Bernard ("fix it, then ship")
+**Files:**
+- Modify: `lib/context_watch.py`
+- Modify: `hooks/done-guard`
+- Modify: `docs/ideas/standards-that-bind.md`
+- Modify: `CHANGELOG.md`
+- Test: `tests/test-context-watch.sh`
+- Test: `tests/test-done-guard.sh`
+
+**Depends on:** task 12
+
+**Behaviours:**
+
+1. A subagent's compaction marker does not reset the main thread's measurement, and a case pins it.
+   Example: a transcript whose last main-thread usage is at 92% of the window, followed by a
+   `{"type":"system","subtype":"compact_boundary","isSidechain":true}` entry, gives the stop text on
+   UserPromptSubmit (the `and not d.get("isSidechain")` filter in `_compact_boundary` is the line it
+   covers).
+2. The `_measure_parts` docstring wraps at 100 columns. Example: no line of `lib/context_watch.py`
+   that this branch added is over 100 columns (`git diff main...HEAD -- lib/context_watch.py`).
+3. `docs/ideas/standards-that-bind.md:357` and `:521` cite the line of `hooks/done-guard` that does
+   the match, not `:154`. Example: each cited line, read after the change, holds the `run_marks`
+   search or the pattern build.
+4. done-guard's required-mode reason reads correctly with several commands and names a shared
+   prefix once. Example: with `verify.test_one` `go test {path}` and `verify.test_affected`
+   `go test {packages}`, an `Edit` of `<repo>/a.go` and no test run, under `required`, gives a
+   reason containing `go test` exactly once and `Run one`; with neither set, the reason still says
+   `Run it`.
+5. Any citation the edits shift is repaired, wherever it lives outside `docs/plans/`, and any plan
+   citation is reported to the coordinator. Example: `tests/test-validate-citations.sh` passes.
+
+**Done when:** `tests/test-context-watch.sh`, `tests/test-done-guard.sh`,
+`tests/test-validate-citations.sh` and `tests/test-harness-claims.sh` pass.
+
+- [ ] **Step 13.1: Build it test first**
+
+Follow `keel:tdd`. Write the case for behaviour 1 in `tests/test-context-watch.sh` and the cases for
+behaviour 4 in `tests/test-done-guard.sh`, after the existing cases. Behaviour 1 pins existing code
+and may pass on arrival: prove it can fail by removing the sidechain filter, watching it go red, and
+restoring it; quote both runs.
+Run: `tests/test-done-guard.sh`
+Expected before the implementation: FAIL, behaviour 4's case fails (the prefix repeats; the reason
+says `Run it`). Expected after: PASS. Quote the failing output in your report.
+
+Run: `tests/run-tests.sh` and the lint command.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+
+- [ ] **Step 13.2: Hand over**
+
+```bash
+git add lib/context_watch.py hooks/done-guard docs/ideas/standards-that-bind.md CHANGELOG.md \
+        tests/test-context-watch.sh tests/test-done-guard.sh
+git status --porcelain
+```
+
+Stage exactly those paths, and any citation repairs by name, and stop. **Do not commit.** The
+coordinator commits after the review passes, with
+`git commit -m "fix(watchdogs): pin the sidechain boundary, tidy the done-guard reason"`.
