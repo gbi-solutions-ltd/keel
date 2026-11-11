@@ -54,6 +54,9 @@ decisions above as written, the `done-guard` loosening included.
 follow-ups before the code review"), from the review findings recorded in the tick notes of tasks
 1, 2, 3 and 7. The coordinator's plan notes on tasks 3, 4 and 7 (four eval scenarios added to Files;
 the harness backgrounding a command) were reported to Bernard before this direction.
+**Review fixes:** tasks 11 and 12 were added on 2026-11-11 from `review-code` on 76211ec (three
+surviving mutants on sensitive paths, and should-fix findings), as `review-code` step 5 sends a
+blocking finding back to the author before its one re-review.
 **Shape:** behaviours with examples.
 **Reviewed:** by a dispatched plan reviewer on 2026-11-11: two blocking findings (`done-guard`
 undoing the checkpoints; task 1 used a `block` value the gate does not have), five should-fix (the
@@ -825,3 +828,131 @@ git status --porcelain
 Stage exactly those paths, and any citation repairs by name, and stop. **Do not commit.** The
 coordinator commits after the review passes, with
 `git commit -m "docs(skills): follow-ups to suite checkpoints and leaner reports"`.
+
+---
+
+### Task 11: review-code fixes in `done-guard`
+
+**Story:** `review-code` on 76211ec, 2026-11-11: blocking findings 1 and 2, should-fix 5, 6 and 7,
+consider 8
+**Files:**
+- Modify: `hooks/done-guard`
+- Modify: `templates/profile.schema.json`
+- Modify: `docs/profile-keys.md`
+- Modify: `CHANGELOG.md`
+- Test: `tests/test-done-guard.sh`
+
+**Depends on:** task 10
+
+**Behaviours:**
+
+1. The repository root comes from git, not the event's `cwd`, and a case pins it. Example: an event
+   whose `cwd` is `<repo>/lib` in a git repository, with a `Write` of `<repo>/hooks/x.sh` and no test
+   run, under `required`, blocks (a root taken from `cwd` would read the path as outside and pass).
+2. A path that is exactly the repository's parent is outside, and a case pins it. Example: a
+   `Write` of `<repo>/..` alone, under `required`, exits 0 with no output.
+3. The block and warn text names the scoped commands as well as `verify.test`, so a checkpointed
+   implementer is not told to run the suite. Example: with `verify.test_one` `go test {path}`, an
+   `Edit` of `<repo>/a.go` and no test run, under `required`, gives a reason containing
+   `tests/run-tests.sh`-style `verify.test` text and `go test`; with `verify.test_one` and
+   `verify.test_affected` both null, the reason names `verify.test` only, as today.
+4. The "ITS LIMIT" header sentence reads plainly: a scoped run satisfies the gate, so it proves a
+   test ran and not that the suite did; a lint naming `tests/*.sh` is no run; `verify.test` counts
+   wherever it appears. It also states what the anchored match does not see (`bash tests/x.sh`,
+   `./tests/x.sh`, `env`, `time` and `VAR=` prefixes, `&` and backticks) and that a prefix has no
+   word boundary, so `tests/evals/stage.sh` counts. Example: the header contains `bash tests/x.sh`
+   and `no word boundary`.
+5. `x-keel-read-by` for `verify.test_one` and `verify.test_affected` in
+   `templates/profile.schema.json` names `hooks/done-guard`, and `docs/profile-keys.md` is
+   regenerated. Example: both rows of `docs/profile-keys.md` contain `hooks/done-guard`.
+6. `CHANGELOG.md` under `## Unreleased` states the scoped match once, as it is now (where a command
+   begins), merging task 1's and task 8's entries. Example: no Unreleased line says a command
+   "containing" the scoped prefix counts.
+7. Any citation into `hooks/done-guard` the edit shifts is repaired, wherever it lives outside
+   `docs/plans/`. Example: `tests/test-validate-citations.sh` passes.
+
+**Done when:** `tests/test-done-guard.sh`, `tests/test-profile-keys.sh` and
+`tests/test-validate-citations.sh` pass.
+
+- [ ] **Step 11.1: Build it test first**
+
+Follow `keel:tdd`. Write cases for behaviours 1 to 3 in `tests/test-done-guard.sh`. Behaviours 1
+and 2 pin existing code and may pass on arrival: prove each can fail by mutating the line it covers
+(`hooks/done-guard`, the `returncode == 0` test and the `rel == ".."` test), watching it go red, and
+restoring it; quote both runs.
+Run: `tests/test-done-guard.sh`
+Expected before the implementation: FAIL, behaviour 3's case fails because the reason names only
+`verify.test`. Expected after: PASS. Quote the failing output in your report.
+
+Run: `tests/run-tests.sh` and the lint command.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+
+- [ ] **Step 11.2: Hand over**
+
+```bash
+git add hooks/done-guard tests/test-done-guard.sh templates/profile.schema.json docs/profile-keys.md CHANGELOG.md
+git status --porcelain
+```
+
+Stage exactly those paths, and any citation repairs by name, and stop. **Do not commit.** The
+coordinator commits after both review passes, with
+`git commit -m "fix(done-guard): pin the root and parent cases, name scoped runs in the reason"`.
+
+---
+
+### Task 12: review-code fixes in `context_watch`
+
+**Story:** `review-code` on 76211ec, 2026-11-11: blocking finding 3, should-fix 4, consider 9
+**Files:**
+- Modify: `lib/context_watch.py`
+- Modify: `CHANGELOG.md`
+- Test: `tests/test-context-watch.sh`
+
+**Depends on:** task 11
+
+**Behaviours:**
+
+1. A handoff with the same mtime as the stop marker is kept at PreCompact, and a case pins the
+   boundary. Example: marker and handoff both touched to the same stamp; PreCompact leaves the
+   handoff containing `next: 4.1`.
+2. A measurement after a compaction does not read the pre-compaction usage. A main-thread
+   `{"type":"system","subtype":"compact_boundary"}` entry after the last assistant usage row makes
+   the measurement 0, so the hook is silent and creates no stop marker until a new assistant turn
+   carries usage. Example: a transcript whose last assistant usage is at 92% of the window, followed
+   by a `compact_boundary` entry, gives no output on UserPromptSubmit and on a `Bash` PreToolUse, and
+   leaves no stop marker; the same transcript without the boundary gives the stop text.
+3. PreCompact removes this session's measurement cache, so the first event after compaction
+   measures again rather than reusing a pre-compaction figure. Example: after PreCompact,
+   `<state dir>/<session>.measure` does not exist.
+4. The comment on the failed marker removal says the line reaches only someone running the library
+   directly, since `hooks/context-watch` discards its stderr. Example: the comment contains
+   `/dev/null` or `discards`, and does not begin with `Said`.
+5. Any citation into `lib/context_watch.py` or `tests/test-context-watch.sh` the edit shifts is
+   repaired, wherever it lives outside `docs/plans/`. Example: `tests/test-validate-citations.sh`
+   and `tests/test-harness-claims.sh` pass.
+
+**Done when:** `tests/test-context-watch.sh`, `tests/test-validate-citations.sh` and
+`tests/test-harness-claims.sh` pass.
+
+- [ ] **Step 12.1: Build it test first**
+
+Follow `keel:tdd`. Write cases for behaviours 1 to 3 in `tests/test-context-watch.sh`, after the
+existing cases. Behaviour 1 pins existing code and may pass on arrival: prove it can fail by
+mutating `>=` to `>` on the kept check, watching it go red, and restoring it; quote both runs.
+Run: `tests/test-context-watch.sh`
+Expected before the implementation: FAIL, behaviour 2's and 3's cases fail (the boundary is
+ignored; the cache survives). Expected after: PASS. Quote the failing output in your report.
+
+Run: `tests/run-tests.sh` and the lint command.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+
+- [ ] **Step 12.2: Hand over**
+
+```bash
+git add lib/context_watch.py tests/test-context-watch.sh CHANGELOG.md
+git status --porcelain
+```
+
+Stage exactly those paths, and any citation repairs by name, and stop. **Do not commit.** The
+coordinator commits after both review passes, with
+`git commit -m "fix(context-watch): measure nothing past a compaction, pin the equal-mtime keep"`.
