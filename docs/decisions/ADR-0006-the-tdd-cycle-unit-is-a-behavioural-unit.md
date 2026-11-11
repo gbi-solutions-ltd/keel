@@ -7,6 +7,7 @@
 | Deciders | Bernard Tebandeke, accepted 2026-09-07, with `gfsekamanya` reviewing the skill change it authorises |
 | Requirements | none; this governs keel's own TDD discipline |
 | Supersedes | none. [ADR-0002](ADR-0002-delegated-execution-default.md) decided a narrower version at plan granularity and this extends it inward |
+| Amended by | [ADR-0017](ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md), for a unit run under `execute-plan` in a plan with a `**Suite checkpoints:**` line |
 
 ## Context
 

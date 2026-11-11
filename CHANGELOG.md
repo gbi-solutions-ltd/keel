@@ -9,6 +9,10 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- ADR-0017: under `execute-plan` with a `**Suite checkpoints:** every N tasks` plan line, the
+  coordinator runs `verify.test` at plan start, every N committed tasks and after the last, and an
+  implementer starts from the last checkpoint's record; it amends ADR-0006 and ADR-0009 for such
+  units only.
 - `execute-plan`'s implementer and review prompts, and the `keel-implementer` and `keel-reviewer`
   agents, run every command in the foreground and end no turn with work still running; the
   coordinator reviews only a report ending in its `git status --porcelain` line, and voids a review

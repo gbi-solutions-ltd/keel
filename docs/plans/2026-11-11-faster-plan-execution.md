@@ -534,13 +534,13 @@ by a reader and by the commands in `Done when:`.
 `grep -c 'Amended by' docs/decisions/ADR-0006-*.md docs/decisions/ADR-0009-*.md` prints at least 1
 for each.
 
-- [ ] **Step 6.1: Write it and check it**
+- [x] **Step 6.1: Write it and check it** Note: No-test task; examples checked by the spec reviewer against the ADR and Done when (validate-citations 60/0, doc-claims 65/0, Amended by 1 each). The ADR names the sample project generically, per the generic-names standard. Gain stated as a forecast. Citation repair outside Files: docs/ideas/skill-and-reference-review.md.
 
 Write the ADR as the behaviours say and add the two header rows.
 Run: the `Done when:` commands, then `tests/run-tests.sh` and the lint command.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 
-- [ ] **Step 6.2: Hand over**
+- [x] **Step 6.2: Hand over** Note: rounds: 1; routing: inherit; loop: light
 
 ```bash
 git add docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md \
