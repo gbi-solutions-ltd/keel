@@ -145,7 +145,8 @@ Answer six questions:
    the behaviour as already satisfied on arrival. A task with no test is exempt.
 
 Verdict: COMPLIES or DEVIATES, then the reasons. Deviating is not a failure to be softened; it is
-the finding.
+the finding. End a DEVIATES verdict with a `Fix scope:` line: the list of what must change, or
+`redo` when the approach itself is wrong.
 
 Put the verdict on the first line. Keep the report to at most 250 words, and quote command output
 only where it is the evidence for a finding.
@@ -192,7 +193,8 @@ end your turn while anything you started is still running: the coordinator reads
 report.
 
 Rank findings: blocking, should fix, consider. Cap at ten. If nothing blocks, say so in the first
-line.
+line. If something blocks, end with a `Fix scope:` line: the list of what must change, or `redo`
+when the approach itself is wrong.
 
 Put the verdict on the first line. Keep the report to at most 250 words, and quote command output
 only where it is the evidence for a finding.
@@ -226,8 +228,8 @@ just before committing, and take that verdict.
   `git status` and `git log`, then ask.
 
 In the light loop the task gets one spec pass. COMPLIES: tick and commit, the tick note carrying
-`loop: light`. DEVIATES: **why the fix pass may build on the rejected attempt here**, where the full
-loop's rule below forbids it: the fix is scoped to what the verdict names, it is capped at one
+`loop: light`. DEVIATES: **why the fix pass may build on the rejected attempt here**, as the full
+loop's first fix pass below does: the fix is scoped to what the verdict names, it is capped at one
 round, and a second rejection goes to a person rather than to another agent. In order:
 
 1. One fix pass: a fresh implementer dispatch on the plan's routing, with the implementer's label,
@@ -306,27 +308,35 @@ note or after `; `. The note applies in inline mode too, where you implement and
 task was redone. Nothing decides a loop in inline mode: write the loop `keel plan risk`
 printed if you ran it, and otherwise leave the field out.
 
-**On a DEVIATES verdict in the full loop**, re-dispatch the same task to a fresh subagent with the
-review attached, rather than asking the original to fix it. A subagent that has already justified
-its approach will defend it, and you get a negotiation instead of a correction.
+**On a DEVIATES verdict in the full loop**, send the task to a fresh subagent with the review
+attached, rather than asking the original to fix it. A subagent that has already justified its
+approach will defend it, and you get a negotiation instead of a correction.
 
-**In the full loop, discard the first attempt before re-dispatching, and be explicit about what that
-means**, because "fresh subagent" is a claim about the tree as much as about the agent. Nothing was
-committed, so there is no history to rewrite: unstage and discard the working tree, and the second
-subagent starts from exactly the state the first one did. In a declared batch, reset or delete that
-task's worktree and do not merge it.
+**The first full-loop rejection whose `Fix scope:` is a list gets one fix pass**, as the light
+loop's does: a fresh implementer dispatch on the plan's routing, with the implementer's label,
+handed the staged attempt and the verdict and told to change only what the fix scope names. It
+counts toward `rounds`. In a declared batch it amends the task's commit with `git commit --amend`,
+and you re-resolve `<task-head>`. Then re-run the same `keel plan risk` command, and both passes
+again, spec then quality. [rationale.md](rationale.md) says why this is safe here.
 
-**In the full loop, never re-dispatch on top of the rejected attempt.** A fresh agent handed a tree
-containing work a reviewer just rejected reads it as the starting point and builds on it, which is
-how a DEVIATES verdict turns into two entangled problems instead of one corrected task. If the work
-was committed anyway, by an implementer that ignored its rules or a plan written before them, say so
-and stop: undoing a commit is the user's call, and it is the one repair this loop must not make
-silently.
+**A second full-loop rejection, or a first whose fix scope is `redo`, discards the attempt before
+re-dispatching, and be explicit about what that means**, because "fresh subagent" is a claim about
+the tree as much as about the agent. Nothing was committed, so there is no history to rewrite:
+unstage and discard the working tree, and the next subagent starts from exactly the state the first
+one did, `rounds` continuing. In a declared batch, reset or delete that task's worktree and do not
+merge it. A third rejection stops and asks the person, with every verdict.
+
+**After a discard, never re-dispatch on top of the rejected attempt.** A fresh agent handed a tree
+containing rejected work, with no fix scope to bound it, reads it as the starting point and builds
+on it, which is how a DEVIATES verdict turns into two entangled problems instead of one corrected
+task. If the work was committed anyway, by an implementer that ignored its rules or a plan written
+before them, say so and stop: undoing a commit is the user's call, and it is the one repair this
+loop must not make silently.
 
 **A `blocking` finding from the quality review is handled exactly as a DEVIATES verdict is**, and
 for the same reason: the tick is the gate, and a finding acted on only after the commit is a
-comment on history. Do not tick, do not commit. Discard the attempt and re-dispatch the task to a
-fresh subagent with the finding attached, as above. `should fix` and `consider` findings do not
+comment on history. Do not tick, do not commit. Send it to the fix pass or discard it, by the rules
+above, with the finding attached. `should fix` and `consider` findings do not
 stop the tick; they go in the Step 6 report beside the task they came from. The one way past a
 `blocking` finding without a fix is the user accepting it by name, and that acceptance is written
 into the plan file beside the task before its box is ticked.

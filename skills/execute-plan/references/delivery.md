@@ -32,9 +32,9 @@ decision the run makes alone.
   twice.
 - A deviation from the plan, a skipped task, or a step deferred or marked not applicable. Each
   needs the user's agreement before the plan is changed, and `ship` check 7 reads the result.
-- The loop sending a task to the person: a second light-loop DEVIATES, or a full-loop DEVIATES or
-  blocking finding with no fix allowed, where the only way past is the user accepting the finding
-  by name.
+- The loop sending a task to the person: a second light-loop DEVIATES, a third full-loop rejection
+  (DEVIATES or a blocking finding), or a full-loop rejection with no fix allowed, where the only
+  way past is the user accepting the finding by name.
 - `keel plan risk` exit 4: nothing staged, or an empty range, which means the implementer staged
   nothing or committed against its rules.
 - A dirty tree before a dispatch. Committing, stashing and discarding are the user's call.

@@ -448,7 +448,7 @@ reader against the diff and by the grep in `Done when:`.
 **Done when:** `tests/test-validate-skills.sh` and `tests/test-validate-citations.sh` pass, and
 `grep -c 'Fix scope:' skills/execute-plan/references/subagent-prompts.md` prints at least `2`.
 
-- [ ] **Step 5.1: Make the change and check it**
+- [x] **Step 5.1: Make the change and check it** Note: No-test task; examples checked by the spec reviewer against the diff and Done when (validate-skills 134/0, validate-citations 60/0, Fix scope grep 3). Light-loop intro clause reworded so it stays true; its numbered list unchanged. Citation repairs outside Files: docs/ideas/implementers-run-git-stash.md, docs/prd/standards-assessment.md.
 
 Edit as the behaviours say. In `subagent-prompts.md` the paragraphs that change are "On a DEVIATES
 verdict in the full loop", "In the full loop, discard the first attempt", "In the full loop, never
@@ -458,7 +458,7 @@ second rejection and name the fix pass for the first.
 Run: the `Done when:` commands, then `tests/run-tests.sh` and the lint command.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 
-- [ ] **Step 5.2: Hand over**
+- [x] **Step 5.2: Hand over** Note: rounds: 1; routing: inherit; loop: light
 
 ```bash
 git add skills/execute-plan/references/subagent-prompts.md skills/execute-plan/references/rationale.md \

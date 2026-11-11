@@ -24,6 +24,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
   naming the plan file and its `next:` line and carry on; the ordinary stop keeps its four steps.
   `PreCompact` keeps a handoff written since the stop fired, then removes the stop marker so a later
   stop blocks again until a newer handoff.
+- `execute-plan`'s full loop gives a first rejection one fix pass, scoped by the `Fix scope:` line
+  both review prompts now end a rejection with, unless it reads `redo`; a second rejection discards
+  the attempt and a third asks the person.
 - `hooks/review-guard` refuses every subagent a stash-writing `git stash`, wherever it runs, and
   allows `git stash list` and `git stash show` (ADR-0016). A subagent is told by a non-empty
   `agent_type` and a non-empty `agent_id` string, so the main session, which carries no `agent_id`
