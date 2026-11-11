@@ -44,7 +44,7 @@ Copied verbatim from the stories, ADRs, the standards document, and profile. Eve
 these.
 
 - Verify commands: test `./gradlew test`, one test `./gradlew test --tests '{name}'`, lint
-  `./gradlew check`
+  `./gradlew spotlessCheck`
 - Never start on `main`
 - ADR-0003 requires that a missing or empty credential fails startup
 - `<docs_root>/standards.md` requires a named exception type, never a bare catch
@@ -106,10 +106,10 @@ Run: `./gradlew test --tests '*SecurityPropertiesTest'`
 Expected before the implementation: FAIL, the case for behaviour 1 fails because startup
 succeeds. Expected after: PASS. Quote the failing output in your report.
 
-Run: `./gradlew check`, and `verify.test_affected` where the profile sets it, with `{base}` filled
-with the start record's commit. With the `Done when:` run above, that is the unit boundary. Run no
-`./gradlew test`: the plan header names suite checkpoints, so the coordinator runs the suite at
-checkpoints and hands you the last one's record as your start record. The task text overrides the
+Run: `./gradlew spotlessCheck`, and `verify.test_affected` where the profile sets it, with `{base}`
+filled with the start record's commit. With the `Done when:` run above, that is the unit boundary.
+Run no `./gradlew test`: the plan header names suite checkpoints, so the coordinator runs the suite
+at checkpoints and hands you the last one's record as your start record. The task text overrides the
 skill, so a step naming the suite would schedule it for every task, the cost checkpoints remove.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.

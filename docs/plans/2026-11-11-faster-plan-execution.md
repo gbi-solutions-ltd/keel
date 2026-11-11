@@ -805,13 +805,13 @@ reader against the diff and by the commands in `Done when:`.
 `tests/test-eval-harness.sh` pass, `wc -w < skills/tdd/SKILL.md` prints at most `746`, and
 `grep -c 'paste its output' skills/execute-plan/references/subagent-prompts.md` prints `0`.
 
-- [ ] **Step 10.1: Make the change and check it**
+- [x] **Step 10.1: Make the change and check it** Note: No-test task; examples checked by the spec reviewer (validate-skills 134/0, validate-citations 60/0, eval-harness 115/0, wc tdd 745, paste-its-output grep 0). Round 1 DEVIATES: tdd body grew 745 to 746 and the boundary cue was lost; light-loop fix pass. Round 2 DEVIATES: RED step did not link affected-tests.md. Bernard authorised a third round on 2026-11-11; it made the words a link, COMPLIES. Citation repairs outside Files: docs/prd/standards-assessment.md, docs/ideas/implementers-run-git-stash.md.
 
 Edit as the behaviours say.
 Run: the `Done when:` commands, then `tests/run-tests.sh` and the lint command.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 
-- [ ] **Step 10.2: Hand over**
+- [x] **Step 10.2: Hand over** Note: rounds: 3; routing: inherit; loop: light; third round authorised by Bernard
 
 ```bash
 git add skills/tdd/SKILL.md skills/write-plan/references/plan-template.md \

@@ -9,6 +9,11 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- `tdd`'s RED step says a plan run's handed start record replaces the first unit's `verify.test`;
+  the plan template's example lint is `./gradlew spotlessCheck`, which runs no tests; `write-plan`'s
+  rationale names `**Suite checkpoints:**` among the header lines `execute-plan` reads; and the
+  implementer report gives the `Done when:` command's summary lines and failing cases, not all
+  its output.
 - The context-watch stop text says a plan run resumes after compaction from
   `keel plan status <plan>`, the handoff's `next:` line recording only where it stood at the stop;
   `PreCompact` writes a line to stderr naming a stop marker it cannot remove, and still exits 0.

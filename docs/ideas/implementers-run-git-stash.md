@@ -20,7 +20,7 @@ stash and the tree before trusting the task, and once the stash held a plan's en
 | 2026-09-19 | `docs/plans/2026-09-19-make-keel-enforceable-outside-the-agent.md:580-586` | A subagent created a stash "apparently to isolate a test run" and never popped it. The stash held "the entire staged diff for this plan including the correct fix already made". The subagent was stopped with `TaskStop`, and one file was restored from the stash by hand | No keel agent type: `agents/keel-implementer.md` was added in `a60df6a` on 2026-10-17 |
 | 2026-09-19 | same plan, `:1119-1123` | The fix's implementer "used `git stash` mid-task despite being explicitly told not to", and `git stash pop` conflicted. It resolved the conflict by hand | As above. The rule was in its dispatch prompt |
 | 2026-10-16 | `docs/plans/2026-10-16-plans-declare-batches.md:190` | "the implementer used git stash once against its rules, tree verified clean", inside worktree `g6-t1` | Sonnet on `keel-implementer` routing, a day before the agent type existed |
-| 2026-10-29 | `docs/plans/2026-10-29-claude-code-only.md:1714` | "implementer ran git stash and pop once on the shared tree, tree intact" | `inherit` routing, which dispatches by model and description, not by a keel agent type (`skills/execute-plan/references/subagent-prompts.md:407-410`) |
+| 2026-10-29 | `docs/plans/2026-10-29-claude-code-only.md:1714` | "implementer ran git stash and pop once on the shared tree, tree intact" | `inherit` routing, which dispatches by model and description, not by a keel agent type (`skills/execute-plan/references/subagent-prompts.md:408-411`) |
 
 The reviewer's own instance, on 2026-10-12, is the one `hooks/review-guard` now holds, and it is
 not counted here.
@@ -69,7 +69,7 @@ reads a command string, so `sh -c "git stash"` or a script still gets through, a
 
 **This argument is weaker than it looks.** Nothing at a task boundary would find a stray stash. The
 coordinator checks `git status --porcelain` before every dispatch
-(`skills/execute-plan/references/subagent-prompts.md:270`), but a stash empties the tree, so status
+(`skills/execute-plan/references/subagent-prompts.md:271`), but a stash empties the tree, so status
 reads clean while the stash holds the work. That is how the 2026-09-19 stash hid a whole plan's
 staged diff. Nothing in `execute-plan` reads `git stash list`; only the eval staging records it
 (`stash.txt`, `docs/plans/2026-10-18-prune-follow-ups.md:104`). Each instance was found in a

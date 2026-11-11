@@ -44,8 +44,8 @@ opens the codebase, so a plan can pass every one and still be unbuildable.
 
 ## Step 6: Hand off
 
-Write the answer into `**Implementer routing:**` and `**Delivery:**` because `execute-plan` reads
-those lines, not this conversation.
+Write the answers into `**Implementer routing:**`, `**Suite checkpoints:**` and `**Delivery:**`
+because `execute-plan` reads those lines, not this conversation.
 
 On the default branch, leave the plan uncommitted and start nothing because a delivery run records
 its progress in a committed plan.
