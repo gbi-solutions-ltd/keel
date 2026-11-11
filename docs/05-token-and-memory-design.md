@@ -302,9 +302,13 @@ the way to clear the pointer rather than a no-op.
 session, which ends with telling the person to `/clear`. When coordinating a `keel:execute-plan`
 run, the session is told to write the handoff naming the plan file and the `next:` line of
 `keel plan status <plan>`, and then to carry on with the run, because compaction is safe when the
-plan file holds the place. `PreCompact` keeps a handoff written since the stop fired rather than
-replacing it with the mechanical render, which would lose that `next:` line, and then removes the
-stop marker, so a later stop in the same session blocks again until a newer handoff is written.
+plan file holds the place. After compaction the run resumes from `keel plan status <plan>`, since
+the handoff's `next:` line records only where the run stood at the stop and the run moves on after
+it. `PreCompact` keeps a handoff written since the stop fired rather than replacing it with the
+mechanical render, which would lose that `next:` line, and then removes the stop marker, so a later
+stop in the same session blocks again until a newer handoff is written. A removal that fails writes
+a line naming the marker to the library's stderr and compaction still goes ahead; the hook sends
+that stderr to `/dev/null`, so the line is not shown in a session.
 
 ## Session hygiene, the part skills cannot enforce
 

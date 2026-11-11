@@ -656,6 +656,32 @@ PY
 [ "$got" = 77001 ] && ok "a tail with no usable turn still falls through to the whole file" \
   || bad "a tail with no usable turn still falls through to the whole file" "got: $got"
 
+# --- a plan run resumes from the plan, and a failed marker removal is said ------------------------
+#
+# The handoff's `next:` line is the place at the stop, and the run moves on after it, so a run
+# resumed from that line would repeat or skip work. The plan file is what holds the place.
+out="$(fire UserPromptSubmit "$work/stop.jsonl" "$work")"
+case "$out" in *'resumes from'*'where the run stood'*)
+    ok "the plan-run paragraph says the run resumes from the plan, not the handoff's next: line" ;;
+  *) bad "plan run" "no resume sentence in the stop text: $out" ;; esac
+
+# A marker PreCompact cannot remove keeps the next stop released by this stop's handoff, so the
+# failure is said rather than swallowed. A directory in the marker's place makes the removal fail.
+# The library is driven directly, as for the unparseable transcript above: hooks/context-watch
+# sends python's stderr to /dev/null, so this line is pinned where it is written.
+sess="marker-stuck-$$"
+rm -rf "${statedir:?}/$sess.stop"
+mkdir -p "$statedir/$sess.stop"
+err="$(printf '{"hook_event_name":"PreCompact","transcript_path":"%s","cwd":"%s","session_id":"%s","tool_name":"Bash"}' \
+  "$work/stop.jsonl" "$work" "$sess" | python3 "$LIB" hook 2>&1 >/dev/null)"
+rc=$?
+case "$err" in *'keel context-watch'*'stop marker'*)
+    ok "a stop marker PreCompact cannot remove is named on stderr" ;;
+  *) bad "plan run" "a failed marker removal was silent: $err" ;; esac
+[ "$rc" -eq 0 ] && ok "a failed marker removal still lets compaction go ahead" \
+  || bad "plan run" "PreCompact exited $rc"
+rm -rf "${statedir:?}/$sess.stop" "$work/.keel/handoff.md"
+
 rm -rf "$work"
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

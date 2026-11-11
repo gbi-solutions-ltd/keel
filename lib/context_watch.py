@@ -494,7 +494,9 @@ def hook():
             try:
                 os.remove(stopped)
             except OSError:
-                pass
+                # Said, because a marker left behind lets this stop's handoff release the next stop.
+                # Compaction still goes ahead: refusing it would cost more than a stale marker.
+                sys.stderr.write("keel context-watch: could not remove the stop marker %s\n" % stopped)
         # Nothing is emitted, deliberately. This announced the file with a systemMessage until
         # 2026-09-05, and the harness discards a PreCompact hook's systemMessage and continue fields
         # outright, so the announcement was written, serialised and thrown away every time. The test
@@ -587,7 +589,8 @@ def _stop_text(pct, tokens, window, handoff):
         "plan file and the `next:` line of `keel plan status <plan>`, and then carry on with the\n"
         "run rather than telling the user to /clear. Compaction is expected and safe there,\n"
         "because the plan file holds the place and compaction keeps a handoff written after this\n"
-        "pause.\n"
+        "pause. After compaction the run resumes from `keel plan status <plan>`: the handoff's\n"
+        "`next:` line records only where the run stood at this pause.\n"
         "\n"
         "Write, Edit and Read still work so you can do this. Other tools are refused until the\n"
         "handoff is written. In an ordinary session, continuing past here means the session is\n"

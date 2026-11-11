@@ -9,6 +9,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- The context-watch stop text says a plan run resumes after compaction from
+  `keel plan status <plan>`, the handoff's `next:` line recording only where it stood at the stop;
+  `PreCompact` writes a line to stderr naming a stop marker it cannot remove, and still exits 0.
 - `hooks/done-guard` counts the text of `verify.test_one` or `verify.test_affected` before its
   first `{` as a test run only where it begins a command, so `shellcheck tests/*.sh` no longer
   satisfies `gates.done_verified`; `verify.test` still counts anywhere in a command.

@@ -708,8 +708,16 @@ coordinator commits after both review passes, with
 **Story:** follow-up from task 2's quality review, directed by Bernard on 2026-11-11
 **Files:**
 - Modify: `lib/context_watch.py`
+- Modify: `docs/05-token-and-memory-design.md`
 - Modify: `CHANGELOG.md`
 - Test: `tests/test-context-watch.sh`
+
+**Plan note, 2026-11-11, coordinator:** `docs/05-token-and-memory-design.md` was added after the
+first report, which found two things: the doc's plan-run paragraph (about lines 301-307) says
+nothing of resuming from `keel plan status`, and `hooks/context-watch` sends the library's stderr
+to `/dev/null`, so behaviour 2's line is seen only when the library is run directly. The hook is
+left as it is; the doc states both. Example: that paragraph contains `keel plan status` and says
+the failed-removal line is not shown in a session.
 
 **Depends on:** task 8
 
@@ -732,7 +740,7 @@ coordinator commits after both review passes, with
 **Done when:** `tests/test-context-watch.sh`, `tests/test-validate-citations.sh` and
 `tests/test-harness-claims.sh` pass.
 
-- [ ] **Step 9.1: Build it test first**
+- [x] **Step 9.1: Build it test first** Note: Red witnessed (79/2, both new cases). Coordinator added docs/05 to Files after the first report (plan note); same implementer finished it. The stderr line is discarded by hooks/context-watch, as docs/05 now states. Quality should-fix: the code comment says "Said" though nothing in a session sees it; the new stderr line is 103 columns. Consider: os.utime fallback when removal fails.
 
 Follow `keel:tdd`. Write cases for behaviours 1 and 2 in `tests/test-context-watch.sh`, after the
 existing cases.
@@ -744,7 +752,7 @@ Run: `tests/run-tests.sh` and the lint command.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 9.2: Hand over**
+- [x] **Step 9.2: Hand over** Note: rounds: 1; routing: inherit; loop: full
 
 ```bash
 git add lib/context_watch.py tests/test-context-watch.sh CHANGELOG.md
