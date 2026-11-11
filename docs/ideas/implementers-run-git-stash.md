@@ -20,7 +20,7 @@ stash and the tree before trusting the task, and once the stash held a plan's en
 | 2026-09-19 | `docs/plans/2026-09-19-make-keel-enforceable-outside-the-agent.md:580-586` | A subagent created a stash "apparently to isolate a test run" and never popped it. The stash held "the entire staged diff for this plan including the correct fix already made". The subagent was stopped with `TaskStop`, and one file was restored from the stash by hand | No keel agent type: `agents/keel-implementer.md` was added in `a60df6a` on 2026-10-17 |
 | 2026-09-19 | same plan, `:1119-1123` | The fix's implementer "used `git stash` mid-task despite being explicitly told not to", and `git stash pop` conflicted. It resolved the conflict by hand | As above. The rule was in its dispatch prompt |
 | 2026-10-16 | `docs/plans/2026-10-16-plans-declare-batches.md:190` | "the implementer used git stash once against its rules, tree verified clean", inside worktree `g6-t1` | Sonnet on `keel-implementer` routing, a day before the agent type existed |
-| 2026-10-29 | `docs/plans/2026-10-29-claude-code-only.md:1714` | "implementer ran git stash and pop once on the shared tree, tree intact" | `inherit` routing, which dispatches by model and description, not by a keel agent type (`skills/execute-plan/references/subagent-prompts.md:322-325`) |
+| 2026-10-29 | `docs/plans/2026-10-29-claude-code-only.md:1714` | "implementer ran git stash and pop once on the shared tree, tree intact" | `inherit` routing, which dispatches by model and description, not by a keel agent type (`skills/execute-plan/references/subagent-prompts.md:349-352`) |
 
 The reviewer's own instance, on 2026-10-12, is the one `hooks/review-guard` now holds, and it is
 not counted here.
@@ -69,7 +69,7 @@ reads a command string, so `sh -c "git stash"` or a script still gets through, a
 
 **This argument is weaker than it looks.** Nothing at a task boundary would find a stray stash. The
 coordinator checks `git status --porcelain` before every dispatch
-(`skills/execute-plan/references/subagent-prompts.md:243`), but a stash empties the tree, so status
+(`skills/execute-plan/references/subagent-prompts.md:260`), but a stash empties the tree, so status
 reads clean while the stash holds the work. That is how the 2026-09-19 stash hid a whole plan's
 staged diff. Nothing in `execute-plan` reads `git stash list`; only the eval staging records it
 (`stash.txt`, `docs/plans/2026-10-18-prune-follow-ups.md:104`). Each instance was found in a
@@ -81,7 +81,7 @@ report or by an unexpected diff, not by a check.
 |---|---|---|
 | review-guard's cheap filter passes the reviewer's calls and any call carrying `"agent_type"` whose event contains `stash` | The "cheap filter" at `hooks/review-guard:99-103` returns at once for every other call, without starting `python3` | A subagent's Bash call starts `python3` only when its event names `stash` somewhere, its `cwd` or `transcript_path` included |
 | review-guard already parses where a git command acts and refuses `stash` in any form for the reviewer | `hooks/review-guard:34-39`, and its word list at `:152-155` | The parsing exists. An implementer must keep `add` and `commit` in its own worktree, so the reviewer's list cannot be reused as it stands, only its `stash` entry |
-| The implementer brief and agent carry a stash rule | `skills/execute-plan/references/subagent-prompts.md` section 1's `=== RULES ===` (`:62-64`) and `agents/keel-implementer.md:23-25` forbid `git stash` other than `list` or `show`, and say a hook refuses it. The two review prompts forbid every `stash` (`:111`, `:166`) | The prompt and the hook state the same line, so a refusal reads as expected |
+| The implementer brief and agent carry a stash rule | `skills/execute-plan/references/subagent-prompts.md` section 1's `=== RULES ===` (`:62-64`) and `agents/keel-implementer.md:23-25` forbid `git stash` other than `list` or `show`, and say a hook refuses it. The two review prompts forbid every `stash` (`:116`, `:177`) | The prompt and the hook state the same line, so a refusal reads as expected |
 | Implementers do commit, in a concurrent batch's private worktree | `skills/write-plan/references/plan-template.md`, "the one exception is a declared concurrent batch" | Any guard for implementers has to leave `commit` alone there. A stash-only guard does |
 | `review-guard` denies, it does not ask | `hooks/review-guard:41-43`, decided by Bernard on 2026-10-17 | The same choice applies here, and a `deny` reaches the agent as a reason it can read |
 

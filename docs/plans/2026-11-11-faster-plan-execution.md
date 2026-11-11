@@ -375,17 +375,23 @@ checked by a reader against the diff and by the greps in `Done when:`.
    idea record, in the style of the 2026-10-12 note the review prompts already carry. Example: the
    section contains `07cd31ed` and `12:15:45`.
 
+**Plan note, 2026-11-11, coordinator:** observed three times in this run, the harness moves a
+foreground Bash command to the background after about 180 s whatever `timeout` it was given, and
+the agent then gets a "waiting on its own background work" notification. Behaviour 1's rule
+therefore also says: if the harness moves a command to the background, wait for it to finish before
+ending the turn. Example: the rule's text contains `moves a command to the background`.
+
 **Done when:** `tests/test-validate-skills.sh`, `tests/test-validate-citations.sh` and
 `tests/test-agents.sh` pass, and `grep -c run_in_background skills/execute-plan/references/subagent-prompts.md agents/keel-implementer.md agents/keel-reviewer.md`
 prints a count of at least 1 for each file.
 
-- [ ] **Step 4.1: Make the change and check it**
+- [x] **Step 4.1: Make the change and check it** Note: No-test task; examples checked by the spec reviewer against the diff and Done when (validate-skills 134/0, validate-citations 60/0, agents 6/0, eval-harness 115/0, greps 3/1/1). Coordinator plan note added before dispatch: the harness backgrounds a command at about 180 s, so the rule also says to wait for it. Citation repairs outside Files: docs/ideas/implementers-run-git-stash.md, docs/prd/standards-assessment.md. Left: commit-outside-a-worktree.md "moved twice" note already stale.
 
 Edit the prompts and agent bodies as the behaviours say.
 Run: the `Done when:` commands, then `tests/run-tests.sh` and the lint command.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 
-- [ ] **Step 4.2: Hand over**
+- [x] **Step 4.2: Hand over** Note: rounds: 1; routing: inherit; loop: light
 
 ```bash
 git add skills/execute-plan/references/subagent-prompts.md agents/keel-implementer.md agents/keel-reviewer.md CHANGELOG.md \

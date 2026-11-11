@@ -197,6 +197,11 @@ test for them. A task with no behaviours list, in the older shape, is followed a
 - Never run `git stash` other than `git stash list` or `git stash show`; a hook refuses it. The
   stash is shared by every worktree, and a stash empties the tree, so status reads clean while it
   hides your whole diff from the coordinator.
+- Run every command in the foreground, never with `run_in_background` and never with a trailing
+  `&`, and give a long command the Bash `timeout` it needs, up to 600000 ms. If the harness
+  moves a command to the background anyway, wait for it to finish before ending your turn. Do not
+  end your turn while anything you started is still running: the coordinator reads your stop as
+  your report.
 
 === REPORT ===
 Finish with: which steps you completed; for each verify command, the command, its exit code and its

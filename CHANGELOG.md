@@ -9,6 +9,10 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- `execute-plan`'s implementer and review prompts, and the `keel-implementer` and `keel-reviewer`
+  agents, run every command in the foreground and end no turn with work still running; the
+  coordinator reviews only a report ending in its `git status --porcelain` line, and voids a review
+  whose author notifies again.
 - `execute-plan`'s implementer report gives each verify command's exit code and at most 15 summary
   lines plus every failing case, and the red run's failing case and message, not whole outputs;
   both review prompts cap the report at 250 words with the verdict first.

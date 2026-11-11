@@ -62,6 +62,11 @@ test for them. A task with no behaviours list, in the older shape, is followed a
 - Never run `git stash` other than `git stash list` or `git stash show`; a hook refuses it. The
   stash is shared by every worktree, and a stash empties the tree, so status reads clean while it
   hides your whole diff from the coordinator.
+- Run every command in the foreground, never with `run_in_background` and never with a trailing
+  `&`, and give a long command the Bash `timeout` it needs, up to 600000 ms. If the harness
+  moves a command to the background anyway, wait for it to finish before ending your turn. Do not
+  end your turn while anything you started is still running: the coordinator reads your stop as
+  your report.
 
 === REPORT ===
 Finish with: which steps you completed; for each verify command, the command, its exit code and its
@@ -119,6 +124,12 @@ as one held in `"$wt"`, and `TMPDIR` is often unset on Linux.
 On 2026-10-12 a spec reviewer ran `git stash` on the tree under review to measure a baseline, and a
 quality reviewer left a worktree behind.
 
+Run every command in the foreground, never with `run_in_background` and never with a trailing
+`&`, and give a long command the Bash `timeout` it needs, up to 600000 ms. If the harness
+moves a command to the background anyway, wait for it to finish before ending your turn. Do not
+end your turn while anything you started is still running: the coordinator reads your stop as your
+report.
+
 Answer six questions:
 1. Is every step's stated outcome actually present?
 2. Is anything here that no step asked for? Name it.
@@ -173,6 +184,12 @@ Write its path as `"${TMPDIR:-/tmp}/<name>"` or a literal temp path, and reach i
 as one held in `"$wt"`, and `TMPDIR` is often unset on Linux.
 On 2026-10-12 a spec reviewer ran `git stash` on the tree under review to measure a baseline, and a
 quality reviewer left a worktree behind.
+
+Run every command in the foreground, never with `run_in_background` and never with a trailing
+`&`, and give a long command the Bash `timeout` it needs, up to 600000 ms. If the harness
+moves a command to the background anyway, wait for it to finish before ending your turn. Do not
+end your turn while anything you started is still running: the coordinator reads your stop as your
+report.
 
 Rank findings: blocking, should fix, consider. Cap at ten. If nothing blocks, say so in the first
 line.
@@ -245,6 +262,16 @@ A dirty tree is not a refusal, so it is not in the table in preconditions.md; it
 because it can become true again halfway through a run that started clean. Stop and ask what to do
 with what is there: committing, stashing and discarding are all reasonable and all the user's call.
 See [preconditions.md](preconditions.md).
+
+**Dispatch a review only on a report whose last line is the `git status --porcelain` paste.** A
+notification that the agent is waiting on its own background work is not the report: the agent has
+ended its turn, not its task, and the tree can still change under the reviewer. If an agent notifies
+again after its review was dispatched, the review is void: re-read `git status --porcelain` and
+re-dispatch the review on the final tree. The redone review does not count as an implementer round,
+because no implementer was dispatched again. On 2026-11-09, in session `07cd31ed`, a task 7
+implementer notified it had finished at 12:07:31, its spec review went out at 12:07:45, and the
+implementer woke on its own background work and finished again at 12:15:45, so the task needed a
+second review; task 9 repeated it, at 12:59:09 and then 13:04:50.
 
 After both passes, with pass one at COMPLIES and pass two carrying nothing `blocking`: tick the
 task's steps with `keel plan tick <plan> <id>`, **then commit**, with the paths and the message the

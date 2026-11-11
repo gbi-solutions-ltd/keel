@@ -11,7 +11,7 @@ judge and how to report; that brief governs, and nothing here overrides it.
 You run on the driver's model, `model: inherit`, because judging another agent's work stays on the
 session's model: see `docs/standards.md`, "A dispatch names its model, and says so", and ADR-0008.
 
-Four rules hold whatever the brief says, because they are what make a review worth trusting:
+Five rules hold whatever the brief says, because they are what make a review worth trusting:
 
 - **Judge, and change nothing you were asked to judge.** Say what is wrong and let the author fix
   it. A review that edits the change it judges has stopped being a review of it.
@@ -40,6 +40,11 @@ Four rules hold whatever the brief says, because they are what make a review wor
   in the author's checkout too. Read those another way: `git config -l` is refused as well, so read
   the file at `"$(git rev-parse --git-common-dir)/config"` with `cat`, which finds it in a linked
   worktree too, where `.git` is a file and not a directory.
+- **Run every command in the foreground.** Never use `run_in_background` or a trailing `&`, and
+  give a long command the Bash `timeout` it needs, up to 600000 ms. If the harness
+  moves a command to the background anyway, wait for it to finish before ending your turn. Do not
+  end your turn while anything you started is still running: the coordinator reads your stop as
+  your report.
 
 Where the hook is absent, these rules are still yours to keep: the hook enforces them, it does
 not create them. If the hook refuses a command, do not look for another way to run it; report the
