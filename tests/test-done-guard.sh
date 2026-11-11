@@ -334,5 +334,77 @@ shape_alone "a summary row with no message is a Claude Code row: silent, exit 0"
 shape_alone "a message row with no type is a Claude Code row: silent, exit 0" \
     '{"message":{"role":"user","content":"x"}}'
 
+# ---- where an edited path lives -----------------------------------------------
+#
+# An edit outside the repository is not this repository's code: a subagent writing a probe under
+# /tmp has changed nothing the suite covers, and blocking it for not running the suite is a false
+# block. The root is git's top level, else the event's cwd, and both sides go through realpath,
+# because mktemp on macOS hands out /var paths that are really /private/var.
+row_write() { printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Write","input":{"file_path":"%s"}}]}}\n' "$1"; }
+
+reason_has() {   # reason_has <name> <output> <text> <want: yes|no>; the output must also block
+    local name="$1" out="$2" text="$3" want="$4" has=no
+    printf '%s' "$out" | grep -qF "$text" && has=yes
+    if printf '%s' "$out" | grep -q '"decision": *"block"' && [ "$has" = "$want" ]; then
+        printf '  PASS  %s\n' "$name"; pass=$((pass+1))
+    else
+        printf '  FAIL  %s (wanted a block, %s containing %s, got: %s)\n' "$name" "$want" "$text" "${out:0:120}"; fail=$((fail+1))
+    fi
+}
+
+repo="$tmp/repo"
+fixture "$repo" '"done_verified": "required"' '"tests/run-tests.sh"'
+git init -q "$repo" 2>/dev/null
+
+# Behaviour 1.
+{ row_user "go"; row_write "/tmp/keel-probe/parse.py"; } > "$repo/b1.jsonl"
+expect "outside the repository: a SubagentStop whose only write is under /tmp is quiet" quiet \
+    "$(send "$repo" "$repo/main.jsonl" SubagentStop "$repo/b1.jsonl")"
+{ row_user "go"; row_write "$repo/docs/x.txt"; } > "$repo/b1d.jsonl"
+expect "inside the repository: an absolute path under docs_root is made relative to the root and passes" quiet \
+    "$(send "$repo" "$repo/b1d.jsonl" Stop)"
+
+# Behaviour 2.
+{ row_user "go"; row_edit "$repo/lib/foo.sh" ""; } > "$repo/b2.jsonl"
+reason_has "inside the repository: an absolute path is code and the reason names lib/foo.sh" \
+    "$(send "$repo" "$repo/b2.jsonl" Stop)" "lib/foo.sh" yes
+
+# Behaviour 3.
+{ row_user "go"; row_write "lib/foo.sh"; } > "$repo/b3.jsonl"
+expect "a relative path is read against the event cwd, so it is inside and blocks" block \
+    "$(send "$repo" "$repo/b3.jsonl" Stop)"
+{ row_user "go"; row_write "$repo/docs/x.md"; } > "$repo/b3d.jsonl"
+expect "an absolute markdown path inside the repository passes" quiet \
+    "$(send "$repo" "$repo/b3d.jsonl" Stop)"
+
+# Behaviour 4.
+{ row_user "go"; row_write "$repo/../elsewhere/x.py"; } > "$repo/b4.jsonl"
+expect "a path that climbs out of the repository is outside: quiet" quiet \
+    "$(send "$repo" "$repo/b4.jsonl" Stop)"
+
+# Behaviour 5.
+{ row_user "go"; row_write "/tmp/keel-probe/a.py"; row_edit "$repo/lib/foo.sh" ""; } > "$repo/b5.jsonl"
+reason_has "a mix is judged on the inside paths and the reason does not name the outside one" \
+    "$(send "$repo" "$repo/b5.jsonl" Stop)" "/tmp/keel-probe/a.py" no
+
+# Behaviour 6. A checkpointed implementer ends on its task's own tests, through verify.test_one or
+# verify.test_affected, so those count as a test run by their text before the first `{`. An empty
+# prefix would be a substring of every command, so it counts for nothing.
+scoped="$tmp/scoped"
+fixture "$scoped" '"done_verified": "required"' '"tests/run-tests.sh", "test_one": "go test {path}"'
+{ row_user "go"; row_edit "$scoped/a.go" ""; row_bash "go test -count=1 -run TestX ./api/" ""; } > "$scoped/b6.jsonl"
+expect "a scoped run through verify.test_one counts as a test run" quiet \
+    "$(send "$scoped" "$scoped/b6.jsonl" Stop)"
+affected="$tmp/affected"
+fixture "$affected" '"done_verified": "required"' '"tests/run-tests.sh", "test_affected": "go test {packages}"'
+{ row_user "go"; row_edit "$affected/a.go" ""; row_bash "go test ./api/" ""; } > "$affected/b6.jsonl"
+expect "a scoped run through verify.test_affected counts as a test run" quiet \
+    "$(send "$affected" "$affected/b6.jsonl" Stop)"
+empty="$tmp/empty-prefix"
+fixture "$empty" '"done_verified": "required"' '"tests/run-tests.sh", "test_one": "{name}"'
+{ row_user "go"; row_edit "$empty/a.go" ""; row_bash "echo hi" ""; } > "$empty/b6.jsonl"
+expect "a verify.test_one with an empty prefix counts nothing, so the edit still blocks" block \
+    "$(send "$empty" "$empty/b6.jsonl" Stop)"
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

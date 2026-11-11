@@ -899,7 +899,7 @@ fi
 # body that `keel guard install` writes.
 # 28% false positives, against docs/standards.md's rule that a check is never stricter than correct
 # output. It under-reports too: gates.done_verified is read as (prof.get("gates") or
-# {}).get("done_verified") at hooks/done-guard:114 and the dotted string appears in that file only
+# {}).get("done_verified") at hooks/done-guard:118 and the dotted string appears in that file only
 # in comments. Bare leaf names rescue nothing: `name` occurs 337 times in this tree and `test` 484,
 # so all 22 dead keys would have passed. The two bin/keel reads above are named by phrase and not
 # by line, because a line inserted anywhere earlier in that file moves them and nothing goes red

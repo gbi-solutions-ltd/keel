@@ -9,6 +9,10 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- `hooks/done-guard` ignores an edit whose path resolves outside the repository (git's top level,
+  else the event's `cwd`), and counts a Bash command containing the text of `verify.test_one` or
+  `verify.test_affected` before its first `{` as a test run, so a scoped test run satisfies
+  `gates.done_verified`: it proves a test ran, not that the suite did.
 - `hooks/review-guard` refuses every subagent a stash-writing `git stash`, wherever it runs, and
   allows `git stash list` and `git stash show` (ADR-0016). A subagent is told by a non-empty
   `agent_type` and a non-empty `agent_id` string, so the main session, which carries no `agent_id`

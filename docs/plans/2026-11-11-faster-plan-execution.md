@@ -171,7 +171,7 @@ Every task inherits these.
 **Done when:** `tests/test-done-guard.sh`, `tests/test-profile-keys.sh` and
 `tests/test-validate-citations.sh` pass.
 
-- [ ] **Step 1.1: Build it test first**
+- [x] **Step 1.1: Build it test first** Note: Red witnessed by the round 2 implementer (6 failing cases quoted); behaviours 2, 3 and 6 second example pinned existing behaviour, passed on arrival. Round 1 DEVIATES: citations into hooks/done-guard left shifted; discarded. Citation repairs outside Files staged: docs/ideas/{declared-profile-keys-take-effect,keel-on-codex,lint-after-each-edit,standards-that-bind}.md, lib/harness/capabilities, tests/validate-skills.sh. Quality should-fix: prefix tests/ matches the lint command; test_one/test_affected read-by docs not updated.
 
 Follow `keel:tdd`. Write cases for behaviours 1 to 6 in `tests/test-done-guard.sh`, in the style
 of the cases already there (fixture directory, a transcript written for the event, `required` as at
@@ -185,7 +185,7 @@ Run: `tests/run-tests.sh` and the lint command.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 1.2: Hand over**
+- [x] **Step 1.2: Hand over** Note: rounds: 2; routing: inherit; loop: full; implementer ran git stash list once (read-only)
 
 ```bash
 git add hooks/done-guard tests/test-done-guard.sh templates/profile.schema.json \

@@ -64,10 +64,12 @@ Stop, SubagentStop and PreCompact. No PostToolUse hook is registered.
 
 <!-- keel:claim gate=done-guard harness=claude -->
 **Critical path: an agent claims done.** The Stop hook runs done-guard, which reads the turn's
-transcript, finds edits to non-documentation files, and looks for `verify.test` as a substring of
+transcript, finds edits to non-documentation files inside the repository, and looks for
 <!-- keel:claim gate=done-guard harness=claude -->
-any Bash command in the turn (hooks/done-guard:32-36). With `gates.done_verified` at `required` it
-blocks the stop (hooks/done-guard:267-269); otherwise it warns.
+`verify.test`, or the text of `verify.test_one` or `verify.test_affected` before its first `{`, as a
+substring of any Bash command in the turn (hooks/done-guard:33-40), so a scoped test run counts.
+With `gates.done_verified` at `required` it blocks the stop (hooks/done-guard:295-297); otherwise
+it warns.
 
 ## 3. Repository structure
 
@@ -168,7 +170,7 @@ fails a profile holding one, both reading the schema (06b8ef2, 61360b3, 3c3c306,
 
 <!-- keel:claim gate=done-guard harness=claude -->
 - **A misspelled gate weakens silently.** done-guard reads any value other than `off` and
-  `required` as `warn` (hooks/done-guard:114, 267-270), so `requird` downgrades a blocking gate.
+  `required` as `warn` (hooks/done-guard:118, 295-298), so `requird` downgrades a blocking gate.
 
 Correction: as of 2026-09-26, not silently: `doctor` fails such a value and `profile set` refuses
 it (61360b3, 06b8ef2, tasks 1 and 2). The Stop hook still reads it as `warn`.

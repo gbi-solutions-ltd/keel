@@ -121,7 +121,7 @@
           "description": "The command that runs the whole test suite, exactly as a shell would run it. Read from what the project declares rather than inferred from the stack, because the real command is frequently not the idiomatic one. null means the project genuinely has none, and a skill asks instead of substituting a guess.",
           "x-keel-read-by": [
             "code:bin/keel#t0=\"$(json_get .keel/profile.json verify.test",
-            "code:hooks/done-guard:118"
+            "code:hooks/done-guard:123"
           ]
         },
         "test_one": {
@@ -326,8 +326,8 @@
             "warn",
             "off"
           ],
-          "description": "Drives hooks/done-guard on Stop and SubagentStop. required refuses to end a turn that edited code and never ran verify.test; warn says it and allows the stop. Off, or absent, and the hook does nothing.",
-          "x-keel-read-by": "code:hooks/done-guard:114"
+          "description": "Drives hooks/done-guard on Stop and SubagentStop. required refuses to end a turn that edited code inside the repository and never ran a test; warn says it and allows the stop. A test run is a Bash command containing verify.test, or the text of verify.test_one or verify.test_affected before its first `{` where that text is not empty, so a scoped test run counts: the gate proves a test ran, not that the suite did. Off, or absent, and the hook does nothing.",
+          "x-keel-read-by": "code:hooks/done-guard:118"
         },
         "context_watch": {
           "type": "boolean",
