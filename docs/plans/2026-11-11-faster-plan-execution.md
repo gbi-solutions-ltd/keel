@@ -616,13 +616,13 @@ reader against ADR-0017 and by the commands in `Done when:`.
 `1`, `wc -w < skills/tdd/SKILL.md` prints at most `746`, and `wc -w < skills/write-plan/SKILL.md`
 prints at most `729`.
 
-- [ ] **Step 7.1: Make the change and check it**
+- [x] **Step 7.1: Make the change and check it** Note: No-test task; examples checked by the spec reviewer against ADR-0017 and Done when (validate-skills 134/0, validate-citations 60/0, START RECORD grep 2, wc tdd 745, wc write-plan 729, eval-harness 115/0). Eval scenarios unchanged: case 23 compares from RULES on, and START RECORD sits before it. Citation repairs outside Files: docs/architecture/tiered-multi-harness-claim-inventory.md, docs/ideas/implementers-run-git-stash.md, docs/prd/standards-assessment.md. Follow-ups: tdd RED step still says the first unit costs one verify.test; the template example lint ./gradlew check also runs tests; write-plan rationale.md:47 names only routing and delivery.
 
 Edit as the behaviours say, reading ADR-0017 first.
 Run: the `Done when:` commands, then `tests/run-tests.sh` and the lint command.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 
-- [ ] **Step 7.2: Hand over**
+- [x] **Step 7.2: Hand over** Note: rounds: 1; routing: inherit; loop: light
 
 ```bash
 git add skills/execute-plan/references/subagent-prompts.md skills/tdd/references/affected-tests.md \

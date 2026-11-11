@@ -36,6 +36,14 @@ listed behaviour with no example makes the task not executable as written: stop 
 task that says it has no test, its examples are checked by its check command or a reader: write no
 test for them. A task with no behaviours list, in the older shape, is followed as written.
 
+=== START RECORD ===
+<the last checkpoint's commit and the tests red on it, or `none`; omit this block, rule and all,
+where the plan header has no `**Suite checkpoints:**` line>
+Take this as your first start record and do not run `verify.test`, for it or at any unit boundary.
+End each unit with the task's `Done when:` and the lint command, plus `verify.test_affected` where
+the profile sets it, `{base}` the commit above. The coordinator runs the suite at checkpoints; a
+run of it here is the per-task cost they exist to remove. Match each red against this record.
+
 === RULES ===
 - Follow the steps in order. Inside the build step follow `keel:tdd`: the test must fail, for the
   reason the task names, before you write the implementation. Do not skip that run.
@@ -340,6 +348,46 @@ above, with the finding attached. `should fix` and `consider` findings do not
 stop the tick; they go in the Step 6 report beside the task they came from. The one way past a
 `blocking` finding without a fix is the user accepting it by name, and that acceptance is written
 into the plan file beside the task before its box is ticked.
+
+## Suite checkpoints
+
+A plan whose header has `**Suite checkpoints:** every N tasks` takes the whole suite out of the
+implementers and gives it to you, as
+`docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md` decides: on a measured run
+the suite, run twice per task, took 22% of the wall clock. A plan with no such line is run as
+written, its steps naming the suite where they do.
+
+**Run `verify.test` before the first dispatch, after every N committed tasks, and after the last.**
+The first run is the plan-start record: its commit and the tests red on it. With N 3, a 10-task
+plan runs it at start and after tasks 3, 6, 9 and 10. Fill each implementer's
+`=== START RECORD ===` block with the last checkpoint's record, its commit and the reds still on
+it. The record is yours because you are the one agent that sees every task.
+
+**At a checkpoint task the order is fixed:**
+
+1. Its review passes, as "Running the loop" says.
+2. Run `verify.test` on the tree with the task staged.
+3. Tick its last step once, the note ending `; suite: pass`, or `; suite: red <names>` with each red
+   matched against the record, for example `rounds: 1; routing: inherit; loop: full; suite: pass`.
+4. Commit task and plan together, as for any task.
+
+So the suite result is in the one tick, no re-tick replaces the note, and the tree is clean before
+the next dispatch. Running the suite before the tick, not after the commit, keeps a red out of a
+commit whose note says nothing of it.
+
+**A red not on the previous record stops the run before that tick.** Run `keel:debug` through
+Phase 3, naming as candidates the staged task and every task committed since the previous
+checkpoint: a red at the task-6 checkpoint names tasks 4, 5 and 6. An earlier task's selection may
+have hidden the break, so naming the staged task alone sends `debug` to the wrong diff.
+
+- If the staged task caused it, it is a rejection of that task, handled as the loop handles one.
+- If an earlier task did, tick and commit the staged task with `suite: red <names>`, and send
+  Phase 4 to a fresh implementer as a task appended to the plan, in the full loop, before any
+  further dispatch. The earlier task is already committed, so the fix can only be a new commit, and
+  dispatching past a known red would let later tasks build on it.
+
+`review-code`, `ship`, CI and a declared batch's join gate still run the whole suite, and remain
+the backstop for what a checkpoint has not yet seen.
 
 ## Which model each prompt goes to
 

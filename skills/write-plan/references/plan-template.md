@@ -11,8 +11,8 @@ its plan as a draft and not as the plan. Harden the draft: give each task its `F
 `Behaviours` with examples, `Depends on:` and `Done when:` from the profile, and size the tasks
 as "Task granularity" says. Plan mode blocks writes until it is left, so write the file where
 `write-plan` step 3 says only after leaving it. Plan mode's approval covers the draft; the
-question at step 6 still carries the routing and the delivery. A headless or scheduled run
-writes the plan directly, and nothing else here changes.
+question at step 6 still carries the routing, the suite checkpoints and the delivery. A headless
+or scheduled run writes the plan directly, and nothing else here changes.
 
 ## Header
 
@@ -35,6 +35,7 @@ that has loaded nothing else.
 **ADRs:** ADR-0003
 **Architecture:** two or three sentences on the approach.
 **Implementer routing:** inherit
+**Suite checkpoints:** every 3 tasks
 **Delivery:** hand-off
 
 ## Global constraints
@@ -64,6 +65,15 @@ before. `pull-request` runs through to an open pull request, stopping wherever
 `skills/execute-plan/references/delivery.md` says. The person approving the plan chooses, and can
 change the line before `execute-plan` runs: `execute-plan` reads the line from the plan and not from
 the request, so the choice made at approval is the one a later session finds.
+
+**The suite checkpoints line** says how often `execute-plan`'s coordinator runs `verify.test`: once
+before the first dispatch, after every N committed tasks and after the last. Its implementers run
+no `verify.test`; each starts from the last checkpoint's record. 3 is the default, and the person
+approving the plan can change it. The reason is ADR-0017
+(`docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md`): on a measured run the
+suite, run twice per task, took 22% of the wall clock, and one run every few tasks still bounds how
+far back a break can hide. A plan with no such line runs its steps as written, so its build steps
+name `verify.test`, or `verify.test_affected` where set, as the boundary run.
 
 ## Task shape
 
@@ -96,11 +106,11 @@ Run: `./gradlew test --tests '*SecurityPropertiesTest'`
 Expected before the implementation: FAIL, the case for behaviour 1 fails because startup
 succeeds. Expected after: PASS. Quote the failing output in your report.
 
-Run: `./gradlew test`. Where the profile sets `verify.test_affected`, run that instead, with
-`{base}` filled with the start record's commit, or `verify.test` where `keel:tdd`'s affected-tests
-reference says to. The task text overrides the skill, so a step naming only the suite would
-schedule it for every task, and an affected run that never selected the unit's new test would pass
-this step.
+Run: `./gradlew check`, and `verify.test_affected` where the profile sets it, with `{base}` filled
+with the start record's commit. With the `Done when:` run above, that is the unit boundary. Run no
+`./gradlew test`: the plan header names suite checkpoints, so the coordinator runs the suite at
+checkpoints and hands you the last one's record as your start record. The task text overrides the
+skill, so a step naming the suite would schedule it for every task, the cost checkpoints remove.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
@@ -232,7 +242,8 @@ Rules:
   environment.` An honest gap reads as a gap. An invented command reads as coverage.
 - It is **scoped to the task's own test, never the full suite**, in every plan and not only in a
   concurrent batch. The tests run once at the unit boundary, which for a sequential task is its
-  build step and for a batched one is the `Batch gate:` line at the join. A whole-suite `Done
+  build step and for a batched one is the `Batch gate:` line at the join; in a plan with suite
+  checkpoints the whole suite runs only at the coordinator's checkpoints. A whole-suite `Done
   when:` puts the suite back inside the cycle it was moved out of, and in a batch it also proves
   nothing, for the reason in rule 1 of [concurrent-batches.md](concurrent-batches.md).
 - It appears once per task, above the steps, so a fresh agent dispatched only that section still

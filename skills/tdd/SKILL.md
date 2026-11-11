@@ -82,8 +82,8 @@ Only once green. Remove duplication, improve names, extract helpers. No new beha
 ### Unit boundary: run the tests
 
 The unit ends with one `verify.test_affected` run when the profile sets it, `{base}` the start
-record's commit, else one `verify.test`. Fallbacks to `verify.test`, carried reds, and which
-units an unmatched red names: [references/affected-tests.md](references/affected-tests.md).
+record's commit, else one `verify.test`. Fallbacks, carried and unmatched reds, and a plan run's
+handed record: [references/affected-tests.md](references/affected-tests.md).
 
 Red for tests this unit did not touch? Name them and match them against the start record. All
 matched means the unit is done: record them and carry on. An unmatched red goes to `keel:debug`.

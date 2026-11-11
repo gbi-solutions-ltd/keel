@@ -9,6 +9,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- `write-plan`'s template carries `**Suite checkpoints:** every 3 tasks` and its approval asks for
+  N; `execute-plan`'s "Suite checkpoints" section and `=== START RECORD ===` block, and `tdd`'s
+  affected-tests reference, carry out ADR-0017 for such plans.
 - ADR-0017: under `execute-plan` with a `**Suite checkpoints:** every N tasks` plan line, the
   coordinator runs `verify.test` at plan start, every N committed tasks and after the last, and an
   implementer starts from the last checkpoint's record; it amends ADR-0006 and ADR-0009 for such
