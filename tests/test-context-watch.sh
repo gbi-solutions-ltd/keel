@@ -682,6 +682,84 @@ case "$err" in *'keel context-watch'*'stop marker'*)
   || bad "plan run" "PreCompact exited $rc"
 rm -rf "${statedir:?}/$sess.stop" "$work/.keel/handoff.md"
 
+# --- the boundaries of compaction -----------------------------------------------------------------
+#
+# A handoff written in the same second the stop fired is the session's own, and mtimes are often
+# whole seconds, so the keep is `>=` and an equal stamp keeps it. Touched to one stamp so the tie
+# is certain rather than a race.
+sess="equal-mtime-$$"
+rm -f "$statedir/$sess.stop"
+fire PreToolUse "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+printf '# Session handoff\n\nplan: docs/plans/example.md\nnext: 4.1\n' > "$work/.keel/handoff.md"
+touch -t 200001010000 "$statedir/$sess.stop" "$work/.keel/handoff.md"
+fire PreCompact "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+grep -q 'next: 4.1' "$work/.keel/handoff.md" \
+  && ok "PreCompact keeps a handoff with the same mtime as the stop marker" \
+  || bad "compaction" "an equal-mtime handoff was replaced: $(head -3 "$work/.keel/handoff.md")"
+rm -f "$work/.keel/handoff.md"
+
+# After a compaction the last assistant usage row describes a context that no longer exists. Read
+# as current, it would stop a session compaction has just emptied, so a main-thread compact_boundary
+# after it measures 0 until a new assistant turn reports usage.
+transcript "$work/compacted.jsonl" 184000       # 92%
+cp "$work/compacted.jsonl" "$work/uncompacted.jsonl"
+printf '{"type":"system","subtype":"compact_boundary","content":"Conversation compacted","isSidechain":false}\n' \
+  >> "$work/compacted.jsonl"
+sess="compacted-$$"
+rm -f "$statedir/$sess.stop" "$statedir/$sess.measure"
+out="$(fire UserPromptSubmit "$work/compacted.jsonl" "$work" Bash "$sess")"
+[ -z "$out" ] && ok "after a compact_boundary the prompt hook is silent" \
+  || bad "compaction" "the pre-compaction usage was read: $out"
+out="$(fire PreToolUse "$work/compacted.jsonl" "$work" Bash "$sess")"
+[ -z "$out" ] && ok "after a compact_boundary a Bash call is not denied" \
+  || bad "compaction" "the pre-compaction usage was read: $out"
+[ ! -e "$statedir/$sess.stop" ] && ok "after a compact_boundary no stop marker is created" \
+  || bad "compaction" "a stop marker was created from the pre-compaction usage"
+out="$(fire UserPromptSubmit "$work/uncompacted.jsonl" "$work")"
+case "$out" in *PAUSE*) ok "the same transcript without the boundary gives the stop text" ;;
+  *) bad "compaction" "no stop text without the boundary: $out" ;; esac
+rm -f "$statedir/$sess.stop" "$statedir/$sess.measure"
+
+# The tail path gives 0 for a boundary and then reads the whole file, so the whole-file read must
+# give 0 too. Here the usage and the boundary are both inside the tail of a file past TAIL_BYTES.
+{
+  cat "$big"
+  printf '{"type":"system","subtype":"compact_boundary","content":"Conversation compacted","isSidechain":false}\n'
+} > "$work/big-compacted.jsonl"
+read -r got _ _ _ < <(python3 "$LIB" measure "$work/big-compacted.jsonl")
+[ "$got" = 0 ] && ok "a compact_boundary in the tail of a large transcript measures 0 on both paths" \
+  || bad "compaction" "got $got tokens past the boundary"
+
+# And the boundary settles it from the tail: reading the whole file on every event after a
+# compaction is the cost _tail_entries exists to avoid. Asserted as the case above that has the
+# tail alone measure, by making the whole-file read impossible. An unparseable head would not show
+# it, since _entries skips a bad line and the whole file ends at the boundary too.
+got="$(KEEL_LIB="$LIB" python3 - "$work/big-compacted.jsonl" <<'PY2' 2>&1
+import importlib.util, os, sys
+spec = importlib.util.spec_from_file_location("cw", os.environ["KEEL_LIB"])
+cw = importlib.util.module_from_spec(spec); spec.loader.exec_module(cw)
+def boom(_path):
+    raise AssertionError("whole file parsed")
+cw._entries = boom
+try:
+    print(cw._measure_parts(sys.argv[1])[0])
+except AssertionError as e:
+    print("WHOLE-FILE: %s" % e)
+PY2
+)"
+[ "$got" = 0 ] && ok "a compact_boundary in the tail settles the measurement without the whole file" \
+  || bad "compaction" "got: $got"
+
+# Compaction ends the context the cached measurement describes, so PreCompact removes it and the
+# first event after compaction measures again.
+sess="measure-cache-$$"
+fire UserPromptSubmit "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+[ -e "$statedir/$sess.measure" ] || bad "compaction" "the fixture wrote no measurement cache to remove"
+fire PreCompact "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+[ ! -e "$statedir/$sess.measure" ] && ok "PreCompact removes the session's measurement cache" \
+  || bad "compaction" "the measurement cache outlived compaction"
+rm -f "$statedir/$sess.stop" "$statedir/$sess.measure" "$work/.keel/handoff.md"
+
 rm -rf "$work"
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

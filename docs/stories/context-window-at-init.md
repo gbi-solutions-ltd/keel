@@ -73,9 +73,9 @@ Scenario: a small session is still not promoted
   Then the reported window is 200000
 ```
 
-**Notes:** `window_for` returns the configured value at `lib/context_watch.py:142-146`, before
-reaching the observation correction at `:149-150`, which is why this is `fix` and not `build`. The
-last scenario is the guard the existing suite already has for the unconfigured path
+**Notes:** `window_for` returns the configured value at `lib/context_watch.py#def window_for(`,
+before reaching the observation correction at `:149-150`, which is why this is `fix` and not
+`build`. The last scenario is the guard the existing suite already has for the unconfigured path
 (`tests/test-context-watch.sh:80-83`), restated for the configured one, because a floor implemented
 as "always promote" would silently stop protecting ordinary sessions.
 

@@ -18,11 +18,11 @@ session at `.keel/handoff.md` themselves, so the two ends of a handoff are manua
 files involved are written mechanically.
 
 **Evidence.** This repository's own `.keel/profile.json` carries `"context_window": 1000000`, and
-`write_profile` never emits that key (`bin/keel:364` writes the gates object and it is not in it), so
-it was added by hand. `bin/keel:1411` exists solely to tell the reader to do the same: "If sessions
-here use a larger context, set gates.context_window in .keel/profile.json". The handoff half is
-`lib/context_watch.py:452`, step 3 of the stop instruction: "Tell the user to run /clear and resume
-by pointing at that file."
+`write_profile` never emits that key (`bin/keel:364` writes the gates object and it is not in it),
+so it was added by hand. `bin/keel:1411` exists solely to tell the reader to do the same: "If
+sessions here use a larger context, set gates.context_window in .keel/profile.json". The handoff
+half is step 3 of the stop instruction,
+`lib/context_watch.py#Tell the user to run /clear and resume by pointing at that file`.
 
 ## What was asked for
 
@@ -34,13 +34,13 @@ by pointing at that file."
 
 **Strongest argument for not building this as stated: writing 200,000 at init would make the
 watchdog worse than it is today, on exactly the sessions that have the most room.** `window_for`
-returns a configured value immediately at `lib/context_watch.py:142-146`, before it ever reaches the
-upward correction at `:149-150`. Observation can currently rescue a wrong assumption: a session that
-provably exceeds 200,000 tokens proves the window is larger, because the API would have refused the
-request otherwise, and the watchdog lifts itself. An explicit setting removes that. So a 1M session
-in a repository where init had written 200,000 would hard-stop at 170,000 tokens and stay stopped,
-with the user's only escape being to edit the file the tool just wrote. That is precisely the
-failure the docstring at `:125-127` says the function was rewritten to prevent: "a watchdog that
+returns a configured value immediately at `lib/context_watch.py#def window_for(`, before it ever
+reaches the upward correction at `:149-150`. Observation can currently rescue a wrong assumption: a
+session that provably exceeds 200,000 tokens proves the window is larger, because the API would have
+refused the request otherwise, and the watchdog lifts itself. An explicit setting removes that. So a
+1M session in a repository where init had written 200,000 would hard-stop at 170,000 tokens and stay
+stopped, with the user's only escape being to edit the file the tool just wrote. That is precisely
+the failure the docstring at `:125-127` says the function was rewritten to prevent: "a watchdog that
 reports 200% hard-stops the session immediately and never lifts, on exactly the sessions with the
 most room left." This repository would have been broken by its own idea, had 1,000,000 not already
 been set by hand.
@@ -103,7 +103,7 @@ costed together or the second one to land fails the build.
 
 | Assumption | True if | How we would know | Checked? |
 |---|---|---|---|
-| Observation only ever proves the window is **larger** | A floor can never be wrong in the dangerous direction | Stated at `lib/context_watch.py:208-210` and it follows from the API refusing oversized requests | Yes |
+| Observation only ever proves the window is **larger** | A floor can never be wrong in the dangerous direction | Stated at `lib/context_watch.py:220-222` and it follows from the API refusing oversized requests | Yes |
 | 200,000 is the right default to write | Most sessions are not 1M | True of the default model tier. This session is `[1m]`, and so is this repository's setting | Partly, and the floor change makes being wrong cheap |
 | A pointer at session start is enough to resume | The model reads the file when told it exists | Nobody has tried it. It is one line and easily tested | **No** |
 | The handoff is fresh when the pointer fires | The file relates to the work about to resume | Not guaranteed. A handoff from last week's task would misdirect a new session | **No, and it is the main risk of piece three** |
@@ -114,12 +114,12 @@ costed together or the second one to land fails the build.
 
 | Finding | Evidence | What it means for the idea |
 |---|---|---|
-| A configured window defeats the upward correction | `lib/context_watch.py:142-146` returns before `:149-150` | The idea as stated is harmful without the floor change. This inverts the build order |
+| A configured window defeats the upward correction | `lib/context_watch.py#def window_for(` returns before `:149-150` | The idea as stated is harmful without the floor change. This inverts the build order |
 | The correction exists because of a real 401,247-token session | `lib/context_watch.py:121-127` | The failure mode is not hypothetical; it was found against a real transcript |
 | init never writes `gates.context_window` | `bin/keel:364` | The gap is real and the fix is one field |
 | The schema already declares it | `templates/profile.schema.json:287` | No schema version bump, no drift report on existing profiles |
 | doctor exists to nag about it | `bin/keel:1411` | The nudge is a workaround for the missing write and could be simplified afterwards |
-| The handoff is already written automatically before compaction | `lib/context_watch.py:472-490`, on `PreCompact` | Half of "automatic handoff" already ships. Only the resume side is manual |
+| The handoff is already written automatically before compaction | `lib/context_watch.py:484-502`, on `PreCompact` | Half of "automatic handoff" already ships. Only the resume side is manual |
 | SessionStart already fires on `clear` | `hooks/hooks.json`, matcher `startup|clear|compact` | The hook that would carry the pointer already runs at exactly the right moment |
 | `hooks/session-start` never reads the handoff | No `handoff` match anywhere in the file | This is the actual gap, and it is small |
 | The hook forbids reading volatile files, with one bounded exception | `hooks/session-start:4-14` | A pointer is permissible under the stated bound; the contents are not |
@@ -157,9 +157,10 @@ costed together or the second one to land fails the build.
 ## Recommendation
 
 **Build it, as three pieces, in order.** First make a configured window a floor that observation may
-raise (`lib/context_watch.py:142-150`), which is a bug fix that stands on its own. Then have init
-write `gates.context_window: 200000`, which is safe only once the first has landed. Then, separately
-and later, have `hooks/session-start` inject a bounded pointer when a current handoff exists.
+raise (`lib/context_watch.py#def window_for(`), which is a bug fix that stands on its own. Then have
+init write `gates.context_window: 200000`, which is safe only once the first has landed. Then,
+separately and later, have `hooks/session-start` inject a bounded pointer when a current handoff
+exists.
 
 Why: the gap you named is real and the first two pieces are small, but the order is load-bearing,
 because piece two before piece one converts a self-correcting assumption into a permanent wrong

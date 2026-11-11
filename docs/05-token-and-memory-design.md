@@ -253,6 +253,12 @@ The cache fields are the entire measurement, and missing them is the obvious mis
 session `input_tokens` is routinely 1, because everything before the last message is a cache read. A
 watchdog reading `input_tokens` alone reports a session at 99% of its window as using one token.
 
+**A compaction reads as 0.** A main-thread `compact_boundary` entry after the last usage row means
+that row measured a context compaction has since ended, so occupancy reads as 0, with no warning
+and no stop, until a new assistant turn carries usage. Read as current, the old row would stop a
+session compaction had just emptied. A boundary in the transcript's tail settles the measurement
+there, so the whole file is not read on every event between the compaction and the next turn.
+
 **Sidechain entries are excluded.** A subagent's context is discarded when it returns, which is the
 whole reason for the delegation table above. Counting its usage would report the main thread as full
 because a subagent read twenty files, and the watchdog would punish exactly the behaviour this
@@ -306,9 +312,11 @@ plan file holds the place. After compaction the run resumes from `keel plan stat
 the handoff's `next:` line records only where the run stood at the stop and the run moves on after
 it. `PreCompact` keeps a handoff written since the stop fired rather than replacing it with the
 mechanical render, which would lose that `next:` line, and then removes the stop marker, so a later
-stop in the same session blocks again until a newer handoff is written. A removal that fails writes
-a line naming the marker to the library's stderr and compaction still goes ahead; the hook sends
-that stderr to `/dev/null`, so the line is not shown in a session.
+stop in the same session blocks again until a newer handoff is written. `PreCompact` also removes
+the session's measurement cache, which describes the context compaction is about to end, so the
+first event after compaction measures again rather than reusing that figure for up to 20 seconds. A
+marker removal that fails writes a line naming the marker to the library's stderr and compaction
+still goes ahead; the hook sends that stderr to `/dev/null`, so the line is not shown in a session.
 
 ## Session hygiene, the part skills cannot enforce
 

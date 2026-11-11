@@ -9,6 +9,10 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- The context watchdog measures 0 past a main-thread `compact_boundary` entry until a new assistant
+  turn reports usage, so it neither warns nor stops on the pre-compaction figure, and a boundary in
+  the transcript's tail settles that without reading the whole file; `PreCompact` removes the
+  session's measurement cache, and keeps a handoff whose mtime equals the stop marker's.
 - `tdd`'s RED step says a plan run's handed start record replaces the first unit's `verify.test`;
   the plan template's example lint is `./gradlew spotlessCheck`, which runs no tests; `write-plan`'s
   rationale names `**Suite checkpoints:**` among the header lines `execute-plan` reads; and the

@@ -807,10 +807,10 @@ say so rather than adding a sentence back to the schema by hand.
 | `code:bin/keel#d=json.load(open('.keel/profile.json')).get('artifacts',{})` | `artifacts.snapshot`, `artifacts.prd`, `artifacts.stories`, `artifacts.architecture`, `artifacts.decisions`, `artifacts.plans` |
 | `code:bin/keel#local cg; cg="$(json_get .keel/profile.json gates.commit_guard 2>/dev/null` | `gates.commit_guard` |
 | `code:hooks/done-guard:114` | `gates.done_verified` |
-| `code:lib/context_watch.py:447` | `gates.context_watch` |
-| `code:lib/context_watch.py:468` | `gates.context_window` |
-| `code:lib/context_watch.py:384` | `gates.context_warn_pct` |
-| `code:lib/context_watch.py:385` | `gates.context_stop_pct` |
+| `code:lib/context_watch.py:459` | `gates.context_watch` |
+| `code:lib/context_watch.py:480` | `gates.context_window` |
+| `code:lib/context_watch.py:396` | `gates.context_warn_pct` |
+| `code:lib/context_watch.py:397` | `gates.context_stop_pct` |
 | `code:hooks/sensitive-guard#get("hard_block_paths") or []` | `hard_block_paths` |
 | `advisory:skills/ship/SKILL.md#profile.conventions.commit_style` | `conventions.commit_style` |
 | `code:bin/keel:2587` | `conventions.default_branch` |

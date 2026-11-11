@@ -89,8 +89,8 @@ def _measure_parts(path):
     """(tokens, model) for the most recent main-thread assistant turn, or (0, ""), from the tail
     where the tail settles it.
 
-    A Claude Code turn in the tail settles the measurement, so the whole file is read only when the
-    tail carries none. Reporting zero there instead would read as an empty context and silence the
+    A Claude Code turn in the tail settles the measurement, and so does a compaction boundary after
+    it, which measures 0, so the whole file is read only when the tail carries neither. Reporting zero there instead would read as an empty context and silence the
     watchdog exactly when it is needed. Parsing the whole file on every cache miss, on
     UserPromptSubmit and on PreToolUse both, is the cost _tail_entries exists to avoid, and its own
     docstring calls paying it "a good way to have it turned off".
@@ -98,14 +98,26 @@ def _measure_parts(path):
     tail = _tail_entries(path)
     if tail is not None:
         tokens, model = _measure_claude(tail)
-        if tokens:
+        if tokens or any(_compact_boundary(d) for d in tail):
             return tokens, model
     return _measure_claude(_entries(path))
+
+
+def _compact_boundary(d):
+    """Whether this entry is the main thread's record that compaction ran."""
+    return d.get("type") == "system" and d.get("subtype") == "compact_boundary" \
+        and not d.get("isSidechain")
 
 
 def _measure_claude(entries):
     tokens, model = 0, ""
     for d in entries:
+        # A compaction ends the context the last usage row measured, so nothing is measured past it
+        # until a new turn reports usage. Read as current, that row would stop a session compaction
+        # has just emptied.
+        if _compact_boundary(d):
+            tokens = 0
+            continue
         if d.get("type") != "assistant" or d.get("isSidechain"):
             continue
         msg = d.get("message")
@@ -490,12 +502,22 @@ def hook():
                     fh.write(render_handoff(transcript, session, tokens, window))
             except OSError:
                 pass
+        # The cached measurement describes the context compaction is about to end, so it goes too
+        # and the first event after compaction measures again.
+        d = _state_dir()
+        if d:
+            try:
+                os.remove(os.path.join(d, "%s.measure" % (session or "nosession")))
+            except OSError:
+                pass
         if stopped:
             try:
                 os.remove(stopped)
             except OSError:
-                # Said, because a marker left behind lets this stop's handoff release the next stop.
-                # Compaction still goes ahead: refusing it would cost more than a stale marker.
+                # A marker left behind lets this stop's handoff release the next stop. The line
+                # reaches only someone running this library directly: hooks/context-watch sends its
+                # stderr to /dev/null. Compaction still goes ahead: refusing it would cost more than
+                # a stale marker.
                 sys.stderr.write("keel context-watch: could not remove the stop marker %s\n" % stopped)
         # Nothing is emitted, deliberately. This announced the file with a systemMessage until
         # 2026-09-05, and the harness discards a PreCompact hook's systemMessage and continue fields

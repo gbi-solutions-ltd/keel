@@ -235,7 +235,7 @@ passes, with `git commit -m "fix(done-guard): ignore edits outside the repositor
    `tests/test-context-watch.sh:336-341` still passes; no new case.
 4. PreCompact keeps a handoff the session wrote: when the stop marker exists and the handoff is
    newer than it, PreCompact leaves the file as it is instead of rewriting it with the mechanical
-   render (`lib/context_watch.py:472-477`). With no stop marker, or a handoff older than it,
+   render (`lib/context_watch.py:484-489`). With no stop marker, or a handoff older than it,
    PreCompact writes the render as today. Example: write a handoff containing `next: 4.1` after the
    stop fires, send PreCompact, and the file still contains `next: 4.1`; with no stop marker the file
    is replaced by the render, as today.
@@ -243,7 +243,7 @@ passes, with `git commit -m "fix(done-guard): ignore edits outside the repositor
    branch and the kept handoff where it describes the stop ending with `/clear`, and
    `skills/execute-plan/references/delivery.md:54` no longer says a context-watch block always
    stops. Any citation into `lib/context_watch.py` the edit shifts is repaired, including
-   `lib/context_watch.py:447` in `templates/profile.schema.json` and the regenerated
+   `lib/context_watch.py:459` in `templates/profile.schema.json` and the regenerated
    `docs/profile-keys.md`. Example: `grep -n 'carry on' docs/05-token-and-memory-design.md
    skills/execute-plan/references/delivery.md` prints a line from each.
 
@@ -905,8 +905,20 @@ coordinator commits after both review passes, with
 **Story:** `review-code` on 76211ec, 2026-11-11: blocking finding 3, should-fix 4, consider 9
 **Files:**
 - Modify: `lib/context_watch.py`
+- Modify: `docs/05-token-and-memory-design.md`
 - Modify: `CHANGELOG.md`
 - Test: `tests/test-context-watch.sh`
+
+**Plan note, 2026-11-11, coordinator:** added after the first report. `docs/05` says the last
+main-thread assistant turn gives the measurement directly, and its PreCompact paragraph does not
+say the cache is removed; both are now incomplete. And a measurement of 0 from the tail made
+`_measure_parts` read the whole transcript on every event after a compaction until a new turn
+carried usage, the cost its docstring warns against. Two behaviours follow. (6) A `compact_boundary`
+in the tail settles the measurement at 0 without reading the whole file. Example: a transcript over
+the tail size whose tail ends in a boundary is measured without the whole-file read (a case can
+assert it by making the head of the file unparseable as JSON and expecting 0 and no error). (7)
+`docs/05` states both changes. Example: it contains `compact_boundary` and says the cache is
+removed at PreCompact.
 
 **Depends on:** task 11
 
@@ -934,7 +946,7 @@ coordinator commits after both review passes, with
 **Done when:** `tests/test-context-watch.sh`, `tests/test-validate-citations.sh` and
 `tests/test-harness-claims.sh` pass.
 
-- [ ] **Step 12.1: Build it test first**
+- [x] **Step 12.1: Build it test first** Note: Red witnessed (83/5 for behaviours 2 and 3; 88/1 for behaviour 6 with _entries made to raise); behaviour 1 proved by the >= to > mutation, restored. Coordinator added behaviours 6 and 7 and docs/05 after the first report (plan note) and repointed plan citations twice; same implementer finished. Citation repairs outside Files include an older plan, docs/plans/2026-09-07-declared-profile-keys-take-effect.md. Quality should-fix: lib/context_watch.py:93 docstring line 163 columns; a test comment and PASS label overstate which path runs.
 
 Follow `keel:tdd`. Write cases for behaviours 1 to 3 in `tests/test-context-watch.sh`, after the
 existing cases. Behaviour 1 pins existing code and may pass on arrival: prove it can fail by
@@ -946,7 +958,7 @@ ignored; the cache survives). Expected after: PASS. Quote the failing output in 
 Run: `tests/run-tests.sh` and the lint command.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 
-- [ ] **Step 12.2: Hand over**
+- [x] **Step 12.2: Hand over** Note: rounds: 1; routing: inherit; loop: full
 
 ```bash
 git add lib/context_watch.py tests/test-context-watch.sh CHANGELOG.md
