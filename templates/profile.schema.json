@@ -326,7 +326,7 @@
             "warn",
             "off"
           ],
-          "description": "Drives hooks/done-guard on Stop and SubagentStop. required refuses to end a turn that edited code inside the repository and never ran a test; warn says it and allows the stop. A test run is a Bash command containing verify.test, or the text of verify.test_one or verify.test_affected before its first `{` where that text is not empty, so a scoped test run counts: the gate proves a test ran, not that the suite did. Off, or absent, and the hook does nothing.",
+          "description": "Drives hooks/done-guard on Stop and SubagentStop. required refuses to end a turn that edited code inside the repository and never ran a test; warn says it and allows the stop. A test run is a Bash command containing verify.test, or the text of verify.test_one or verify.test_affected before its first `{` where that text is not empty and begins a command (at the start, or after `;`, `&&`, `||`, `|`, `(` or a newline), so a scoped test run counts: the gate proves a test ran, not that the suite did. Off, or absent, and the hook does nothing.",
           "x-keel-read-by": "code:hooks/done-guard:118"
         },
         "context_watch": {

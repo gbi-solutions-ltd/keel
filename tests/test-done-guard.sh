@@ -406,5 +406,25 @@ fixture "$empty" '"done_verified": "required"' '"tests/run-tests.sh", "test_one"
 expect "a verify.test_one with an empty prefix counts nothing, so the edit still blocks" block \
     "$(send "$empty" "$empty/b6.jsonl" Stop)"
 
+# A scoped prefix counts only where it begins a command: at the start, or after `;`, `&&`, `||`,
+# `|`, `(` or a newline. As a bare substring, `tests/` inside a shellcheck argument counted as a
+# test run, so a turn that only linted ended unblocked.
+begins="$tmp/begins"
+fixture "$begins" '"done_verified": "required"' '"tests/run-tests.sh", "test_one": "tests/{name}"'
+{ row_user "go"; row_edit "$begins/lib/foo.sh" ""; row_bash "shellcheck -x lib/foo.sh tests/*.sh" ""; } > "$begins/mid.jsonl"
+expect "a scoped prefix in the middle of a command is not a test run, so the edit blocks" block \
+    "$(send "$begins" "$begins/mid.jsonl" Stop)"
+{ row_user "go"; row_edit "$begins/lib/foo.sh" ""; row_bash "tests/test-foo.sh" ""; } > "$begins/start.jsonl"
+expect "a command that begins with the scoped prefix is a test run" quiet \
+    "$(send "$begins" "$begins/start.jsonl" Stop)"
+{ row_user "go"; row_edit "$begins/lib/foo.sh" ""; row_bash "cd /x && tests/test-foo.sh" ""; } > "$begins/cd.jsonl"
+expect "the scoped prefix after cd and && begins a command, so it is a test run" quiet \
+    "$(send "$begins" "$begins/cd.jsonl" Stop)"
+whole="$tmp/whole"
+fixture "$whole" '"done_verified": "required"' '"tests/run-tests.sh"'
+{ row_user "go"; row_edit "$whole/lib/foo.sh" ""; row_bash "bash tests/run-tests.sh" ""; } > "$whole/b.jsonl"
+expect "verify.test still counts as a substring anywhere in a command" quiet \
+    "$(send "$whole" "$whole/b.jsonl" Stop)"
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

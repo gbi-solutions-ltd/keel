@@ -31,11 +31,11 @@
 # event's cwd: a subagent's probe under /tmp is not this repository's code, and no suite covers it.
 #
 # ITS LIMIT, STATED RATHER THAN DISCOVERED. It matches the profile's test command as a substring of
-# a Bash command, and does the same with the text of verify.test_one or verify.test_affected before
-# its first `{`, where that text is not empty. A scoped test run satisfies it, so that a
-# checkpointed implementer can end on its task's own tests: it proves a test ran, not that the suite
-# did. A wrapper script, a changed directory or an alias runs the suite without being seen, and a
-# command that merely mentions the string counts as having run it. This raises the cost of claiming
+# a Bash command. The text of verify.test_one or verify.test_affected before its first `{`, where
+# that text is not empty, counts only where it begins a command: at the start, or after `;`, `&&`,
+# `||`, `|`, `(` or a newline. So a checkpointed implementer can end on its task's own tests, and
+# `shellcheck tests/*.sh` is not one: it proves a test ran, not the suite. A wrapper, a changed
+# directory or alias goes unseen, and merely mentioning it counts. This raises the cost of claiming
 # done without checking; it is not a proof that the suite passed. It cannot see the exit code, and
 # does not pretend to: `ship` is the gate that reads results.
 
@@ -77,7 +77,7 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 KEEL_EVENT="$event" KEEL_PROFILE_TEXT="$profile_text" python3 - <<'PY'
-import json, os, subprocess, sys
+import json, os, re, subprocess, sys
 
 def emit(obj):
     print(json.dumps(obj))
@@ -124,10 +124,10 @@ test_cmd = verify.get("test")
 if not test_cmd:
     sys.exit(0)          # nothing to check against, and inventing a command would be worse
 
-# A scoped run counts by its text before the first `{`, so a checkpointed implementer can end on its
-# task's own tests. An empty prefix is a substring of every command, so it counts for nothing.
-run_marks = [test_cmd] + [p for p in (str(verify.get(k) or "").split("{", 1)[0].strip()
-                                      for k in ("test_affected", "test_one")) if p]
+# A scoped run counts by its text before the first `{`, only where it begins a command, so a lint
+# of `tests/*.sh` is no run. An empty prefix would begin every command, so it counts for nothing.
+run_marks = [re.escape(test_cmd)] + [r"(?:^|[;|(\n]|&&)\s*" + re.escape(p) for p in (
+    str(verify.get(k) or "").split("{", 1)[0].strip() for k in ("test_affected", "test_one")) if p]
 
 docs_root = (prof.get("docs_root") or "docs").rstrip("/")
 
@@ -275,7 +275,7 @@ for c in calls:
         rel = in_repo(p) if p else None
         if rel is not None and is_code(rel):
             edited.append(rel)
-    elif name == "Bash" and any(m in (ti.get("command") or "") for m in run_marks):
+    elif name == "Bash" and any(re.search(m, ti.get("command") or "") for m in run_marks):
         ran = True
 
 if not edited or ran:

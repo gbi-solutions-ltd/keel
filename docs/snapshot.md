@@ -66,10 +66,10 @@ Stop, SubagentStop and PreCompact. No PostToolUse hook is registered.
 **Critical path: an agent claims done.** The Stop hook runs done-guard, which reads the turn's
 transcript, finds edits to non-documentation files inside the repository, and looks for
 <!-- keel:claim gate=done-guard harness=claude -->
-`verify.test`, or the text of `verify.test_one` or `verify.test_affected` before its first `{`, as a
-substring of any Bash command in the turn (hooks/done-guard:33-40), so a scoped test run counts.
-With `gates.done_verified` at `required` it blocks the stop (hooks/done-guard:295-297); otherwise
-it warns.
+`verify.test` as a substring of any Bash command in the turn, or the text of `verify.test_one` or
+`verify.test_affected` before its first `{` where it begins a command (hooks/done-guard:33-40). With
+`gates.done_verified` at `required` it blocks the stop (hooks/done-guard:295-297); otherwise it
+warns.
 
 ## 3. Repository structure
 

@@ -647,8 +647,17 @@ passes, with `git commit -m "feat(execute-plan): run the suite at plan checkpoin
 **Story:** follow-up from task 1's quality review, directed by Bernard on 2026-11-11
 **Files:**
 - Modify: `hooks/done-guard`
+- Modify: `templates/profile.schema.json`
+- Modify: `docs/profile-keys.md`
+- Modify: `docs/snapshot.md`
 - Modify: `CHANGELOG.md`
 - Test: `tests/test-done-guard.sh`
+
+**Plan note, 2026-11-11, coordinator:** the three documents above were added after the first
+report: each describes the scoped match as a substring of any command, which this task makes
+wrong (`docs/snapshot.md:69-70`, the `gates.done_verified` description in
+`templates/profile.schema.json`, and `docs/profile-keys.md`, regenerated from it). Example: none
+of them says a scoped prefix matches anywhere in a command.
 
 **Depends on:** task 7
 
@@ -670,7 +679,7 @@ passes, with `git commit -m "feat(execute-plan): run the suite at plan checkpoin
 
 **Done when:** `tests/test-done-guard.sh` and `tests/test-validate-citations.sh` pass.
 
-- [ ] **Step 8.1: Build it test first**
+- [x] **Step 8.1: Build it test first** Note: Red witnessed (41/1, the mid-command prefix case). Coordinator added three docs to Files after the first report (plan note); same implementer finished them. Quality should-fix: the anchored match misses bash tests/x.sh, ./tests/x.sh, env/time/VAR= forms and & or backtick boundaries; boundary cases ||, |, (, newline untested; header comment lines 36-38 garbled.
 
 Follow `keel:tdd`. Write cases for behaviours 1 to 3 in `tests/test-done-guard.sh`.
 Run: `tests/test-done-guard.sh`
@@ -681,7 +690,7 @@ Run: `tests/run-tests.sh` and the lint command.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 8.2: Hand over**
+- [x] **Step 8.2: Hand over** Note: rounds: 1; routing: inherit; loop: full
 
 ```bash
 git add hooks/done-guard tests/test-done-guard.sh CHANGELOG.md

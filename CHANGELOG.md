@@ -9,6 +9,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- `hooks/done-guard` counts the text of `verify.test_one` or `verify.test_affected` before its
+  first `{` as a test run only where it begins a command, so `shellcheck tests/*.sh` no longer
+  satisfies `gates.done_verified`; `verify.test` still counts anywhere in a command.
 - `write-plan`'s template carries `**Suite checkpoints:** every 3 tasks` and its approval asks for
   N; `execute-plan`'s "Suite checkpoints" section and `=== START RECORD ===` block, and `tdd`'s
   affected-tests reference, carry out ADR-0017 for such plans.
