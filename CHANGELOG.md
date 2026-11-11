@@ -17,9 +17,12 @@ Entries are terse by design; the narrative for each release is in this file's gi
 - The context-watch stop text says a plan run resumes after compaction from
   `keel plan status <plan>`, the handoff's `next:` line recording only where it stood at the stop;
   `PreCompact` writes a line to stderr naming a stop marker it cannot remove, and still exits 0.
-- `hooks/done-guard` counts the text of `verify.test_one` or `verify.test_affected` before its
-  first `{` as a test run only where it begins a command, so `shellcheck tests/*.sh` no longer
-  satisfies `gates.done_verified`; `verify.test` still counts anywhere in a command.
+- `hooks/done-guard` ignores an edit whose path resolves outside the repository (git's top level,
+  else the event's `cwd`), and counts as a test run a Bash command containing `verify.test`, or one
+  that begins with the text of `verify.test_one` or `verify.test_affected` before its first `{` (at
+  the start, or after `;`, `&&`, `||`, `|`, `(` or a newline): a scoped test run satisfies
+  `gates.done_verified` and proves a test ran, not that the suite did, and `shellcheck tests/*.sh`
+  is no run. Its block and warn text names those scoped commands beside `verify.test`.
 - `write-plan`'s template carries `**Suite checkpoints:** every 3 tasks` and its approval asks for
   N; `execute-plan`'s "Suite checkpoints" section and `=== START RECORD ===` block, and `tdd`'s
   affected-tests reference, carry out ADR-0017 for such plans.
@@ -34,10 +37,6 @@ Entries are terse by design; the narrative for each release is in this file's gi
 - `execute-plan`'s implementer report gives each verify command's exit code and at most 15 summary
   lines plus every failing case, and the red run's failing case and message, not whole outputs;
   both review prompts cap the report at 250 words with the verdict first.
-- `hooks/done-guard` ignores an edit whose path resolves outside the repository (git's top level,
-  else the event's `cwd`), and counts a Bash command containing the text of `verify.test_one` or
-  `verify.test_affected` before its first `{` as a test run, so a scoped test run satisfies
-  `gates.done_verified`: it proves a test ran, not that the suite did.
 - The context-watch stop text tells a session coordinating `keel:execute-plan` to write the handoff
   naming the plan file and its `next:` line and carry on; the ordinary stop keeps its four steps.
   `PreCompact` keeps a handoff written since the stop fired, then removes the stop marker so a later

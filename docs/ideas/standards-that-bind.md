@@ -354,7 +354,7 @@ is the defect. Deleting a claim costs no words at all.
 | keel says this about itself in its release notes | `CHANGELOG.md#seven declared profile keys are read by nothing`: "seven declared profile keys are read by nothing (`gates.tdd`, `gates.coding_standards`, `gates.review`, ...)" | The gap is admitted, not hidden. Nothing here is news to keel |
 | `ship` has no standards item | `skills/ship/SKILL.md:16-40`, eight items, none naming standards; items 5 and 6 are prose with no command behind them | Claim B is true |
 | Two documents claim an enforcement that does not exist | `docs/02-skill-catalog.md:69` "Coding standards enforcement"; `:382` says `refactor` reads `standards.md` | The false claim is fixable for free and is arguably the whole of B |
-| Hooks cannot decide this | `hooks/done-guard:154` works by substring-matching the configured test command in a `Bash` call; `hooks/done-guard:39-40` says outright "It cannot see the exit code, and does not pretend to" | There is no observable event whose presence proves standards were followed. A hook is not available for B |
+| Hooks cannot decide this | `hooks/done-guard:154` works by substring-matching the configured test command in a `Bash` call; `hooks/done-guard:42-43` says outright "It cannot see the exit code, and does not pretend to" | There is no observable event whose presence proves standards were followed. A hook is not available for B |
 | A model acted on the inert gate unprompted | `tests/evals/results.md`: "arm 2 read the key out of the profile itself and used it to set severity" | See question 5 |
 
 ## 1. Are A and B separate problems, or one?

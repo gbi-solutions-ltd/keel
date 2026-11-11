@@ -31,13 +31,16 @@
 # event's cwd: a subagent's probe under /tmp is not this repository's code, and no suite covers it.
 #
 # ITS LIMIT, STATED RATHER THAN DISCOVERED. It matches the profile's test command as a substring of
-# a Bash command. The text of verify.test_one or verify.test_affected before its first `{`, where
-# that text is not empty, counts only where it begins a command: at the start, or after `;`, `&&`,
-# `||`, `|`, `(` or a newline. So a checkpointed implementer can end on its task's own tests, and
-# `shellcheck tests/*.sh` is not one: it proves a test ran, not the suite. A wrapper, a changed
-# directory or alias goes unseen, and merely mentioning it counts. This raises the cost of claiming
-# done without checking; it is not a proof that the suite passed. It cannot see the exit code, and
-# does not pretend to: `ship` is the gate that reads results.
+# a Bash command, so verify.test counts wherever it appears, even merely mentioned. The text of
+# verify.test_one or verify.test_affected before its first `{`, where that text is not empty, counts
+# only where it begins a command: at the start, or after `;`, `&&`, `||`, `|`, `(` or a newline. So
+# a scoped run satisfies the gate, which proves a test ran and not that the suite did, and a lint
+# naming `tests/*.sh` is no run. The anchored match does not see `bash tests/x.sh`, `./tests/x.sh`,
+# an `env`, `time` or `VAR=` prefix, a command after `&`, or one inside backticks. A prefix has no
+# word boundary, so the prefix `tests/` counts `tests/evals/stage.sh` as a run. A wrapper, a changed
+# directory or an alias goes unseen. This raises the cost of claiming done without checking; it is
+# not a proof that the suite passed. It cannot see the exit code, and does not pretend to: `ship` is
+# the gate that reads results.
 
 set -uo pipefail
 
@@ -126,8 +129,9 @@ if not test_cmd:
 
 # A scoped run counts by its text before the first `{`, only where it begins a command, so a lint
 # of `tests/*.sh` is no run. An empty prefix would begin every command, so it counts for nothing.
-run_marks = [re.escape(test_cmd)] + [r"(?:^|[;|(\n]|&&)\s*" + re.escape(p) for p in (
-    str(verify.get(k) or "").split("{", 1)[0].strip() for k in ("test_affected", "test_one")) if p]
+scoped = [p for p in (str(verify.get(k) or "").split("{", 1)[0].strip()
+                      for k in ("test_affected", "test_one")) if p]
+run_marks = [re.escape(test_cmd)] + [r"(?:^|[;|(\n]|&&)\s*" + re.escape(p) for p in scoped]
 
 docs_root = (prof.get("docs_root") or "docs").rstrip("/")
 
@@ -290,7 +294,9 @@ shown = ", ".join(uniq[:5]) + (" and %d more" % (len(uniq) - 5) if len(uniq) > 5
 # statement of what happened. Until 2026-09-05 both carried the instruction, which meant warn mode
 # told the user to go and run a command, in the voice of an order aimed at somebody else. warn is
 # what `keel init` writes by default, so that was the text most repositories actually saw.
-where = "%s edited %d file(s) including %s and never ran `%s`" % (who, len(uniq), shown, test_cmd)
+# A checkpointed implementer is satisfied by a scoped run, so the text names one beside the suite.
+cmds = "`%s`" % test_cmd + "".join(" or a command beginning `%s`" % p for p in scoped)
+where = "%s edited %d file(s) including %s and never ran %s" % (who, len(uniq), shown, cmds)
 
 if mode == "required":
     block("%s. Run it and report what it printed before ending the turn. If the work is genuinely "

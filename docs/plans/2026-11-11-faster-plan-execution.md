@@ -81,7 +81,7 @@ wrong, behaviours without examples, path comparison) and three to consider. All 
   review redone as "round 2" at 12:15:57. Task 9: finished 12:59:09 and again 13:04:50, with spec
   and quality reviews dispatched in between. Both implementers had first notified "waiting on its
   own background work".
-- **`done-guard` takes any `file_path` as code.** `hooks/done-guard:124-125` excludes only `.md`
+- **`done-guard` takes any `file_path` as code.** `hooks/done-guard:138-139` excludes only `.md`
   and `docs_root`, and `hooks/done-guard:247-249` reads the path as given, so an absolute path under
   the system temp directory counts.
 - **No ADR states the full loop's discard rule.** It lives only in
@@ -145,7 +145,7 @@ Every task inherits these.
    `git -C <event cwd> rev-parse --show-toplevel`, else the event's `cwd` where that fails. Both the
    root and each path go through `os.path.realpath` before comparing (macOS `/var` is
    `/private/var`), and an inside path is made relative to the root before `is_code` reads it, since
-   `is_code` compares a relative `docs_root` (`hooks/done-guard:124-125`). Example: a SubagentStop
+   `is_code` compares a relative `docs_root` (`hooks/done-guard:138-139`). Example: a SubagentStop
    whose only call is `Write` to `/tmp/keel-probe/parse.py`, in a repository with
    `gates.done_verified` `required` and no test run, exits 0 with no output.
 2. An absolute path inside the repository is still code. Example: `Edit` of `<repo>/lib/foo.sh`, no
@@ -874,7 +874,7 @@ consider 8
 **Done when:** `tests/test-done-guard.sh`, `tests/test-profile-keys.sh` and
 `tests/test-validate-citations.sh` pass.
 
-- [ ] **Step 11.1: Build it test first**
+- [x] **Step 11.1: Build it test first** Note: Red witnessed (46/1, behaviour 3); behaviours 1 and 2 proved by mutation (45/2 each, restored). Coordinator repointed two plan citations (done-guard:124-125 to :138-139) that the grown header shifted. Citation repairs outside Files: docs/snapshot.md, lib/harness/capabilities, docs/ideas/declared-profile-keys-take-effect.md, docs/ideas/standards-that-bind.md, tests/validate-skills.sh. Quality should-fix: duplicate prefixes repeat in the reason; "Run it" with several commands; standards-that-bind.md cites done-guard:154 for the match (stale since before this branch). Implementer ran git stash list once (read-only).
 
 Follow `keel:tdd`. Write cases for behaviours 1 to 3 in `tests/test-done-guard.sh`. Behaviours 1
 and 2 pin existing code and may pass on arrival: prove each can fail by mutating the line it covers
@@ -887,7 +887,7 @@ Expected before the implementation: FAIL, behaviour 3's case fails because the r
 Run: `tests/run-tests.sh` and the lint command.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 
-- [ ] **Step 11.2: Hand over**
+- [x] **Step 11.2: Hand over** Note: rounds: 1; routing: inherit; loop: full
 
 ```bash
 git add hooks/done-guard tests/test-done-guard.sh templates/profile.schema.json docs/profile-keys.md CHANGELOG.md

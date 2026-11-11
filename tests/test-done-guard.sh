@@ -426,5 +426,29 @@ fixture "$whole" '"done_verified": "required"' '"tests/run-tests.sh"'
 expect "verify.test still counts as a substring anywhere in a command" quiet \
     "$(send "$whole" "$whole/b.jsonl" Stop)"
 
+# The root comes from git, not the event's cwd. Taken from a cwd of <repo>/lib, the root would put
+# <repo>/hooks outside and pass an edit the suite covers.
+mkdir -p "$repo/hooks"
+{ row_user "go"; row_write "$repo/hooks/x.sh"; } > "$repo/sub.jsonl"
+expect "the root is git's top level, so an edit beside the event's cwd still blocks" block \
+    "$(send "$repo/lib" "$repo/sub.jsonl" Stop)"
+
+# The repository's parent is exactly "..", which a test for "../" alone would read as inside.
+{ row_user "go"; row_write "$repo/.."; } > "$repo/parent.jsonl"
+expect "a path that is exactly the repository's parent is outside: quiet" quiet \
+    "$(send "$repo" "$repo/parent.jsonl" Stop)"
+
+# The reason names the scoped commands as well as verify.test, so a checkpointed implementer is not
+# told to run the suite when its task's own tests satisfy the gate.
+{ row_user "go"; row_edit "$scoped/a.go" ""; } > "$scoped/named.jsonl"
+reason_has "the reason names verify.test" \
+    "$(send "$scoped" "$scoped/named.jsonl" Stop)" "tests/run-tests.sh" yes
+reason_has "the reason names verify.test_one's scoped command" \
+    "$(send "$scoped" "$scoped/named.jsonl" Stop)" "go test" yes
+{ row_user "go"; row_edit "$whole/lib/foo.sh" ""; } > "$whole/named.jsonl"
+# shellcheck disable=SC2016  # the backticks are the reason's literal text
+reason_has "with no scoped command the reason names verify.test only, as before" \
+    "$(send "$whole" "$whole/named.jsonl" Stop)" 'never ran `tests/run-tests.sh`. Run it' yes
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
