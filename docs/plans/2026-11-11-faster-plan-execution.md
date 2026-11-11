@@ -50,6 +50,10 @@ and put to Bernard at approval:
   it then proves a test ran, not that the suite did; `ship` still runs the suite.
 **Approved:** by Bernard, 2026-11-11: routing `inherit`, delivered to a pull request, with the
 decisions above as written, the `done-guard` loosening included.
+**Follow-ups:** tasks 8 to 10 were added on 2026-11-11 at Bernard's direction ("handle the
+follow-ups before the code review"), from the review findings recorded in the tick notes of tasks
+1, 2, 3 and 7. The coordinator's plan notes on tasks 3, 4 and 7 (four eval scenarios added to Files;
+the harness backgrounding a command) were reported to Bernard before this direction.
 **Shape:** behaviours with examples.
 **Reviewed:** by a dispatched plan reviewer on 2026-11-11: two blocking findings (`done-guard`
 undoing the checkpoints; task 1 used a `block` value the gate does not have), five should-fix (the
@@ -635,3 +639,172 @@ git status --porcelain
 
 Stage exactly those paths and stop. **Do not commit.** The coordinator commits after both review
 passes, with `git commit -m "feat(execute-plan): run the suite at plan checkpoints"`.
+
+---
+
+### Task 8: a scoped test run counts only where a command starts
+
+**Story:** follow-up from task 1's quality review, directed by Bernard on 2026-11-11
+**Files:**
+- Modify: `hooks/done-guard`
+- Modify: `CHANGELOG.md`
+- Test: `tests/test-done-guard.sh`
+
+**Depends on:** task 7
+
+**Behaviours:**
+
+1. A `verify.test_one` or `verify.test_affected` prefix counts as a test run only where it begins a
+   command: at the start of the Bash command, or after `;`, `&&`, `||`, `|`, `(` or a newline, each
+   followed by optional whitespace. Example: with `verify.test_one` `tests/{name}`, an `Edit` of
+   `<repo>/lib/foo.sh` plus Bash `shellcheck -x lib/foo.sh tests/*.sh` blocks under `required`.
+2. A command that does begin with the prefix still counts, including after `cd <dir> &&`. Example:
+   with `tests/{name}`, Bash `tests/test-foo.sh` and Bash `cd /x && tests/test-foo.sh` each exit 0
+   with no output; with `go test {path}`, Bash `go test -count=1 -run TestX ./api/` exits 0 with no
+   output.
+3. `verify.test` itself is still matched as a substring anywhere, as today. Example: with
+   `verify.test` `tests/run-tests.sh`, Bash `bash tests/run-tests.sh` exits 0 with no output.
+4. The hook's header comment ("ITS LIMIT") says where a scoped prefix counts. Example: it contains
+   `begins a command`. Any citation into `hooks/done-guard` the edit shifts is repaired, wherever it
+   lives outside `docs/plans/`, and listed as a citation repair.
+
+**Done when:** `tests/test-done-guard.sh` and `tests/test-validate-citations.sh` pass.
+
+- [ ] **Step 8.1: Build it test first**
+
+Follow `keel:tdd`. Write cases for behaviours 1 to 3 in `tests/test-done-guard.sh`.
+Run: `tests/test-done-guard.sh`
+Expected before the implementation: FAIL, behaviour 1's case fails because `tests/` inside the
+shellcheck command counts as a run. Expected after: PASS. Quote the failing output in your report.
+
+Run: `tests/run-tests.sh` and the lint command.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+This is the one boundary run the task schedules.
+
+- [ ] **Step 8.2: Hand over**
+
+```bash
+git add hooks/done-guard tests/test-done-guard.sh CHANGELOG.md
+git status --porcelain
+```
+
+Stage exactly those paths, and any citation repairs by name, and stop. **Do not commit.** The
+coordinator commits after both review passes, with
+`git commit -m "fix(done-guard): a scoped run counts only where a command starts"`.
+
+---
+
+### Task 9: the plan-run stop resumes from the plan, and a failed marker removal is said
+
+**Story:** follow-up from task 2's quality review, directed by Bernard on 2026-11-11
+**Files:**
+- Modify: `lib/context_watch.py`
+- Modify: `CHANGELOG.md`
+- Test: `tests/test-context-watch.sh`
+
+**Depends on:** task 8
+
+**Behaviours:**
+
+1. The plan-run paragraph of the stop text says that after compaction the run resumes from
+   `keel plan status <plan>`, and that the handoff's `next:` line records only where the run stood
+   at the stop. Example: past the stop threshold the prompt hook's output contains
+   `resumes from` and `where the run stood`.
+2. When PreCompact cannot remove the stop marker (the removal raises `OSError`), it writes one line
+   to stderr naming the marker path, and still exits 0. Example: with the marker made a directory so
+   removal fails, PreCompact's stderr contains `keel context-watch` and `stop marker`, and its exit
+   code is 0.
+3. The ordinary stop text and the existing cases are unchanged. Example: the existing cases at
+   `tests/test-context-watch.sh:310` and `:336-341` still pass.
+4. Any citation into `lib/context_watch.py` or `tests/test-context-watch.sh` the edit shifts is
+   repaired, wherever it lives outside `docs/plans/`. Example: `tests/test-validate-citations.sh`
+   and `tests/test-harness-claims.sh` pass.
+
+**Done when:** `tests/test-context-watch.sh`, `tests/test-validate-citations.sh` and
+`tests/test-harness-claims.sh` pass.
+
+- [ ] **Step 9.1: Build it test first**
+
+Follow `keel:tdd`. Write cases for behaviours 1 and 2 in `tests/test-context-watch.sh`, after the
+existing cases.
+Run: `tests/test-context-watch.sh`
+Expected before the implementation: FAIL, both new cases fail (no resume sentence; a silent failed
+removal). Expected after: PASS. Quote the failing output in your report.
+
+Run: `tests/run-tests.sh` and the lint command.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+This is the one boundary run the task schedules.
+
+- [ ] **Step 9.2: Hand over**
+
+```bash
+git add lib/context_watch.py tests/test-context-watch.sh CHANGELOG.md
+git status --porcelain
+```
+
+Stage exactly those paths, and any citation repairs by name, and stop. **Do not commit.** The
+coordinator commits after both review passes, with
+`git commit -m "fix(context-watch): resume a plan run from the plan, say a failed removal"`.
+
+---
+
+### Task 10: text follow-ups in tdd, write-plan and the implementer brief
+
+**Story:** follow-ups from tasks 3 and 7's reviews, directed by Bernard on 2026-11-11
+**Files:**
+- Modify: `skills/tdd/SKILL.md`
+- Modify: `skills/write-plan/references/plan-template.md`
+- Modify: `skills/write-plan/references/rationale.md`
+- Modify: `skills/execute-plan/references/subagent-prompts.md`
+- Modify: `tests/evals/scenarios/commit-outside-a-worktree.md`
+- Modify: `tests/evals/scenarios/implement-a-five-step-task.md`
+- Modify: `tests/evals/scenarios/implement-a-two-step-task.md`
+- Modify: `tests/evals/scenarios/implement-a-batched-task.md`
+- Modify: `CHANGELOG.md`
+
+**Depends on:** task 9
+
+**Behaviours:** this task changes skill text and has no failing test; each example is checked by a
+reader against the diff and by the commands in `Done when:`.
+
+1. `tdd`'s RED step no longer says without qualification that the first unit's start record costs
+   one `verify.test`: it also says a plan run's handed record replaces that run, pointing at
+   `references/affected-tests.md`. The body does not grow. Example: the RED step's start-record
+   sentence names a handed record, and `wc -w < skills/tdd/SKILL.md` prints at most `746`.
+2. The plan template's example lint command is one that runs no tests, so a checkpointed boundary
+   in the example runs no suite. Example: `./gradlew check` appears nowhere in `plan-template.md`,
+   and its lint example is `./gradlew spotlessCheck` (lines 47 and 109 today).
+3. `write-plan`'s `references/rationale.md` "Step 6: Hand off" names `**Suite checkpoints:**`
+   beside `**Implementer routing:**` and `**Delivery:**` as the lines `execute-plan` reads. Example:
+   that section contains `**Suite checkpoints:**`.
+4. The implementer prompt's REPORT asks for the `Done when:` command's summary lines and every
+   failing case in full, not its whole output, and the four eval scenarios carry the changed REPORT
+   verbatim (`tests/test-eval-harness.sh` case 23). Example: `paste its output` appears nowhere in
+   `subagent-prompts.md` or the four scenarios.
+5. Any citation the edits shift is repaired, wherever it lives outside `docs/plans/`. Example:
+   `tests/test-validate-citations.sh` passes.
+
+**Done when:** `tests/test-validate-skills.sh`, `tests/test-validate-citations.sh` and
+`tests/test-eval-harness.sh` pass, `wc -w < skills/tdd/SKILL.md` prints at most `746`, and
+`grep -c 'paste its output' skills/execute-plan/references/subagent-prompts.md` prints `0`.
+
+- [ ] **Step 10.1: Make the change and check it**
+
+Edit as the behaviours say.
+Run: the `Done when:` commands, then `tests/run-tests.sh` and the lint command.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+
+- [ ] **Step 10.2: Hand over**
+
+```bash
+git add skills/tdd/SKILL.md skills/write-plan/references/plan-template.md \
+        skills/write-plan/references/rationale.md skills/execute-plan/references/subagent-prompts.md \
+        tests/evals/scenarios/commit-outside-a-worktree.md tests/evals/scenarios/implement-a-five-step-task.md \
+        tests/evals/scenarios/implement-a-two-step-task.md tests/evals/scenarios/implement-a-batched-task.md \
+        CHANGELOG.md
+git status --porcelain
+```
+
+Stage exactly those paths, and any citation repairs by name, and stop. **Do not commit.** The
+coordinator commits after the review passes, with
+`git commit -m "docs(skills): follow-ups to suite checkpoints and leaner reports"`.
