@@ -240,7 +240,7 @@ whoever picks it up next.
 | --- | --- |
 | `UserPromptSubmit` | Silent below 70%. Between 70 and 85, one short warning naming the number. Past 85, the stop instruction |
 | `PreToolUse` | Nothing below 85%. Past it, denies tool calls until a handoff is written |
-| `PreCompact` | Writes a mechanical handoff before the session's own memory is rewritten |
+| `PreCompact` | Writes a mechanical handoff before the session's own memory is rewritten, unless the session wrote one since the stop fired |
 
 **Occupancy is read, not estimated.** Claude Code's transcript records the usage the API reported for
 each request, so the last main-thread assistant turn gives the answer directly:
@@ -297,6 +297,14 @@ sent to a summary of a conversation it never had. The marker is written when the
 compared by modification time, so a handoff is announced once and a new compaction is announced
 again. An empty handoff is not named at all, which is what makes `context-budget` step 7 emptying it
 the way to clear the pointer rather than a no-op.
+
+**A plan run carries on past the stop.** The stop instruction keeps its four steps for an ordinary
+session, which ends with telling the person to `/clear`. When coordinating a `keel:execute-plan`
+run, the session is told to write the handoff naming the plan file and the `next:` line of
+`keel plan status <plan>`, and then to carry on with the run, because compaction is safe when the
+plan file holds the place. `PreCompact` keeps a handoff written since the stop fired rather than
+replacing it with the mechanical render, which would lose that `next:` line, and then removes the
+stop marker, so a later stop in the same session blocks again until a newer handoff is written.
 
 ## Session hygiene, the part skills cannot enforce
 

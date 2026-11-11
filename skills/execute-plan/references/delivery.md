@@ -51,8 +51,10 @@ decision the run makes alone.
   person names passes, under `warn` the person decides, and a delivery run holds neither.
 - A `hooks/sensitive-guard` ask the person declines or does not answer. An ask that gets no answer
   is not a yes.
-- A context-watch block. The session writes down where it is and stops; the record below is what
-  the next one resumes from.
+- A context-watch block outside a plan run. The session writes down where it is and stops; the
+  record below is what the next one resumes from. A session coordinating this run is told instead
+  to write the handoff naming the plan and its `next:` line and carry on, since the plan file
+  holds the place.
 
 ## The run
 

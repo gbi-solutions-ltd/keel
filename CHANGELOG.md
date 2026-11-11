@@ -13,6 +13,10 @@ Entries are terse by design; the narrative for each release is in this file's gi
   else the event's `cwd`), and counts a Bash command containing the text of `verify.test_one` or
   `verify.test_affected` before its first `{` as a test run, so a scoped test run satisfies
   `gates.done_verified`: it proves a test ran, not that the suite did.
+- The context-watch stop text tells a session coordinating `keel:execute-plan` to write the handoff
+  naming the plan file and its `next:` line and carry on; the ordinary stop keeps its four steps.
+  `PreCompact` keeps a handoff written since the stop fired, then removes the stop marker so a later
+  stop blocks again until a newer handoff.
 - `hooks/review-guard` refuses every subagent a stash-writing `git stash`, wherever it runs, and
   allows `git stash list` and `git stash show` (ADR-0016). A subagent is told by a non-empty
   `agent_type` and a non-empty `agent_id` string, so the main session, which carries no `agent_id`

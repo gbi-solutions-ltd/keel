@@ -243,7 +243,7 @@ passes, with `git commit -m "fix(done-guard): ignore edits outside the repositor
 **Done when:** `tests/test-context-watch.sh`, `tests/test-harness-claims.sh`,
 `tests/test-profile-keys.sh` and `tests/test-validate-citations.sh` pass.
 
-- [ ] **Step 2.1: Build it test first**
+- [x] **Step 2.1: Build it test first** Note: Red witnessed by the round 2 implementer (5 failing cases quoted); behaviour 3 pinned by the existing release case. Round 1 met the task; quality blocking: stop marker outlived compaction; discarded. Round 2 also scoped the ordinary-session steps (should-fix from round 1). Citation repairs outside Files: docs/ideas/context-window-at-init.md, docs/ideas/declared-profile-keys-take-effect.md. Schema and profile-keys needed no change. Quality should-fix: the kept handoff can name a stale next: if the run carries on several tasks before compaction; a failed marker removal is silent.
 
 Follow `keel:tdd`. Write the cases for behaviours 1 and 4 in `tests/test-context-watch.sh`.
 Run: `tests/test-context-watch.sh`
@@ -255,7 +255,7 @@ Run: `tests/run-tests.sh` and the lint command.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 2.2: Hand over**
+- [x] **Step 2.2: Hand over** Note: rounds: 2; routing: inherit; loop: full
 
 ```bash
 git add lib/context_watch.py tests/test-context-watch.sh docs/05-token-and-memory-design.md \

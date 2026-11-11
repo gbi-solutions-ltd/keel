@@ -341,6 +341,81 @@ out="$(fire PreToolUse "$work/stop.jsonl" "$work" Bash "$sess")"
   || bad "block" "still denied after the handoff was written: $out"
 rm -f "$work/.keel/handoff.md"
 
+# ---- a plan run carries on past the stop -----------------------------------
+
+# A plan run's place is held by the plan file, so the session coordinating one writes the handoff
+# and carries on rather than handing the person a /clear. Both carriers of the stop text say so.
+out="$(fire UserPromptSubmit "$work/stop.jsonl" "$work")"
+case "$out" in *execute-plan*'keel plan status'*'carry on'*)
+    ok "the stop text tells a plan run to write the handoff and carry on" ;;
+  *) bad "plan run" "no plan-run paragraph in the prompt hook's stop text: $out" ;; esac
+case "$out" in *PAUSE*.keel/handoff.md*/clear*Stop.*)
+    ok "the ordinary stop keeps its four steps beside the plan-run paragraph" ;;
+  *) bad "plan run" "the ordinary stop lost a step: $out" ;; esac
+out="$(fire PreToolUse "$work/stop.jsonl" "$work" Bash "plan-deny-$$")"
+case "$out" in *deny*execute-plan*'keel plan status'*'carry on'*)
+    ok "the deny reason carries the same plan-run paragraph" ;;
+  *) bad "plan run" "no plan-run paragraph in the deny reason: $out" ;; esac
+
+# Compaction must not replace the handoff the session wrote after the stop with the mechanical
+# render, or the plan run resumes from a summary instead of its `next:` line. The stop marker goes
+# at PreCompact, so a later stop in the same session starts fresh rather than being released by
+# the first stop's handoff.
+statedir="${TMPDIR:-/tmp}/keel-context-watch"
+sess="plan-run-$$"
+rm -f "$statedir/$sess.stop"
+fire PreToolUse "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+# Dated so the order is certain: the marker in 2000, the session's handoff in 2001. A marker kept
+# through compaction would stay older than that handoff and release the second stop below.
+touch -t 200001010000 "$statedir/$sess.stop"
+printf '# Session handoff\n\nplan: docs/plans/example.md\nnext: 4.1\n' > "$work/.keel/handoff.md"
+touch -t 200101010000 "$work/.keel/handoff.md"
+fire PreCompact "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+grep -q 'next: 4.1' "$work/.keel/handoff.md" \
+  && ok "PreCompact keeps a handoff written after the stop fired" \
+  || bad "plan run" "PreCompact replaced the session's handoff: $(head -3 "$work/.keel/handoff.md")"
+[ ! -e "$statedir/$sess.stop" ] \
+  && ok "PreCompact removes the stop marker so the next stop starts fresh" \
+  || bad "plan run" "the stop marker outlived compaction"
+
+# The second stop in the same session. The first stop's handoff predates it.
+out="$(fire PreToolUse "$work/stop.jsonl" "$work" Bash "$sess")"
+case "$out" in *'"permissionDecision": "deny"'*)
+    ok "a second stop denies again until a newer handoff is written" ;;
+  *) bad "plan run" "the first stop's handoff released the second stop: $out" ;; esac
+printf '# Session handoff\n\nplan: docs/plans/example.md\nnext: 5.1\n' > "$work/.keel/handoff.md"
+out="$(fire PreToolUse "$work/stop.jsonl" "$work" Bash "$sess")"
+[ -z "$out" ] && ok "a newer handoff releases the second stop" \
+  || bad "plan run" "still denied after the second handoff: $out"
+fire PreCompact "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+h="$(cat "$work/.keel/handoff.md")"
+case "$h" in *'next: 5.1'*) ok "the second PreCompact keeps only the newer handoff" ;;
+  *) bad "plan run" "the second handoff was not kept: $h" ;; esac
+case "$h" in *'next: 4.1'*) bad "plan run" "the first stop's handoff came back: $h" ;; esac
+
+# With no stop marker, PreCompact writes the render as before.
+sess="plan-nomarker-$$"
+rm -f "$statedir/$sess.stop"
+printf '# Session handoff\n\nnext: 4.1\n' > "$work/.keel/handoff.md"
+fire PreCompact "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+h="$(cat "$work/.keel/handoff.md")"
+case "$h" in *'next: 4.1'*) bad "plan run" "with no stop marker the old handoff was kept: $h" ;;
+  *'TO BE COMPLETED'*) ok "with no stop marker PreCompact writes the render" ;;
+  *) bad "plan run" "with no stop marker no render was written: $h" ;; esac
+
+# A handoff older than the stop marker was not written for this stop, so the render replaces it.
+sess="plan-stale-$$"
+rm -f "$statedir/$sess.stop"
+printf '# Session handoff\n\nnext: 4.1\n' > "$work/.keel/handoff.md"
+touch -t 200001010000 "$work/.keel/handoff.md"
+fire PreToolUse "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+fire PreCompact "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+h="$(cat "$work/.keel/handoff.md")"
+case "$h" in *'next: 4.1'*) bad "plan run" "a handoff older than the stop was kept: $h" ;;
+  *'TO BE COMPLETED'*) ok "a handoff older than the stop marker is replaced by the render" ;;
+  *) bad "plan run" "no render over a stale handoff: $h" ;; esac
+rm -f "$work/.keel/handoff.md"
+
 # ---- the escape hatch ------------------------------------------------------
 
 out="$(KEEL_CONTEXT_WATCH=off fire PreToolUse "$work/stop.jsonl" "$work" Bash)"

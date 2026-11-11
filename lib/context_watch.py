@@ -472,12 +472,29 @@ def hook():
     if event == "PreCompact":
         # Compaction is the one moment the session's own memory is about to be rewritten, so capture
         # what is still readable first. Cheap, silent, and it costs nothing if never used.
+        #
+        # A handoff written since the stop fired is the session's own, naming what comes next (for a
+        # plan run, the plan file and its `next:` line), and the render would replace it with less.
+        # It is kept. The marker then goes, so a later stop in the same session starts fresh: kept,
+        # it would leave this handoff newer than it, releasing the next stop before any new handoff
+        # and keeping this one, with its stale `next:`, through the next compaction.
+        stopped = _stop_marker(session, False)
         try:
-            os.makedirs(os.path.dirname(handoff), exist_ok=True)
-            with open(handoff, "w", encoding="utf-8") as fh:
-                fh.write(render_handoff(transcript, session, tokens, window))
+            kept = bool(stopped) and os.path.getmtime(handoff) >= os.path.getmtime(stopped)
         except OSError:
-            pass
+            kept = False
+        if not kept:
+            try:
+                os.makedirs(os.path.dirname(handoff), exist_ok=True)
+                with open(handoff, "w", encoding="utf-8") as fh:
+                    fh.write(render_handoff(transcript, session, tokens, window))
+            except OSError:
+                pass
+        if stopped:
+            try:
+                os.remove(stopped)
+            except OSError:
+                pass
         # Nothing is emitted, deliberately. This announced the file with a systemMessage until
         # 2026-09-05, and the harness discards a PreCompact hook's systemMessage and continue fields
         # outright, so the announcement was written, serialised and thrown away every time. The test
@@ -557,7 +574,7 @@ def _stop_text(pct, tokens, window, handoff):
     return (
         "PAUSE. Context is at %d%% (%s of %s tokens), past the keel stop threshold.\n"
         "\n"
-        "Do these, in order, and nothing else:\n"
+        "In an ordinary session, do these, in order, and nothing else:\n"
         "  1. Write or refresh %s: what is done, what is not, the next concrete step, and any\n"
         "     decision taken that is not yet recorded anywhere else.\n"
         "  2. Move anything durable out of it and into its real home, an ADR under the docs root or\n"
@@ -566,9 +583,15 @@ def _stop_text(pct, tokens, window, handoff):
         "  3. Tell the user to run /clear and resume by pointing at that file.\n"
         "  4. Stop.\n"
         "\n"
+        "When coordinating a keel:execute-plan run, do steps 1 and 2 with the handoff naming the\n"
+        "plan file and the `next:` line of `keel plan status <plan>`, and then carry on with the\n"
+        "run rather than telling the user to /clear. Compaction is expected and safe there,\n"
+        "because the plan file holds the place and compaction keeps a handoff written after this\n"
+        "pause.\n"
+        "\n"
         "Write, Edit and Read still work so you can do this. Other tools are refused until the\n"
-        "handoff is written. Continuing past here means the session is compacted mid-task and the\n"
-        "reasoning that got you here is summarised away.\n"
+        "handoff is written. In an ordinary session, continuing past here means the session is\n"
+        "compacted mid-task and the reasoning that got you here is summarised away.\n"
         "\n"
         "If this is genuinely wrong, the user can set KEEL_CONTEXT_WATCH=off, or gates.context_watch\n"
         "to false in .keel/profile.json. Do not set either yourself: it is the user's call."
