@@ -239,9 +239,11 @@ test for them. A task with no behaviours list, in the older shape, is followed a
   hides your whole diff from the coordinator.
 
 === REPORT ===
-Finish with: which steps you completed, the exact output of each verify command, anything you
-noticed and deliberately left alone, and anything that blocked you. Quote the output of the failing
-run that came before the implementation.
+Finish with: which steps you completed; for each verify command, the command, its exit code and its
+summary lines (at most 15: for a test runner, the per-package or per-file pass and fail lines and
+the totals), plus every failing case in full; anything you noticed and deliberately left alone; and
+anything that blocked you. From the failing run that came before the implementation, quote the
+failing case and its message, not the whole run.
 
 Name separately any step you did not perform, or whose outcome you did not see: a test passing on
 arrival is not "watch it fail". It is not completed, and whoever ticks the box needs to know.

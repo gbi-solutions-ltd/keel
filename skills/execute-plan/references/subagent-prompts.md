@@ -64,9 +64,11 @@ test for them. A task with no behaviours list, in the older shape, is followed a
   hides your whole diff from the coordinator.
 
 === REPORT ===
-Finish with: which steps you completed, the exact output of each verify command, anything you
-noticed and deliberately left alone, and anything that blocked you. Quote the output of the failing
-run that came before the implementation.
+Finish with: which steps you completed; for each verify command, the command, its exit code and its
+summary lines (at most 15: for a test runner, the per-package or per-file pass and fail lines and
+the totals), plus every failing case in full; anything you noticed and deliberately left alone; and
+anything that blocked you. From the failing run that came before the implementation, quote the
+failing case and its message, not the whole run.
 
 Name separately any step you did not perform, or whose outcome you did not see: a test passing on
 arrival is not "watch it fail". It is not completed, and whoever ticks the box needs to know.
@@ -78,6 +80,11 @@ Run the task's `Done when:` command after your last code change and paste its ou
 run it, say so in your first line. A report claiming completion with no command output in it is
 rejected and re-dispatched, which costs more than saying you skipped it.
 ```
+
+The report asks for summaries, not whole outputs, because every report lands in your context and
+stays there for the rest of the run. On 2026-11-09 the implementer reports were the largest item in
+a coordinator's context, 186,525 characters over 10 tasks, and that is what drove the run into the
+context stop. The review prompts below carry a length cap for the same reason.
 
 Paste the standards too, and not a path to them. The review prompt below offers the path as an
 option because a reviewer goes looking for what to judge against; an implementer writes to what is
@@ -128,6 +135,9 @@ Answer six questions:
 
 Verdict: COMPLIES or DEVIATES, then the reasons. Deviating is not a failure to be softened; it is
 the finding.
+
+Put the verdict on the first line. Keep the report to at most 250 words, and quote command output
+only where it is the evidence for a finding.
 ```
 
 Questions four to six cannot be answered by reading the diff, and five is the cheapest of all,
@@ -166,6 +176,9 @@ quality reviewer left a worktree behind.
 
 Rank findings: blocking, should fix, consider. Cap at ten. If nothing blocks, say so in the first
 line.
+
+Put the verdict on the first line. Keep the report to at most 250 words, and quote command output
+only where it is the evidence for a finding.
 ```
 
 [../../keel/references/reporting-findings.md](../../keel/references/reporting-findings.md) carries

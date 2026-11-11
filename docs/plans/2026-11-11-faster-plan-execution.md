@@ -275,6 +275,16 @@ passes, with `git commit -m "feat(context-watch): a plan run carries on past the
 - Modify: `skills/execute-plan/references/subagent-prompts.md`
 - Modify: `agents/keel-implementer.md`
 - Modify: `CHANGELOG.md`
+- Modify: `tests/evals/scenarios/commit-outside-a-worktree.md`
+- Modify: `tests/evals/scenarios/implement-a-five-step-task.md`
+- Modify: `tests/evals/scenarios/implement-a-two-step-task.md`
+- Modify: `tests/evals/scenarios/implement-a-batched-task.md`
+
+**Plan note, 2026-11-11, coordinator:** the four `tests/evals/scenarios/` files above were added
+during execution. Each carries the implementer prompt's `=== RULES ===` block verbatim, which
+`tests/test-eval-harness.sh` (case 23) checks, so a change to that block or to REPORT must be
+mirrored in them; task 3's first attempt found it. Any citation into them that the change shifts is
+repaired too.
 
 **Depends on:** none
 
@@ -301,16 +311,18 @@ a reader against the diff and by the grep in `Done when:`.
 `grep -c 'exact output of each verify command' skills/execute-plan/references/subagent-prompts.md`
 prints `0`.
 
-- [ ] **Step 3.1: Make the change and check it**
+- [x] **Step 3.1: Make the change and check it** Note: No-test task; examples checked by the spec reviewer against the diff and Done when (validate-skills 134/0, validate-citations 60/0, grep 0). First pass blocked on tests/test-eval-harness.sh case 23: four eval scenarios carry the RULES block verbatim and were not in Files; coordinator added them to tasks 3, 4 and 7 (plan note), same implementer mirrored the lines. Citation repairs outside Files: docs/ideas/implementers-run-git-stash.md, docs/prd/standards-assessment.md. Follow-up: the REPORT line asking to paste the Done when output still asks for whole output.
 
 Edit the prompts as the behaviours say, keeping each prompt a fenced block the coordinator pastes.
 Run: the `Done when:` commands, then `tests/run-tests.sh` and the lint command.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 
-- [ ] **Step 3.2: Hand over**
+- [x] **Step 3.2: Hand over** Note: rounds: 1; routing: inherit; loop: light
 
 ```bash
-git add skills/execute-plan/references/subagent-prompts.md agents/keel-implementer.md CHANGELOG.md
+git add skills/execute-plan/references/subagent-prompts.md agents/keel-implementer.md CHANGELOG.md \
+        tests/evals/scenarios/commit-outside-a-worktree.md tests/evals/scenarios/implement-a-five-step-task.md \
+        tests/evals/scenarios/implement-a-two-step-task.md tests/evals/scenarios/implement-a-batched-task.md
 git status --porcelain
 ```
 
@@ -327,6 +339,16 @@ passes, with `git commit -m "feat(execute-plan): reports quote summaries, not wh
 - Modify: `agents/keel-implementer.md`
 - Modify: `agents/keel-reviewer.md`
 - Modify: `CHANGELOG.md`
+- Modify: `tests/evals/scenarios/commit-outside-a-worktree.md`
+- Modify: `tests/evals/scenarios/implement-a-five-step-task.md`
+- Modify: `tests/evals/scenarios/implement-a-two-step-task.md`
+- Modify: `tests/evals/scenarios/implement-a-batched-task.md`
+
+**Plan note, 2026-11-11, coordinator:** the four `tests/evals/scenarios/` files above were added
+during execution. Each carries the implementer prompt's `=== RULES ===` block verbatim, which
+`tests/test-eval-harness.sh` (case 23) checks, so a change to that block or to REPORT must be
+mirrored in them; task 3's first attempt found it. Any citation into them that the change shifts is
+repaired too.
 
 **Depends on:** task 3
 
@@ -366,7 +388,9 @@ Expected: PASS, or reds this task did not cause, each named and matched against 
 - [ ] **Step 4.2: Hand over**
 
 ```bash
-git add skills/execute-plan/references/subagent-prompts.md agents/keel-implementer.md agents/keel-reviewer.md CHANGELOG.md
+git add skills/execute-plan/references/subagent-prompts.md agents/keel-implementer.md agents/keel-reviewer.md CHANGELOG.md \
+        tests/evals/scenarios/commit-outside-a-worktree.md tests/evals/scenarios/implement-a-five-step-task.md \
+        tests/evals/scenarios/implement-a-two-step-task.md tests/evals/scenarios/implement-a-batched-task.md
 git status --porcelain
 ```
 
@@ -535,6 +559,16 @@ passes, with `git commit -m "docs(decisions): ADR-0017, suite checkpoints in a p
 - Modify: `skills/write-plan/SKILL.md`
 - Modify: `docs/02-skill-catalog.md`
 - Modify: `CHANGELOG.md`
+- Modify: `tests/evals/scenarios/commit-outside-a-worktree.md`
+- Modify: `tests/evals/scenarios/implement-a-five-step-task.md`
+- Modify: `tests/evals/scenarios/implement-a-two-step-task.md`
+- Modify: `tests/evals/scenarios/implement-a-batched-task.md`
+
+**Plan note, 2026-11-11, coordinator:** the four `tests/evals/scenarios/` files above were added
+during execution. Each carries the implementer prompt's `=== RULES ===` block verbatim, which
+`tests/test-eval-harness.sh` (case 23) checks, so a change to that block or to REPORT must be
+mirrored in them; task 3's first attempt found it. Any citation into them that the change shifts is
+repaired too.
 
 **Depends on:** tasks 5 and 6
 
@@ -587,7 +621,9 @@ Expected: PASS, or reds this task did not cause, each named and matched against 
 ```bash
 git add skills/execute-plan/references/subagent-prompts.md skills/tdd/references/affected-tests.md \
         skills/tdd/SKILL.md skills/write-plan/references/plan-template.md skills/write-plan/SKILL.md \
-        docs/02-skill-catalog.md CHANGELOG.md
+        docs/02-skill-catalog.md CHANGELOG.md tests/evals/scenarios/commit-outside-a-worktree.md \
+        tests/evals/scenarios/implement-a-five-step-task.md tests/evals/scenarios/implement-a-two-step-task.md \
+        tests/evals/scenarios/implement-a-batched-task.md
 git status --porcelain
 ```
 

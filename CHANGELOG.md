@@ -9,6 +9,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- `execute-plan`'s implementer report gives each verify command's exit code and at most 15 summary
+  lines plus every failing case, and the red run's failing case and message, not whole outputs;
+  both review prompts cap the report at 250 words with the verdict first.
 - `hooks/done-guard` ignores an edit whose path resolves outside the repository (git's top level,
   else the event's `cwd`), and counts a Bash command containing the text of `verify.test_one` or
   `verify.test_affected` before its first `{` as a test run, so a scoped test run satisfies
