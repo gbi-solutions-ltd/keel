@@ -662,7 +662,7 @@ passes, with `git commit -m "feat(write-plan): find the live documents a change 
 
 **Done when:** `tests/test-plan.sh` passes.
 
-- [ ] **Step 9.1: Build it test first**
+- [x] **Step 9.1: Build it test first** Note: red 615/4 quoted; test-plan 619/0; spec COMPLIES, edge cases probed (1.1 vs 1.10, regex ids, -- notes, lock on every path); coordinator repaired one flagged plan citation (prune-to-the-target.md:436); follow-ups: a newline inside one argument splits into two ids; doc could say ids end at the first -- argument
 
 Follow `keel:tdd`. Write cases for behaviours 1 and 2 after the existing tick cases.
 Run: `tests/test-plan.sh`
@@ -674,7 +674,7 @@ Run: the lint command. With the `Done when:` run above, that is the unit boundar
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 9.2: Hand over**
+- [x] **Step 9.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; suite: pass at tree f55fb8e
 
 ```bash
 git add bin/keel tests/test-plan.sh docs/03-install-and-distribution.md CHANGELOG.md

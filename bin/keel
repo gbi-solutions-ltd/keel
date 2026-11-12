@@ -4708,8 +4708,10 @@ plan_unlock() {
     rmdir "$PLAN_LOCK"
 }
 
-# plan_tick <plan> <id> [--note <text> | --defer <reason> | --not-applicable <reason>]: sets one
-# step's state and rewrites only its line. Done is the default; a note follows the title as
+# plan_tick <plan> <id> [<id> ...] [--note <text> | --defer <reason> | --not-applicable <reason>]:
+# sets each named step's state, with the same option for each, under one lock, and rewrites only
+# their lines. An id the plan does not hold, or holds twice, changes nothing, and the first such id
+# in argument order is named. Done is the default; a note follows the title as
 # ` Note: <text>`, for a step the ticker did not witness. --defer and --not-applicable park the step
 # with ` Deferred: <reason>` or ` Not applicable: <reason>` instead, and refuse without a reason,
 # since a parked step without one reads as forgotten. A reason must start with a character that is
@@ -4723,9 +4725,16 @@ plan_unlock() {
 # plan with no step ids exits 3; a fence that never closes is reported as such rather than as a plan
 # without ids.
 plan_tick() {
-    local plan="${1:-}" id="${2:-}" opt="${3:-}" text="${4:-}" mark=x tail="" tmp rc
-    [ -n "$plan" ] && [ -n "$id" ] && [ "$#" -le 4 ] \
-      || die "usage: keel plan tick <plan> <id> [--note <text> | --defer <reason> | --not-applicable <reason>]"
+    local plan="${1:-}" ids="" id opt text mark=x tail="" tmp rc
+    local usage="usage: keel plan tick <plan> <id> [<id> ...] [--note <text> | --defer <reason> | --not-applicable <reason>]"
+    [ "$#" -gt 0 ] && shift
+    # Ids run up to the first argument starting --, one a line, since awk splits them on newlines.
+    while [ "$#" -gt 0 ]; do
+        case "$1" in --*) break ;; "") die "$usage" ;; esac
+        ids="$ids$1"$'\n'; shift
+    done
+    opt="${1:-}" text="${2:-}"
+    [ -n "$plan" ] && [ -n "$ids" ] && [ "$#" -le 2 ] || die "$usage"
     [ -f "$plan" ] || die "no such plan: $plan"
     case "$text" in *$'\n'*) die "a note or reason must be one line: it is written on the step's own line" ;; esac
     case "$opt" in
@@ -4747,25 +4756,42 @@ plan_tick() {
     tmp="$(mktemp)" || die "cannot create a temporary file"
     # ENVIRON rather than awk -v, because -v rewrites backslash escapes: a note holding \t would be
     # written with a tab.
+    # On exit 4 or 5 the copy holds only the id at fault, in place of the plan.
     # shellcheck disable=SC2016  # $0 is awk's record, not a shell expansion
-    PLAN_ID="$id" PLAN_MARK="$mark" PLAN_TAIL="$tail" awk "$PLAN_AWK_LIB"'
-        BEGIN { id = ENVIRON["PLAN_ID"]; mark = ENVIRON["PLAN_MARK"]; tail = ENVIRON["PLAN_TAIL"] }
+    PLAN_IDS="$ids" PLAN_MARK="$mark" PLAN_TAIL="$tail" awk "$PLAN_AWK_LIB"'
+        BEGIN {
+            nid = split(ENVIRON["PLAN_IDS"], ids, "\n") - 1
+            for (k = 1; k <= nid; k++) want[ids[k]] = 1
+            mark = ENVIRON["PLAN_MARK"]; tail = ENVIRON["PLAN_TAIL"]
+        }
         { line[NR] = $0 }
         fenced($0) { next }
-        step($0) { nstep++; if (sid == id) { hits++; at = NR; oldtail = stail; title = stitle } }
+        step($0) {
+            nstep++
+            if (sid in want) {
+                hits[sid]++; at[sid] = NR; oldtail[sid] = stail; title[sid] = stitle
+            }
+        }
         END {
             if (!nstep) exit (infence ? 6 : 3)
-            if (!hits) exit 4
-            if (hits > 1) exit 5
-            cr = ""; if (oldtail ~ /\r$/) { cr = "\r"; sub(/\r$/, "", oldtail) }
-            if (mark == "x") {
-                if (oldtail ~ /^ (Deferred|Not applicable): /) oldtail = ""
-                tail = oldtail tail
+            for (k = 1; k <= nid; k++) {
+                id = ids[k]
+                if (!hits[id]) { print id; exit 4 }
+                if (hits[id] > 1) { print id; exit 5 }
             }
-            line[at] = "- [" mark "] **Step " id ": " title "**" tail cr
+            for (id in want) {
+                old = oldtail[id]; t = tail
+                cr = ""; if (old ~ /\r$/) { cr = "\r"; sub(/\r$/, "", old) }
+                if (mark == "x") {
+                    if (old ~ /^ (Deferred|Not applicable): /) old = ""
+                    t = old t
+                }
+                line[at[id]] = "- [" mark "] **Step " id ": " title[id] "**" t cr
+            }
             for (i = 1; i <= NR; i++) print line[i]
         }' "$plan" > "$tmp"
     rc=$?
+    case "$rc" in 4|5) read -r id < "$tmp" ;; esac
     # A complete copy has the plan's record count and ends in a newline, as awk's print always does:
     # busybox awk exits 0 on a failed write, and copying a short file back would cut the plan.
     if [ "$rc" -eq 0 ] \
@@ -4996,7 +5022,7 @@ case "${1:-}" in
         say "  guard install [--leak-guard|--no-leak-guard]|status|uninstall   pre-push hook: the scan, and no pushes to the default branch, plus a pre-commit hook that stays off until gates.commit_guard turns it on"
         say "  ci-review install|remove|status   opt in to keel's review on pull requests in GitHub Actions: writes one workflow file, off until you run it"
         say "  plan status <plan>   an implementation plan's steps by state, per task, and the next open step's id"
-        say "  plan tick <plan> <id> [--note <text> | --defer <reason> | --not-applicable <reason>]   set one step's state"
+        say "  plan tick <plan> <id> [<id> ...] [--note <text> | --defer <reason> | --not-applicable <reason>]   set each step's state"
         say "  plan report <plan> [--json]   when a plan was planned and delivered, its lead time, and the commits that reworked it, from git"
         say "  plan risk [--staged | --range <a>..<b> | <path>...]   which review loop a change gets, from hard_block_paths: light only when the last line is 'loop: light' and the exit is 0"
         say "  plan batches <plan> [--json]   which of a plan's tasks may run at the same time, from their Depends on and Files lines, and why the rest may not"

@@ -9,6 +9,8 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- `keel plan tick` takes several ids, `keel plan tick <plan> <id> [<id> ...]`, ticking each under
+  one lock with the same option; an unknown id among them changes nothing and is named.
 - `write-plan` searches the live documents for the behaviour each task changes and lists every hit
   in that task's `Files`, leaving records unsearched; the plan reviewer asks the same question.
 - A plan's header carries `**Commits that ask:**`, naming the tasks that stage `hard_block_paths`,

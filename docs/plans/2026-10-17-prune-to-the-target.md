@@ -433,7 +433,7 @@ task.
    the closing `---` of `skills/ship/SKILL.md` changing. The schema markers `verify.format_fix`,
    `profile.conventions.commit_style` and `gates.security_audit` stay in the body, so the
    `format_fix` exception is not moved as step detail. Gate item 7 is matched line by line with
-   `grep -F` by `tests/test-plan.sh:3077-3086`, so it stays in the body exactly as it is, line
+   `grep -F` by `tests/test-plan.sh:3102-3111`, so it stays in the body exactly as it is, line
    breaks included.
 9. If behaviours 3 to 5 together cannot bring the body under 700, the task stops: the body is left
    as it stands, uncommitted in this task's worktree, and the report gives the count, the shortfall
