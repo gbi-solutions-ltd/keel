@@ -62,6 +62,9 @@ case, a usage line in `docs/03-install-and-distribution.md`, and ship's quoting.
 **Approved:** by Bernard, 2026-11-12: routing `inherit`, onto PR #12's branch, with the decisions
 above as written. Task 3b added and approved the same day, after a test fixture committed into the
 working repository at task 3's checkpoint.
+**Task 11 added:** 2026-11-12, from `review-code` on 57d4f44..a6c55bf (two blocking surviving
+mutants, one should-fix against ADR-0011), as `review-code` step 5 sends blocking findings back
+before its one re-review.
 **Shape:** behaviours with examples.
 
 ## Global constraints
@@ -722,7 +725,8 @@ checked by a reader against the diff and by the greps in `Done when:`.
    body word count is lower than before.
 
 **Done when:** `tests/test-validate-skills.sh`, `tests/test-validate-citations.sh` and
-`tests/test-eval-harness.sh` pass, and the grep in behaviour 2 prints `0`.
+`tests/test-eval-harness.sh` pass. (Behaviour 2's grep was dropped with behaviour 2; see the plan
+note above.)
 
 - [x] **Step 10.1: Make the change and check it** Note: No-test task; behaviour 1 checked by the spec reviewer against the diff and Done when (validate-skills 134/0, validate-citations 64/0, eval-harness 115/0, four mirrors cmp-identical); behaviour 2 dropped by Bernard (ADR-0011 stands, see plan note), tdd unchanged at 698; commit message reworded to match
 
@@ -745,3 +749,84 @@ git status --porcelain
 
 Stage exactly those paths and stop. **Do not commit.** The coordinator commits after both review
 passes, with `git commit -m "feat(skills): the green run counts, tdd links without orders"`.
+
+---
+
+### Task 11: review fix, pin the subagent rule and keep the checkpoint rule where ADR-0011 puts it
+
+**Story:** the `review-code` rubric pass over 57d4f44..a6c55bf on 2026-11-12: two blocking findings
+(surviving mutants on `hard_block_paths`), one should-fix (an instruction placed in a reasons file,
+against ADR-0011) and two consider items taken because they are cheap. `review-code` step 5 sends
+blocking findings back to the author before its one re-review.
+**Files:**
+- Modify: `lib/harness/capabilities` only if a test needs it (it should not)
+- Modify: `skills/review-code/SKILL.md`
+- Modify: `skills/review-code/references/rationale.md`
+- Create: `skills/review-code/references/step-detail.md`
+- Modify: `skills/execute-plan/references/subagent-prompts.md`
+- Modify: `tests/run-tests.sh`
+- Modify: `CHANGELOG.md`
+- Test: `tests/test-context-watch.sh`
+- Test: `tests/test-harness-resolve.sh`
+- Test: `tests/test-run-tests.sh`
+
+**Depends on:** task 10
+
+**Behaviours:**
+
+1. The subagent check needs both fields to be non-empty strings. Example: past the stop threshold,
+   a `Bash` PreToolUse with `"agent_type":"","agent_id":"a1"` is denied, one with
+   `"agent_type":1,"agent_id":"a1"` is denied, and one with
+   `"agent_type":"general-purpose","agent_id":1` is denied. Dropping `and agent_type`,
+   `isinstance(agent_type, str)` or `isinstance(agent_id, str)` from the check in
+   `lib/context_watch.py` each turns a case red.
+2. context-watch is withheld on a harness that does not provide the PreToolUse agent fields, as
+   review-guard is. Example: in `tests/test-harness-resolve.sh`, with
+   `provides|claude|pretooluse_agent_id` cut from a copy of the capabilities file (the pattern the
+   done-guard case there uses), the generated manifest carries no `context-watch`; with the file as
+   it is, it does. Deleting the two `requires|context-watch|pretooluse_agent_*` rows turns the case
+   red.
+3. `review-code`'s three conditions for quoting the plan-end checkpoint move from
+   `references/rationale.md` to a new `references/step-detail.md`, which step 3 links with a
+   sentence saying to read it before the step, as ADR-0011 sets for step detail. `rationale.md`
+   keeps only the reasons. The body's word count does not grow (592 now). Example: `step-detail.md`
+   contains `git diff --name-only`; step 3 contains `step-detail.md` and `Read it before`;
+   `rationale.md` no longer contains `git status --porcelain` as a condition.
+4. The checkpoint's suite run is on the tree it records: before running `verify.test` at a
+   checkpoint, `git status --porcelain` shows only staged entries (no unstaged edit, no untracked
+   file), else the coordinator stages or stops first. Example: the suite checkpoints section of
+   `subagent-prompts.md` says so in step 2.
+5. A run with `KEEL_TEST_FILES` set and no `KEEL_TEST_DURATIONS` leaves `.keel/test-durations`
+   untouched. Example: in `tests/test-run-tests.sh`, with a durations file at a temp path standing
+   in for the real one (the runner's default path made overridable for the test only by running in
+   a temp copy of the runner's root, or an equivalent seam that does not touch the real file), a
+   `KEEL_TEST_FILES` run leaves its content byte-identical.
+
+**Done when:** `tests/test-context-watch.sh`, `tests/test-harness-resolve.sh`,
+`tests/test-run-tests.sh`, `tests/test-validate-skills.sh`, `tests/test-validate-citations.sh` and
+`tests/test-eval-harness.sh` pass.
+
+- [ ] **Step 11.1: Build it test first**
+
+Follow `keel:tdd`. Behaviours 1 and 2 pin code that is already right: write each case, prove it by
+making the named mutant in a throwaway worktree or copy, watching the case go red and restoring.
+Behaviour 5 is new behaviour: its case fails first. Behaviours 3 and 4 are text, checked by the
+examples. Quote each red.
+Run: the `Done when:` commands and the lint command. Run no `tests/run-tests.sh`: the coordinator
+runs the plan-end checkpoint again after this task.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+This is the one boundary run the task schedules.
+
+- [ ] **Step 11.2: Hand over**
+
+```bash
+git add skills/review-code/SKILL.md skills/review-code/references/rationale.md \
+        skills/review-code/references/step-detail.md \
+        skills/execute-plan/references/subagent-prompts.md tests/run-tests.sh CHANGELOG.md \
+        tests/test-context-watch.sh tests/test-harness-resolve.sh tests/test-run-tests.sh
+git status --porcelain
+```
+
+Stage exactly those paths, and any flagged citation repairs by name, and stop. **Do not commit.**
+The coordinator commits after both review passes, with
+`git commit -m "fix(review): pin the subagent rule, checkpoint conditions in step detail"`.
