@@ -15,7 +15,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-work="$(mktemp -d)"
+work="$(mktemp -d)"; [ -d "$work" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 trap 'rm -rf "$work"' EXIT
 
 # One init, about a second. The key set it writes is the same for every stack, checked against

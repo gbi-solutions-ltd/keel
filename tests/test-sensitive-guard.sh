@@ -59,13 +59,13 @@ check() {
 
 # A commit touching a declared sensitive path needs a human. This is the whole point of the task:
 # `ask` is the only decision the model cannot satisfy for itself, and it survives bypassPermissions.
-r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth/**"'
 : > "$r/src/auth/token.go"; git -C "$r" add -A
 check "a commit staging a sensitive path asks for a human" ask "$r" "git commit -m x"
 rm -rf "$r"
 
 # And it must not fire on everything, or it gets turned off.
-r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth/**"'
 : > "$r/src/ui/button.tsx"; git -C "$r" add -A
 check "a commit staging nothing sensitive is not blocked" "" "$r" "git commit -m x"
 rm -rf "$r"
@@ -74,7 +74,7 @@ rm -rf "$r"
 # hook that died here waved the commit through. A tool_input that is a string rather than an object
 # makes the embedded Python raise, which is the crash this case can reach from outside; a `set -u`
 # slip ends the same way.
-r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth/**"'
 : > "$r/src/auth/token.go"; git -C "$r" add -A
 out="$(printf '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":"git commit -m x","cwd":"%s"}' "$r" \
   | ( cd "$r" && "$GUARD" ) 2>/dev/null)"; rc=$?
@@ -89,7 +89,7 @@ rm -rf "$r"
 # the hook expects to fail: with the profile unreadable every Bash call would ask, which the header's
 # cheap filters exist to prevent. An unreadable profile and a command that is not a commit stay
 # silent. As root the profile is readable anyway and the case passes for the plain reason.
-r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth/**"'
 chmod 000 "$r/.keel/profile.json"
 check "an unreadable profile on a command that is not a commit asks nothing" "" "$r" "ls"
 chmod 644 "$r/.keel/profile.json"
@@ -98,7 +98,7 @@ rm -rf "$r"
 # The same commit with the hook run by a relative path and no CLAUDE_PLUGIN_ROOT. The hook reads
 # nothing beside itself, so where it is run from must not change its answer. kp is a link to this
 # repository, which puts the hook at a relative path from inside the fixture.
-r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth/**"'
 : > "$r/src/ui/button.tsx"; git -C "$r" add -A
 ln -s "$(cd "$(dirname "$GUARD")/.." && pwd)" "$r/kp"
 out="$(event "git commit -m x" "$r" | ( cd "$r" && unset CLAUDE_PLUGIN_ROOT && kp/hooks/sensitive-guard ) 2>/dev/null)"
@@ -110,7 +110,7 @@ fi
 rm -rf "$r"
 
 # A repository that declares no sensitive paths must be untouched, which is almost every repository.
-r="$(mktemp -d)"; fixture "$r" ''
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" ''
 : > "$r/src/auth/token.go"; git -C "$r" add -A
 check "no hard_block_paths means no interference" "" "$r" "git commit -m x"
 rm -rf "$r"
@@ -118,14 +118,14 @@ rm -rf "$r"
 # Only the top-level list counts. A regex over the whole profile text read an empty list nested in
 # `_notes` as the repository declaring nothing, so one note turned the guard off (audit M-01).
 nested='{"project":{"name":"t"},"hard_block_paths":["auth"],"_notes":{"hard_block_paths":[]}}'
-r="$(mktemp -d)"; fixture "$r" ''
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" ''
 printf '%s\n' "$nested" > "$r/.keel/profile.json"; git -C "$r" commit -qam nested
 mkdir -p "$r/auth"; : > "$r/auth/x"; git -C "$r" add -A
 check "an empty list nested under another key does not turn the guard off" ask "$r" "git commit -m x"
 rm -rf "$r"
 
 # A commit that changes the profile can change the list that judges it, so it asks, and says why.
-r="$(mktemp -d)"; fixture "$r" '"auth"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"auth"'
 : > "$r/src/ui/button.tsx"; git -C "$r" add -A; git -C "$r" commit -qm init
 printf '{"project": {"name": "t2"}, "hard_block_paths": ["auth"]}\n' > "$r/.keel/profile.json"
 git -C "$r" add .keel/profile.json
@@ -141,7 +141,7 @@ rm -rf "$r"
 # sensitive path went unguarded.
 for body in '{"project": {"name": "t"}, "hard_block_paths": []}' '{"project": {"name": "t"}}' \
             '{"project": {"name": "t"},}' '{"hard_block_paths": [],}'; do
-    r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+    r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth"'
     printf '%s\n' "$body" > "$r/.keel/profile.json"; git -C "$r" add .keel/profile.json
     out="$(event "git commit -m x" "$r" | ( cd "$r" && "$GUARD" ) 2>/dev/null)"
     if printf '%s' "$out" | grep -q '"permissionDecision": *"ask"' \
@@ -153,7 +153,7 @@ done
 
 # The list a commit is judged by includes the committed one, so emptying it in the working tree
 # without staging it does not lift the gate.
-r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth"'
 printf '{"project": {"name": "t"}, "hard_block_paths": []}\n' > "$r/.keel/profile.json"
 : > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
 check "the committed list still judges a commit when the working tree empties it" ask "$r" "git commit -m x"
@@ -161,7 +161,7 @@ rm -rf "$r"
 
 # With no working-tree profile left, the committed one still judges. Staging its deletion is staging
 # the profile, and deleting it without staging that does not lift the gate either.
-r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth"'
 git -C "$r" rm -q .keel/profile.json
 out="$(event "git commit -m x" "$r" | ( cd "$r" && "$GUARD" ) 2>/dev/null)"
 if printf '%s' "$out" | grep -q '"permissionDecision": *"ask"' \
@@ -170,14 +170,14 @@ if printf '%s' "$out" | grep -q '"permissionDecision": *"ask"' \
 else printf '  FAIL  staging the profile deletion asks, naming the profile (got: %s)\n' "${out:0:120}"; fail=$((fail+1)); fi
 rm -rf "$r"
 
-r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth"'
 rm "$r/.keel/profile.json"; : > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
 check "the committed list still judges a commit when the working-tree profile is deleted" ask "$r" "git commit -m x"
 rm -rf "$r"
 
 # A repository that declares nothing anywhere, neither at HEAD nor in the working tree, is never
 # asked, including when the commit changes its profile.
-r="$(mktemp -d)"; fixture "$r" ''
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" ''
 printf '{"project": {"name": "t"}}\n' > "$r/.keel/profile.json"; git -C "$r" commit -qam none
 : > "$r/src/auth/token.go"; git -C "$r" add src/auth/token.go
 ev="$(event "git commit -m x" "$r")"
@@ -191,7 +191,7 @@ rm -rf "$r"
 
 # The guard only concerns itself with committing. Blocking every edit to auth code would make the
 # gate the thing people remove.
-r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth/**"'
 : > "$r/src/auth/token.go"; git -C "$r" add -A
 check "a non-commit command is not blocked" "" "$r" "git status"
 rm -rf "$r"
@@ -199,14 +199,14 @@ rm -rf "$r"
 # `git commit -a` stages tracked modifications at commit time, so a staged-only check sees nothing
 # and the gate silently does not exist for the most ordinary way people commit. This is not the
 # documented `sh -c` limit; it is a plain everyday command, and missing it made the guard decorative.
-r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth/**"'
 : > "$r/src/auth/token.go"; git -C "$r" add -A; git -C "$r" commit -qm init
 printf 'changed\n' >> "$r/src/auth/token.go"     # tracked, modified, deliberately not staged
 check "a -a commit catches an unstaged modification" ask "$r" "git commit -am x"
 rm -rf "$r"
 
 # And -a must not widen it to untracked files, which a commit would not include either.
-r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth/**"'
 : > "$r/src/ui/button.tsx"; git -C "$r" add -A; git -C "$r" commit -qm init
 : > "$r/src/auth/untracked.go"                   # untracked: `git commit -a` does not commit it
 check "a -a commit ignores untracked files" "" "$r" "git commit -am x"
@@ -214,7 +214,7 @@ rm -rf "$r"
 
 # Splitting git's output on whitespace tears a path in half. It happened to still match here, but
 # the file it named was wrong, and a pattern anchored on the full path would have missed entirely.
-r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth/**"'
 mkdir -p "$r/src/auth/two words"; : > "$r/src/auth/two words/k.go"; git -C "$r" add -A
 out="$(event "git commit -m x" "$r" | ( cd "$r" && "$GUARD" ) 2>/dev/null)"
 if printf '%s' "$out" | grep -q 'src/auth/two words/k.go'; then
@@ -227,7 +227,7 @@ rm -rf "$r"
 # A session started in a subdirectory is ordinary, and git commits the whole staged set from there
 # regardless. Looking for the profile only in the current directory meant the guard silently did not
 # exist for that session, which is the worst failure available to a gate: absent and quiet.
-r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth/**"'
 : > "$r/src/auth/token.go"; git -C "$r" add -A
 out="$(event "git commit -m x" "$r" | ( cd "$r/src/ui" && "$GUARD" ) 2>/dev/null)"
 if printf '%s' "$out" | grep -q '"permissionDecision": *"ask"'; then
@@ -240,15 +240,15 @@ rm -rf "$r"
 # A guard that cannot answer must say so, rather than go quiet. These three are the cases where it
 # could not answer, and each one used to exit 0 in silence, which is the failure the whole hook
 # exists to avoid: a repository that declared sensitive paths and believed in a gate it did not get.
-r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth/**"'
 printf '{\n  "hard_block_paths": ["src/auth/**"],\n}\n' > "$r/.keel/profile.json"   # trailing comma
 : > "$r/src/auth/token.go"; git -C "$r" add -A
 check "an unparseable profile asks rather than passing" ask "$r" "git commit -m x"
 rm -rf "$r"
 
-r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth/**"'
 : > "$r/src/auth/token.go"; git -C "$r" add -A
-shim="$(mktemp -d)"; ln -s "$(command -v bash)" "$shim/bash"; ln -s "$(command -v python3)" "$shim/python3"
+shim="$(mktemp -d)"; [ -d "$shim" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; ln -s "$(command -v bash)" "$shim/bash"; ln -s "$(command -v python3)" "$shim/python3"
 out="$(event "git commit -m x" "$r" | ( cd "$r" && PATH="$shim" "$GUARD" ) 2>/dev/null)"
 if printf '%s' "$out" | grep -q '"permissionDecision": *"ask"'; then
     printf '  PASS  %s\n' "git being unreachable asks rather than passing"; pass=$((pass+1))
@@ -260,8 +260,8 @@ rm -rf "$r" "$shim"
 # The fail-closed branch must not turn into a prompt on every Read and Grep. The tool and command
 # filters have to run before it, or a machine without python3 gets a permission dialog per tool call
 # and the gate becomes the thing people delete.
-r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
-shim="$(mktemp -d)"; ln -s "$(command -v bash)" "$shim/bash"
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth/**"'
+shim="$(mktemp -d)"; [ -d "$shim" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; ln -s "$(command -v bash)" "$shim/bash"
 out="$(printf '{"tool_name":"Read","tool_input":{"file_path":"README.md"}}' | ( cd "$r" && PATH="$shim" "$GUARD" ) 2>/dev/null)"
 if [ -z "$out" ]; then
     printf '  PASS  %s\n' "a non-Bash call is silent even with python3 absent"; pass=$((pass+1))
@@ -272,7 +272,7 @@ rm -rf "$r" "$shim"
 
 # Flag detection must read the command, not the prose inside it. A gate that fires on
 # `git commit -m "fix the -a flag"` is a gate people switch off.
-r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth/**"'
 : > "$r/src/auth/token.go"; : > "$r/src/ui/b.tsx"; git -C "$r" add -A; git -C "$r" commit -qm init
 printf 'x\n' >> "$r/src/auth/token.go"          # unstaged sensitive change
 printf 'y\n' >> "$r/src/ui/b.tsx"; git -C "$r" add src/ui/b.tsx
@@ -280,7 +280,7 @@ check "a -a inside the commit message does not widen the check" "" "$r" 'git com
 rm -rf "$r"
 
 # And the attached-value form is still a -a commit.
-r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth/**"'
 : > "$r/src/auth/token.go"; git -C "$r" add -A; git -C "$r" commit -qm init
 printf 'x\n' >> "$r/src/auth/token.go"
 check "git commit -am\"msg\" is recognised as -a" ask "$r" 'git commit -am"msg"'
@@ -288,7 +288,7 @@ rm -rf "$r"
 
 # A pathspec commits that file's working tree content even when unstaged, which is the same everyday
 # bypass as -a wearing a different hat.
-r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth/**"'
 : > "$r/src/auth/token.go"; git -C "$r" add -A; git -C "$r" commit -qm init
 printf 'x\n' >> "$r/src/auth/token.go"
 check "a pathspec commit is caught" ask "$r" "git commit src/auth/token.go -m x"
@@ -296,7 +296,7 @@ rm -rf "$r"
 
 # Decision 3 proposes patterns like "anything under a path matching auth". A directory written
 # without a glob must match what is under it, or a repository declares a gate that never fires.
-r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth"'
 : > "$r/src/auth/token.go"; git -C "$r" add -A
 check "a bare directory pattern matches what is under it" ask "$r" "git commit -m x"
 rm -rf "$r"
@@ -304,12 +304,12 @@ rm -rf "$r"
 # Fail closed, and only here. Everywhere else an absent python3 means keel goes quiet, because the
 # feature is advisory. A repository that declared sensitive paths and silently got no enforcement
 # would believe it had a gate it did not have, which is worse than having none.
-r="$(mktemp -d)"; fixture "$r" '"src/auth/**"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth/**"'
 : > "$r/src/auth/token.go"; git -C "$r" add -A
 # The shim carries bash and nothing else. It must carry bash: the shebang is `/usr/bin/env bash`,
 # and env resolves bash through PATH, so an empty shim stops the script starting at all rather than
 # exercising the branch under test. That mistake is what this comment exists to prevent.
-shim="$(mktemp -d)"
+shim="$(mktemp -d)"; [ -d "$shim" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ln -s "$(command -v bash)" "$shim/bash"
 out="$(event "git commit -m x" "$r" | ( cd "$r" && PATH="$shim" "$GUARD" ) 2>/dev/null)"
 if printf '%s' "$out" | grep -q '"permissionDecision": *"ask"'; then
@@ -345,7 +345,7 @@ codex_guard() { env -u CLAUDE_PROJECT_DIR CODEX_VERSION=0.153.4 "$GUARD"; }
 for cmd in 'git -c core.hooksPath=/dev/null commit -m x' 'git -C . commit -m x' \
            'git --git-dir .git --work-tree . commit -m x' 'git --git-dir=.git commit -m x' \
            $'git\tcommit -m x' 'git -c "a=\"b c\"" commit -m x'; do
-    r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+    r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth"'
     : > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
     check "a global option before commit does not hide it: $cmd" ask "$r" "$cmd"
     rm -rf "$r"
@@ -353,7 +353,7 @@ done
 
 # And a global option on a command that is not a commit is not one, even with the word in its value
 # and the profile staged, which is the one change that asks whatever the command's files are.
-r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth"'
 : > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
 check "a global option on a command that is not a commit asks nothing" "" "$r" \
     'git -c commit.gpgsign=false log -1'
@@ -373,7 +373,7 @@ print(json.dumps({"hook_event_name": "PreToolUse", "tool_name": "Bash",
                   "tool_input": {"command": os.environ["CMD"], "description": os.environ["DESC"]},
                   "cwd": os.environ["CWD"]}))'
 }
-r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth"'
 printf '{"project": {"name": "t2"}, "hard_block_paths": ["src/auth"]}\n' > "$r/.keel/profile.json"
 git -C "$r" add .keel/profile.json
 desc='Show the staged diff before commit'
@@ -393,7 +393,7 @@ rm -rf "$r"
 
 # A repeated "command" key makes the prefilter read the whole event. Reading the first value alone,
 # a nested "command" key ahead of the tool's own was the one matched, and the commit went silent.
-r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth"'
 : > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
 tev="$(CWD="$r" python3 -c '
 import json, os
@@ -414,7 +414,7 @@ rm -rf "$r"
 if [ "$(id -u)" = 0 ]; then
     printf '  SKIP  an unreadable profile asks on a commit: running as root, which reads mode 000\n'
 else
-    r="$(mktemp -d)"; plain_repo "$r"
+    r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; plain_repo "$r"
     mkdir -p "$r/.keel"; printf '{"hard_block_paths": ["src/auth"]}\n' > "$r/.keel/profile.json"
     chmod 000 "$r/.keel/profile.json"
     : > "$r/src/ui/button.tsx"; git -C "$r" add src/ui/button.tsx
@@ -431,10 +431,10 @@ fi
 # The profile walk calls no external command. It stepped up with `dirname`, so with PATH holding
 # bash, git and python3 only, the walk lost its directory at the first step up, found no profile and
 # let the commit through in silence. The profile is untracked, so HEAD cannot stand in for it.
-r="$(mktemp -d)"; plain_repo "$r"
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; plain_repo "$r"
 mkdir -p "$r/.keel"; printf '{"hard_block_paths": ["src/auth"]}\n' > "$r/.keel/profile.json"
 : > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
-shim="$(mktemp -d)"
+shim="$(mktemp -d)"; [ -d "$shim" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 for t in bash git python3; do ln -s "$(command -v "$t")" "$shim/$t"; done
 out="$(event "git commit -m x" "$r/src/ui" | ( cd "$r/src/ui" && PATH="$shim" "$GUARD" ) 2>/dev/null)"
 asks "$out"
@@ -445,9 +445,9 @@ rm -rf "$r" "$shim"
 # CLAUDE_PROJECT_DIR, then $PWD, the first that names a directory that exists. The hook process's
 # own directory is not promised to be the one the command runs in, and a profile and a staged set
 # read from a directory outside the repository found neither. The repository path holds a space.
-base="$(mktemp -d)"; r="$base/with space"; mkdir -p "$r"; fixture "$r" '"src/auth"'
+base="$(mktemp -d)"; [ -d "$base" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; r="$base/with space"; mkdir -p "$r"; fixture "$r" '"src/auth"'
 : > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
-away="$(mktemp -d)"
+away="$(mktemp -d)"; [ -d "$away" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 out="$(event "git commit -m x" "$r" | ( cd "$away" && env -u CLAUDE_PROJECT_DIR "$GUARD" ) 2>/dev/null)"
 asks "$out"
 verdict "run from outside the repository, the event's cwd names it, path with a space" $? "$out"
@@ -464,9 +464,9 @@ rm -rf "$base" "$away"
 # right one, so the cases above cannot tell them apart. Run from inside B, a repository with no
 # profile and nothing staged, a wrong directory gives silence instead, and each case asks naming
 # the file A stages.
-a="$(mktemp -d)"; fixture "$a" '"src/auth"'
+a="$(mktemp -d)"; [ -d "$a" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$a" '"src/auth"'
 : > "$a/src/auth/t.go"; git -C "$a" add src/auth/t.go
-b="$(mktemp -d)"; plain_repo "$b"
+b="$(mktemp -d)"; [ -d "$b" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; plain_repo "$b"
 names_t() { asks "$1" && printf '%s' "$1" | grep -q 'src/auth/t\.go'; }
 out="$(event "git commit -m x" "$a" | ( cd "$b" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
 names_t "$out"
@@ -493,14 +493,14 @@ staging_fixture() {
 }
 for cmd in 'git add -A && git commit -m x' 'git add src/auth/t.go; git commit -m x' \
            'git rm src/auth/t.go && git commit -m x'; do
-    r="$(mktemp -d)"; staging_fixture "$r"
+    r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; staging_fixture "$r"
     out="$(event "$cmd" "$r" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
     names_t "$out"
     verdict "a command that stages before it commits asks, naming the unstaged file: $cmd" $? "$out"
     rm -rf "$r"
 done
 # The guard does not read which paths an add names, so an add of a harmless file widens too.
-r="$(mktemp -d)"; staging_fixture "$r"
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; staging_fixture "$r"
 out="$(event 'git add src/ui/button.tsx && git commit -m x' "$r" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
 names_t "$out"
 verdict "an add of a harmless file before a commit still widens, an accepted over-ask" $? "$out"
@@ -508,14 +508,14 @@ check "a plain commit in the staging fixture prints nothing" "" "$r" "git commit
 rm -rf "$r"
 for cmd in 'git commit -p -m x' 'git commit --patch -m x' \
            'git commit --pathspec-from-file=list -m x' 'git commit --pathspec-from-file list -m x'; do
-    r="$(mktemp -d)"; staging_fixture "$r"
+    r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; staging_fixture "$r"
     out="$(event "$cmd" "$r" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
     names_t "$out"
     verdict "a commit of what the guard cannot list widens as -a does: $cmd" $? "$out"
     rm -rf "$r"
 done
 # On Codex the refusal already fires on each of these.
-r="$(mktemp -d)"; staging_fixture "$r"
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; staging_fixture "$r"
 out="$(event 'git add -A && git commit -m x' "$r" | ( cd "$r" && codex_guard ) 2>&1 >/dev/null)"; rc=$?
 [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'v0\.26\.0'
 verdict "on codex a command that stages before it commits refuses" $? "rc $rc: $out"
@@ -532,14 +532,14 @@ untracked_fixture() {
 }
 names_new() { asks "$1" && printf '%s' "$1" | grep -q 'src/auth/new\.go'; }
 for cmd in 'git add -A && git commit -m x' 'git stage -A && git commit -m x'; do
-    r="$(mktemp -d)"; untracked_fixture "$r"
+    r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; untracked_fixture "$r"
     out="$(event "$cmd" "$r" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
     names_new "$out"
     verdict "a command staging before its commit asks, naming the untracked file: $cmd" $? "$out"
     rm -rf "$r"
 done
 # From a subdirectory git lists only the untracked files under it, relative to it.
-r="$(mktemp -d)"; untracked_fixture "$r"
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; untracked_fixture "$r"
 out="$(event 'git add -A && git commit -m x' "$r/src/ui" | ( cd "$r/src/ui" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
 names_new "$out"
 verdict "a session in a subdirectory still sees an untracked file outside it" $? "$out"
@@ -554,7 +554,7 @@ check "an ignored untracked file does not ask" "" "$r" "git add -A && git commit
 rm -rf "$r"
 # The untracked read is slow on a big tree, so it runs after the tracked check has asked: a tracked
 # hit is named alone, without waiting to list untracked files.
-r="$(mktemp -d)"; untracked_fixture "$r"; echo x > "$r/src/auth/t.go"
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; untracked_fixture "$r"; echo x > "$r/src/auth/t.go"
 out="$(event 'git add -A && git commit -m x' "$r" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
 asks "$out" && printf '%s' "$out" | grep -q 'src/auth/t\.go' \
     && ! printf '%s' "$out" | grep -q 'new\.go'
@@ -562,7 +562,7 @@ verdict "a tracked hit asks before untracked files are read" $? "$out"
 rm -rf "$r"
 # The untracked read hands git the declared patterns, and the profile, as pathspecs, so git filters
 # a big tree: matching every one of a million untracked paths in Python outlasted the hook's time.
-r="$(mktemp -d)"; untracked_fixture "$r"; shim="$(mktemp -d)"
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; untracked_fixture "$r"; shim="$(mktemp -d)"; [ -d "$shim" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 # shellcheck disable=SC2016  # the shim's own arguments, expanded when it runs
 printf '#!/bin/sh\nprintf "%%s\\n" "$*" >> "%s/argv"\nexec "%s" "$@"\n' "$shim" "$(command -v git)" \
     > "$shim/git"; chmod +x "$shim/git"
@@ -578,7 +578,7 @@ esac
 verdict "the untracked read passes the declared paths and the profile to git as pathspecs" $? "$line"
 rm -rf "$r" "$shim"
 # A profile never committed is untracked, and a staging commit adds it, so the pathspecs carry it.
-r="$(mktemp -d)"; mkdir -p "$r/.keel" "$r/src/ui"; git -C "$r" init -q
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; mkdir -p "$r/.keel" "$r/src/ui"; git -C "$r" init -q
 git -C "$r" config user.email t@example.com; git -C "$r" config user.name Test
 : > "$r/src/ui/a.tsx"; git -C "$r" add src/ui/a.tsx; git -C "$r" commit -qm init
 printf '{"hard_block_paths": ["src/auth"]}\n' > "$r/.keel/profile.json"
@@ -592,7 +592,7 @@ rm -rf "$r"
 # read as 10.
 now() { python3 -c 'import time; print("%.3f" % time.time())'; }
 within10() { python3 -c 'import sys; sys.exit(float(sys.argv[2]) - float(sys.argv[1]) >= 10)' "$1" "$(now)"; }
-r="$(mktemp -d)"; untracked_fixture "$r"; shim="$(mktemp -d)"
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; untracked_fixture "$r"; shim="$(mktemp -d)"; [ -d "$shim" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 # shellcheck disable=SC2016  # the shim's own arguments, expanded when it runs
 printf '#!/bin/sh\n[ "$1" = ls-files ] && exec sleep 30\nexec "%s" "$@"\n' "$(command -v git)" \
     > "$shim/git"; chmod +x "$shim/git"
@@ -604,7 +604,7 @@ verdict "git outlasting the hook's deadline asks inside the hook's 10 seconds, s
 rm -rf "$r" "$shim"
 # Matching is held to the same deadline: git can return a million candidates under a declared path,
 # and matching them outlasted the hook. The shim returns three million at once.
-r="$(mktemp -d)"; untracked_fixture "$r"; shim="$(mktemp -d)"
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; untracked_fixture "$r"; shim="$(mktemp -d)"; [ -d "$shim" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 printf '{"hard_block_paths": [%s"data"]}\n' "$(printf '"p%s", ' 1 2 3 4 5 6 7 8 9 10 11 12 13 14)" \
     > "$r/.keel/profile.json"; git -C "$r" commit -qam profile
 # shellcheck disable=SC2016  # the shim's own arguments, expanded when it runs
@@ -619,14 +619,14 @@ verdict "matching three million candidates asks inside the hook's 10 seconds, sa
 rm -rf "$r" "$shim"
 # git reads `[^...]`, `[[:class:]]` and `\` in a pattern unlike fnmatch, so such a pattern is not
 # handed to git as a pathspec: fnmatch takes `[^.]` as `^` or `.`, and git as anything but `.`.
-r="$(mktemp -d)"; fixture "$r" '"secrets/[^.]*"'; mkdir "$r/secrets"; : > "$r/secrets/.env"
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"secrets/[^.]*"'; mkdir "$r/secrets"; : > "$r/secrets/.env"
 out="$(event 'git add -A && git commit -m x' "$r" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
 asks "$out" && printf '%s' "$out" | grep -q 'secrets/\.env'
 verdict "a bracket pattern git reads differently still sees the untracked file it names" $? "$out"
 rm -rf "$r"
 # A GIT_*_PATHSPECS variable in the session changes how git reads every pathspec, so git runs
 # without them: GIT_NOGLOB_PATHSPECS made `*.pem` a literal name.
-r="$(mktemp -d)"; fixture "$r" '"*.pem"'; mkdir "$r/a"; : > "$r/a/k.pem"
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"*.pem"'; mkdir "$r/a"; : > "$r/a/k.pem"
 out="$(event 'git add -A && git commit -m x' "$r" | ( cd "$r" && GIT_NOGLOB_PATHSPECS=1 env -u CLAUDE_PROJECT_DIR -u CODEX_VERSION "$GUARD" ) 2>/dev/null)"
 asks "$out" && printf '%s' "$out" | grep -q 'a/k\.pem'
 verdict "GIT_NOGLOB_PATHSPECS in the session does not hide an untracked file" $? "$out"
@@ -636,7 +636,7 @@ rm -rf "$r"
 # was iterated character by character, so `"src/auth"` declared s, r, c and so on, and a commit
 # under none of them went through in silence.
 for list in '"src/auth"' '{"src/auth": true}' '["src/auth", 1]'; do
-    r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+    r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth"'
     printf '{"project": {"name": "t"}, "hard_block_paths": %s}\n' "$list" > "$r/.keel/profile.json"
     git -C "$r" commit -qam list
     : > "$r/src/ui/button.tsx"; git -C "$r" add src/ui/button.tsx
@@ -651,7 +651,7 @@ done
 
 # And an empty list, an absent key and null still declare nothing, on either harness.
 for body in '"hard_block_paths": []' '"name": "t"' '"hard_block_paths": null'; do
-    r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+    r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth"'
     printf '{%s}\n' "$body" > "$r/.keel/profile.json"; git -C "$r" commit -qam list
     : > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
     check "a profile of {$body} asks nothing" "" "$r" "git commit -m x"
@@ -662,7 +662,7 @@ for body in '"hard_block_paths": []' '"name": "t"' '"hard_block_paths": null'; d
 done
 
 # A repository with a HEAD and no profile anywhere is never asked, whatever it stages.
-r="$(mktemp -d)"; plain_repo "$r"
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; plain_repo "$r"
 : > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
 ev="$(event "git commit -m x" "$r")"
 out="$( cd "$r" && "$GUARD" <<<"$ev" 2>&1 )"; rc=$?     # no pipe, so rc is the hook's own
@@ -673,8 +673,8 @@ rm -rf "$r"
 # With CDPATH set, a relative cd in the hook would land in the decoy and print its path to stdout,
 # which corrupts the hook's JSON. So the hook is run, not read: an ask is exactly one JSON object,
 # and a repository with no profile gets no output at all.
-decoy="$(mktemp -d)"; mkdir -p "$decoy/.keel" "$decoy/src"
-r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+decoy="$(mktemp -d)"; [ -d "$decoy" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; mkdir -p "$decoy/.keel" "$decoy/src"
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth"'
 : > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
 out="$(event 'git -c core.hooksPath=/dev/null commit -m x' "$r" \
   | ( cd "$r" && CDPATH="$decoy" "$GUARD" ) 2>/dev/null)"
@@ -683,7 +683,7 @@ import json, sys
 sys.exit(json.load(sys.stdin)["hookSpecificOutput"]["permissionDecision"] != "ask")' 2>/dev/null
 verdict "with CDPATH set, an ask is exactly one JSON object on stdout" $? "$out"
 rm -rf "$r"
-r="$(mktemp -d)"; plain_repo "$r"
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; plain_repo "$r"
 : > "$r/src/auth/t.go"; git -C "$r" add src/auth/t.go
 out="$(event "git commit -m x" "$r" | ( cd "$r" && CDPATH="$decoy" "$GUARD" ) 2>&1)"
 silent 0 "$out"; verdict "with CDPATH set, a repository with no profile gets no output" $? "$out"
@@ -704,7 +704,7 @@ n="$(grep -c resolve.sh "$GUARD")"
 if [ "$n" = 0 ]; then printf '  PASS  the hook no longer sources the resolver\n'; pass=$((pass+1))
 else printf '  FAIL  the hook no longer sources the resolver (resolve.sh named %s times)\n' "$n"; fail=$((fail+1)); fi
 
-r="$(mktemp -d)"; fixture "$r" '"src/auth"'
+r="$(mktemp -d)"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$r" '"src/auth"'
 : > "$r/src/auth/token.go"; git -C "$r" add -A
 ev="$(event "git commit -m x" "$r")"
 
@@ -785,7 +785,7 @@ else printf '  FAIL  a commit message naming turn_id is not read as Codex (rc %s
 # The invariant, and the case that catches the refusal being placed too early. A repository whose
 # list is empty declares nothing and must produce nothing, on every harness. Above the empty-list
 # check the refusal would block every commit in a repository that asked for nothing.
-q="$(mktemp -d)"; fixture "$q" ''
+q="$(mktemp -d)"; [ -d "$q" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$q" ''
 out="$(printf '%s' "$(event "git commit -m x" "$q")" | ( cd "$q" && env -u CLAUDE_PROJECT_DIR CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1)"; rc=$?
 if [ "$rc" -eq 0 ] && [ -z "$out" ]; then printf '  PASS  silent on codex when the repo declares nothing\n'; pass=$((pass+1))
 else printf '  FAIL  silent on codex when the repo declares nothing (rc %s: %s)\n' "$rc" "${out:0:90}"; fail=$((fail+1)); fi
@@ -793,7 +793,7 @@ rm -rf "$q"
 
 # And the same judgement on Codex: an empty list nested under another key is not the repository
 # declaring nothing, so the refusal still stands.
-q="$(mktemp -d)"; fixture "$q" ''
+q="$(mktemp -d)"; [ -d "$q" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; fixture "$q" ''
 printf '%s\n' "$nested" > "$q/.keel/profile.json"
 out="$(printf '%s' "$(event "git commit -m x" "$q")" | ( cd "$q" && env -u CLAUDE_PROJECT_DIR CODEX_VERSION=0.153.4 "$GUARD" ) 2>&1 >/dev/null)"; rc=$?
 if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'keel v0\.26\.0'; then
@@ -824,7 +824,7 @@ else printf '  FAIL  a Claude Code event with neither signal still gets the ask 
 # On Codex with no python3 the list cannot be parsed, and an unparsed declaration counts as
 # declared. The ask the Claude Code path gives here is one Codex discards, so it must refuse.
 # The shim carries bash and nothing else, as in the python3-absent case above.
-shim="$(mktemp -d)"; ln -s "$(command -v bash)" "$shim/bash"
+shim="$(mktemp -d)"; [ -d "$shim" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; ln -s "$(command -v bash)" "$shim/bash"
 out="$(printf '%s' "$ev" | ( cd "$r" && env -u CLAUDE_PROJECT_DIR CODEX_VERSION=0.153.4 PATH="$shim" "$GUARD" ) 2>&1 >/dev/null)"; rc=$?
 if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'keel v0\.26\.0'; then
     printf '  PASS  on codex with python3 absent the commit is refused, not asked\n'; pass=$((pass+1))

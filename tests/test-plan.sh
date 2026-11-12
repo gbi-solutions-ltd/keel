@@ -19,7 +19,7 @@ fail=0
 ok()  { printf '  PASS  %s\n' "$1"; pass=$((pass+1)); return 0; }
 bad() { printf '  FAIL  %s: %s\n' "$1" "$2"; fail=$((fail+1)); return 0; }
 
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 
 # mkplan <file> <line>...: a plan holding a heading and then the given lines, one per argument.
 mkplan() {

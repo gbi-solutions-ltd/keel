@@ -113,7 +113,7 @@ check() {
 
 run() {
     local name="$1" expected="$2" mutate="$3"
-    local root; root="$(mktemp -d)"
+    local root; root="$(mktemp -d)"; [ -d "$root" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
     fixture_valid "$root"
     "$mutate" "$root"
     check "$name" "$expected" "$root"
@@ -283,7 +283,7 @@ m_hot_line_in_idea_named() {
 }
 run_hot_named() {
     local name="$1" root out
-    root="$(mktemp -d)"
+    root="$(mktemp -d)"; [ -d "$root" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
     fixture_valid "$root"
     m_hot_line_in_live_doc_named "$root"
     out="$(cd "$root" && "$CHECKER" 2>&1)"
@@ -476,7 +476,7 @@ run "a citation into a staged fixture tree in the eval log is not flagged" 0 m_f
 # while it is present, and a document inside it is never one of the documents these checks read.
 check_says() {   # check_says <name> <yes|no> <needle> <mutate-fn>
     local name="$1" want="$2" needle="$3" mutate="$4"
-    local root; root="$(mktemp -d)"
+    local root; root="$(mktemp -d)"; [ -d "$root" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
     fixture_valid "$root"
     "$mutate" "$root"
     local out; out="$( cd "$root" && "$CHECKER" 2>&1 )"

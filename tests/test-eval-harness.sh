@@ -208,7 +208,7 @@ fi
 # the cache rather than because the TTL elapsed. The user's stated cause must be the wrong one.
 d="$(tests/evals/stage.sh debug-obvious-cause 2>/dev/null)"; staged+=("$d")
 stale="$( cd "$d/project" && bash -c '
-  export CACHE_DIR=$(mktemp -d) LEDGER=$(mktemp)
+  CACHE_DIR="$(mktemp -d)"; [ -d "$CACHE_DIR" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; export CACHE_DIR LEDGER=$(mktemp)
   . src/balance.sh; . src/payout.sh
   ledger_append acc_1 10000; get_balance acc_1 >/dev/null
   make_payout acc_1 2500 >/dev/null
@@ -1023,7 +1023,7 @@ ISO="$REPO/tests/evals/isolation-check.sh"
 # subshell and was lost, so every root outlived the suite's cleanup trap.
 iso_root() {
     local r
-    r="$(mktemp -d "${TMPDIR:-/tmp}/keel-iso-root-XXXXXX")" || return 1
+    r="$(mktemp -d "${TMPDIR:-/tmp}/keel-iso-root-XXXXXX")"; [ -d "$r" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
     selftest_paths+=("$r")
     iso_r="$(cd "$r" && pwd -P)"
 }
@@ -1327,7 +1327,7 @@ fi
 # code. Nothing may describe the exercise, so there is no keel, no plan and no setup.sh anywhere.
 batched_setup="$REPO/tests/evals/fixtures/implement-a-batched-task/setup.sh"
 fx1="tests/evals/fixtures/implement-a-small-change"
-b="$(mktemp -d)"; staged+=("$b")
+b="$(mktemp -d)"; [ -d "$b" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; staged+=("$b")
 mkdir "$b/project"
 b_out="$( cd "$b/project" && bash "$batched_setup" 2>&1 )"; b_rc=$?
 bg() { git -C "$1" "${@:2}" 2>/dev/null; }
@@ -1401,7 +1401,7 @@ fi
 # second variable. The identity and the dates are fixed in the script, so the commit hash is the
 # same, and the trees are compared with diff -r outside .git, which is a file in a worktree and
 # holds an absolute path that differs by directory.
-b2="$(mktemp -d)"; staged+=("$b2")
+b2="$(mktemp -d)"; [ -d "$b2" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; staged+=("$b2")
 mkdir "$b2/project"
 ( cd "$b2/project" && bash "$batched_setup" >/dev/null 2>&1 )
 b_det=1; b_why=""
@@ -1510,7 +1510,7 @@ GATESH="$REPO/tests/evals/gate.sh"
 # A macOS TMPDIR ends in /, and mktemp keeps the // that makes while cd drops it, so an arm's $PWD
 # and the .dir file naming its directory would differ in spelling alone.
 gate_root="${TMPDIR:-/tmp}"
-gate_tmp="$(mktemp -d "${gate_root%/}/keel-gate-test-XXXXXX")"
+gate_tmp="$(mktemp -d "${gate_root%/}/keel-gate-test-XXXXXX")"; [ -d "$gate_tmp" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 selftest_paths+=("$gate_tmp")
 # The directories the refusal cases name inside the repository. A gate.sh that creates a refused path
 # would leave it in the tree it was refused for, so each is registered for cleanup, but only when it
@@ -2243,7 +2243,7 @@ fi
 # that went through CDPATH lands in the decoy, and each script is run the way it is documented, by a
 # relative path. dispatch.sh is reached through its OUT's name because a path starting with a dot
 # never consults CDPATH.
-cdp="$(mktemp -d "${TMPDIR:-/tmp}/keel-cdpath-XXXXXX")"
+cdp="$(mktemp -d "${TMPDIR:-/tmp}/keel-cdpath-XXXXXX")"; [ -d "$cdp" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 selftest_paths+=("$cdp")
 mkdir -p "$cdp/tests/evals" "$cdp/v" "$cdp/cdp-out"
 

@@ -14,7 +14,7 @@ pass=0; fail=0
 ok()  { printf '  PASS  %s\n' "$1"; pass=$((pass+1)); return 0; }
 bad() { printf '  FAIL  %s\n' "$1"; fail=$((fail+1)); return 0; }
 
-repo() { local d; d="$(mktemp -d)"; ( cd "$d" && git init -q -b main ) >/dev/null 2>&1; printf '%s\n' "$d"; }
+repo() { local d; d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; ( cd "$d" && git init -q -b main ) >/dev/null 2>&1; printf '%s\n' "$d"; }
 W=.github/workflows/keel-review.yml
 
 # 1. Off by default, and status writes nothing.
@@ -121,9 +121,9 @@ out="$(cd "$d/sub/dir" && "$KEEL" ci-review status 2>&1)"
 case "$out" in *"review in CI: on, "*) ok "status from a subdirectory reads the root file" ;; *) bad "status from a subdirectory: got '$out'" ;; esac
 
 # 8. Outside a git repository, and in a bare one.
-n="$(mktemp -d)"
+n="$(mktemp -d)"; [ -d "$n" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$n" && "$KEEL" ci-review install >/dev/null 2>&1 ) && bad "installed outside a git repository" || ok "refuses outside a git repository"
-b="$(mktemp -d)"; git init -q --bare "$b" >/dev/null 2>&1
+b="$(mktemp -d)"; [ -d "$b" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; git init -q --bare "$b" >/dev/null 2>&1
 ( cd "$b" && "$KEEL" ci-review install >/dev/null 2>&1 ) && bad "installed in a bare repository" || ok "refuses in a bare repository"
 
 # 9. Listed in help.
@@ -182,7 +182,7 @@ done
 # 12. A keel install without its template says so and writes nothing. That is a different problem
 # from a directory that cannot be written, and the message has to name which. The tree below is a
 # copy of bin/keel with the real lib/ and VERSION and no templates/, so HERE resolves to it.
-tk="$(mktemp -d)"; mkdir "$tk/bin"; cp -p "$KEEL" "$tk/bin/keel"; ln -s "$ROOT/lib" "$tk/lib"; cp "$ROOT/VERSION" "$tk/VERSION"
+tk="$(mktemp -d)"; [ -d "$tk" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; mkdir "$tk/bin"; cp -p "$KEEL" "$tk/bin/keel"; ln -s "$ROOT/lib" "$tk/lib"; cp "$ROOT/VERSION" "$tk/VERSION"
 t="$(repo)"
 out="$(cd "$t" && "$tk/bin/keel" ci-review install 2>&1)"; rc=$?
 if [ "$rc" -ne 0 ] && [[ "$out" == *"templates/ci-review.yml is missing from this keel install"* ]] && [ ! -e "$t/$W" ]; then

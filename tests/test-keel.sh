@@ -432,7 +432,7 @@ done
 # migrations repository, which is the exact false positive this clause removes.
 token_probe() {   # token_probe <file-content>
     local d got
-    d="$(mktemp -d)"
+    d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
     ( cd "$d" || exit 1
       i=1; while [ "$i" -le 12 ]; do printf 'CREATE TABLE t%s (id integer);\n' "$i" > "m$i.sql"; i=$((i+1)); done
       printf '%s\n' "$1" > marker.sql )
@@ -462,7 +462,7 @@ done
 # rc 1) with nothing for the fallback's own find to see, which is the exact shape that triggered it.
 # The assertion could not be watched fail on this machine's BSD xargs, only reasoned from GNU's
 # documented behaviour; it guards the return value and that the call does not block.
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" || exit 1
   mkdir -p blocked; : > blocked/unreadable
   chmod 000 blocked )
@@ -585,7 +585,7 @@ got="$(detect_in "$d" 'detect_stack | cut -d" " -f3,4')"
 rm -rf "$d"
 
 # A Maven project with no Spring dependency must not be called spring either.
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '<project><groupId>f</groupId><artifactId>f</artifactId></project>\n' > pom.xml )
 got="$(detect_in "$d" 'detect_stack | cut -d" " -f3')"
@@ -597,7 +597,7 @@ rm -rf "$d"
 # written in, so the file name alone said Kotlin about plain Java projects. They then got
 # `./gradlew compileKotlin`, a task that does not exist without the Kotlin plugin, so the typecheck
 # gate failed the first time it ran. What the build applies is the marker, not what it is written in.
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf 'plugins { id("java") }\n' > build.gradle.kts
   mkdir -p src/main/java/com/example/app && printf 'class A {}\n' > src/main/java/com/example/app/A.java )
@@ -609,7 +609,7 @@ rm -rf "$d"
 # A Gradle build that does apply Kotlin, over a tree that also holds Java sources, is both. The
 # depth bound was 4, and the conventional path src/main/java/<group>/<artifact>/A.java is 7, so the
 # second language was never found and the mixed repo this branch exists for got one server.
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf 'plugins { id "org.jetbrains.kotlin.jvm" }\n' > build.gradle
   mkdir -p src/main/java/com/example/app && printf 'class A {}\n' > src/main/java/com/example/app/A.java )
@@ -769,7 +769,7 @@ v_typecheck="$(detect_in "$d" 'detect_verify typecheck')"
 rm -rf "$d"
 
 # No script, but a tsconfig: tsc --noEmit is the fallback rather than nothing.
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f","devDependencies":{"typescript":"^5"}}\n' > package.json
   echo '{}' > tsconfig.json )
@@ -782,7 +782,7 @@ v_test="$(detect_in "$d" 'detect_verify test')"
 rm -rf "$d"
 
 # Biome and Prettier are declared by their config file, which is how the project says which it uses.
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f"}\n' > package.json
   printf '{"linter":{"enabled":true}}\n' > biome.json )
@@ -797,7 +797,7 @@ rm -rf "$d"
 # `ls a* b*` exits non-zero when either operand matches nothing, so testing both Prettier config
 # forms in one `ls` was an AND. A repo with the common .prettierrc and no prettier.config.js got
 # null, which is the tool being declared and the command still missing.
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f"}\n' > package.json
   printf '{"semi":false}\n' > .prettierrc )
@@ -812,7 +812,7 @@ rm -rf "$d"
 # A newline inside a script value must not lose the script itself. Every caller reads the value as
 # a presence test and writes `npm run <name>`, never the body, so skipping the entry answers "there
 # is no test command" for a project that declares one.
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f","scripts":{"test":"echo a\\nfoo","lint":"eslint ."}}\n' > package.json )
 v_test="$(detect_in "$d" 'detect_verify test')"
@@ -829,7 +829,7 @@ rm -rf "$d"
 # marking the load done leaves every later lookup in that process reading an empty cache. Exercised
 # by sourcing the library, because bin/keel scaffolds package.json before it primes and so cannot
 # reach this ordering today; one reordered line in cmd_new would.
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 cat > "$d/probe.sh" <<'P'
 have_python() { command -v python3 >/dev/null 2>&1; }
 . "$1"
@@ -849,7 +849,7 @@ rm -rf "$d"
 # reading one small file seventeen times. The bound is asserted rather than the saving, because a
 # saving in seconds is a property of the machine and a spawn count is a property of the code.
 d="$(fixture node-ts)"
-shimdir="$(mktemp -d)"
+shimdir="$(mktemp -d)"; [ -d "$shimdir" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 real_python="$(command -v python3)"
 cat > "$shimdir/python3" <<SHIM
 #!/bin/sh
@@ -872,7 +872,7 @@ rm -rf "$d" "$shimdir"
 # the same small file.
 d="$(fixture node-ts)"
 ( cd "$d" && "$KEEL" init >/dev/null 2>&1 )
-shimdir="$(mktemp -d)"
+shimdir="$(mktemp -d)"; [ -d "$shimdir" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 real_python="$(command -v python3)"
 cat > "$shimdir/python3" <<SHIM
 #!/bin/sh
@@ -923,7 +923,7 @@ v_test="$(detect_in "$d" 'detect_verify test')"
   || bad "python" "test was guessed as '$v_test'"
 rm -rf "$d"
 
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '[project]\nname = "f"\ndependencies = []\n\n[dependency-groups]\ndev = ["pytest", "ruff", "pyright"]\n' > pyproject.toml
   : > uv.lock )
@@ -941,7 +941,7 @@ v_lint="$(detect_in "$d" 'detect_verify lint')"
   || bad "python" "lint was '$v_lint'"
 rm -rf "$d"
 
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf 'pytest\nflake8\nmypy\n' > requirements.txt
   mkdir -p tests )
@@ -957,7 +957,7 @@ v_typecheck="$(detect_in "$d" 'detect_verify typecheck')"
 rm -rf "$d"
 
 # A project with a tests/ directory and no pytest anywhere runs the standard library runner.
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '[project]\nname = "f"\n' > pyproject.toml
   mkdir -p tests && printf 'import unittest\n' > tests/test_f.py )
@@ -969,7 +969,7 @@ rm -rf "$d"
 # ---- php, go and java, from declarations rather than from the machine -------
 # PHP got no test command at all unless vendor/ happened to be installed, and vendor/ is gitignored
 # on essentially every PHP project, so a fresh clone always produced an empty profile.
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f/f","require-dev":{"phpunit/phpunit":"^11","phpstan/phpstan":"^2"}}\n' > composer.json )
 v_test="$(detect_in "$d" 'detect_verify test')"
@@ -982,7 +982,7 @@ rm -rf "$d"
 
 # Pest is a different runner and a different binary. A project that declares it must not be told
 # to run phpunit.
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f/f","require-dev":{"pestphp/pest":"^3"}}\n' > composer.json )
 v_test="$(detect_in "$d" 'detect_verify test')"
@@ -1103,7 +1103,7 @@ rm -rf "$d"
 # ---- framework detection --------------------------------------------------
 # Found by running init on a real NestJS service, which was detected as Next.js because the
 # nestjs marker was OR'd into every iteration of the framework loop.
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f","dependencies":{"@nestjs/core":"^10"},"scripts":{"test":"jest"}}' > package.json
   echo '{}' > tsconfig.json )
@@ -1121,7 +1121,7 @@ ui_of() {  # ui_of <dir> -> the profile's stack.has_ui, printed as Python's True
     python3 -c "import json;print(json.load(open('$1/.keel/profile.json'))['stack']['has_ui'])" 2>/dev/null
 }
 
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f","dependencies":{"react":"^18"},"scripts":{"test":"jest"}}' > package.json )
 ( cd "$d" && "$KEEL" init -y >/dev/null 2>&1 )
@@ -1130,7 +1130,7 @@ d="$(mktemp -d)"
 rm -rf "$d"
 
 # A static site is a UI with no framework and no package.json to name one.
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '<!doctype html>\n' > index.html )
 got="$(detect_in "$d" detect_has_ui)"
@@ -1140,7 +1140,7 @@ rm -rf "$d"
 
 # The other direction matters as much, and this one passes before the fix: it is here to hold the
 # detector to backend frameworks rather than to anything shaped like JavaScript.
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f","dependencies":{"@nestjs/core":"^10"},"scripts":{"test":"jest"}}' > package.json )
 got="$(detect_in "$d" detect_has_ui)"
@@ -1182,7 +1182,7 @@ stores_of() {  # stores_of <dir> -> the profile's stack.datastores, comma-separa
     python3 -c "import json;print(','.join(sorted(json.load(open('$1/.keel/profile.json'))['stack']['datastores'])))" 2>/dev/null
 }
 
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f","dependencies":{"pg":"^8","ioredis":"^5"},"scripts":{"test":"jest"}}' > package.json )
 got="$(detect_in "$d" 'detect_datastores | sort | tr "\n" " "')"
@@ -1194,7 +1194,7 @@ rm -rf "$d"
 # The second signal, and the one that is language-independent: a managed database reached over a
 # connection string leaves nothing in a dependency list of a language keel does not parse, but the
 # service a developer runs locally is named in the compose file.
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf 'module f\n\ngo 1.22\n' > go.mod
   printf 'services:\n  db:\n    image: postgres:15-alpine\n  cache:\n    image: redis:7-alpine\n' \
@@ -1763,7 +1763,7 @@ rm -rf "$d"
 # S-06, FR-14. cmd_profile already refuses both cases for get and set, and sync inherits them by
 # entering through the same function. This is the assertion proving it, so that a later refactor
 # that gives sync its own entry point is caught rather than shipped.
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 out="$( cd "$d" && "$KEEL" profile sync 2>&1 )"
 case "$out" in
   *"Run 'keel init'"*) ok "profile sync refuses without a profile" ;;
@@ -1880,7 +1880,7 @@ v_format_fix="$(detect_in "$d" 'detect_verify format_fix')"
   && ok "go gets the writing variant separately" || bad "go format_fix" "got '$v_format_fix'"
 rm -rf "$d"
 
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '[package]\nname = "f"\n' > Cargo.toml )
 v_format="$(detect_in "$d" 'detect_verify format')"
@@ -1892,7 +1892,7 @@ v_format_fix="$(detect_in "$d" 'detect_verify format_fix')"
 rm -rf "$d"
 
 # npm is the case that motivated the split: `npm run format` rewrites, so it cannot be the gate.
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f","scripts":{"test":"jest","format":"prettier --write ."}}' > package.json )
 v_format="$(detect_in "$d" 'detect_verify format')"
@@ -1903,7 +1903,7 @@ v_format_fix="$(detect_in "$d" 'detect_verify format_fix')"
   && ok "a writing npm format script becomes format_fix" || bad "npm format_fix" "got '$v_format_fix'"
 rm -rf "$d"
 
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '{"name":"f","scripts":{"test":"jest","format":"prettier --write .","format:check":"prettier --check ."}}' > package.json )
 v_format="$(detect_in "$d" 'detect_verify format')"
@@ -1913,7 +1913,7 @@ rm -rf "$d"
 
 # Declared tools only for python, php and java: none of them ships a formatter with the runtime,
 # so an undeclared one is a command that fails at first use.
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf '[project]\nname = "f"\n[tool.ruff]\nline-length = 100\n' > pyproject.toml )
 v_format="$(detect_in "$d" 'detect_verify format')"
@@ -1927,7 +1927,7 @@ v_format="$(detect_in "$d" 'detect_verify format')"
   && ok "python with no formatter declared gets null, not a guess" || bad "python format" "got '$v_format'"
 rm -rf "$d"
 
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   echo '{"name":"f/f"}' > composer.json && mkdir -p vendor/bin && touch vendor/bin/pint )
 v_format="$(detect_in "$d" 'detect_verify format')"
@@ -1938,7 +1938,7 @@ v_format_fix="$(detect_in "$d" 'detect_verify format_fix')"
   && ok "php gets the writing variant separately" || bad "pint format_fix" "got '$v_format_fix'"
 rm -rf "$d"
 
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && git config user.email t@t.t && git config user.name t
   printf 'plugins { id "com.diffplug.spotless" version "6.25.0" }\n' > build.gradle )
 v_format="$(detect_in "$d" 'detect_verify format')"
@@ -1977,7 +1977,7 @@ printf '%s\n' "$staged" | grep -qxF .claude/settings.local.json \
 rm -rf "$d"
 
 # Outside a git repo there is no index, so the success line would be a lie.
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 printf '{"name":"f","scripts":{"test":"jest"}}\n' > "$d/package.json"
 out="$( cd "$d" && "$KEEL" init -y --team 2>&1 )"
 case "$out" in

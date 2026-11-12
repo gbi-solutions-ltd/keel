@@ -950,7 +950,7 @@ else
     bad "dogfood profile" "it still sets: $retired_in_own"
 fi
 
-retired_tmp="$(mktemp -d)"
+retired_tmp="$(mktemp -d)"; [ -d "$retired_tmp" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 trap 'rm -rf "$retired_tmp"' EXIT
 
 # The same check on a copy of that profile that sets the first key the register prints, dotted ones

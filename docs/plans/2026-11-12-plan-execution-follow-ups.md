@@ -121,7 +121,7 @@ Every task inherits these.
    `required`, blocks; an `Edit` of `/tmp/elsewhere/x.py` still passes. Every checkout path goes
    through `realpath`, and `in_repo` returns the path relative to the checkout that holds the file,
    so `is_code` reads `docs_root` against the right root. The case needs a committed repository: a
-   git identity set as `tests/keel-test-lib.sh:69` does, the profile committed so the worktree has
+   git identity set as `tests/keel-test-lib.sh:80` does, the profile committed so the worktree has
    it (the hook finds the profile from `$PWD` upward, `hooks/done-guard:63-73`), then
    `git worktree add`.
 5. git runs only when the turn edited something. Example: with a `git` shim first on `PATH` that

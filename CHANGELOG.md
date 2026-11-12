@@ -9,6 +9,10 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- Every `mktemp -d` in `tests/*.sh` is checked: when it fails or prints no directory, the test
+  file stops with a message naming mktemp, from a subshell too, before a fixture's git command
+  can fall back to this repository; `tests/keel-test-lib.sh` has `keel_tmpdir`, and
+  `tests/test-grep-quiet.sh` fails any unchecked call.
 - `hooks/done-guard` and `lib/context_watch.py` are hot files to `tests/validate-citations.sh`:
   a live document cites them by phrase, and every live line citation into them is now a phrase
   citation (records still cite them by line); the plan template says to repair flagged

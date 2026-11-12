@@ -195,7 +195,7 @@ fi
 # ...and it fires on a marker and on nothing else. Without the first case the check above passes
 # against a grep that matches nothing; without the second, prose that names the old marker reads as
 # a claim, and a check stricter than correct output teaches people to ignore it.
-xf="$(mktemp -d)"
+xf="$(mktemp -d)"; [ -d "$xf" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 printf '<!-- keel:claim gate=session-start harness=codex -->\n' > "$xf/marker.md"
 printf 'the old marker said harness=codex\n' > "$xf/prose.md"
 [ -n "$(codex_claims "$xf/marker.md")" ] \
@@ -212,7 +212,7 @@ rm -rf "$xf"
 # ledger holds no claude row for: a claim either way that nothing in the ledger grants. The ghost
 # harness tags a gate claude does get, so only the harness can refuse it, and a registry that read
 # the gate name alone would pass it.
-cf="$(mktemp -d)"
+cf="$(mktemp -d)"; [ -d "$cf" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 printf '<!-- keel:claim gate=no-such-gate harness=claude -->\n' > "$cf/gate.md"
 printf '<!-- keel:claim property=no_such_primitive harness=claude -->\n' > "$cf/property.md"
 printf '<!-- keel:claim gate=session-start harness=ghost -->\n' > "$cf/harness.md"
@@ -277,7 +277,7 @@ fi
 # one. The tagged file sits its claim exactly three lines under its tag, the furthest the lookback
 # reaches, so a lookback shortened to one or two lines reports it. That is a false stop on a
 # correctly tagged document, which is the kind of check people switch off.
-vf="$(mktemp -d)"
+vf="$(mktemp -d)"; [ -d "$vf" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 printf 'intro\nthe done-guard holds the turn open\n' > "$vf/untagged.md"
 printf 'intro\n<!-- keel:claim gate=done-guard harness=claude -->\nprose\nmore prose\nthe done-guard holds the turn open\n' > "$vf/tagged.md"
 fence='`''`''`'   # assembled, because shellcheck reads a backtick in a single-quoted string as an
@@ -384,7 +384,7 @@ done
 [ -z "$miss" ] && ok "the plugin manifest and the hook manifest are tracked, so they ship" \
   || bad "the plugin manifest and the hook manifest are tracked, so they ship" "untracked:$miss"
 
-xd="$(mktemp -d)"
+xd="$(mktemp -d)"; [ -d "$xd" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 while IFS= read -r f; do
     mkdir -p "$xd/$(dirname "$f")"
     cp -p "$f" "$xd/$f" 2>/dev/null
@@ -487,7 +487,7 @@ grep -q '^requires|.*|pretooluse_on_failure_block' lib/harness/capabilities \
 
 # The generator emits the key from the ledger, in both directions, on copies of the ledger. A
 # generator that always printed the key, or never did, fails one half.
-of="$(mktemp -d)"
+of="$(mktemp -d)"; [ -d "$of" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 grep -v '^provides|claude|pretooluse_on_failure_block|' lib/harness/capabilities > "$of/without"
 { cat "$of/without"; printf '%s\n' "$row"; } > "$of/with"
 KEEL_CAPABILITIES="$of/with" "$GEN" claude > "$of/with.json" 2>/dev/null

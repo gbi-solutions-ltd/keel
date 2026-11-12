@@ -352,7 +352,7 @@ approved this task on 2026-11-12.
 **Done when:** the rule's test file passes, and behaviour 2's run exits non-zero with HEAD
 unchanged.
 
-- [ ] **Step 3b.1: Build it test first**
+- [x] **Step 3b.1: Build it test first** Note: red 104/4 quoted (193 unchecked calls in 35 files); behaviour 2 proved in a throwaway clone (rc 143, 'mktemp -d failed', HEAD unchanged); behaviour 3: tests/test-sensitive-guard.sh:583 made the init commit; every converted file green in a second clone; spec COMPLIES with correctness checked (kill $$, traps, rule cannot be satisfied by a late check)
 
 Follow `keel:tdd`. Write behaviour 1's rule first and run it: it fails, naming the unchecked calls.
 Then add the helper and convert each call, keeping each file's behaviour otherwise unchanged.
@@ -365,7 +365,7 @@ Run: the lint command. With the `Done when:` run above, that is the unit boundar
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 3b.2: Hand over**
+- [x] **Step 3b.2: Hand over** Note: rounds: 1; routing: inherit; loop: light
 
 ```bash
 git add tests/keel-test-lib.sh CHANGELOG.md <each converted tests/*.sh file, by name>

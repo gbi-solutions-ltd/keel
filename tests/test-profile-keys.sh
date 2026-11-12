@@ -20,7 +20,7 @@ bad() { printf '  FAIL  %s: %s\n' "$1" "$2"; fail=$((fail+1)); return 0; }
 
 command -v python3 >/dev/null 2>&1 || { printf 'SKIP  python3 absent\n'; exit 0; }
 
-work="$(mktemp -d)"
+work="$(mktemp -d)"; [ -d "$work" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 trap 'rm -rf "$work"' EXIT
 
 bash "$GEN" > "$work/a.md" 2>"$work/err.txt"

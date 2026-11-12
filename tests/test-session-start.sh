@@ -18,7 +18,7 @@ fail=0
 ok()  { printf '  PASS  %s\n' "$1"; pass=$((pass+1)); }
 bad() { printf '  FAIL  %s (%s)\n' "$1" "$2"; fail=$((fail+1)); }
 
-tmp="$(mktemp -d)"
+tmp="$(mktemp -d)"; [ -d "$tmp" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 trap 'rm -rf "$tmp"' EXIT
 
 # A profile carrying the two keys. Either may be empty, meaning that key is absent.
@@ -367,7 +367,7 @@ done
 # session" means. This repository happens to have a handoff on disk, and running the hook from the
 # repo root therefore measured the compact-only pointer as though it were paid on every request.
 # The pointer is bounded separately below rather than left unmeasured.
-clean_dir="$(mktemp -d)"
+clean_dir="$(mktemp -d)"; [ -d "$clean_dir" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 chars=$( cd "$clean_dir" && "$HOOK" 2>/dev/null | wc -c | tr -d ' ')
 est=$(( chars * 10 / 36 ))
 if [ "$est" -ge 300 ] && [ "$est" -le 356 ]; then
@@ -411,7 +411,7 @@ done
 # written to survive it. PreCompact cannot announce it: the harness discards that hook's
 # systemMessage. This hook already runs on compact, and additionalContext genuinely reaches the
 # model, so this is where the next session finds out the file exists.
-w="$(mktemp -d)"; mkdir -p "$w/.keel"
+w="$(mktemp -d)"; [ -d "$w" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; mkdir -p "$w/.keel"
 out="$( cd "$w" && "$HOOK" 2>/dev/null )"
 case "$out" in *handoff*) bad "no handoff, no mention" "named a handoff that does not exist" ;;
   *) ok "no handoff, no mention" ;; esac

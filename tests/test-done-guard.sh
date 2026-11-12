@@ -92,7 +92,7 @@ check() {   # check <name> <want: deny|warn|none> <root> <active> <edits> <cmds>
     esac
 }
 
-tmp="$(mktemp -d)"
+tmp="$(mktemp -d)"; [ -d "$tmp" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 trap 'rm -rf "$tmp"' EXIT
 
 # 1. No gate declared: silent, like sensitive-guard with no hard_block_paths.

@@ -30,7 +30,7 @@ for cmd in claude python3; do
     fi
 done
 
-tmp="$(mktemp -d "${TMPDIR:-/tmp}/probe-agent-id.XXXXXX")" || exit 2
+tmp="$(mktemp -d "${TMPDIR:-/tmp}/probe-agent-id.XXXXXX")"; [ -d "$tmp" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 trap 'rm -rf "$tmp"' EXIT
 
 plugin="$tmp/plugin"; project="$tmp/project"; log="$tmp/events.jsonl"

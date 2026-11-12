@@ -103,7 +103,7 @@ fake="$( cd "$hp" && printf 'object %s\ntype commit\ntag v2\ntagger t <t@t.t> 0 
 
 # A branch delete in a SHA-256 repository sends 64 zeros, not 40, and is still a delete. This case
 # passes before the change too, since the working-tree hook it replaced scanned a clean tree.
-s256="$(mktemp -d)"
+s256="$(mktemp -d)"; [ -d "$s256" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$s256" && git init -q --object-format=sha256 -b main . && git config user.email t@t.t && git config user.name t \
   && printf 'a\n' > a.txt && git add a.txt && git commit -qm init && "$KEEL" guard install ) >/dev/null 2>&1
 z64='0000000000000000000000000000000000000000000000000000000000000000'
@@ -124,7 +124,7 @@ rm -f "$hp/scratch.sh"
 # A keel on PATH older than the hook has no --push, ignores it, and scans the working tree while
 # reading as a clean scan of the push. The hook asks first, says so, and scans the working tree with
 # it. A stub stands in for the older keel, recording how it is called.
-old_bin="$(mktemp -d)"
+old_bin="$(mktemp -d)"; [ -d "$old_bin" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 printf '#!/bin/sh\ncase "$1" in\n    --help) echo "  scan                 supply chain scan of this tree" ;;\n    scan) echo "OLD-KEEL-SCAN $*" ;;\nesac\n' > "$old_bin/keel"
 chmod +x "$old_bin/keel"
 out="$( cd "$hp" && printf 'refs/heads/topic %s refs/heads/topic %s\n' "$hp_sha" '0000000000000000000000000000000000000000' \
@@ -362,7 +362,7 @@ rm -rf "$rt"
 # have_py here (bin/keel#guard_hook_body) used `command -v python3` too: the shim looked present,
 # so the loosening comparator actually ran it, and its not-found message came back as $report,
 # non-empty, read as though the profile had loosened. Nothing about this profile moved.
-storeshim2="$(mktemp -d)"
+storeshim2="$(mktemp -d)"; [ -d "$storeshim2" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 cat > "$storeshim2/python3" <<'SHIM'
 #!/bin/sh
 printf 'Python was not found; run without arguments to install from the Microsoft Store.\n'
@@ -516,7 +516,7 @@ fi
 # it, and the gate value read back from `field()` was the shim's not-found message instead of
 # "required", which fell through the hook's own case statement to the catch-all "not a value the
 # hook knows about, exit 0" with no explanation printed. A required gate went unchecked silently.
-storeshim3="$(mktemp -d)"
+storeshim3="$(mktemp -d)"; [ -d "$storeshim3" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 cat > "$storeshim3/python3" <<'SHIM'
 #!/bin/sh
 printf 'Python was not found; run without arguments to install from the Microsoft Store.\n'
@@ -655,7 +655,7 @@ done
 
 # Both manifests validate. An empty HOME needs no credentials; a machine without claude skips.
 if command -v claude >/dev/null 2>&1; then
-    vh="$(mktemp -d)"
+    vh="$(mktemp -d)"; [ -d "$vh" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
     ( cd "$ROOT" && HOME="$vh" claude plugin validate --strict .claude-plugin/marketplace.json >/dev/null 2>&1 ) \
       && ok "claude plugin validate --strict passes the marketplace" \
       || bad "required plugins" "claude plugin validate --strict .claude-plugin/marketplace.json failed"
@@ -990,7 +990,7 @@ rm -rf "$FIXTURE_CACHE"
 # refactor's hand-over records the SHA, and why this prints which ref it used rather than leaving a
 # reader to guess whether the case meant anything.
 BASELINE_REF="${KEEL_BASELINE_REF:-HEAD}"
-base="$(mktemp -d)"; after="$(mktemp -d)"
+base="$(mktemp -d)"; [ -d "$base" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; after="$(mktemp -d)"; [ -d "$after" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 if git -C "$ROOT" worktree add -q --detach "$base/repo" "$BASELINE_REF" 2>/dev/null; then
     ( cd "$base" && git init -q -b main . && "$base/repo/bin/keel" init -y > "$base/init.txt" 2>&1 )
     ( cd "$after" && git init -q -b main . && "$ROOT/bin/keel" init -y > "$after/init.txt" 2>&1 )
@@ -1092,7 +1092,7 @@ leak="$(grep -nE '\.claude|CLAUDE\.md|enabledPlugins|known_marketplaces' "$KEEL"
 # init ignores a flag it does not know, so a --harness accepted and then dropped would leave the
 # person believing it took effect. It is refused, before anything is written.
 for flag in "--harness codex" "--harness=codex"; do
-    w="$(mktemp -d)"
+    w="$(mktemp -d)"; [ -d "$w" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
     # $flag is deliberately split: "--harness codex" is two arguments.
     # shellcheck disable=SC2086
     out="$( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init $flag -y 2>&1 )"; rc=$?
@@ -1107,7 +1107,7 @@ for flag in "--harness codex" "--harness=codex"; do
 done
 
 # A tracked .codex/config.toml is the repository's own file and no longer a signal of anything.
-w="$(mktemp -d)"
+w="$(mktemp -d)"; [ -d "$w" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$w" && git init -q -b main . && git config user.email t@t.t && git config user.name t \
   && mkdir -p .codex && echo 'model = "x"' > .codex/config.toml \
   && git add -A && git commit -qm x && "$ROOT/bin/keel" init -y >/dev/null 2>&1 )
@@ -1121,7 +1121,7 @@ rm -rf "$w"
 
 # A schema 6 profile that lists harnesses still loads, and doctor names the key as retired beside
 # the schema warning it already gave.
-w="$(mktemp -d)"
+w="$(mktemp -d)"; [ -d "$w" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init -y >/dev/null 2>&1 )
 python3 - "$w/.keel/profile.json" <<'SIX'
 import json,sys
@@ -1139,7 +1139,7 @@ rm -rf "$w"
 
 # The agent files keel wrote for Codex are left in place and named once as no longer managed. A
 # repository's own .codex/config.toml is not keel's and gets no line.
-w="$(mktemp -d)"
+w="$(mktemp -d)"; [ -d "$w" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init -y >/dev/null 2>&1 )
 mkdir -p "$w/.codex/agents"
 for agent in keel-fanout keel-implementer; do
@@ -1188,7 +1188,7 @@ rm -rf "$w"
 
 # Doctor no longer asks which harness is running. With every Codex signal set it prints what it
 # prints without them, on both context window messages, and neither names a running harness.
-w="$(mktemp -d)"; ch="$(mktemp -d)"
+w="$(mktemp -d)"; [ -d "$w" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; ch="$(mktemp -d)"; [ -d "$ch" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 printf '[plugins."keel@gbi"]\nenabled = true\n\n[hooks.state."keel"]\nenabled = true\ntrusted_hash = "9f2c"\n' > "$ch/config.toml"
 ( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init -y >/dev/null 2>&1 )
 for cw in absent 50000; do
@@ -1255,7 +1255,7 @@ n="$(grep -ic codex "$ROOT/templates/profile.schema.json")"
 [ "$n" = 0 ] && ok "the schema names no Codex" || bad "the schema names no Codex" "$n lines"
 
 # R-01: init still prompts for nothing.
-w="$(mktemp -d)"
+w="$(mktemp -d)"; [ -d "$w" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 if ( cd "$w" && git init -q -b main . && "$ROOT/bin/keel" init -y </dev/null >/dev/null 2>&1 ); then
     ok "init completes with no tty and no prompt"
 else
@@ -1322,7 +1322,7 @@ rm -rf "$wr"
 cv_fx="$(fixture node-ts)"
 ( cd "$cv_fx" && "$KEEL" init -y >/dev/null 2>&1 )
 cv_min="$(bash -c ". '$ROOT/lib/harness/resolve.sh'; harness_min_version")"
-cv_stub="$(mktemp -d)"
+cv_stub="$(mktemp -d)"; [ -d "$cv_stub" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 # A stub that hangs leaves its background sleep running after doctor kills the stub, and writes
 # that sleep's pid to `orphans` so cleanup can kill it. ps names the command, so a pid reused since
 # is not killed. A second trap on EXIT replaces the first, so this one reads back the trap
@@ -1594,7 +1594,7 @@ vf_asked "doctor writes the version file only when it is its own: a path that do
 # case pins what the rename leaves: the answer in a regular file and no temporary file beside it, in
 # a directory of its own so that any other file is one doctor left. A hard link to the empty file,
 # made beside that directory, still holds nothing, which a write through the path would not leave.
-vf_dir="$(mktemp -d)"; : > "$vf_dir/vf"; ln "$vf_dir/vf" "$vf_dir.link"
+vf_dir="$(mktemp -d)"; [ -d "$vf_dir" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; : > "$vf_dir/vf"; ln "$vf_dir/vf" "$vf_dir.link"
 vf_run "$vf_dir/vf"
 why="$(vf_once)"
 [ -z "$why" ] && [ "$(cat "$vf_dir/vf")" != "$cv_min|" ] && why="the file holds: $(cat "$vf_dir/vf")"

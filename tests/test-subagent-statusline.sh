@@ -153,7 +153,7 @@ want='{"id": "y", "content": "inherit: ok · m"}'
 #     directory as the working directory, and a plain `python3 -c` imports from there first, so a
 #     json.py in a user project would run on every refresh tick as the user. The decoy prints a loud
 #     line and defines nothing else, so a command that imports it prints that line and no row.
-decoy="$(mktemp -d)"
+decoy="$(mktemp -d)"; [ -d "$decoy" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 printf 'print("DECOY RAN")\n' > "$decoy/json.py"
 got="$(cd "$decoy" && row '{"columns":120,"tasks":[{"id":"t1","description":"inherit: review task 4","model":"claude-opus-5-5","tokenCount":12345}]}')"
 rm -rf "$decoy"

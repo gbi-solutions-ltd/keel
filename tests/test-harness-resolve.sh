@@ -386,7 +386,7 @@ if command -v harness_active_gates >/dev/null 2>&1; then
 
     # The gate path must not need python3. Assert that against a PATH built to lack one: /usr/bin
     # carries /usr/bin/python3, so the obvious version of this test would prove nothing.
-    stub="$(mktemp -d)"
+    stub="$(mktemp -d)"; [ -d "$stub" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
     ln -s "$(command -v dirname)" "$stub/dirname"
     # `command -v` consults bash's hash table before PATH, so a python3 invoked earlier in this
     # shell would be found here and fail this control spuriously. Forget it and test PATH alone.
@@ -424,7 +424,7 @@ if command -v harness_active_gates >/dev/null 2>&1; then
 
     # Sourced through a symlink, the manifest is the one beside the file the link names, not one
     # beside the link.
-    lnk="$(mktemp -d)"
+    lnk="$(mktemp -d)"; [ -d "$lnk" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
     ln -s "$ROOT/lib/harness/resolve.sh" "$lnk/resolve.sh"
     out="$(/bin/bash -c ". '$lnk/resolve.sh'; harness_active_gates claude" 2>&1 | sort | tr '\n' ' ')"
     [ "$out" = "context-watch done-guard review-guard sensitive-guard session-start " ] \
@@ -486,7 +486,7 @@ done
 # call runs in a subshell, because before the guard the second one aborted the shell it ran in. The
 # command touches a relative path from inside the scratch directory, because a dot in the path
 # would split the field and the payload with it.
-vg="$(mktemp -d)"
+vg="$(mktemp -d)"; [ -d "$vg" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 out="$(cd "$vg" && harness_version_ge "1+a[\$(touch p)]" 2 2>&1)"; rc=$?
 [ "$rc" -eq 1 ] && [ ! -e "$vg/p" ] \
   && ok "harness_version_ge compares only versions it can read: a field holding a command returns 1 and runs nothing" \

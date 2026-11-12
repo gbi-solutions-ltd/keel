@@ -43,7 +43,7 @@ bad() { printf '  FAIL  %s: %s\n' "$1" "$2"; fail=$((fail+1)); return 0; }
 # and the deny list contains the patterns by construction. The scanner is right to report it: a deny
 # list committed inside a repository is a leak, and teaching the scanner to skip its own list would
 # hide exactly that. So the test puts the file where production puts it.
-DENY_DIR="$(mktemp -d)"
+DENY_DIR="$(mktemp -d)"; [ -d "$DENY_DIR" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 trap 'rm -rf "$DENY_DIR"' EXIT
 
 write_deny() {
@@ -76,7 +76,7 @@ DENY
 }
 
 fixture() {
-    local root; root="$(mktemp -d)"
+    local root; root="$(mktemp -d)"; [ -d "$root" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
     mkdir -p "$root/skills/example" "$root/templates" "$root/docs" "$root/tests"
     printf '# Example\n\nA generic skill mentioning a partner bank and payments-api generically.\n' \
       > "$root/skills/example/SKILL.md"

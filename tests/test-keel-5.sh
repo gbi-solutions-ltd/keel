@@ -82,7 +82,7 @@ esac
 # A schema doctor cannot read means the enum check did not run, and saying only "profile parses"
 # reads as a profile that passed it. A copy of keel with its schema removed stands in for a broken
 # install, since doctor resolves the schema from its own directory and the repo's must stay intact.
-dk="$(mktemp -d)"
+dk="$(mktemp -d)"; [ -d "$dk" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 cp -R "$ROOT/bin" "$ROOT/lib" "$ROOT/templates" "$ROOT/VERSION" "$dk/"
 rm "$dk/templates/profile.schema.json"
 out="$( cd "$de" && "$dk/bin/keel" doctor --fast 2>&1 )"
@@ -101,7 +101,7 @@ rm -rf "$de"
 # ---- generated CI triggers on the recorded default branch ---------------------------------------
 # write_ci hardcoded `branches: [main]`, so a master repository got a workflow that never ran on a
 # push to its own default branch, while the profile beside it said master.
-mb="$(mktemp -d)"
+mb="$(mktemp -d)"; [ -d "$mb" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$mb" && git init -q -b master . && git config user.email t@t.t && git config user.name t \
   && printf '{"name":"f","scripts":{"test":"jest"}}\n' > package.json \
   && git add package.json && git commit -qm init && "$KEEL" init -y >/dev/null 2>&1 )
@@ -116,8 +116,8 @@ rm -rf "$mb"
 # have_python reads as absent). write_ci reads the branch through json_get, which needs python3,
 # while write_profile records it with printf, so the profile said master and the workflow fell
 # back to main.
-mbn="$(mktemp -d)"
-storeshim4="$(mktemp -d)"
+mbn="$(mktemp -d)"; [ -d "$mbn" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
+storeshim4="$(mktemp -d)"; [ -d "$storeshim4" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 cat > "$storeshim4/python3" <<'SHIM'
 #!/bin/sh
 printf 'Python was not found; run without arguments to install from the Microsoft Store.\n'
@@ -735,7 +735,7 @@ for k in lint typecheck build; do setj "$speed_tpl" "verify.$k" null; done
 
 # A copy of that template whose verify.test is the given command.
 speed_fixture() {   # speed_fixture <verify.test command>
-    local d; d="$(mktemp -d)"
+    local d; d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
     cp -R "$speed_tpl/." "$d/"
     setj "$d" verify.test "\"$1\""
     printf '%s' "$d"
@@ -822,7 +822,7 @@ PY
 # ---- behaviours 3 to 6: the suites that take real seconds are started together, then read
 # Each needs a suite that really runs longer than its threshold, and $SECONDS has one second
 # granularity, so these are the slow part of this block. They start here and are read below.
-tmp_out="$(mktemp -d)"
+tmp_out="$(mktemp -d)"; [ -d "$tmp_out" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 sw="$(speed_fixture 'sleep 2')";               setj "$sw" gates.suite_warn_seconds '"001"'
 sp="$(speed_fixture 'sleep 3')";               setj "$sp" gates.suite_warn_seconds 1
 sf="$(speed_fixture 'sleep 2; exit 1')";       setj "$sf" gates.suite_warn_seconds 1
@@ -1055,7 +1055,7 @@ rm -rf "$tp"
 # for a key the profile does not name. A profile without the keys costs no more than one with them.
 count_doctor_starts() {   # count_doctor_starts <dir>
     local shimdir real_python n
-    shimdir="$(mktemp -d)"; real_python="$(command -v python3)"
+    shimdir="$(mktemp -d)"; [ -d "$shimdir" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; real_python="$(command -v python3)"
     printf '#!/bin/sh\nprintf "x\\n" >> "%s/count"\nexec "%s" "$@"\n' "$shimdir" "$real_python" > "$shimdir/python3"
     chmod +x "$shimdir/python3"; : > "$shimdir/count"
     ( cd "$1" && PATH="$shimdir:$PATH" "$KEEL" doctor >/dev/null 2>&1 )

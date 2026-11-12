@@ -44,7 +44,7 @@ fire() {   # fire <event> <transcript> <cwd> [tool_name] [session]
       "$event" "$tr" "$cwd" "$sess" "$tool" | "$HOOK" 2>/dev/null
 }
 
-work="$(mktemp -d)"
+work="$(mktemp -d)"; [ -d "$work" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 mkdir -p "$work/.keel"
 printf '{"docs_root":"docs/keel"}\n' > "$work/.keel/profile.json"
 

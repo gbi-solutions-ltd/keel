@@ -90,7 +90,7 @@ fi
 # log is replayed below in the order the jobs started, so the transcript reads the same as a serial
 # run. Each job's exit code and elapsed seconds go to their own file rather than a shared one,
 # because two backgrounded jobs writing "$rc" into the same variable would just race.
-LOG_DIR="$(mktemp -d)"
+LOG_DIR="$(mktemp -d)"; [ -d "$LOG_DIR" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 trap 'rm -rf "$LOG_DIR"' EXIT
 
 # KEEL_TEST_JOBS when it is a positive integer, else the online CPU count capped at 8 so a large

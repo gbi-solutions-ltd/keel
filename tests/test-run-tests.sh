@@ -18,7 +18,7 @@ expect() {
   return 0
 }
 
-TMP="$(mktemp -d)"
+TMP="$(mktemp -d)"; [ -d "$TMP" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 trap 'rm -rf "$TMP"' EXIT
 
 # stub <path> <body>: a test file that runs <body> and exits 0. It is run once with an argument, which

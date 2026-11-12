@@ -33,7 +33,7 @@ command -v python3 >/dev/null 2>&1 || {
     exit 1
 }
 
-OUT="$(mktemp -d)"
+OUT="$(mktemp -d)"; [ -d "$OUT" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 trap 'rm -rf "$OUT"' EXIT
 
 # ---- the export runs -------------------------------------------------------
