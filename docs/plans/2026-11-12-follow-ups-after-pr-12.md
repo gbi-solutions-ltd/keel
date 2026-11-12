@@ -106,6 +106,14 @@ Every task inherits these.
 - Modify: `CHANGELOG.md`
 - Test: `tests/test-context-watch.sh`
 
+**Plan note, 2026-11-12, coordinator:** task 1's quality review showed behaviour 3 unsafe as
+written: tightening a loose directory keeps symlinks already planted in it, and the cache write
+follows them (reproduced). Behaviour 3 now refuses a directory whose mode is not 0700 (it fails the
+check and the fallback is used), the bash shortcut also requires the cache file to be a regular
+file owned by this user, a fallback path that is not absolute (no `HOME`) is skipped, and docs/05
+names the assumption that the parent directory is sticky or private. The Decided line's "tightened
+to 0700" is superseded by this note; reported to Bernard.
+
 **Depends on:** none
 
 **Behaviours:**
@@ -122,8 +130,10 @@ Every task inherits these.
    `ALWAYS_ALLOWED` return before any measurement) leaves the planted file unchanged, writes
    `<sid>.measure` under `<XDG_CACHE_HOME>/keel-context-watch` (mode 700), exits 0, and past the
    stop threshold is still denied.
-3. A state directory this user owns with looser permissions is tightened to 0700 and used. Example:
-   pre-created with mode 0777, after a `Bash` event it has mode `700`.
+3. A state directory this user owns whose mode is not 0700 is not used, and nothing is written in
+   it; the fallback is used instead. Example: pre-created with mode 0777 and holding
+   `<sid>.measure` as a symlink to a scratch file, a `Bash` event leaves the scratch file unchanged
+   and writes `<sid>.measure` under `<XDG_CACHE_HOME>/keel-context-watch`.
 4. `hooks/context-watch`'s cached shortcut reads its cache only from
    `${TMPDIR:-/tmp}/keel-context-watch-$EUID`, and only when it is a real directory owned by this
    user (`[ -d ] && [ ! -L ] && [ -O ]`; `-O` alone is true for a symlink to our directory);
@@ -139,7 +149,7 @@ Every task inherits these.
 **Done when:** `tests/test-context-watch.sh`, `tests/test-validate-citations.sh` and
 `tests/test-harness-claims.sh` pass.
 
-- [ ] **Step 1.1: Build it test first**
+- [x] **Step 1.1: Build it test first** Note: round 1 reds (107/16, then 123/3) and round 2 reds (125/4, the reviewer's loose-directory exploit among them) quoted; spec COMPLIES after the coordinator repaired one shifted plan citation; quality found loose-dir tightening unsafe (reproduced), fixed in round 2 per the coordinator plan note; quality re-check: nothing blocking, exploit closed, 0700 under umask 022/077/002/000; context-watch 129/0; follow-up: the hook's shortcut comment omits the 0700 mode test
 
 Follow `keel:tdd`, in two rounds. Round one: write behaviour 1's and 3's cases and move the existing
 cases to the new name (behaviour 6); they fail against today's shared name; make the rename with the
@@ -154,7 +164,7 @@ Run: the lint command. With the `Done when:` run above, that is the unit boundar
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 1.2: Hand over**
+- [x] **Step 1.2: Hand over** Note: rounds: 2; routing: inherit; loop: full; extra staged: docs/ideas citation repair
 
 ```bash
 git add lib/context_watch.py hooks/context-watch tests/test-context-watch.sh \

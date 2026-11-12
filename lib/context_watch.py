@@ -21,6 +21,7 @@ which is written. Nothing reaches the network, and there is no branch that runs 
 
 import json
 import os
+import stat
 import sys
 import time
 
@@ -366,13 +367,37 @@ ALWAYS_ALLOWED = {"Write", "Edit", "NotebookEdit", "Read", "TodoWrite", "TaskUpd
 CACHE_SECONDS = 20
 
 
-def _state_dir():
-    d = os.path.join(os.environ.get("TMPDIR", "/tmp"), "keel-context-watch")
+def _private_dir(d):
+    """d, made if missing, when it is a real directory this user owns at mode 0700; else None.
+
+    The euid in the TMPDIR name is predictable, so another local user can make that name first, as
+    a directory of their own or a symlink to one, and wait for this hook to write through it (audit
+    W-08). lstat does not follow a symlink, so a planted one fails the type check. Looser bits are
+    refused, not tightened: anything planted while the directory was loose would stay after a chmod.
+    This assumes the parent is sticky, as /tmp is, or private, so nobody can swap the directory.
+    """
     try:
-        os.makedirs(d, exist_ok=True)
+        os.makedirs(d, mode=0o700, exist_ok=True)
+        st = os.lstat(d)
+        if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.geteuid():
+            return None
+        return d if stat.S_IMODE(st.st_mode) == 0o700 else None
     except OSError:
         return None
-    return d
+
+
+def _state_dir():
+    """The per-user state directory, else the XDG cache fallback, else None.
+
+    With no state there is no stop marker, and PreCompact renders over the session's own handoff,
+    so a directory that fails the check falls back to a second private one, not to no state. An
+    empty TMPDIR or XDG_CACHE_HOME counts as unset; a fallback that is not absolute (no HOME leaves
+    a literal `~`) names no fixed place and is skipped.
+    """
+    tmp = os.path.join(os.environ.get("TMPDIR") or "/tmp", "keel-context-watch-%d" % os.geteuid())
+    cache = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
+    fallback = os.path.join(cache, "keel-context-watch")
+    return _private_dir(tmp) or (os.path.isabs(fallback) and _private_dir(fallback)) or None
 
 
 def _profile(cwd):

@@ -75,7 +75,7 @@ difference between the plan and what happened.
 - Test: `tests/test-context-watch.sh`
 
 **Interfaces:**
-- Consumes: `LONG_WINDOW` and `DEFAULT_WINDOW` (`lib/context_watch.py:27-28`), unchanged
+- Consumes: `LONG_WINDOW` and `DEFAULT_WINDOW` (`lib/context_watch.py:28-29`), unchanged
 - Produces: `_positive_int(value)`, a module-level helper returning a positive `int` or `None`.
   Tasks 2 and 3 use it. `window_for(model, observed=0, configured=None)` keeps its signature.
 

@@ -113,7 +113,7 @@ prevent, found against a real 2.4MB transcript holding 401,247 tokens.
 | ID | Constraint | Imposed by |
 |---|---|---|
 | CON-01 | `SCHEMA_VERSION` must not move for this change. `gates.context_window` is already declared at `templates/profile.schema.json:287`, so writing it adds no field. | The existing schema, and the drift rule at `tests/validate-skills.sh:351-365` |
-| CON-02 | Between the true window and 1,000,000, a configured value that overstates the window cannot be corrected downward. FR-11 bounds the damage but does not eliminate it: setting 1,000,000 on a 200,000 session still silences the watchdog. | The platform: occupancy proves a lower bound on the window and never an upper one (`lib/context_watch.py:236-237`) |
+| CON-02 | Between the true window and 1,000,000, a configured value that overstates the window cannot be corrected downward. FR-11 bounds the damage but does not eliminate it: setting 1,000,000 on a 200,000 session still silences the watchdog. | The platform: occupancy proves a lower bound on the window and never an upper one (`lib/context_watch.py#occupancy proves a lower bound and never an upper one`) |
 | CON-03 | `200000` is correct for the default model tier and understates a 1M session. It is written knowing it is sometimes wrong, because FR-01 makes being wrong recoverable. | The absence of any readable window field (`lib/context_watch.py:121-127`) |
 | CON-04 | `/clear` cannot be triggered by keel. No hook output clears a session and a plugin cannot start one. | Claude Code's hook interface |
 | CON-05 | The watchdog is advisory infrastructure, not a correctness gate, and must fail silently. | `hooks/context-watch:14-16` |

@@ -47,6 +47,10 @@ fire() {   # fire <event> <transcript> <cwd> [tool_name] [session]
 work="$(mktemp -d)"; [ -d "$work" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 mkdir -p "$work/.keel"
 printf '{"docs_root":"docs/keel"}\n' > "$work/.keel/profile.json"
+# The watchdog falls back to a state directory under XDG_CACHE_HOME when its TMPDIR one fails the
+# ownership check. Pointing that at a nested directory here means no case can reach the real cache
+# under $HOME, whatever state the shared TMPDIR is in.
+export XDG_CACHE_HOME="$work/xdg/cache"
 
 # ---- the arithmetic --------------------------------------------------------
 
@@ -361,7 +365,7 @@ case "$out" in *deny*execute-plan*'keel plan status'*'carry on'*)
 # render, or the plan run resumes from a summary instead of its `next:` line. The stop marker goes
 # at PreCompact, so a later stop in the same session starts fresh rather than being released by
 # the first stop's handoff.
-statedir="${TMPDIR:-/tmp}/keel-context-watch"
+statedir="${TMPDIR:-/tmp}/keel-context-watch-$EUID"
 sess="plan-run-$$"
 rm -f "$statedir/$sess.stop"
 fire PreToolUse "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
@@ -770,10 +774,10 @@ TMPDIR="$tx" fire PreCompact "$work/stop.jsonl" "$work" Bash "../../victim" >/de
   || bad "state paths" "the file outside the state directory was removed or rewritten"
 sess="safe-id-$$"
 TMPDIR="$tx" fire UserPromptSubmit "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
-[ -e "$tx/keel-context-watch/$sess.measure" ] \
+[ -e "$tx/keel-context-watch-$EUID/$sess.measure" ] \
   || bad "state paths" "the fixture wrote no measurement cache under the nested TMPDIR"
 TMPDIR="$tx" fire PreCompact "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
-[ ! -e "$tx/keel-context-watch/$sess.measure" ] \
+[ ! -e "$tx/keel-context-watch-$EUID/$sess.measure" ] \
   && ok "a normal session id still has its measurement cache removed at PreCompact" \
   || bad "state paths" "the measurement cache under the nested TMPDIR outlived compaction"
 rm -f "$work/.keel/handoff.md"
@@ -840,9 +844,9 @@ done
 # A session with no id has no line to ask for, so for it a handoff newer than the marker is enough,
 # the rule from before the session line. Under the nested TMPDIR, so the nosession marker of a live
 # session is not touched.
-mkdir -p "$tx/keel-context-watch"
-printf 'stop\n' > "$tx/keel-context-watch/nosession.stop"
-touch -t 200001010000 "$tx/keel-context-watch/nosession.stop"
+mkdir -p "$tx/keel-context-watch-$EUID" && chmod 700 "$tx/keel-context-watch-$EUID"
+printf 'stop\n' > "$tx/keel-context-watch-$EUID/nosession.stop"
+touch -t 200001010000 "$tx/keel-context-watch-$EUID/nosession.stop"
 printf '# Session handoff\n\nnext: 4.1\n' > "$work/.keel/handoff.md"
 touch -t 200101010000 "$work/.keel/handoff.md"
 printf '{"hook_event_name":"PreCompact","transcript_path":"%s","cwd":"%s","session_id":"","tool_name":"Bash"}' \
@@ -850,7 +854,7 @@ printf '{"hook_event_name":"PreCompact","transcript_path":"%s","cwd":"%s","sessi
 grep -q 'next: 4.1' "$work/.keel/handoff.md" \
   && ok "with no session id a handoff newer than the marker is kept" \
   || bad "session line" "with no session id the handoff was replaced: $(head -3 "$work/.keel/handoff.md")"
-rm -f "$tx/keel-context-watch/nosession.stop" "$tx/keel-context-watch/nosession.measure" "$work/.keel/handoff.md"
+rm -f "$tx/keel-context-watch-$EUID/nosession.stop" "$tx/keel-context-watch-$EUID/nosession.measure" "$work/.keel/handoff.md"
 
 # --- a marker PreCompact cannot remove is made current instead --------------------------------------
 #
@@ -908,9 +912,9 @@ rm -f "$statedir/$sess.stop" "$statedir/$sess.measure" "$work/.keel/handoff.md"
 # first on PATH records each python call and runs the real one. The nested TMPDIR keeps the planted
 # file inside this case's own directory.
 ty="$work/ty/a/b"
-mkdir -p "$ty/keel-context-watch" "$work/pyshim"
+mkdir -p "$ty/keel-context-watch-$EUID" "$work/pyshim" && chmod 700 "$ty/keel-context-watch-$EUID"
 printf '%s 1 200000\n' "$(date +%s)" > "$work/ty/a/victim.measure"
-rm -f "$ty/keel-context-watch/nosession.measure"
+rm -f "$ty/keel-context-watch-$EUID/nosession.measure"
 real_python="$(command -v python3)"
 printf '#!/bin/sh\necho "$*" >> "%s"\nexec "%s" "$@"\n' "$work/pyshim/calls" "$real_python" > "$work/pyshim/python3"
 chmod +x "$work/pyshim/python3"
@@ -941,20 +945,20 @@ rm -rf "$work/ty" "$work/pyshim"
 # agent_id together. fire() takes no agent fields, so these events are written by hand. The nested
 # TMPDIR keeps their state files inside this case's own directory, where they can be counted.
 tz="$work/tz/a"
-mkdir -p "$tz/keel-context-watch"
+mkdir -p "$tz/keel-context-watch-$EUID" && chmod 700 "$tz/keel-context-watch-$EUID"
 rm -f "$work/.keel/handoff.md"
 sess="subagent-$$"
-before="$(find "$tz/keel-context-watch" -name "$sess.*" | wc -l | tr -d ' ')"
+before="$(find "$tz/keel-context-watch-$EUID" -name "$sess.*" | wc -l | tr -d ' ')"
 out="$(printf '{"hook_event_name":"PreToolUse","transcript_path":"%s","cwd":"%s","session_id":"%s","tool_name":"Bash","agent_type":"general-purpose","agent_id":"a1"}' \
   "$work/stop.jsonl" "$work" "$sess" | TMPDIR="$tz" "$HOOK" 2>/dev/null)"
 rc=$?
 [ "$rc" -eq 0 ] && [ -z "$out" ] \
   && ok "a subagent's tool call past the stop threshold gets no output and exit 0" \
   || bad "subagent" "exit $rc, output: $out"
-after="$(find "$tz/keel-context-watch" -name "$sess.*" | wc -l | tr -d ' ')"
+after="$(find "$tz/keel-context-watch-$EUID" -name "$sess.*" | wc -l | tr -d ' ')"
 [ "$after" = "$before" ] \
   && ok "a subagent's event writes no stop marker and no measurement for its session" \
-  || bad "subagent" "state files for $sess went from $before to $after: $(ls "$tz/keel-context-watch")"
+  || bad "subagent" "state files for $sess went from $before to $after: $(ls "$tz/keel-context-watch-$EUID")"
 
 out="$(printf '{"hook_event_name":"PreToolUse","transcript_path":"%s","cwd":"%s","session_id":"%s","tool_name":"Bash"}' \
   "$work/stop.jsonl" "$work" "$sess" | TMPDIR="$tz" "$HOOK" 2>/dev/null)"
@@ -993,6 +997,112 @@ for c in 'empty-type|"agent_type":"","agent_id":"a1"|an empty agent_type' \
       *) bad "subagent" "$what was left alone: $out" ;; esac
 done
 rm -rf "$work/tz"
+
+# --- the state directory is private to its user ---------------------------------------------------
+#
+# A state directory shared by name lets another local user who made it first plant a symlink where
+# the watchdog writes (audit W-08). The directory is named for the effective user and kept at 0700.
+# Modes are read with python's os.stat because stat's flags differ between BSD and GNU.
+mode_of() {   # mode_of <path>  -> the permission bits in octal, as 700
+    python3 -c 'import os, sys; print("%o" % (os.stat(sys.argv[1]).st_mode & 0o777))' "$1"
+}
+tp="$work/tp/a"
+mkdir -p "$tp"
+sess="private-$$"
+TMPDIR="$tp" fire PreToolUse "$work/warn.jsonl" "$work" Bash "$sess" >/dev/null
+[ "$(mode_of "$tp/keel-context-watch-$EUID" 2>/dev/null)" = 700 ] \
+  && ok "the state directory is named for the effective user and made with mode 700" \
+  || bad "private state" "no keel-context-watch-$EUID with mode 700 in TMPDIR: $(ls "$tp")"
+[ -f "$tp/keel-context-watch-$EUID/$sess.measure" ] \
+  && ok "the session's measurement is kept in the per-user state directory" \
+  || bad "private state" "no $sess.measure in keel-context-watch-$EUID"
+rm -rf "$tp"
+
+# One this user owns with looser bits is refused, not tightened: while it was loose anyone could
+# plant a symlink inside it, and a chmod leaves that symlink where the measurement write follows it.
+# The planted measurement does not parse, so code that wrote through the symlink would rewrite it.
+mkdir -p "$tp/keel-context-watch-$EUID"
+chmod 777 "$tp/keel-context-watch-$EUID"
+sess="loose-$$"
+printf 'victim\n' > "$work/victim-loose"
+ln -s "$work/victim-loose" "$tp/keel-context-watch-$EUID/$sess.measure"
+TMPDIR="$tp" XDG_CACHE_HOME="$work/xdg-loose/cache" \
+  fire PreToolUse "$work/warn.jsonl" "$work" Bash "$sess" >/dev/null
+[ "$(cat "$work/victim-loose")" = victim ] \
+  && ok "nothing is written through a symlink planted in a state directory with mode 777" \
+  || bad "private state" "the file behind the planted symlink now reads: $(cat "$work/victim-loose")"
+[ -f "$work/xdg-loose/cache/keel-context-watch/$sess.measure" ] \
+  && ok "a state directory with mode 777 is refused and the XDG_CACHE_HOME fallback is used" \
+  || bad "private state" "no $sess.measure in the fallback under XDG_CACHE_HOME"
+
+# The cached shortcut in bash must not answer from a measurement that is a symlink either: in a
+# loose directory it can point at a file anyone wrote, holding a fresh low reading.
+mkdir -p "$work/pyshim"
+printf '%s 1 200000\n' "$(date +%s)" > "$work/victim-loose"
+printf '#!/bin/sh\necho "$*" >> "%s"\nexec "%s" "$@"\n' "$work/pyshim/calls" "$real_python" \
+  > "$work/pyshim/python3"
+chmod +x "$work/pyshim/python3"
+: > "$work/pyshim/calls"
+TMPDIR="$tp" XDG_CACHE_HOME="$work/xdg-loose/cache" PATH="$work/pyshim:$PATH" \
+  fire PreToolUse "$work/quiet.jsonl" "$work" Edit "$sess" >/dev/null
+grep -q 'context_watch.py hook' "$work/pyshim/calls" \
+  && ok "the cached shortcut does not read a measurement that is a symlink" \
+  || bad "private state" "no python call was recorded, so bash answered from the planted symlink"
+rm -rf "$work/tp" "$work/victim-loose" "$work/xdg-loose" "$work/pyshim"
+
+# A fallback path that is not absolute names no fixed place, so it is skipped and the watchdog runs
+# without state rather than writing under whatever the current directory is. A relative
+# XDG_CACHE_HOME stands in for HOME being unset with no passwd entry, which this test cannot arrange
+# without touching the real environment.
+mkdir -p "$tp" "$work/planted-rel" "$work/rel"
+ln -s "$work/planted-rel" "$tp/keel-context-watch-$EUID"
+(cd "$work/rel" && TMPDIR="$tp" XDG_CACHE_HOME="relcache" \
+  fire PreToolUse "$work/stop.jsonl" "$work" Bash "rel-$$" >/dev/null)
+rc=$?
+[ "$rc" -eq 0 ] && [ ! -e "$work/rel/relcache" ] \
+  && ok "a relative XDG_CACHE_HOME is not used as the fallback" \
+  || bad "private state" "exit $rc; under the current directory: $(ls "$work/rel")"
+rm -rf "$work/tp" "$work/planted-rel" "$work/rel"
+
+# A state directory planted as a symlink, as another user who made the name first could leave it, is
+# not used and nothing is written through it. The state goes to the XDG_CACHE_HOME fallback, so the
+# stop still holds: without a stop marker PreCompact would render over the session's own handoff.
+# A Bash event, because the tools in ALWAYS_ALLOWED return before anything is measured. The planted
+# measurement does not parse, so code that read through the symlink would rewrite it.
+mkdir -p "$tp" "$work/planted"
+ln -s "$work/planted" "$tp/keel-context-watch-$EUID"
+sess="planted-$$"
+printf 'planted\n' > "$work/planted/$sess.measure"
+out="$(TMPDIR="$tp" XDG_CACHE_HOME="$work/xdg-planted/cache" \
+  fire PreToolUse "$work/stop.jsonl" "$work" Bash "$sess")"
+rc=$?
+[ "$(cat "$work/planted/$sess.measure")" = planted ] \
+  && ok "nothing is written through a state directory planted as a symlink" \
+  || bad "private state" "the planted file now reads: $(cat "$work/planted/$sess.measure")"
+[ -f "$work/xdg-planted/cache/keel-context-watch/$sess.measure" ] \
+  && [ "$(mode_of "$work/xdg-planted/cache/keel-context-watch/" 2>/dev/null)" = 700 ] \
+  && ok "the state goes to the XDG_CACHE_HOME fallback, mode 700" \
+  || bad "private state" "no $sess.measure in a mode 700 fallback under XDG_CACHE_HOME"
+[ "$rc" -eq 0 ] && ok "a planted state directory still exits 0" || bad "private state" "exit $rc"
+case "$out" in *'"permissionDecision": "deny"'*)
+    ok "past the stop threshold the call is still denied with the state in the fallback" ;;
+  *) bad "private state" "the call was not denied: $out" ;; esac
+
+# The cached shortcut in hooks/context-watch must not answer from a planted directory either: a
+# fresh, low reading there would wave the call through without python. The shim records whether
+# python ran.
+mkdir -p "$work/pyshim"
+printf '%s 1 200000\n' "$(date +%s)" > "$work/planted/$sess.measure"
+printf '#!/bin/sh\necho "$*" >> "%s"\nexec "%s" "$@"\n' "$work/pyshim/calls" "$real_python" \
+  > "$work/pyshim/python3"
+chmod +x "$work/pyshim/python3"
+: > "$work/pyshim/calls"
+TMPDIR="$tp" XDG_CACHE_HOME="$work/xdg-planted/cache" PATH="$work/pyshim:$PATH" \
+  fire PreToolUse "$work/quiet.jsonl" "$work" Edit "$sess" >/dev/null
+grep -q 'context_watch.py hook' "$work/pyshim/calls" \
+  && ok "the cached shortcut does not read from a state directory planted as a symlink" \
+  || bad "private state" "no python call was recorded, so bash answered from the planted directory"
+rm -rf "$work/tp" "$work/planted" "$work/xdg-planted" "$work/pyshim"
 
 rm -rf "$work"
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
