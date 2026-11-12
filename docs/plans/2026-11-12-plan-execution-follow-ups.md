@@ -38,7 +38,7 @@ and touches the marker when it cannot remove it.
 whitespace; `os.utime` succeeds on the directory the existing failed-removal case uses; the existing
 keep cases carry no `session:` line), and should-fix items on test setup (JSON escaping in
 `row_bash`, a git shim, a committed profile for the worktree, a nested `TMPDIR`, an older s-2
-marker), `hooks/context-watch:70` and the documents the match rule appears in. All folded in.
+marker), `hooks/context-watch:74` and the documents the match rule appears in. All folded in.
 **Approved:** by Bernard, 2026-11-12: routing `inherit`, onto PR #12's branch, with the decisions
 above as written.
 **Shape:** behaviours with examples.
@@ -185,7 +185,7 @@ coordinator commits after both review passes, with
 **Behaviours:**
 
 1. Every per-session state path (`.stop`, `.measure`) is built by one helper, and a session id
-   holding `/`, `\`, `..` or a NUL is read as `nosession`. `hooks/context-watch:70` builds the
+   holding `/`, `\`, `..` or a NUL is read as `nosession`. `hooks/context-watch:74` builds the
    `.measure` path in bash for its cached shortcut, so it applies the same rule. Example: with
    `TMPDIR` set to a nested temp directory for the case, a PreCompact event with `session_id`
    `../../victim`, where `<state dir>/../../victim.measure` exists, leaves that file in place; a
@@ -196,14 +196,14 @@ coordinator commits after both review passes, with
    the render at s-2's PreCompact, s-2 having its own stop marker older than the handoff (without
    one the render is written anyway, so the case would pass before the change); the stop text
    contains `session: ` followed by the session id. The existing keep cases
-   (`tests/test-context-watch.sh:368` and `:690`) gain the `session:` line, since without it their
+   (`tests/test-context-watch.sh:371` and `:676`) gain the `session:` line, since without it their
    handoffs are now replaced. Test session ids carry `$$`, so they do not collide with a live
    session's state.
 3. When the marker cannot be removed, PreCompact sets its mtime to now (`os.utime`), so the kept
    handoff no longer releases the next stop; only if that fails too is the stderr line written.
    Example: with the marker a directory (removal fails, `os.utime` succeeds), after PreCompact its
    mtime is newer than the handoff and a `Bash` PreToolUse past the threshold is denied; this
-   replaces the existing directory case at `tests/test-context-watch.sh:668-682`. The stderr line
+   replaces the directory case once at `:668-683` (now `tests/test-context-watch.sh:815-860`). The stderr line
    stays tested by running the library through `runpy` with `os.remove` and `os.utime` replaced by
    functions that raise `OSError`, expecting the line and exit 0.
 4. `docs/05-token-and-memory-design.md` states the session line and the touch fallback where it
@@ -216,7 +216,7 @@ coordinator commits after both review passes, with
 **Done when:** `tests/test-context-watch.sh`, `tests/test-validate-citations.sh` and
 `tests/test-harness-claims.sh` pass.
 
-- [ ] **Step 2.1: Build it test first**
+- [x] **Step 2.1: Build it test first** Note: red witnessed in both rounds (92/6, then 100/6); 2 rounds (spec COMPLIES; quality 2 should-fix fixed: lenient session line, empty id keeps old rule); routing inherit; loop full; coordinator ran run-tests.sh green on the final tree
 
 Follow `keel:tdd`. Write cases for behaviours 1 to 3 in `tests/test-context-watch.sh`, after the
 existing cases.
@@ -229,7 +229,7 @@ Run: `tests/run-tests.sh` and the lint command.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 2.2: Hand over**
+- [x] **Step 2.2: Hand over** Note: staged by the implementer; coordinator repaired this plan's citations
 
 ```bash
 git add lib/context_watch.py hooks/context-watch tests/test-context-watch.sh \

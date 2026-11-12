@@ -399,8 +399,8 @@ def _thresholds(profile):
 
 def _cached_measure(path, session_id, configured=None):
     """(tokens, window, pct), from a recent cache where one exists."""
-    d = _state_dir()
-    cache = os.path.join(d, "%s.measure" % (session_id or "nosession")) if d else None
+    # _state_path keeps a session id from naming a file outside the state directory.
+    cache = _state_path(session_id, "measure")
     now = int(time.time())
     if cache and os.path.exists(cache):
         try:
@@ -490,9 +490,15 @@ def hook():
         # It is kept. The marker then goes, so a later stop in the same session starts fresh: kept,
         # it would leave this handoff newer than it, releasing the next stop before any new handoff
         # and keeping this one, with its stale `next:`, through the next compaction.
+        #
+        # Newer than the marker is not enough on its own, because every session in the project
+        # writes the same file: another session's handoff, written after this one's stop, would be
+        # kept here as this session's. So the stop text asks for a `session: <id>` line, and only a
+        # handoff carrying this session's is kept.
         stopped = _stop_marker(session, False)
         try:
-            kept = bool(stopped) and os.path.getmtime(handoff) >= os.path.getmtime(stopped)
+            kept = bool(stopped) and os.path.getmtime(handoff) >= os.path.getmtime(stopped) \
+                and _names_session(handoff, session)
         except OSError:
             kept = False
         if not kept:
@@ -504,22 +510,27 @@ def hook():
                 pass
         # The cached measurement describes the context compaction is about to end, so it goes too
         # and the first event after compaction measures again.
-        d = _state_dir()
-        if d:
+        measure = _state_path(session, "measure")
+        if measure:
             try:
-                os.remove(os.path.join(d, "%s.measure" % (session or "nosession")))
+                os.remove(measure)
             except OSError:
                 pass
         if stopped:
             try:
                 os.remove(stopped)
             except OSError:
-                # A marker left behind lets this stop's handoff release the next stop. The line
-                # reaches only someone running this library directly: hooks/context-watch sends its
-                # stderr to /dev/null. Compaction still goes ahead: refusing it would cost more than
-                # a stale marker.
-                sys.stderr.write("keel context-watch: could not remove the stop marker %s\n"
-                                 % stopped)
+                # A marker left behind, older than the kept handoff, would let that handoff release
+                # the next stop. Touched to now it is newer, so the next stop blocks until a new
+                # handoff is written, which is what removing it was for.
+                try:
+                    os.utime(stopped, None)
+                except OSError:
+                    # The line reaches only someone running this library directly:
+                    # hooks/context-watch sends its stderr to /dev/null. Compaction still goes
+                    # ahead: refusing it would cost more than a stale marker.
+                    sys.stderr.write("keel context-watch: could not remove the stop marker %s\n"
+                                     % stopped)
         # Nothing is emitted, deliberately. This announced the file with a systemMessage until
         # 2026-09-05, and the harness discards a PreCompact hook's systemMessage and continue fields
         # outright, so the announcement was written, serialised and thrown away every time. The test
@@ -537,7 +548,8 @@ def hook():
         if pct >= stop_at:
             _emit({"hookSpecificOutput": {
                 "hookEventName": "UserPromptSubmit",
-                "additionalContext": _stop_text(pct, tokens, window, os.path.relpath(handoff, cwd)),
+                "additionalContext": _stop_text(pct, tokens, window, os.path.relpath(handoff, cwd),
+                                            session),
             }})
         elif pct >= warn_at:
             _emit({"hookSpecificOutput": {
@@ -563,19 +575,59 @@ def hook():
         _emit({"hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
-            "permissionDecisionReason": _stop_text(pct, tokens, window, os.path.relpath(handoff, cwd)),
+            "permissionDecisionReason": _stop_text(pct, tokens, window,
+                                                   os.path.relpath(handoff, cwd), session),
         }})
         return 0
 
     return 0
 
 
-def _stop_marker(session, active):
-    """Path of the marker recording when the stop first fired, or None."""
+def _state_path(session, suffix):
+    """Path of this session's state file with the given suffix, or None without a state directory.
+
+    The session id comes from the hook event and is joined into a path, so an id holding a path
+    separator, `..` or a NUL could name a file outside the state directory, which PreCompact would
+    then remove. Such an id is read as `nosession`, the name an empty one already gets.
+    hooks/context-watch applies the same rule to the cached measurement it reads in bash.
+    """
     d = _state_dir()
     if not d:
         return None
-    p = os.path.join(d, "%s.stop" % (session or "nosession"))
+    if not session or any(bad in session for bad in ("/", "\\", "..", "\0")):
+        session = "nosession"
+    return os.path.join(d, "%s.%s" % (session, suffix))
+
+
+def _names_session(handoff, session):
+    """Whether the handoff carries this session's `session: <id>` line.
+
+    The line is written by a model copying the stop text, which shows it in backticks, so a leading
+    `-` or `*`, surrounding backticks, a capital S and a missing space after the colon are all read
+    as the line. Rejecting them would silently replace the session's own handoff with the render.
+    The id is compared whole, so `s-1` does not claim the handoff of `s-10`.
+
+    A session with no id has no line to ask for, so for it any handoff counts, which leaves the
+    rule from before the line existed: newer than the marker is enough.
+    """
+    if not session:
+        return True
+    with open(handoff, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            s = line.strip()
+            if s[:1] in ("-", "*"):
+                s = s[1:].lstrip()
+            s = s.strip("`")
+            if s[:8].lower() == "session:" and s[8:].strip() == session:
+                return True
+    return False
+
+
+def _stop_marker(session, active):
+    """Path of the marker recording when the stop first fired, or None."""
+    p = _state_path(session, "stop")
+    if not p:
+        return None
     if active and not os.path.exists(p):
         try:
             with open(p, "w", encoding="utf-8") as fh:
@@ -595,13 +647,14 @@ def _warn_text(pct, stop_at, handoff):
     )
 
 
-def _stop_text(pct, tokens, window, handoff):
+def _stop_text(pct, tokens, window, handoff, session):
     return (
         "PAUSE. Context is at %d%% (%s of %s tokens), past the keel stop threshold.\n"
         "\n"
         "In an ordinary session, do these, in order, and nothing else:\n"
-        "  1. Write or refresh %s: what is done, what is not, the next concrete step, and any\n"
-        "     decision taken that is not yet recorded anywhere else.\n"
+        "  1. Write or refresh %s: what is done, what is not, the next concrete step, any\n"
+        "     decision taken that is not yet recorded anywhere else, and a line reading\n"
+        "     `session: %s`, which is how compaction knows the file is this session's.\n"
         "  2. Move anything durable out of it and into its real home, an ADR under the docs root or\n"
         "     the artifact it belongs to. That file is git-ignored and is thrown away once the work\n"
         "     resumes, so decisions left only in it are lost.\n"
@@ -621,7 +674,7 @@ def _stop_text(pct, tokens, window, handoff):
         "\n"
         "If this is genuinely wrong, the user can set KEEL_CONTEXT_WATCH=off, or gates.context_watch\n"
         "to false in .keel/profile.json. Do not set either yourself: it is the user's call."
-        % (pct, f"{tokens:,}", f"{window:,}", handoff)
+        % (pct, f"{tokens:,}", f"{window:,}", handoff, session)
     )
 
 

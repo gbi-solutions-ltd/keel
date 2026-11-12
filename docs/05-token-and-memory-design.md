@@ -240,7 +240,7 @@ whoever picks it up next.
 | --- | --- |
 | `UserPromptSubmit` | Silent below 70%. Between 70 and 85, one short warning naming the number. Past 85, the stop instruction |
 | `PreToolUse` | Nothing below 85%. Past it, denies tool calls until a handoff is written |
-| `PreCompact` | Writes a mechanical handoff before the session's own memory is rewritten, unless the session wrote one since the stop fired |
+| `PreCompact` | Writes a mechanical handoff before the session's own memory is rewritten, unless the session wrote one since the stop fired carrying its `session:` line |
 
 **Occupancy is read, not estimated.** Claude Code's transcript records the usage the API reported for
 each request, so the last main-thread assistant turn gives the answer directly:
@@ -312,11 +312,21 @@ plan file holds the place. After compaction the run resumes from `keel plan stat
 the handoff's `next:` line records only where the run stood at the stop and the run moves on after
 it. `PreCompact` keeps a handoff written since the stop fired rather than replacing it with the
 mechanical render, which would lose that `next:` line, and then removes the stop marker, so a later
-stop in the same session blocks again until a newer handoff is written. `PreCompact` also removes
-the session's measurement cache, which describes the context compaction is about to end, so the
-first event after compaction measures again rather than reusing that figure for up to 20 seconds. A
-marker removal that fails writes a line naming the marker to the library's stderr and compaction
-still goes ahead; the hook sends that stderr to `/dev/null`, so the line is not shown in a session.
+stop in the same session blocks again until a newer handoff is written. Every session in the project
+writes the same `.keel/handoff.md`, so the stop text asks for a line reading `session: <id>`, and
+`PreCompact` keeps only a handoff that is newer than the marker and carries this session's line;
+another session's handoff is replaced by the render. The line may carry a leading `-` or `*`,
+surrounding backticks, a capital S or no space after the colon, and the id must match whole, so
+`s-1` does not keep the handoff of `s-10`. A session with no id has no line to ask for, so for it a
+handoff newer than the marker is enough. `PreCompact` also removes the
+session's measurement cache, which describes the context compaction is about to end, so the first
+event after compaction measures again rather than reusing that figure for up to 20 seconds. When the
+marker cannot be removed, `PreCompact` sets its mtime to now, so the kept handoff is older than it
+and the next stop blocks until a new one is written. Only when that touch fails as well is a line
+naming the marker written to the library's stderr, and compaction still goes ahead; the hook sends
+that stderr to `/dev/null`, so the line is not shown in a session. The `.stop` and `.measure` state
+files are named from the session id, and an id holding `/`, `\`, `..` or a NUL is read as
+`nosession`, so no id names a file outside the state directory.
 
 ## Session hygiene, the part skills cannot enforce
 

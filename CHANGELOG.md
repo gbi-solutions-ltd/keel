@@ -9,6 +9,11 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- The context-watch stop text asks for a `session: <id>` line in the handoff, and `PreCompact`
+  keeps a handoff only when it is newer than the stop marker and carries this session's line; a
+  marker it cannot remove has its mtime set to now, and only a failed touch writes the stderr line;
+  a session id holding `/`, `\`, `..` or a NUL names the `nosession` state files, in
+  `lib/context_watch.py` and in `hooks/context-watch`'s cached shortcut alike.
 - The context watchdog measures 0 past a main-thread `compact_boundary` entry until a new assistant
   turn reports usage, so it neither warns nor stops on the pre-compaction figure, and a boundary in
   the transcript's tail settles that without reading the whole file; `PreCompact` removes the

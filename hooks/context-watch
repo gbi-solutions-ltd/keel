@@ -66,6 +66,10 @@ if [ "$fast" = 1 ]; then
         tail="${tail#*\"}"
         session="${tail%%\"*}"
     fi
+    # The rule _state_path applies in lib/context_watch.py: an id that could name a file outside the
+    # state directory is read as no session. A bash string cannot hold a NUL, so there is no fourth
+    # pattern, and a JSON-escaped one arrives as text holding a backslash.
+    case "$session" in *'/'*|*\\*|*'..'*) session="" ;; esac
 
     cache="${TMPDIR:-/tmp}/keel-context-watch/${session:-nosession}.measure"
     if [ -f "$cache" ]; then
