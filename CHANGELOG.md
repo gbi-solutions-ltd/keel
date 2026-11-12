@@ -9,6 +9,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- `review-code` quotes a plan-end checkpoint only when `git cat-file -t <sha>` prints `tree` and
+  `git diff --name-only <sha> HEAD` exits 0, so a fresh clone without the note's tree runs the
+  suite. ADR-0017 records the amendment.
 - `review-code`'s conditions for quoting the plan-end checkpoint are in its new
   `references/step-detail.md`; the coordinator runs a checkpoint's suite only when
   `git status --porcelain` shows staged entries alone; a `KEEL_TEST_FILES` run with no

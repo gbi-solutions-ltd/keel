@@ -866,7 +866,7 @@ checked by a reader against the diff and by the greps in `Done when:`.
 docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md` prints at least `1` for
 each file.
 
-- [ ] **Step 12.1: Make the change and check it**
+- [x] **Step 12.1: Make the change and check it** Note: No-test task; examples checked by the spec reviewer against the diff and Done when (validate-skills 134/0, validate-citations 64/0, doc-claims 65/0, eval-harness 115/0, greps 1 and 1); reviewer confirmed it fails closed (made-up sha: cat-file 128, diff 128)
 
 Edit as the behaviours say.
 Run: the `Done when:` commands and the lint command. Run no `tests/run-tests.sh`: the coordinator
@@ -874,7 +874,7 @@ runs the plan-end checkpoint after this task.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 12.2: Hand over**
+- [x] **Step 12.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; suite: pass at tree 2092d13
 
 ```bash
 git add skills/review-code/references/step-detail.md \

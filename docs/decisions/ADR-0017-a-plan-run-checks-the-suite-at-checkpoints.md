@@ -159,3 +159,12 @@ This replaces "A plan with no `**Suite checkpoints:**` line runs its steps as wr
 Decision as the whole rule; that sentence now holds only after a no or below 3 open tasks. "What
 this forecloses" stands: a plan whose line is left out, and whose offer is declined, keeps the
 per-unit suite.
+
+**2026-11-12, decided by Bernard Tebandeke: `review-code` reuses a checkpoint only when its tree
+is here.** Finding L-01 of
+[the security audit](../audits/2026-11-12-security-plan-execution-speed-2.md): the note's tree comes
+from `git write-tree` and no commit holds it, so a fresh clone, a cloud session or `git gc` lacks
+it, and `git diff --name-only <sha> HEAD` then exits 128 with empty output, which read as "nothing
+outside `docs/plans/`" and let a stale note skip the suite on code it never checked. The diff
+condition above now also needs `git cat-file -t <sha>` to print `tree` and the `git diff` to exit
+0; a failed command means `review-code` runs the suite.
