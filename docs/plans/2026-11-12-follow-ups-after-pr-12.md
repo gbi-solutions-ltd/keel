@@ -555,7 +555,7 @@ further re-review, then ship.
 **Done when:** `tests/test-done-guard.sh`, `tests/test-context-watch.sh`,
 `tests/test-validate-citations.sh` and `tests/test-harness-claims.sh` pass.
 
-- [ ] **Step 8.1: Build it test first**
+- [x] **Step 8.1: Build it test first** Note: reds quoted: fallback cases 102/2, Run-it assertion under the named mutant 103/1; spec COMPLIES, no correctness findings: the fallback filter keeps every prefix that should count and drops wrapper-only and empty ones; done-guard 104/0; no further re-review by Bernard's choice
 
 Follow `keel:tdd`. Behaviour 1 pins code that is right: add the assertion and prove it with the
 named mutant in a throwaway worktree or copy. Behaviour 2's cases fail first. Quote each red.
@@ -563,7 +563,7 @@ Run: the `Done when:` commands and the lint command. Run no `tests/run-tests.sh`
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 8.2: Hand over**
+- [x] **Step 8.2: Hand over** Note: rounds: 1; routing: inherit; loop: full; suite: pass at tree 9fc2f43
 
 ```bash
 git add hooks/done-guard hooks/context-watch CHANGELOG.md tests/test-done-guard.sh

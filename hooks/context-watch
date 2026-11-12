@@ -73,9 +73,9 @@ if [ "$fast" = 1 ]; then
 
     # The cache is read only from the per-user TMPDIR directory, and only when that is a real
     # directory this user owns. -O alone is true for a symlink to a directory we own, so -L rules
-    # it out. Unlike _private_dir, this does not test for mode 0700: the cache file must also pass
-    # -f, ! -L and -O, which no other user can arrange, and a low reading only allows what python
-    # would. Anything else, including the XDG_CACHE_HOME fallback, falls through to python.
+    # it out. Unlike _private_dir, this does not test for mode 0700: a looser directory still serves
+    # only a cache file this user owns that is not a symlink (-f, ! -L, -O). A low reading allows
+    # only what python would; anything else, the XDG_CACHE_HOME fallback too, goes to python.
     sdir="${TMPDIR:-/tmp}/keel-context-watch-$EUID"
     cache="$sdir/${session:-nosession}.measure"
     if [ -d "$sdir" ] && [ ! -L "$sdir" ] && [ -O "$sdir" ] \

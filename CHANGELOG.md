@@ -9,6 +9,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- done-guard's regex fallback, for a command shlex cannot split, uses only the scoped prefixes
+  that can count, so `sh {script}` does not count `shellcheck 'x` and `./{script}` does not count
+  `./configure 'x`; a test pins `Run it` in a block reason that names `verify.test` alone.
 - done-guard's block reason names only scoped prefixes that can count, so `sh {script}` is not
   offered as a test run, and a prefix that is only `./`, as in `./{script}`, counts nothing where
   it counted every command; tests pin context-watch's refusal of a state directory symlinked to a

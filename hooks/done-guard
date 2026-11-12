@@ -140,8 +140,6 @@ if not test_cmd:
 # `tests/*.sh` is no run. An empty prefix would begin every command; a shared one is named once.
 scoped = list(dict.fromkeys(p for p in (str(verify.get(k) or "").split("{", 1)[0].strip()
                                         for k in ("test_affected", "test_one")) if p))
-# The anchored regex, kept for a command shlex cannot tokenise, so the hook never errors on one.
-fallback_marks = [r"(?:^|[;|(\n]|&&)\s*" + re.escape(p) for p in scoped]
 
 SEPARATORS = set(";&|()\n")
 KEYWORDS = ("{", "}", "then", "do", "else")
@@ -201,8 +199,8 @@ def leading(words):
     return words
 
 # shlex strips the command's quotes, so the prefix's go too: a cut at `{` leaves `'*`, which shlex
-# refuses. Bare quotes count none. It loosens any quote just before `{`, which once matched nothing:
-# `bash -c '{cmd}'` now counts every `bash -c` command, and `pytest -k '{name}'` every `pytest -k`.
+# refuses. Bare quotes count none. A quote just before `{` is dropped, so `bash -c '{cmd}'` counts
+# every `bash -c` command, and `pytest -k '{name}'` every `pytest -k`.
 # A prefix that is only a wrapper, as `sh {script}` is, names no test and counts nothing. Its last
 # word is matched as a start only where the text before `{` ends inside a word, as `tests/{name}`
 # does; after a space or a quote that word is complete, so `pytest` does not count `pytest-watch`.
@@ -214,6 +212,8 @@ def prefix(head):
 
 prefix_words = [prefix(str(verify.get(k) or "").split("{", 1)[0])
                 for k in ("test_affected", "test_one")]
+# The anchored regex, for a command shlex cannot tokenise, built from the prefixes that can count.
+fallback_marks = [r"(?:^|[;|(\n]|&&)\s*" + re.escape(p) for p in scoped if prefix(p)[0]]
 
 def begins(words, pw, open_end):
     n = len(pw)

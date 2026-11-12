@@ -659,6 +659,10 @@ quote_case block "./{script}" "ls -la"
 quote_case block "sh ./{script}" "echo hi"
 quote_case quiet "./tests/{name}" "./tests/x.sh"
 quote_case quiet "./tests/{name}" "tests/x.sh"
+# A command shlex cannot split falls back to the regular expression, which uses only the prefixes
+# that can count, so a wrapper-only or `./`-only prefix counts nothing there either.
+quote_case block "sh {script}" "shellcheck 'x"
+quote_case block "./{script}" "./configure 'x"
 
 # The block reason names only prefixes that can count. One that is only a wrapper names no test, so
 # naming it would send the reader to a command the hook then ignores.
@@ -673,6 +677,8 @@ if printf '%s' "$out" | grep -q '"decision": *"block"' \
 else
     printf '  FAIL  %s (got: %s)\n' "$what" "$out"; fail=$((fail+1))
 fi
+# Naming verify.test alone, the reason says `Run it`; naming more, it says `Run one`.
+reason_has "a reason naming only verify.test says Run it" "$out" "Run it and report" yes
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
