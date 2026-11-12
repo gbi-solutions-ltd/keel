@@ -9,6 +9,8 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- `write-plan` searches the live documents for the behaviour each task changes and lists every hit
+  in that task's `Files`, leaving records unsearched; the plan reviewer asks the same question.
 - A plan's header carries `**Commits that ask:**`, naming the tasks that stage `hard_block_paths`,
   which are ordered early and stated at approval; before committing a `loop: full` task the
   `execute-plan` coordinator sends a `PushNotification` where that tool exists.

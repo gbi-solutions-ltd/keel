@@ -40,7 +40,8 @@ fails.
 
 ## Step 2: Map the files before writing tasks
 
-List every file to create or modify and what each is responsible for.
+List each file created or modified and its job, live documents included
+([references/plan-template.md](references/plan-template.md)).
 
 **Where the area to map is larger than you can hold, delegate the reading**: subagents in one
 message, delegation profile `keel-fanout`, with each dispatch's description starting

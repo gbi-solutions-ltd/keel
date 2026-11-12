@@ -48,7 +48,7 @@ depending on a file no task creates, every behaviour has an example, and step id
 Read the source files the plan names before answering. A finding without a `path:line` behind it
 is a guess, and says so.
 
-Answer six questions.
+Answer seven questions.
 
 1. Every symbol a task consumes: does it exist in the code today, or does a named task in this
    plan create it? List each one and which. A consumed function that neither exists nor is created
@@ -69,6 +69,9 @@ Answer six questions.
    build command that does not currently run cleanly. Say what would go wrong and when.
 6. What would you not know how to build if you were handed one task and nothing else? Name the
    task and the missing decision.
+7. Does each task's `Files` name every live document the change makes wrong? Search the
+   documents that say what is true now, not records such as plans, ideas, decisions or released
+   changelog entries, for the behaviour each task changes, and name each hit no task lists.
 
 Rank findings: blocking, should fix, consider. If nothing blocks, say so in the first line.
 ```

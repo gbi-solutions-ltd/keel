@@ -616,7 +616,7 @@ reader against the diff and by the greps in `Done when:`.
 `grep -c 'live document' skills/write-plan/SKILL.md skills/write-plan/references/plan-review.md`
 prints at least `1` for each file.
 
-- [ ] **Step 8.1: Make the change and check it**
+- [x] **Step 8.1: Make the change and check it** Note: No-test task; examples checked by the spec reviewer against the diff and Done when (validate-skills 134/0, validate-citations 64/0, grep 1 and 1); write-plan body 682 before and after; records list matches validate-citations.sh's record case; follow-ups: CHANGELOG worded two ways in the template, docs/snapshot.md counted live, one early line break
 
 Edit as the behaviours say.
 Run: the `Done when:` commands and the lint command. Run no `tests/run-tests.sh`: the plan header
@@ -624,7 +624,7 @@ names suite checkpoints.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 8.2: Hand over**
+- [x] **Step 8.2: Hand over** Note: rounds: 1; routing: inherit; loop: light
 
 ```bash
 git add skills/write-plan/SKILL.md skills/write-plan/references/plan-template.md \

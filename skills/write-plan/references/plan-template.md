@@ -179,6 +179,23 @@ there uncommitted, someone's debugging edit, a half-finished experiment, gets sw
 task's commit and attributed to work that never touched it. A batch is not what makes `git add -A`
 dangerous; a non-empty `git status` is, and that can be true on task 1 of a serial plan.
 
+### Live documents in a task's Files
+
+**When mapping the files, search the live documents for the behaviour each task changes, and list
+every hit in that task's `Files`.** Search by the names, commands and phrases a reader would look
+for. A change lands with the live documents it makes wrong, and an implementer reads only its own
+task. Live documents say what is true now: every document that is not a record. In keel they are
+`README.md` and the other root documents, `docs/NN-*.md`, `docs/runbooks/`, `skills/`, `agents/`,
+`templates/` (`templates/profile.schema.json` among them), the generated `docs/profile-keys.md`
+and the other files directly under `docs/`. Records are not
+searched: the ones the citation paragraph under "Global constraints" names (`docs/plans`,
+`docs/ideas`, `docs/prd`, `docs/stories`, `docs/architecture`, `docs/decisions`, `docs/audits`,
+`docs/07-open-decisions.md`, `docs/harness-support.md`, the eval fixtures) and the `CHANGELOG.md`
+entries already released. Where the two lists overlap, the file is a record.
+
+It costs the measured resumes: on the 2026-11-11 run, 4 of 13 tasks stopped because their Files
+missed a document the change made wrong, about 30 minutes.
+
 ### Why the Interfaces block exists
 
 A task's implementer may see only their own section. `Consumes` tells them the exact signatures
