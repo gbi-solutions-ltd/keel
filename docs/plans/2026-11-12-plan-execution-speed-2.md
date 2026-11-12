@@ -65,6 +65,8 @@ working repository at task 3's checkpoint.
 **Task 11 added:** 2026-11-12, from `review-code` on 57d4f44..a6c55bf (two blocking surviving
 mutants, one should-fix against ADR-0011), as `review-code` step 5 sends blocking findings back
 before its one re-review.
+**Task 12 added:** 2026-11-12, from the security audit's L-01; Bernard chose to fix it before
+shipping.
 **Shape:** behaviours with examples.
 
 ## Global constraints
@@ -830,3 +832,55 @@ git status --porcelain
 Stage exactly those paths, and any flagged citation repairs by name, and stop. **Do not commit.**
 The coordinator commits after both review passes, with
 `git commit -m "fix(review): pin the subagent rule, checkpoint conditions in step detail"`.
+
+---
+
+### Task 12: the checkpoint reuse rule needs the diff to succeed
+
+**Story:** security audit `docs/audits/2026-11-12-security-plan-execution-speed-2.md`, L-01 (Low,
+confirmed): `git diff --name-only <tree> HEAD` exits 128 with empty output when the tree is absent
+(a fresh clone or a cloud session never has a `git write-tree` tree no commit holds), and the rule
+reads empty output as "nothing outside `docs/plans/`", so a stale note would let `review-code` skip
+its own suite run on untested code. Bernard chose on 2026-11-12 to fix it before shipping.
+**Files:**
+- Modify: `skills/review-code/references/step-detail.md`
+- Modify: `docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md`
+- Modify: `CHANGELOG.md`
+
+**Depends on:** task 11
+
+**Behaviours:** this task changes skill text and an ADR and has no failing test; each example is
+checked by a reader against the diff and by the greps in `Done when:`.
+
+1. The reuse conditions require the note's tree to exist here and the diff to succeed: `git
+   cat-file -t <sha>` prints `tree`, and `git diff --name-only <sha> HEAD` exits 0 and names
+   nothing outside `docs/plans/`; a failed command means run the suite. Example: `step-detail.md`
+   contains `git cat-file -t` and `exits 0`.
+2. ADR-0017's `Amended` section, which states the conditions, gains a dated line recording the
+   added condition and why (the audit finding), without rewriting the earlier entries. Example:
+   ADR-0017 contains `git cat-file -t`.
+
+**Done when:** `tests/test-validate-skills.sh`, `tests/test-validate-citations.sh`,
+`tests/test-doc-claims.sh` and `tests/test-eval-harness.sh` pass, and
+`grep -c 'git cat-file -t' skills/review-code/references/step-detail.md
+docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md` prints at least `1` for
+each file.
+
+- [ ] **Step 12.1: Make the change and check it**
+
+Edit as the behaviours say.
+Run: the `Done when:` commands and the lint command. Run no `tests/run-tests.sh`: the coordinator
+runs the plan-end checkpoint after this task.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+This is the one boundary run the task schedules.
+
+- [ ] **Step 12.2: Hand over**
+
+```bash
+git add skills/review-code/references/step-detail.md \
+        docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md CHANGELOG.md
+git status --porcelain
+```
+
+Stage exactly those paths and stop. **Do not commit.** The coordinator commits after the review
+pass, with `git commit -m "fix(review-code): reuse a checkpoint only when its tree is here"`.
