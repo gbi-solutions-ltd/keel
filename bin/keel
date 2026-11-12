@@ -4751,8 +4751,13 @@ plan_tick() {
     local usage="usage: keel plan tick <plan> <id> [<id> ...] [--note <text> | --defer <reason> | --not-applicable <reason>]"
     [ "$#" -gt 0 ] && shift
     # Ids run up to the first argument starting --, one a line, since awk splits them on newlines.
+    # An argument holding a newline would split into several ids, so it is refused before the lock.
     while [ "$#" -gt 0 ]; do
-        case "$1" in --*) break ;; "") die "$usage" ;; esac
+        case "$1" in
+            --*) break ;;
+            "") die "$usage" ;;
+            *$'\n'*) die "not one id: an id must be one line, since the ids are read one a line" ;;
+        esac
         ids="$ids$1"$'\n'; shift
     done
     opt="${1:-}" text="${2:-}"

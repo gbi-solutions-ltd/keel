@@ -308,7 +308,7 @@ The coordinator commits after both review passes, with
 
 **Done when:** `tests/test-plan.sh` and `tests/test-run-tests.sh` pass.
 
-- [ ] **Step 4.1: Build it test first**
+- [x] **Step 4.1: Build it test first** Note: red 623/1 quoted (both steps ticked from one newline argument); test-plan 624/0, test-run-tests 17/0; spec COMPLIES: newline refused before lock and any write, unconditional mkdir creates no unexpected .keel/
 
 Follow `keel:tdd`. Write behaviour 1's case after the several-ids tick cases.
 Run: `tests/test-plan.sh`
@@ -321,7 +321,7 @@ boundary. Run no `tests/run-tests.sh` as the suite: the plan header names suite 
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 4.2: Hand over**
+- [x] **Step 4.2: Hand over** Note: rounds: 1; routing: inherit; loop: light
 
 ```bash
 git add bin/keel tests/test-plan.sh tests/run-tests.sh CHANGELOG.md

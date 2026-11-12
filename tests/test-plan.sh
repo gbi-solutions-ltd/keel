@@ -464,6 +464,17 @@ out="$("$KEEL" plan tick "$p" 1.1 9.9 2>&1)"; rc=$?
   && ok "tick with an unknown id among several changes nothing and names it" \
   || bad "tick several ids, one missing" "rc=$rc out=$out, plan now: $(cat "$p")"
 
+# Ids reach awk one a line, so an argument holding a newline would be split into two ids and tick
+# both steps; it must be refused as not one id.
+p="$d/several-newline.md"
+mkplan "$p" '- [ ] **Step 1.1: a**' '- [ ] **Step 1.2: b**'
+cp "$p" "$d/several-newline.before"
+out="$("$KEEL" plan tick "$p" "$(printf '1.1\n1.2')" 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && cmp -s "$p" "$d/several-newline.before" \
+  && case "$out" in *"an id must be one line"*) true ;; *) false ;; esac \
+  && ok "tick refuses an id holding a newline as not one id and changes nothing" \
+  || bad "tick newline id" "rc=$rc out=$out, plan now: $(cat "$p")"
+
 help="$("$KEEL" --help 2>&1)"
 case "$help" in
   *'plan tick <plan> <id> [<id> ...]'*) ok "keel --help lists plan tick with several ids" ;;

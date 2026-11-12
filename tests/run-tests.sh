@@ -155,9 +155,10 @@ wall=$(( $(date +%s) - run_start ))
 # The durations are rewritten for the next run, gathered while the logs replay and written once at
 # the end, so a run stopped during the jobs leaves the last record in place. This is the one file
 # the runner writes into the repository's tree, and a partial run with no KEEL_TEST_DURATIONS skips
-# the write.
+# the write. The file's directory is made on every run: a partial run that writes no file leaves at
+# most an empty .keel/, which git never tracks.
 failed=0
-[ "$RECORD" -eq 0 ] || mkdir -p "$(dirname "$DURATIONS")"
+mkdir -p "$(dirname "$DURATIONS")"
 : > "$LOG_DIR/durations"
 for i in $order; do
     read -r rc elapsed < "$LOG_DIR/$i.meta"

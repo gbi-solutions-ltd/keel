@@ -9,6 +9,8 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- `keel plan tick` refuses an id holding a newline as not one id, before taking the lock, and
+  changes nothing; `tests/run-tests.sh` makes the durations file's directory on every run.
 - context-watch keeps its state in `$TMPDIR/keel-context-watch-<euid>`, used only when it is a real
   directory this user owns at mode 0700, with `${XDG_CACHE_HOME:-$HOME/.cache}/keel-context-watch`
   as the fallback; the bash cached shortcut reads only the first, and only a cache file this user
