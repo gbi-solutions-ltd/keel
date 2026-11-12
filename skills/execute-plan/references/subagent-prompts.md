@@ -146,7 +146,10 @@ Answer six questions:
    adjacent instead? For a task with no test, quote the line of the diff, or the check output, that
    produces each behaviour's example. For a task with no behaviours list, in the older shape, does
    the test assert the behaviour the task describes?
-4. Did the verify commands run, and did they pass? Quote the output rather than the claim.
+4. Did the verify commands run, and did they pass? Quote the output rather than the claim. Re-run
+   the task's `Done when:` commands yourself: they take seconds and are the one independent check
+   that the report is real. But do not run `verify.test` or the lint command; quote the report's
+   output for those instead.
 5. Is the output of the task's `Done when:` command in the report? Absence is DEVIATES on its own,
    however good the code looks: an unrun done condition means nothing here has been checked.
 6. Does the report quote a failing run from before the implementation, for the reason the task
@@ -166,6 +169,11 @@ which is exactly why a reviewer under time pressure skips it. Question three is 
 most real problems. A test that passes while asserting something adjacent to the requirement is the
 most common way a task looks done and is not.
 
+Question four keeps the reviewer to the scoped re-run. Across three sessions, 24 of 62 spec
+reviewers ran the full suite, minutes each, to re-check output the report already quoted. The
+`Done when:` commands take seconds and are the check only the reviewer can make independently;
+the suite runs at the coordinator's checkpoints.
+
 ## 3. Code quality review
 
 Only once pass one returns COMPLIES.
@@ -181,7 +189,8 @@ Review the quality of this work. It already matches its task; that is settled.
 
 Look for: correctness bugs the tests would not catch, error and edge cases missed, duplication of
 something that already exists in this codebase, a guard added at a leaf where the boundary was the
-right place, and anything contradicting the standards above.
+right place, and anything contradicting the standards above. Scoped tests are fine to run to
+check a finding; do not run `verify.test` or the lint command.
 
 Do not change the tree you are judging. Run no git command that changes its index, working tree or
 stash: no `stash`, `checkout`, `restore`, `reset`, `commit`, or `git add` of a file. Read it with

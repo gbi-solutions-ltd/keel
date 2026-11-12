@@ -9,6 +9,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- The execute-plan spec and quality review prompts tell reviewers not to run `verify.test` or
+  the lint command; the spec reviewer re-runs the task's `Done when:` commands and quotes the
+  report's output for the rest.
 - Every `mktemp -d` in `tests/*.sh` is checked: when it fails or prints no directory, the test
   file stops with a message naming mktemp, from a subshell too, before a fixture's git command
   can fall back to this repository; `tests/keel-test-lib.sh` has `keel_tmpdir`, and

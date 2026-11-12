@@ -402,7 +402,7 @@ a reader against the diff and by the greps in `Done when:`.
 `tr '\n' ' ' < skills/execute-plan/references/subagent-prompts.md | grep -o 'do not run
 \`verify.test\`' | wc -l` prints at least `2` (joined first, since a phrase may wrap).
 
-- [ ] **Step 4.1: Make the change and check it**
+- [x] **Step 4.1: Make the change and check it** Note: No-test task; examples checked by the spec reviewer against the diff and Done when (validate-skills 134/0, validate-citations 64/0, grep 3 of which 2 new at the spec and quality prompts); eval-harness 115/0
 
 Edit the prompts as the behaviours say, keeping each prompt a fenced block the coordinator pastes.
 Run: the `Done when:` commands and the lint command. Run no `tests/run-tests.sh`: the plan header
@@ -410,7 +410,7 @@ names suite checkpoints.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 4.2: Hand over**
+- [x] **Step 4.2: Hand over** Note: rounds: 1; routing: inherit; loop: light
 
 ```bash
 git add skills/execute-plan/references/subagent-prompts.md CHANGELOG.md
