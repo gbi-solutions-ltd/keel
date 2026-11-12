@@ -18,8 +18,9 @@ Run the whole suite, as the boundary always did, in either case:
 
 ## The start record across units
 
-The first unit's start record costs one full `verify.test`. It is the only run that sees every red,
-because an affected run sees only what it selects. Every later unit's start record is the previous
+The first unit's start record costs one full `verify.test`, unless a plan run hands it to you (the
+next section). It is the only run that sees every red, because an affected run sees only what it
+selects. Every later unit's start record is the previous
 one carried forward:
 
 - **A red stays on the record until a run shows that test passing.** An affected run that does not
@@ -35,6 +36,28 @@ Two examples:
 - A test was red before the work started. Unit 2's boundary run selected it and saw it pass, so it
   dropped off the record. Unit 4 breaks it again. Unit 4's start record no longer holds it, so the
   red is **unmatched** and goes to `keel:debug`. Fixed means fixed: a break after the fix is new.
+
+## When a plan run hands you the start record
+
+Under `keel:execute-plan`, in a plan whose header has a `**Suite checkpoints:**` line, the
+coordinator hands you the last checkpoint's record, its commit and the reds still on it, in the
+prompt's `=== START RECORD ===` block.
+`docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md` amends ADR-0006 and
+ADR-0009 for such a unit only, because on a measured plan run the suite, run twice per task, took
+22% of the wall clock:
+
+- **The handed record replaces the first unit's full run.** Run no `verify.test` for it; the
+  coordinator runs the suite at checkpoints.
+- **Each unit boundary is the task's `Done when:` and the lint command, plus `verify.test_affected`
+  where the profile sets it,** `{base}` the record's commit, and no `verify.test`. The fallbacks
+  above do not apply: the `Done when:` runs the unit's own cases, and the next checkpoint runs the
+  whole suite.
+
+Example: the record names commit `abc1234` and one red, `test_export_totals`. Unit 1 runs no suite,
+and its boundary runs the task's `Done when:` and the lint command. `test_export_totals` shows red
+in that run and is on the record, so it is matched: record it and carry on.
+
+Outside a plan run, or in a plan with no checkpoint line, this section does not apply.
 
 ## Which units an unmatched red names
 

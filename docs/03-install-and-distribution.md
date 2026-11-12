@@ -452,12 +452,13 @@ A plan with no step ids, such as one written before steps carried them, is unadd
 and `tick` say so, change nothing, and exit 3, and the plan is read and ticked by hand.
 
 ```bash
-keel plan tick <plan> <id> [--note <text> | --defer <reason> | --not-applicable <reason>]
+keel plan tick <plan> <id> [<id> ...] [--note <text> | --defer <reason> | --not-applicable <reason>]
 ```
 
-Marks one step done, rewriting only its line. `--note` writes ` Note: <text>` after the step's
-title, for a step the ticker did not witness; a note holding a newline is refused. An id the plan
-does not hold, or holds twice, changes nothing and exits 1.
+Marks each named step done, rewriting only their lines, under one lock and with the same option for
+each. `--note` writes ` Note: <text>` after the step's title, for a step the ticker did not witness;
+a note holding a newline is refused. An id the plan does not hold, or holds twice, changes nothing,
+not even the other ids, and exits 1 naming it.
 A plan with no step ids changes nothing and exits 3; a fence that never closes is reported, exit 1,
 rather than read as a plan without ids.
 `--defer` and `--not-applicable` park the step instead, writing ` Deferred: <reason>` or

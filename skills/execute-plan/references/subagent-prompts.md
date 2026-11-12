@@ -36,6 +36,14 @@ listed behaviour with no example makes the task not executable as written: stop 
 task that says it has no test, its examples are checked by its check command or a reader: write no
 test for them. A task with no behaviours list, in the older shape, is followed as written.
 
+=== START RECORD ===
+<the last checkpoint's commit and the tests red on it, or `none`; omit this block, rule and all,
+where the plan header has no `**Suite checkpoints:**` line>
+Take this as your first start record and do not run `verify.test`, for it or at any unit boundary.
+End each unit with the task's `Done when:` and the lint command, plus `verify.test_affected` where
+the profile sets it, `{base}` the commit above. The coordinator runs the suite at checkpoints; a
+run of it here is the per-task cost they exist to remove. Match each red against this record.
+
 === RULES ===
 - Follow the steps in order. Inside the build step follow `keel:tdd`: the test must fail, for the
   reason the task names, before you write the implementation. Do not skip that run.
@@ -62,11 +70,18 @@ test for them. A task with no behaviours list, in the older shape, is followed a
 - Never run `git stash` other than `git stash list` or `git stash show`; a hook refuses it. The
   stash is shared by every worktree, and a stash empties the tree, so status reads clean while it
   hides your whole diff from the coordinator.
+- Run every command in the foreground, never with `run_in_background` and never with a trailing
+  `&`, and give a long command the Bash `timeout` it needs, up to 600000 ms. If the harness
+  moves a command to the background anyway, wait for it to finish before ending your turn. Do not
+  end your turn while anything you started is still running: the coordinator reads your stop as
+  your report.
 
 === REPORT ===
-Finish with: which steps you completed, the exact output of each verify command, anything you
-noticed and deliberately left alone, and anything that blocked you. Quote the output of the failing
-run that came before the implementation.
+Finish with: which steps you completed; for each verify command, the command, its exit code and its
+summary lines (at most 15: for a test runner, the per-package or per-file pass and fail lines and
+the totals), plus every failing case in full; anything you noticed and deliberately left alone; and
+anything that blocked you. From the failing run that came before the implementation, quote the
+failing case and its message, not the whole run.
 
 Name separately any step you did not perform, or whose outcome you did not see: a test passing on
 arrival is not "watch it fail". It is not completed, and whoever ticks the box needs to know.
@@ -74,10 +89,17 @@ arrival is not "watch it fail". It is not completed, and whoever ticks the box n
 Paste `git status --porcelain` as your last line. If it lists a path this task does not name, say so
 rather than staging it.
 
-Run the task's `Done when:` command after your last code change and paste its output. If you did not
-run it, say so in your first line. A report claiming completion with no command output in it is
-rejected and re-dispatched, which costs more than saying you skipped it.
+Run the task's `Done when:` command after your last code change and give its summary lines and every
+failing case in full, not its whole output. A GREEN run of exactly the `Done when:` commands, with
+no change after it, is that run: do not run them a second time. If you did not run it, say so in
+your first line. A report claiming completion with no command output in it is rejected and
+re-dispatched, which costs more than saying you skipped it.
 ```
+
+The report asks for summaries, not whole outputs, because every report lands in your context and
+stays there for the rest of the run. On 2026-11-09 the implementer reports were the largest item in
+a coordinator's context, 186,525 characters over 10 tasks, and that is what drove the run into the
+context stop. The review prompts below carry a length cap for the same reason.
 
 Paste the standards too, and not a path to them. The review prompt below offers the path as an
 option because a reviewer goes looking for what to judge against; an implementer writes to what is
@@ -112,6 +134,12 @@ as one held in `"$wt"`, and `TMPDIR` is often unset on Linux.
 On 2026-10-12 a spec reviewer ran `git stash` on the tree under review to measure a baseline, and a
 quality reviewer left a worktree behind.
 
+Run every command in the foreground, never with `run_in_background` and never with a trailing
+`&`, and give a long command the Bash `timeout` it needs, up to 600000 ms. If the harness
+moves a command to the background anyway, wait for it to finish before ending your turn. Do not
+end your turn while anything you started is still running: the coordinator reads your stop as your
+report.
+
 Answer six questions:
 1. Is every step's stated outcome actually present?
 2. Is anything here that no step asked for? Name it.
@@ -119,7 +147,10 @@ Answer six questions:
    adjacent instead? For a task with no test, quote the line of the diff, or the check output, that
    produces each behaviour's example. For a task with no behaviours list, in the older shape, does
    the test assert the behaviour the task describes?
-4. Did the verify commands run, and did they pass? Quote the output rather than the claim.
+4. Did the verify commands run, and did they pass? Quote the output rather than the claim. Re-run
+   the task's `Done when:` commands yourself: they take seconds and are the one independent check
+   that the report is real. But do not run `verify.test` or the lint command; quote the report's
+   output for those instead.
 5. Is the output of the task's `Done when:` command in the report? Absence is DEVIATES on its own,
    however good the code looks: an unrun done condition means nothing here has been checked.
 6. Does the report quote a failing run from before the implementation, for the reason the task
@@ -127,13 +158,22 @@ Answer six questions:
    the behaviour as already satisfied on arrival. A task with no test is exempt.
 
 Verdict: COMPLIES or DEVIATES, then the reasons. Deviating is not a failure to be softened; it is
-the finding.
+the finding. End a DEVIATES verdict with a `Fix scope:` line: the list of what must change, or
+`redo` when the approach itself is wrong.
+
+Put the verdict on the first line. Keep the report to at most 250 words, and quote command output
+only where it is the evidence for a finding.
 ```
 
 Questions four to six cannot be answered by reading the diff, and five is the cheapest of all,
 which is exactly why a reviewer under time pressure skips it. Question three is the one that catches
 most real problems. A test that passes while asserting something adjacent to the requirement is the
 most common way a task looks done and is not.
+
+Question four keeps the reviewer to the scoped re-run. Across three sessions, 24 of 62 spec
+reviewers ran the full suite, minutes each, to re-check output the report already quoted. The
+`Done when:` commands take seconds and are the check only the reviewer can make independently;
+the suite runs at the coordinator's checkpoints.
 
 ## 3. Code quality review
 
@@ -150,7 +190,8 @@ Review the quality of this work. It already matches its task; that is settled.
 
 Look for: correctness bugs the tests would not catch, error and edge cases missed, duplication of
 something that already exists in this codebase, a guard added at a leaf where the boundary was the
-right place, and anything contradicting the standards above.
+right place, and anything contradicting the standards above. Scoped tests are fine to run to
+check a finding; do not run `verify.test` or the lint command.
 
 Do not change the tree you are judging. Run no git command that changes its index, working tree or
 stash: no `stash`, `checkout`, `restore`, `reset`, `commit`, or `git add` of a file. Read it with
@@ -164,8 +205,18 @@ as one held in `"$wt"`, and `TMPDIR` is often unset on Linux.
 On 2026-10-12 a spec reviewer ran `git stash` on the tree under review to measure a baseline, and a
 quality reviewer left a worktree behind.
 
+Run every command in the foreground, never with `run_in_background` and never with a trailing
+`&`, and give a long command the Bash `timeout` it needs, up to 600000 ms. If the harness
+moves a command to the background anyway, wait for it to finish before ending your turn. Do not
+end your turn while anything you started is still running: the coordinator reads your stop as your
+report.
+
 Rank findings: blocking, should fix, consider. Cap at ten. If nothing blocks, say so in the first
-line.
+line. If something blocks, end with a `Fix scope:` line: the list of what must change, or `redo`
+when the approach itself is wrong.
+
+Put the verdict on the first line. Keep the report to at most 250 words, and quote command output
+only where it is the evidence for a finding.
 ```
 
 [../../keel/references/reporting-findings.md](../../keel/references/reporting-findings.md) carries
@@ -196,8 +247,8 @@ just before committing, and take that verdict.
   `git status` and `git log`, then ask.
 
 In the light loop the task gets one spec pass. COMPLIES: tick and commit, the tick note carrying
-`loop: light`. DEVIATES: **why the fix pass may build on the rejected attempt here**, where the full
-loop's rule below forbids it: the fix is scoped to what the verdict names, it is capped at one
+`loop: light`. DEVIATES: **why the fix pass may build on the rejected attempt here**, as the full
+loop's first fix pass below does: the fix is scoped to what the verdict names, it is capped at one
 round, and a second rejection goes to a person rather than to another agent. In order:
 
 1. One fix pass: a fresh implementer dispatch on the plan's routing, with the implementer's label,
@@ -233,6 +284,16 @@ because it can become true again halfway through a run that started clean. Stop 
 with what is there: committing, stashing and discarding are all reasonable and all the user's call.
 See [preconditions.md](preconditions.md).
 
+**Dispatch a review only on a report whose last line is the `git status --porcelain` paste.** A
+notification that the agent is waiting on its own background work is not the report: the agent has
+ended its turn, not its task, and the tree can still change under the reviewer. If an agent notifies
+again after its review was dispatched, the review is void: re-read `git status --porcelain` and
+re-dispatch the review on the final tree. The redone review does not count as an implementer round,
+because no implementer was dispatched again. On 2026-11-09, in session `07cd31ed`, a task 7
+implementer notified it had finished at 12:07:31, its spec review went out at 12:07:45, and the
+implementer woke on its own background work and finished again at 12:15:45, so the task needed a
+second review; task 9 repeated it, at 12:59:09 and then 13:04:50.
+
 After both passes, with pass one at COMPLIES and pass two carrying nothing `blocking`: tick the
 task's steps with `keel plan tick <plan> <id>`, **then commit**, with the paths and the message the
 task's hand-over step names, then dispatch the next. Where `keel` cannot run, or reports the plan
@@ -245,6 +306,12 @@ fallback, "cannot run" means `keel` is not installed or not on PATH. Any other f
 names what is wrong with the id or the plan, such as an id the plan does not hold, a fence that
 never closes, or a lock still held, and is fixed rather than bypassed by editing the plan by hand,
 which would reopen the race the lock closes.
+
+**Before committing a task whose `keel plan risk --staged` printed `loop: full`, send a
+`PushNotification`** naming the task and saying a commit approval is waiting, where that tool
+exists, then commit. `hooks/sensitive-guard` may ask at that commit, and only the person can answer
+it: the notification brings them to the prompt and answers nothing. Where the tool does not exist,
+nothing changes.
 
 **You commit, not the implementer.** The implementer stages and stops, unless its task's final step
 says otherwise, which only a batched task's does. This is the order the skill body already states,
@@ -266,30 +333,94 @@ note or after `; `. The note applies in inline mode too, where you implement and
 task was redone. Nothing decides a loop in inline mode: write the loop `keel plan risk`
 printed if you ran it, and otherwise leave the field out.
 
-**On a DEVIATES verdict in the full loop**, re-dispatch the same task to a fresh subagent with the
-review attached, rather than asking the original to fix it. A subagent that has already justified
-its approach will defend it, and you get a negotiation instead of a correction.
+**On a DEVIATES verdict in the full loop**, send the task to a fresh subagent with the review
+attached, rather than asking the original to fix it. A subagent that has already justified its
+approach will defend it, and you get a negotiation instead of a correction.
 
-**In the full loop, discard the first attempt before re-dispatching, and be explicit about what that
-means**, because "fresh subagent" is a claim about the tree as much as about the agent. Nothing was
-committed, so there is no history to rewrite: unstage and discard the working tree, and the second
-subagent starts from exactly the state the first one did. In a declared batch, reset or delete that
-task's worktree and do not merge it.
+**The first full-loop rejection whose `Fix scope:` is a list gets one fix pass**, as the light
+loop's does: a fresh implementer dispatch on the plan's routing, with the implementer's label,
+handed the staged attempt and the verdict and told to change only what the fix scope names. It
+counts toward `rounds`. In a declared batch it amends the task's commit with `git commit --amend`,
+and you re-resolve `<task-head>`. Then re-run the same `keel plan risk` command, and both passes
+again, spec then quality. [rationale.md](rationale.md) says why this is safe here.
 
-**In the full loop, never re-dispatch on top of the rejected attempt.** A fresh agent handed a tree
-containing work a reviewer just rejected reads it as the starting point and builds on it, which is
-how a DEVIATES verdict turns into two entangled problems instead of one corrected task. If the work
-was committed anyway, by an implementer that ignored its rules or a plan written before them, say so
-and stop: undoing a commit is the user's call, and it is the one repair this loop must not make
-silently.
+**A second full-loop rejection, or a first whose fix scope is `redo`, discards the attempt before
+re-dispatching, and be explicit about what that means**, because "fresh subagent" is a claim about
+the tree as much as about the agent. Nothing was committed, so there is no history to rewrite:
+unstage and discard the working tree, and the next subagent starts from exactly the state the first
+one did, `rounds` continuing. In a declared batch, reset or delete that task's worktree and do not
+merge it. A third rejection stops and asks the person, with every verdict.
+
+**After a discard, never re-dispatch on top of the rejected attempt.** A fresh agent handed a tree
+containing rejected work, with no fix scope to bound it, reads it as the starting point and builds
+on it, which is how a DEVIATES verdict turns into two entangled problems instead of one corrected
+task. If the work was committed anyway, by an implementer that ignored its rules or a plan written
+before them, say so and stop: undoing a commit is the user's call, and it is the one repair this
+loop must not make silently.
 
 **A `blocking` finding from the quality review is handled exactly as a DEVIATES verdict is**, and
 for the same reason: the tick is the gate, and a finding acted on only after the commit is a
-comment on history. Do not tick, do not commit. Discard the attempt and re-dispatch the task to a
-fresh subagent with the finding attached, as above. `should fix` and `consider` findings do not
+comment on history. Do not tick, do not commit. Send it to the fix pass or discard it, by the rules
+above, with the finding attached. `should fix` and `consider` findings do not
 stop the tick; they go in the Step 6 report beside the task they came from. The one way past a
 `blocking` finding without a fix is the user accepting it by name, and that acceptance is written
 into the plan file beside the task before its box is ticked.
+
+## Suite checkpoints
+
+A plan whose header has `**Suite checkpoints:** every N tasks` takes the whole suite out of the
+implementers and gives it to you, as
+`docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md` decides: on a measured run
+the suite, run twice per task, took 22% of the wall clock.
+
+**A plan with no such line and 3 or more open tasks is offered checkpoints before the first
+dispatch**, in one question to the person: every 3 tasks, the default. On a yes, write the header
+line and rewrite each open task's boundary step to the plan template's checkpoint form: its
+`Done when:` and the lint command, `verify.test_affected` where the profile sets it, and no
+`verify.test`. The rewrite changes only the boundary step's run lines; every other line of the task
+is kept, and a ticked step is not touched. Commit the plan alone as a repair,
+`docs(plans): <slug> suite checkpoints`, before dispatching. On a no, or with fewer than 3 open
+tasks, the plan runs as written, its steps naming the suite where they do.
+
+**Run `verify.test` before the first dispatch, after every N committed tasks, and after the last.**
+The first run is the plan-start record: its commit and the tests red on it. With N 3, a 10-task
+plan runs it at start and after tasks 3, 6, 9 and 10. Fill each implementer's
+`=== START RECORD ===` block with the last checkpoint's record, its commit and the reds still on
+it. The record is yours because you are the one agent that sees every task.
+
+**At a checkpoint task the order is fixed:**
+
+1. Its review passes, as "Running the loop" says.
+2. Run `verify.test` on the tree with the task staged, then `git write-tree` for that tree's sha.
+   Before the run, `git status --porcelain` shows only staged entries, no unstaged edit and no
+   untracked file; otherwise stage the task's remaining changes or stop before running it, so the
+   suite runs on the tree the note records.
+3. Tick its last step once, the note ending `; suite: pass at tree <tree sha>`, or
+   `; suite: red at tree <tree sha> <names>` with each red matched against the record, for example
+   `rounds: 1; routing: inherit; loop: full; suite: pass at tree 3f9a1c2`.
+4. Commit task and plan together, as for any task.
+
+So the suite result is in the one tick, no re-tick replaces the note, and the tree is clean before
+the next dispatch. Running the suite before the tick, not after the commit, keeps a red out of a
+commit whose note says nothing of it. The note names a tree, not a commit, because task and plan
+are committed after the run, so no commit it could name is HEAD.
+
+**A red not on the previous record stops the run before that tick.** Run `keel:debug` through
+Phase 3, naming as candidates the staged task and every task committed since the previous
+checkpoint: a red at the task-6 checkpoint names tasks 4, 5 and 6. An earlier task's selection may
+have hidden the break, so naming the staged task alone sends `debug` to the wrong diff.
+
+- If the staged task caused it, it is a rejection of that task, handled as the loop handles one.
+- If an earlier task did, tick and commit the staged task with
+  `suite: red at tree <tree sha> <names>`, and send Phase 4 to a fresh implementer as a task
+  appended to the plan, in the full loop, before any further dispatch. The earlier task is already
+  committed, so the fix can only be a new commit, and dispatching past a known red would let later
+  tasks build on it.
+
+`ship`, CI and a declared batch's join gate still run the whole suite, and remain the backstop for
+what a checkpoint has not yet seen. `review-code` does too, except that it quotes the plan-end
+`suite: pass at tree` note in place of its own run when HEAD differs from that tree only under
+`docs/plans/` and the working tree is clean, as its `references/step-detail.md` says.
 
 ## Which model each prompt goes to
 

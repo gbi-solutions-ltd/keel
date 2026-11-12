@@ -56,7 +56,7 @@ never in real use.
 
 | Option | What it costs | Why not this |
 |---|---|---|
-| Do nothing | Nothing. `review-code` already says "Dispatch this pass; do not run it inline" (`skills/review-code/SKILL.md:49`) and the plugin evals grade the dispatch | The 1-in-6 inline review stays possible, with no real-use instance behind it |
+| Do nothing | Nothing. `review-code` already says "Dispatch this pass; do not run it inline" (`skills/review-code/SKILL.md#Dispatch this pass; do not run it inline`) and the plugin evals grade the dispatch | The 1-in-6 inline review stays possible, with no real-use instance behind it |
 | Do it manually | Nothing to build. A user in a keel session can already type "use a workflow" and get a scripted fan-out for a review | Ad hoc, not keel's review, and none of keel's briefs or agents unless the user asks for them |
 | Buy it | `/code-review ultra` (multi-agent cloud review, billed per run) and the bundled `/deep-research` workflow | Neither runs keel's rubric, spec pass or `keel-reviewer` |
 | Build something smaller | See the variants below | |

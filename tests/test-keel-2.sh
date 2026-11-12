@@ -171,7 +171,7 @@ rm -rf "$d"
 # needs the coding-standards skill's own judgement about which house references apply, which `new`,
 # a plain shell script, does not have.
 
-parent="$(mktemp -d)"
+parent="$(mktemp -d)"; [ -d "$parent" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$parent" && "$KEEL" new svc-node --stack node >/dev/null 2>&1 )
 d="$parent/svc-node"
 
@@ -248,7 +248,7 @@ rm -rf "$dj"
 # fleet script with an empty "JSON" and no explanation.
 dnp="$(fixture bare)"
 ( cd "$dnp" && "$KEEL" init -y >/dev/null 2>&1 )
-nopy_dir="$(mktemp -d)"
+nopy_dir="$(mktemp -d)"; [ -d "$nopy_dir" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 oldifs="$IFS"; IFS=':'
 for pd in $PATH; do
   [ -d "$pd" ] || continue
@@ -279,7 +279,7 @@ rm -rf "$dnp" "$nopy_dir"; rm -f "$nopy_stdout"
 # which is a python3 truly absent from PATH; this one is present and broken.
 hpd="$(fixture bare)"
 ( cd "$hpd" && "$KEEL" init -y >/dev/null 2>&1 )
-storeshim="$(mktemp -d)"
+storeshim="$(mktemp -d)"; [ -d "$storeshim" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 cat > "$storeshim/python3" <<'SHIM'
 #!/bin/sh
 printf 'Python was not found; run without arguments to install from the Microsoft Store.\n'
@@ -302,7 +302,7 @@ rm -rf "$hpd" "$storeshim"
 # the profile being invalid.
 dpd="$(fixture bare)"
 ( cd "$dpd" && "$KEEL" init -y >/dev/null 2>&1 )
-dualshim="$(mktemp -d)"
+dualshim="$(mktemp -d)"; [ -d "$dualshim" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 cat > "$dualshim/python3" <<'SHIM'
 #!/bin/sh
 if [ "$1" = "-c" ] && [ "$2" = "pass" ]; then
@@ -325,7 +325,7 @@ rm -rf "$dpd" "$dualshim"
 # so a cached value carried an invisible trailing CR that broke exact-string comparisons downstream.
 crd="$(fixture bare)"
 ( cd "$crd" && "$KEEL" init -y >/dev/null 2>&1 )
-crlfdir="$(mktemp -d)"
+crlfdir="$(mktemp -d)"; [ -d "$crlfdir" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 real_python="$(command -v python3)"
 cat > "$crlfdir/python3" <<CRLF
 #!/usr/bin/env bash
@@ -548,14 +548,14 @@ before="$(cat "$a7/.github/workflows/ci.yml")"
 rm -rf "$a7"
 
 # Refuses to write into a non-empty directory.
-parent="$(mktemp -d)"; mkdir -p "$parent/taken"; echo x > "$parent/taken/file"
+parent="$(mktemp -d)"; [ -d "$parent" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; mkdir -p "$parent/taken"; echo x > "$parent/taken/file"
 if ( cd "$parent" && "$KEEL" new taken --stack node >/dev/null 2>&1 ); then
   bad "new" "overwrote a non-empty directory"
 else ok "new refuses a non-empty directory"; fi
 rm -rf "$parent"
 
 # Python stack.
-parent="$(mktemp -d)"
+parent="$(mktemp -d)"; [ -d "$parent" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$parent" && "$KEEL" new svc-py --stack python >/dev/null 2>&1 )
 got="$(prof_of "$parent/svc-py" stack.language)"
 [ "$got" = "python" ] && ok "new supports the python stack" || bad "new python" "got '$got'"
@@ -632,7 +632,7 @@ d["verify"] = {k: ("true" if k in ("test", "test_one", "lint") else None) for k 
 p.write_text(json.dumps(d, indent=2) + "\n")
 PY
 mkdir -p "$crfd/docs" && printf '# PRD\n' > "$crfd/docs/PROD-CRLF-requirements.md"
-crlfdir2="$(mktemp -d)"
+crlfdir2="$(mktemp -d)"; [ -d "$crlfdir2" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 real_python2="$(command -v python3)"
 cat > "$crlfdir2/python3" <<CRLF2
 #!/usr/bin/env bash
@@ -876,7 +876,7 @@ rm -rf "$b"
 # does not need to: a plugin shipping a skill name keel also ships is found by reading the
 # installed cache, whoever wrote it. The collision is silent in a real session, which is why it is
 # worth a warning at all: the model resolves the name to one of the two and records nothing.
-rival_cfg="$(mktemp -d)"
+rival_cfg="$(mktemp -d)"; [ -d "$rival_cfg" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 mkdir -p "$rival_cfg/plugins/cache/somemarket/rival/1.0.0/skills/tdd"
 printf -- '---\nname: tdd\ndescription: Use when writing tests.\n---\n\n# TDD\n' \
   > "$rival_cfg/plugins/cache/somemarket/rival/1.0.0/skills/tdd/SKILL.md"
@@ -945,7 +945,7 @@ rm -rf "$d"
 # ---- doctor's summary counts its warnings ---------------------------------
 # Three warnings scrolled past, then "keel doctor: no problems". Writing the PR body for 0.6.1
 # meant counting them by hand to say "no problems and one warning", which is the tell.
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && "$KEEL" init -y >/dev/null 2>&1 )
 seed_standards "$d"
 out="$( cd "$d" && "$KEEL" doctor 2>&1 || true )"
@@ -963,7 +963,7 @@ rm -rf "$d"
 # first thing a new project reads, and both were wrong for the case the plan calls the more
 # important pilot.
 
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$d" && git init -q -b main . && "$KEEL" init -y >/dev/null 2>&1 )
 out="$( cd "$d" && "$KEEL" init -y 2>&1 )"
 

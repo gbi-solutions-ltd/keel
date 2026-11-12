@@ -261,8 +261,8 @@ approver sees the overlap they approve. It also runs a short path for small work
 Ends with a self-review pass: does every story map to a task, are there placeholders left, do the
 type names used in task 7 match what task 3 defined. Those four are mechanical and run inline. A
 dispatched reviewer then covers what they cannot reach, because all four compare the plan to itself
-and none of them opens the codebase the plan will be built on. Approval asks one question for
-routing and delivery; a pull request choice starts `execute-plan` and runs to an open pull request.
+and none of them opens the codebase the plan will be built on. Approval asks one question on
+routing, checkpoints, delivery and commits that ask; a pull request runs `execute-plan` to one.
 
 ### `execute-plan`
 
@@ -298,7 +298,8 @@ task; a small change asked for directly, outside a plan, starts at `write-plan`'
 **Writes:** tests, then code.
 **Does:** superpowers' `test-driven-development`, adapted to read the test command from the profile
 instead of guessing. Keeps the iron law, the rationalisation table, and the red flags list, all of
-which are load-bearing under pressure. The boundary runs `verify.test_affected` when set.
+which are load-bearing under pressure. The boundary runs `verify.test_affected` when set; under
+`execute-plan` in a plan with suite checkpoints it runs the task's `Done when:` and lint instead.
 
 Adds one thing superpowers lacks: an explicit exception path. Throwaway spikes, generated
 code, and pure config are exempt, but the exemption must be stated out loud and the spike

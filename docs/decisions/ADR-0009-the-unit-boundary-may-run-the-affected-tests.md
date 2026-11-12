@@ -7,6 +7,7 @@
 | Deciders | Bernard Tebandeke, accepted 2026-10-16 |
 | Requirements | none; driver is gap 2 of `docs/ideas/delivery-flow-gaps.md`, "test speed is reported, not managed" |
 | Supersedes | none; amends one rule of [ADR-0006](ADR-0006-the-tdd-cycle-unit-is-a-behavioural-unit.md), under "A red boundary the unit did not cause" |
+| Amended by | [ADR-0017](ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md), for a unit run under `execute-plan` in a plan with a `**Suite checkpoints:**` line |
 
 ## Context
 

@@ -19,7 +19,7 @@ happens on every skill invocation, in every project that installs keel.
 
 - `skills/tdd/SKILL.md` line 87 at `b821eef` said "The suite is 313 seconds and one test is 2."
   until commit `268a950`. That was keel's own `tests/run-tests.sh`, measured for
-  `docs/decisions/ADR-0006-the-tdd-cycle-unit-is-a-behavioural-unit.md:16`, shipped as a statement
+  `docs/decisions/ADR-0006-the-tdd-cycle-unit-is-a-behavioural-unit.md:17`, shipped as a statement
   about every project's suite.
 - Commit `a132794` (2026-08-19): the `build-with-no-prd` arm asked five questions in one table, which
   `write-prd` Step 2 forbids. The rule was stated. Whether a clearer body would have been followed

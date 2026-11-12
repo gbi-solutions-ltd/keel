@@ -25,12 +25,23 @@ fail=0
 ok()   { printf '  PASS  %s\n' "$1"; pass=$((pass+1)); return 0; }
 bad()  { printf '  FAIL  %s: %s\n' "$1" "$2"; fail=$((fail+1)); return 0; }
 
+# keel_tmpdir <name>: a new temporary directory, its path stored in the variable <name>. When mktemp
+# fails or prints anything but a directory, the test file stops with a message naming mktemp, from a
+# subshell too: with the disk full, an unchecked `mktemp -d` printed nothing, a fixture's `git -C ""`
+# ran in this repository, and its `git commit -m init` committed the staged work here. Called, never
+# captured with $( ), so the variable lands in the caller's shell.
+keel_tmpdir() {
+    local _kt_d
+    _kt_d="$(mktemp -d)"; [ -d "$_kt_d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
+    printf -v "$1" '%s' "$_kt_d"
+}
+
 # keel doctor asks the installed Claude Code for its version through KEEL_CLAUDE, so without a stub
 # every doctor run in these files prints one line on a machine with claude and another on CI with
 # none. This one prints the ledger's current minimum, read from the ledger rather than written here,
 # so a row that moves the minimum does not leave the suite behind. Test files that run doctor
 # without this library export the same.
-KEEL_CLAUDE="$(mktemp -d)/claude"
+keel_tmpdir KEEL_CLAUDE; KEEL_CLAUDE="$KEEL_CLAUDE/claude"
 printf '#!/bin/sh\necho "%s (Claude Code)"\n' \
   "$(bash -c ". '$ROOT/lib/harness/resolve.sh'; harness_min_version")" > "$KEEL_CLAUDE"
 chmod +x "$KEEL_CLAUDE"
@@ -39,14 +50,14 @@ export KEEL_CLAUDE
 # Every stack is built once, committed once, and copied per case. The content and the commit are
 # identical every time and no test asserts on commit identity, so the git work is shared as well as
 # the files. fixture() hands out a copy and never the template, so nothing a case does can reach it.
-FIXTURE_CACHE="$(mktemp -d)"
+keel_tmpdir FIXTURE_CACHE
 
 # A throwaway git repo of the given stack, printed as a path.
 fixture() {
     local stack="$1"
     local tmpl="$FIXTURE_CACHE/$stack" dir
     [ -d "$tmpl" ] || fixture_build "$stack" "$tmpl"
-    dir="$(mktemp -d)"
+    keel_tmpdir dir
     cp -R "$tmpl/." "$dir/"
     printf '%s' "$dir"
 }

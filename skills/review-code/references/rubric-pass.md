@@ -30,8 +30,8 @@ A subagent starts cold, so a brief that names none of these makes it guess:
 - the plan or story path, or the intent you inferred in step 1 where there is none;
 - the path to `<docs_root>/standards.md`, and the decisions directory: `artifacts.decisions` in
   `.keel/profile.json`, else `<docs_root>/decisions/`;
-- the result of the suite run you made in step 3, quoted, so the reviewer does not run a suite of
-  minutes a second time;
+- the suite result from step 3, whether your own run or the plan-end checkpoint note it quoted,
+  quoted, so the reviewer does not run a suite of minutes a second time;
 - the test command for the revert check: `verify.test_one` from `.keel/profile.json` with its
   placeholders (`{path}` or `{name}`) filled for the added test file or case, else `verify.test`;
 - the sensitive files step 3 found, one path per line, or `none`, so the reviewer mutates the
@@ -56,7 +56,7 @@ Intent: <the plan or story path, or the intent the driver inferred>
 === PROJECT ===
 Standards: <path to standards.md>
 Decisions: <the decisions directory>
-Suite result, run by the driver: <quoted output>
+Suite result, from the driver's run or the plan-end checkpoint note: <quoted output or note>
 Test command for item 5 below: <verify.test_one, else verify.test>
 Sensitive paths: <the files, or none>
 Test command for item 6 below, placeholder unfilled: <verify.test_one, else verify.test>

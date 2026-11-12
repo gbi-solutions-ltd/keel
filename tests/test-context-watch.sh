@@ -44,7 +44,7 @@ fire() {   # fire <event> <transcript> <cwd> [tool_name] [session]
       "$event" "$tr" "$cwd" "$sess" "$tool" | "$HOOK" 2>/dev/null
 }
 
-work="$(mktemp -d)"
+work="$(mktemp -d)"; [ -d "$work" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 mkdir -p "$work/.keel"
 printf '{"docs_root":"docs/keel"}\n' > "$work/.keel/profile.json"
 
@@ -341,6 +341,81 @@ out="$(fire PreToolUse "$work/stop.jsonl" "$work" Bash "$sess")"
   || bad "block" "still denied after the handoff was written: $out"
 rm -f "$work/.keel/handoff.md"
 
+# ---- a plan run carries on past the stop -----------------------------------
+
+# A plan run's place is held by the plan file, so the session coordinating one writes the handoff
+# and carries on rather than handing the person a /clear. Both carriers of the stop text say so.
+out="$(fire UserPromptSubmit "$work/stop.jsonl" "$work")"
+case "$out" in *execute-plan*'keel plan status'*'carry on'*)
+    ok "the stop text tells a plan run to write the handoff and carry on" ;;
+  *) bad "plan run" "no plan-run paragraph in the prompt hook's stop text: $out" ;; esac
+case "$out" in *PAUSE*.keel/handoff.md*/clear*Stop.*)
+    ok "the ordinary stop keeps its four steps beside the plan-run paragraph" ;;
+  *) bad "plan run" "the ordinary stop lost a step: $out" ;; esac
+out="$(fire PreToolUse "$work/stop.jsonl" "$work" Bash "plan-deny-$$")"
+case "$out" in *deny*execute-plan*'keel plan status'*'carry on'*)
+    ok "the deny reason carries the same plan-run paragraph" ;;
+  *) bad "plan run" "no plan-run paragraph in the deny reason: $out" ;; esac
+
+# Compaction must not replace the handoff the session wrote after the stop with the mechanical
+# render, or the plan run resumes from a summary instead of its `next:` line. The stop marker goes
+# at PreCompact, so a later stop in the same session starts fresh rather than being released by
+# the first stop's handoff.
+statedir="${TMPDIR:-/tmp}/keel-context-watch"
+sess="plan-run-$$"
+rm -f "$statedir/$sess.stop"
+fire PreToolUse "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+# Dated so the order is certain: the marker in 2000, the session's handoff in 2001. A marker kept
+# through compaction would stay older than that handoff and release the second stop below.
+touch -t 200001010000 "$statedir/$sess.stop"
+printf '# Session handoff\n\nsession: %s\nplan: docs/plans/example.md\nnext: 4.1\n' "$sess" > "$work/.keel/handoff.md"
+touch -t 200101010000 "$work/.keel/handoff.md"
+fire PreCompact "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+grep -q 'next: 4.1' "$work/.keel/handoff.md" \
+  && ok "PreCompact keeps a handoff written after the stop fired" \
+  || bad "plan run" "PreCompact replaced the session's handoff: $(head -3 "$work/.keel/handoff.md")"
+[ ! -e "$statedir/$sess.stop" ] \
+  && ok "PreCompact removes the stop marker so the next stop starts fresh" \
+  || bad "plan run" "the stop marker outlived compaction"
+
+# The second stop in the same session. The first stop's handoff predates it.
+out="$(fire PreToolUse "$work/stop.jsonl" "$work" Bash "$sess")"
+case "$out" in *'"permissionDecision": "deny"'*)
+    ok "a second stop denies again until a newer handoff is written" ;;
+  *) bad "plan run" "the first stop's handoff released the second stop: $out" ;; esac
+printf '# Session handoff\n\nsession: %s\nplan: docs/plans/example.md\nnext: 5.1\n' "$sess" > "$work/.keel/handoff.md"
+out="$(fire PreToolUse "$work/stop.jsonl" "$work" Bash "$sess")"
+[ -z "$out" ] && ok "a newer handoff releases the second stop" \
+  || bad "plan run" "still denied after the second handoff: $out"
+fire PreCompact "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+h="$(cat "$work/.keel/handoff.md")"
+case "$h" in *'next: 5.1'*) ok "the second PreCompact keeps only the newer handoff" ;;
+  *) bad "plan run" "the second handoff was not kept: $h" ;; esac
+case "$h" in *'next: 4.1'*) bad "plan run" "the first stop's handoff came back: $h" ;; esac
+
+# With no stop marker, PreCompact writes the render as before.
+sess="plan-nomarker-$$"
+rm -f "$statedir/$sess.stop"
+printf '# Session handoff\n\nnext: 4.1\n' > "$work/.keel/handoff.md"
+fire PreCompact "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+h="$(cat "$work/.keel/handoff.md")"
+case "$h" in *'next: 4.1'*) bad "plan run" "with no stop marker the old handoff was kept: $h" ;;
+  *'TO BE COMPLETED'*) ok "with no stop marker PreCompact writes the render" ;;
+  *) bad "plan run" "with no stop marker no render was written: $h" ;; esac
+
+# A handoff older than the stop marker was not written for this stop, so the render replaces it.
+sess="plan-stale-$$"
+rm -f "$statedir/$sess.stop"
+printf '# Session handoff\n\nnext: 4.1\n' > "$work/.keel/handoff.md"
+touch -t 200001010000 "$work/.keel/handoff.md"
+fire PreToolUse "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+fire PreCompact "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+h="$(cat "$work/.keel/handoff.md")"
+case "$h" in *'next: 4.1'*) bad "plan run" "a handoff older than the stop was kept: $h" ;;
+  *'TO BE COMPLETED'*) ok "a handoff older than the stop marker is replaced by the render" ;;
+  *) bad "plan run" "no render over a stale handoff: $h" ;; esac
+rm -f "$work/.keel/handoff.md"
+
 # ---- the escape hatch ------------------------------------------------------
 
 out="$(KEEL_CONTEXT_WATCH=off fire PreToolUse "$work/stop.jsonl" "$work" Bash)"
@@ -580,6 +655,344 @@ PY
 )"
 [ "$got" = 77001 ] && ok "a tail with no usable turn still falls through to the whole file" \
   || bad "a tail with no usable turn still falls through to the whole file" "got: $got"
+
+# --- a plan run resumes from the plan, and a failed marker removal is said ------------------------
+#
+# The handoff's `next:` line is the place at the stop, and the run moves on after it, so a run
+# resumed from that line would repeat or skip work. The plan file is what holds the place.
+out="$(fire UserPromptSubmit "$work/stop.jsonl" "$work")"
+case "$out" in *'resumes from'*'where the run stood'*)
+    ok "the plan-run paragraph says the run resumes from the plan, not the handoff's next: line" ;;
+  *) bad "plan run" "no resume sentence in the stop text: $out" ;; esac
+
+# --- the boundaries of compaction -----------------------------------------------------------------
+#
+# A handoff written in the same second the stop fired is the session's own, and mtimes are often
+# whole seconds, so the keep is `>=` and an equal stamp keeps it. Touched to one stamp so the tie
+# is certain rather than a race.
+sess="equal-mtime-$$"
+rm -f "$statedir/$sess.stop"
+fire PreToolUse "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+printf '# Session handoff\n\nsession: %s\nplan: docs/plans/example.md\nnext: 4.1\n' "$sess" > "$work/.keel/handoff.md"
+touch -t 200001010000 "$statedir/$sess.stop" "$work/.keel/handoff.md"
+fire PreCompact "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+grep -q 'next: 4.1' "$work/.keel/handoff.md" \
+  && ok "PreCompact keeps a handoff with the same mtime as the stop marker" \
+  || bad "compaction" "an equal-mtime handoff was replaced: $(head -3 "$work/.keel/handoff.md")"
+rm -f "$work/.keel/handoff.md"
+
+# After a compaction the last assistant usage row describes a context that no longer exists. Read
+# as current, it would stop a session compaction has just emptied, so a main-thread compact_boundary
+# after it measures 0 until a new assistant turn reports usage.
+transcript "$work/compacted.jsonl" 184000       # 92%
+cp "$work/compacted.jsonl" "$work/uncompacted.jsonl"
+printf '{"type":"system","subtype":"compact_boundary","content":"Conversation compacted","isSidechain":false}\n' \
+  >> "$work/compacted.jsonl"
+sess="compacted-$$"
+rm -f "$statedir/$sess.stop" "$statedir/$sess.measure"
+out="$(fire UserPromptSubmit "$work/compacted.jsonl" "$work" Bash "$sess")"
+[ -z "$out" ] && ok "after a compact_boundary the prompt hook is silent" \
+  || bad "compaction" "the pre-compaction usage was read: $out"
+out="$(fire PreToolUse "$work/compacted.jsonl" "$work" Bash "$sess")"
+[ -z "$out" ] && ok "after a compact_boundary a Bash call is not denied" \
+  || bad "compaction" "the pre-compaction usage was read: $out"
+[ ! -e "$statedir/$sess.stop" ] && ok "after a compact_boundary no stop marker is created" \
+  || bad "compaction" "a stop marker was created from the pre-compaction usage"
+out="$(fire UserPromptSubmit "$work/uncompacted.jsonl" "$work")"
+case "$out" in *PAUSE*) ok "the same transcript without the boundary gives the stop text" ;;
+  *) bad "compaction" "no stop text without the boundary: $out" ;; esac
+rm -f "$statedir/$sess.stop" "$statedir/$sess.measure"
+
+# The tail path gives 0 for a boundary and then reads the whole file, so the whole-file read must
+# give 0 too. Here the usage and the boundary are both inside the tail of a file past TAIL_BYTES.
+{
+  cat "$big"
+  printf '{"type":"system","subtype":"compact_boundary","content":"Conversation compacted","isSidechain":false}\n'
+} > "$work/big-compacted.jsonl"
+read -r got _ _ _ < <(python3 "$LIB" measure "$work/big-compacted.jsonl")
+[ "$got" = 0 ] && ok "a compact_boundary in the tail of a large transcript measures 0 on both paths" \
+  || bad "compaction" "got $got tokens past the boundary"
+
+# And the boundary settles it from the tail: reading the whole file on every event after a
+# compaction is the cost _tail_entries exists to avoid. Asserted as the case above that has the
+# tail alone measure, by making the whole-file read impossible. An unparseable head would not show
+# it, since _entries skips a bad line and the whole file ends at the boundary too.
+got="$(KEEL_LIB="$LIB" python3 - "$work/big-compacted.jsonl" <<'PY2' 2>&1
+import importlib.util, os, sys
+spec = importlib.util.spec_from_file_location("cw", os.environ["KEEL_LIB"])
+cw = importlib.util.module_from_spec(spec); spec.loader.exec_module(cw)
+def boom(_path):
+    raise AssertionError("whole file parsed")
+cw._entries = boom
+try:
+    print(cw._measure_parts(sys.argv[1])[0])
+except AssertionError as e:
+    print("WHOLE-FILE: %s" % e)
+PY2
+)"
+[ "$got" = 0 ] && ok "a compact_boundary in the tail settles the measurement without the whole file" \
+  || bad "compaction" "got: $got"
+
+# Compaction ends the context the cached measurement describes, so PreCompact removes it and the
+# first event after compaction measures again.
+sess="measure-cache-$$"
+fire UserPromptSubmit "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+[ -e "$statedir/$sess.measure" ] || bad "compaction" "the fixture wrote no measurement cache to remove"
+fire PreCompact "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+[ ! -e "$statedir/$sess.measure" ] && ok "PreCompact removes the session's measurement cache" \
+  || bad "compaction" "the measurement cache outlived compaction"
+rm -f "$statedir/$sess.stop" "$statedir/$sess.measure" "$work/.keel/handoff.md"
+
+# A subagent's compaction empties the subagent's context, not the main thread's, so a sidechain
+# compact_boundary leaves the main thread's last usage standing.
+transcript "$work/side-compacted.jsonl" 184000       # 92%
+printf '{"type":"system","subtype":"compact_boundary","isSidechain":true}\n' \
+  >> "$work/side-compacted.jsonl"
+sess="side-compacted-$$"
+rm -f "$statedir/$sess.stop" "$statedir/$sess.measure"
+out="$(fire UserPromptSubmit "$work/side-compacted.jsonl" "$work" Bash "$sess")"
+case "$out" in *PAUSE*) ok "a subagent's compact_boundary leaves the main thread's stop text" ;;
+  *) bad "compaction" "a sidechain boundary reset the main thread's measurement: $out" ;; esac
+rm -f "$statedir/$sess.stop" "$statedir/$sess.measure" "$work/.keel/handoff.md"
+
+# --- a session id names a file inside the state directory, and nothing else -----------------------
+#
+# The session id arrives in the hook event and becomes part of a path. An id that climbs out of the
+# state directory would have PreCompact remove, and the measurement cache overwrite, a file the
+# watchdog does not own. A nested TMPDIR keeps the file such an id reaches inside this case's own
+# directory, so a failure here harms nothing.
+tx="$work/tx/a/b"
+mkdir -p "$tx"
+printf 'not the watchdog file\n' > "$work/tx/a/victim.measure"
+TMPDIR="$tx" fire PreCompact "$work/stop.jsonl" "$work" Bash "../../victim" >/dev/null
+[ "$(cat "$work/tx/a/victim.measure" 2>/dev/null)" = "not the watchdog file" ] \
+  && ok "a session id that climbs out of the state directory touches nothing outside it" \
+  || bad "state paths" "the file outside the state directory was removed or rewritten"
+sess="safe-id-$$"
+TMPDIR="$tx" fire UserPromptSubmit "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+[ -e "$tx/keel-context-watch/$sess.measure" ] \
+  || bad "state paths" "the fixture wrote no measurement cache under the nested TMPDIR"
+TMPDIR="$tx" fire PreCompact "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+[ ! -e "$tx/keel-context-watch/$sess.measure" ] \
+  && ok "a normal session id still has its measurement cache removed at PreCompact" \
+  || bad "state paths" "the measurement cache under the nested TMPDIR outlived compaction"
+rm -f "$work/.keel/handoff.md"
+
+# --- the handoff PreCompact keeps is this session's own ---------------------------------------------
+#
+# The handoff path is shared by every session in the project, so a handoff another session wrote
+# after this one's stop is newer than this one's marker without being this one's. The stop text asks
+# for a session line, and PreCompact keeps only a handoff carrying this session's.
+own="own-$$"
+other="other-$$"
+rm -f "$statedir/$own.stop" "$statedir/$other.stop" "$statedir/$own.measure" "$statedir/$other.measure"
+fire PreToolUse "$work/stop.jsonl" "$work" Bash "$own" >/dev/null
+fire PreToolUse "$work/stop.jsonl" "$work" Bash "$other" >/dev/null
+touch -t 200001010000 "$statedir/$own.stop" "$statedir/$other.stop"
+printf '# Session handoff\n\nsession: %s\nnext: 4.1\n' "$own" > "$work/.keel/handoff.md"
+touch -t 200101010000 "$work/.keel/handoff.md"
+fire PreCompact "$work/stop.jsonl" "$work" Bash "$other" >/dev/null
+h="$(cat "$work/.keel/handoff.md")"
+case "$h" in *'next: 4.1'*) bad "own handoff" "another session's PreCompact kept this session's handoff: $h" ;;
+  *'TO BE COMPLETED'*) ok "a handoff carrying another session's line is replaced by the render" ;;
+  *) bad "own handoff" "no render over another session's handoff: $h" ;; esac
+printf '# Session handoff\n\nsession: %s\nnext: 4.1\n' "$own" > "$work/.keel/handoff.md"
+touch -t 200101010000 "$work/.keel/handoff.md"
+fire PreCompact "$work/stop.jsonl" "$work" Bash "$own" >/dev/null
+grep -q 'next: 4.1' "$work/.keel/handoff.md" \
+  && ok "a handoff carrying this session's line is kept at its PreCompact" \
+  || bad "own handoff" "the session's own handoff was replaced: $(head -4 "$work/.keel/handoff.md")"
+sess="session-line-$$"
+out="$(fire UserPromptSubmit "$work/stop.jsonl" "$work" Bash "$sess")"
+case "$out" in *"session: $sess"*) ok "the stop text asks for the session line with this session's id" ;;
+  *) bad "own handoff" "the stop text does not name session: $sess: $out" ;; esac
+out="$(fire PreToolUse "$work/stop.jsonl" "$work" Bash "$sess")"
+case "$out" in *deny*"session: $sess"*) ok "the deny reason asks for the same session line" ;;
+  *) bad "own handoff" "the deny reason does not name session: $sess: $out" ;; esac
+rm -f "$statedir/$own.stop" "$statedir/$other.stop" "$statedir/$own.measure" "$statedir/$other.measure" \
+  "$statedir/$sess.stop" "$statedir/$sess.measure" "$work/.keel/handoff.md"
+
+# The line is written by a model reading the stop text, which shows it in backticks, so the forms a
+# model plausibly writes are accepted: a list marker, the backticks, a capital S, no space after the
+# colon. The id is still matched whole, or one session would keep another whose id it prefixes.
+kept_with() {   # kept_with <session> <line>  -> "kept" or "rendered"
+    rm -f "$statedir/$1.measure"
+    printf 'stop\n' > "$statedir/$1.stop"
+    touch -t 200001010000 "$statedir/$1.stop"
+    printf '# Session handoff\n\n%s\nnext: 4.1\n' "$2" > "$work/.keel/handoff.md"
+    touch -t 200101010000 "$work/.keel/handoff.md"
+    fire PreCompact "$work/stop.jsonl" "$work" Bash "$1" >/dev/null
+    if grep -q 'next: 4.1' "$work/.keel/handoff.md"; then echo kept; else echo rendered; fi
+    rm -f "$statedir/$1.stop" "$statedir/$1.measure" "$work/.keel/handoff.md"
+}
+sess="form-$$"
+for line in "\`session: $sess\`" "- session: $sess" "* session: $sess" "Session: $sess" "session:$sess"; do
+    [ "$(kept_with "$sess" "$line")" = kept ] \
+      && ok "a handoff whose session line reads '$line' is kept" \
+      || bad "session line" "the session's own handoff with '$line' was replaced by the render"
+done
+for line in "session: ${sess}0" "session: ${sess}x"; do
+    [ "$(kept_with "$sess" "$line")" = rendered ] \
+      && ok "a session line naming an id that only starts with this one ('$line') is not kept" \
+      || bad "session line" "'$line' kept the handoff of session $sess"
+done
+
+# A session with no id has no line to ask for, so for it a handoff newer than the marker is enough,
+# the rule from before the session line. Under the nested TMPDIR, so the nosession marker of a live
+# session is not touched.
+mkdir -p "$tx/keel-context-watch"
+printf 'stop\n' > "$tx/keel-context-watch/nosession.stop"
+touch -t 200001010000 "$tx/keel-context-watch/nosession.stop"
+printf '# Session handoff\n\nnext: 4.1\n' > "$work/.keel/handoff.md"
+touch -t 200101010000 "$work/.keel/handoff.md"
+printf '{"hook_event_name":"PreCompact","transcript_path":"%s","cwd":"%s","session_id":"","tool_name":"Bash"}' \
+  "$work/stop.jsonl" "$work" | TMPDIR="$tx" "$HOOK" >/dev/null 2>&1
+grep -q 'next: 4.1' "$work/.keel/handoff.md" \
+  && ok "with no session id a handoff newer than the marker is kept" \
+  || bad "session line" "with no session id the handoff was replaced: $(head -3 "$work/.keel/handoff.md")"
+rm -f "$tx/keel-context-watch/nosession.stop" "$tx/keel-context-watch/nosession.measure" "$work/.keel/handoff.md"
+
+# --- a marker PreCompact cannot remove is made current instead --------------------------------------
+#
+# A marker left behind would let the kept handoff, newer than it, release the next stop before any
+# new handoff is written. A directory in the marker's place makes the removal fail while a touch
+# still works, so PreCompact touches it and the next stop blocks.
+sess="marker-stuck-$$"
+rm -rf "${statedir:?}/$sess.stop" "$statedir/$sess.measure"
+mkdir -p "$statedir/$sess.stop"
+touch -t 200001010000 "$statedir/$sess.stop"
+printf '# Session handoff\n\nsession: %s\nnext: 4.1\n' "$sess" > "$work/.keel/handoff.md"
+touch -t 200101010000 "$work/.keel/handoff.md"
+fire PreCompact "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
+[ "$statedir/$sess.stop" -nt "$work/.keel/handoff.md" ] \
+  && ok "a stop marker PreCompact cannot remove is touched newer than the kept handoff" \
+  || bad "stuck marker" "the marker kept its old mtime"
+out="$(fire PreToolUse "$work/stop.jsonl" "$work" Bash "$sess")"
+case "$out" in *'"permissionDecision": "deny"'*)
+    ok "after a touched marker the kept handoff does not release the next stop" ;;
+  *) bad "stuck marker" "the kept handoff released the next stop: $out" ;; esac
+rm -rf "${statedir:?}/$sess.stop" "$statedir/$sess.measure" "$work/.keel/handoff.md"
+
+# Only when the touch fails as well is the failure said. Both calls are replaced with ones that
+# raise, and the library is driven directly, as for the unparseable transcript above:
+# hooks/context-watch sends python's stderr to /dev/null, so this line is pinned where it is written.
+# The program is read into a variable because stdin carries the hook event.
+sess="marker-untouchable-$$"
+rm -f "$statedir/$sess.stop" "$statedir/$sess.measure"
+printf 'stop\n' > "$statedir/$sess.stop"
+read -r -d '' refuse <<'PY3'
+import os, runpy, sys
+def refuse(*_args, **_kwargs):
+    raise OSError("refused by the test")
+os.remove = refuse
+os.utime = refuse
+lib = sys.argv[1]
+sys.argv = [lib, "hook"]
+runpy.run_path(lib, run_name="__main__")
+PY3
+err="$(printf '{"hook_event_name":"PreCompact","transcript_path":"%s","cwd":"%s","session_id":"%s","tool_name":"Bash"}' \
+  "$work/stop.jsonl" "$work" "$sess" | python3 -c "$refuse" "$LIB" 2>&1 >/dev/null)"
+rc=$?
+case "$err" in *'keel context-watch'*'stop marker'*)
+    ok "a stop marker PreCompact can neither remove nor touch is named on stderr" ;;
+  *) bad "stuck marker" "a failed removal and touch were silent: $err" ;; esac
+[ "$rc" -eq 0 ] && ok "a failed removal and touch still let compaction go ahead" \
+  || bad "stuck marker" "PreCompact exited $rc"
+rm -f "$statedir/$sess.stop" "$statedir/$sess.measure" "$work/.keel/handoff.md"
+
+# --- the cached shortcut's session id rule, and a stop with no session id ---------------------------
+#
+# The cached shortcut in hooks/context-watch applies the session id rule in bash. A fresh, low
+# measurement planted where `../../victim` reaches would let that shortcut answer from a file the
+# watchdog does not own, so with the rule in place the call falls through to python instead. A shim
+# first on PATH records each python call and runs the real one. The nested TMPDIR keeps the planted
+# file inside this case's own directory.
+ty="$work/ty/a/b"
+mkdir -p "$ty/keel-context-watch" "$work/pyshim"
+printf '%s 1 200000\n' "$(date +%s)" > "$work/ty/a/victim.measure"
+rm -f "$ty/keel-context-watch/nosession.measure"
+real_python="$(command -v python3)"
+printf '#!/bin/sh\necho "$*" >> "%s"\nexec "%s" "$@"\n' "$work/pyshim/calls" "$real_python" > "$work/pyshim/python3"
+chmod +x "$work/pyshim/python3"
+: > "$work/pyshim/calls"
+TMPDIR="$ty" PATH="$work/pyshim:$PATH" fire PreToolUse "$work/quiet.jsonl" "$work" Edit "../../victim" >/dev/null
+grep -q 'context_watch.py hook' "$work/pyshim/calls" \
+  && ok "the cached shortcut does not read a measurement a climbing session id names" \
+  || bad "state paths" "no python call was recorded, so bash answered from the planted file"
+
+# With no session id there is no session line to ask for, so the stop text does not ask for one.
+# Under the nested TMPDIR, so the nosession marker of a live session is not touched.
+out="$(printf '{"hook_event_name":"UserPromptSubmit","transcript_path":"%s","cwd":"%s","session_id":"","tool_name":"Bash"}' \
+  "$work/stop.jsonl" "$work" | TMPDIR="$ty" "$HOOK" 2>/dev/null)"
+case "$out" in *PAUSE*'session: '*) bad "session line" "the stop text asks for a session line with no id: $out" ;;
+  *PAUSE*) ok "with no session id the stop text asks for no session line" ;;
+  *) bad "session line" "no stop text with no session id: $out" ;; esac
+sess="with-id-$$"
+out="$(TMPDIR="$ty" fire UserPromptSubmit "$work/stop.jsonl" "$work" Bash "$sess")"
+case "$out" in *"session: $sess"*) ok "with a session id the stop text still asks for its session line" ;;
+  *) bad "session line" "the stop text does not name session: $sess: $out" ;; esac
+rm -rf "$work/ty" "$work/pyshim"
+
+# --- a subagent is left alone -----------------------------------------------------------------------
+#
+# A subagent's context is its own and is discarded when it returns, and no field on its PreToolUse
+# event is known to name its own transcript, so the main transcript's measurement says nothing about
+# it. It is told apart as hooks/review-guard tells one, by a non-empty agent_type and a non-empty
+# agent_id together. fire() takes no agent fields, so these events are written by hand. The nested
+# TMPDIR keeps their state files inside this case's own directory, where they can be counted.
+tz="$work/tz/a"
+mkdir -p "$tz/keel-context-watch"
+rm -f "$work/.keel/handoff.md"
+sess="subagent-$$"
+before="$(find "$tz/keel-context-watch" -name "$sess.*" | wc -l | tr -d ' ')"
+out="$(printf '{"hook_event_name":"PreToolUse","transcript_path":"%s","cwd":"%s","session_id":"%s","tool_name":"Bash","agent_type":"general-purpose","agent_id":"a1"}' \
+  "$work/stop.jsonl" "$work" "$sess" | TMPDIR="$tz" "$HOOK" 2>/dev/null)"
+rc=$?
+[ "$rc" -eq 0 ] && [ -z "$out" ] \
+  && ok "a subagent's tool call past the stop threshold gets no output and exit 0" \
+  || bad "subagent" "exit $rc, output: $out"
+after="$(find "$tz/keel-context-watch" -name "$sess.*" | wc -l | tr -d ' ')"
+[ "$after" = "$before" ] \
+  && ok "a subagent's event writes no stop marker and no measurement for its session" \
+  || bad "subagent" "state files for $sess went from $before to $after: $(ls "$tz/keel-context-watch")"
+
+out="$(printf '{"hook_event_name":"PreToolUse","transcript_path":"%s","cwd":"%s","session_id":"%s","tool_name":"Bash"}' \
+  "$work/stop.jsonl" "$work" "$sess" | TMPDIR="$tz" "$HOOK" 2>/dev/null)"
+case "$out" in *'"permissionDecision": "deny"'*)
+    ok "the same tool call without the agent fields is still denied" ;;
+  *) bad "subagent" "the main session's call was not denied: $out" ;; esac
+
+# A main session started with `--agent` carries agent_type and no agent_id, so either field alone is
+# the main session and is held to the stop.
+out="$(printf '{"hook_event_name":"PreToolUse","transcript_path":"%s","cwd":"%s","session_id":"%s","tool_name":"Bash","agent_type":"helper"}' \
+  "$work/stop.jsonl" "$work" "type-only-$$" | TMPDIR="$tz" "$HOOK" 2>/dev/null)"
+case "$out" in *'"permissionDecision": "deny"'*)
+    ok "agent_type without agent_id is not a subagent and is denied" ;;
+  *) bad "subagent" "agent_type alone was left alone: $out" ;; esac
+out="$(printf '{"hook_event_name":"PreToolUse","transcript_path":"%s","cwd":"%s","session_id":"%s","tool_name":"Bash","agent_id":"a1"}' \
+  "$work/stop.jsonl" "$work" "id-only-$$" | TMPDIR="$tz" "$HOOK" 2>/dev/null)"
+case "$out" in *'"permissionDecision": "deny"'*)
+    ok "agent_id without agent_type is not a subagent and is denied" ;;
+  *) bad "subagent" "agent_id alone was left alone: $out" ;; esac
+# An empty agent_id is no id at all, so it is the main session too.
+out="$(printf '{"hook_event_name":"PreToolUse","transcript_path":"%s","cwd":"%s","session_id":"%s","tool_name":"Bash","agent_type":"general-purpose","agent_id":""}' \
+  "$work/stop.jsonl" "$work" "empty-id-$$" | TMPDIR="$tz" "$HOOK" 2>/dev/null)"
+case "$out" in *'"permissionDecision": "deny"'*)
+    ok "an empty agent_id is not a subagent and is denied" ;;
+  *) bad "subagent" "an empty agent_id was left alone: $out" ;; esac
+# Both fields must be non-empty strings: an empty agent_type, or either field a number, is the main
+# session. Each case fails if its part of the check in lib/context_watch.py is dropped.
+for c in 'empty-type|"agent_type":"","agent_id":"a1"|an empty agent_type' \
+         'num-type|"agent_type":1,"agent_id":"a1"|a numeric agent_type' \
+         'num-id|"agent_type":"general-purpose","agent_id":1|a numeric agent_id'; do
+    IFS='|' read -r tag fields what <<< "$c"
+    out="$(printf '{"hook_event_name":"PreToolUse","transcript_path":"%s","cwd":"%s","session_id":"%s","tool_name":"Bash",%s}' \
+      "$work/stop.jsonl" "$work" "$tag-$$" "$fields" | TMPDIR="$tz" "$HOOK" 2>/dev/null)"
+    case "$out" in *'"permissionDecision": "deny"'*)
+        ok "$what is not a subagent and is denied" ;;
+      *) bad "subagent" "$what was left alone: $out" ;; esac
+done
+rm -rf "$work/tz"
 
 rm -rf "$work"
 printf '\n%s passed, %s failed\n' "$pass" "$fail"

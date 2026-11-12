@@ -38,13 +38,14 @@ Either way, run step 3.
 
 ## Step 3: The pass that only we can do
 
-Run `profile.verify.test` yourself first.
+Run `profile.verify.test` yourself, or quote a qualifying `suite: pass at tree` note. Which note
+qualifies, and how to count sensitive files:
+[references/step-detail.md](references/step-detail.md#step-3-the-pass-that-only-we-can-do).
+Read it before this step.
 
 **Find the sensitive files before dispatching.** Run the command in
 [../security-audit/references/sensitive-match.md](../security-audit/references/sensitive-match.md)
-with the review's base and read the result by its rules. Where they make every changed file
-sensitive, or read the result as touching without naming paths, count every changed production
-file and say so in the report.
+with the review's base and read the result by its rules.
 
 **Dispatch this pass; do not run it inline.**
 Read [references/rubric-pass.md](references/rubric-pass.md) now, and brief a
@@ -52,8 +53,8 @@ subagent as it says, with model `inherit` and a description starting `inherit: `
 the rubric, the sensitive files and six checks a generic reviewer lacks: the diff matches the plan,
 every changed line traces to the request, the tests came first, no accepted decision is
 contradicted, a test was proved able to fail, and every changed decision line on a sensitive path
-was mutated. A dispatch without them reviews none of these. Where step 2's plugin ran, both stand:
-it is the correctness pass, and this one settles a conflict.
+was mutated. Where step 2's plugin ran, both stand: it is the correctness pass, and this one
+settles a conflict.
 
 ## Step 4: Rank, and say what blocks
 

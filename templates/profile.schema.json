@@ -121,7 +121,7 @@
           "description": "The command that runs the whole test suite, exactly as a shell would run it. Read from what the project declares rather than inferred from the stack, because the real command is frequently not the idiomatic one. null means the project genuinely has none, and a skill asks instead of substituting a guess.",
           "x-keel-read-by": [
             "code:bin/keel#t0=\"$(json_get .keel/profile.json verify.test",
-            "code:hooks/done-guard:118"
+            "code:hooks/done-guard#test_cmd = verify.get(\"test\")"
           ]
         },
         "test_one": {
@@ -130,7 +130,10 @@
             "null"
           ],
           "description": "Single test. `{path}` or `{name}` is substituted. Required by tdd and by the optional commit guard.",
-          "x-keel-read-by": "code:bin/keel#t1=\"$(json_get .keel/profile.json verify.test_one"
+          "x-keel-read-by": [
+            "code:bin/keel#t1=\"$(json_get .keel/profile.json verify.test_one",
+            "code:hooks/done-guard#for k in (\"test_affected\", \"test_one\")"
+          ]
         },
         "test_affected": {
           "type": [
@@ -140,6 +143,7 @@
           "description": "The command the tdd unit boundary runs in place of `verify.test`, selecting only the tests the unit's change affects. `{base}` is replaced with the commit the unit started from, the one tdd's start record names, for example `npx vitest run --changed {base}` or `npx jest --changedSince={base}`. It must select uncommitted and untracked changes since `{base}` too, because under execute-plan an implementer stages and does not commit, so every unit of a task shares one HEAD. A value without `{base}` is accepted, for a runner that tracks changes itself. null, the default, means the boundary runs `verify.test`. Set by hand: keel init writes null and detects no runner. `verify.test` still runs in review-code, ship and CI, and a break outside what the runner selects surfaces there (ADR-0009). Read by keel doctor, which shows the value and never runs it, because it needs a commit only a tdd unit has.",
           "x-keel-read-by": [
             "code:bin/keel#ta=\"$(json_declared .keel/profile.json verify.test_affected",
+            "code:hooks/done-guard#for k in (\"test_affected\", \"test_one\")",
             "advisory:skills/tdd/SKILL.md#verify.test_affected"
           ]
         },
@@ -326,33 +330,33 @@
             "warn",
             "off"
           ],
-          "description": "Drives hooks/done-guard on Stop and SubagentStop. required refuses to end a turn that edited code and never ran verify.test; warn says it and allows the stop. Off, or absent, and the hook does nothing.",
-          "x-keel-read-by": "code:hooks/done-guard:114"
+          "description": "Drives hooks/done-guard on Stop and SubagentStop. required refuses to end a turn that edited code inside the repository and never ran a test; warn says it and allows the stop. A test run is a Bash command containing verify.test, or one whose simple command, read as a shell reads it (shlex words, quotes removed, split at `;`, `&&`, `||`, `|`, `&`, parentheses, newlines, and a brace, `then`, `do` or `else` that begins a command, with a leading `VAR=value`, `env`, `time`, `command`, `bash` or `sh`, and `./` dropped), begins with the text of verify.test_one or verify.test_affected before its first `{` where that text is not empty, so a scoped test run counts and quoted text does not: the gate proves a test ran, not that the suite did. A command shlex cannot split falls back to a regular expression anchored at a command's start. Off, or absent, and the hook does nothing.",
+          "x-keel-read-by": "code:hooks/done-guard#get(\"done_verified\") or \"off\""
         },
         "context_watch": {
           "type": "boolean",
           "description": "false turns the session context watchdog off for this project. Declared here rather than left to additionalProperties because it is not a required/warn/off gate.",
-          "x-keel-read-by": "code:lib/context_watch.py:447"
+          "x-keel-read-by": "code:lib/context_watch.py#get(\"context_watch\") is False"
         },
         "context_window": {
           "type": "integer",
           "minimum": 1,
           "description": "Context window in tokens for sessions in this project, written by keel init as 200000. It is a floor and not a ceiling: the watchdog raises it once a session is observed exceeding it, since the API would have refused the request otherwise, so a value that understates the window costs nothing beyond an early first estimate. It is never raised above 1000000, the largest window any current model offers, so a mistyped extra zero cannot silence the watchdog. A floor only ever raises, so setting a value at or below the window the session already has does nothing. That baseline is 200000, because a Claude Code transcript does not state its own window. KEEL_CONTEXT_WINDOW is how a smaller window is forced deliberately, and it is used as set except that it too is capped at 1000000.",
-          "x-keel-read-by": "code:lib/context_watch.py:468"
+          "x-keel-read-by": "code:lib/context_watch.py#configured=(profile.get(\"gates\") or {}).get(\"context_window\")"
         },
         "context_warn_pct": {
           "type": "integer",
           "minimum": 1,
           "maximum": 99,
           "description": "Percentage of the window at which the watchdog starts warning. Default 70.",
-          "x-keel-read-by": "code:lib/context_watch.py:384"
+          "x-keel-read-by": "code:lib/context_watch.py#pick(\"KEEL_CONTEXT_WARN\", \"context_warn_pct\", WARN_PCT)"
         },
         "context_stop_pct": {
           "type": "integer",
           "minimum": 1,
           "maximum": 100,
           "description": "Percentage of the window at which the watchdog blocks tool calls until a handoff is written. Default 85.",
-          "x-keel-read-by": "code:lib/context_watch.py:385"
+          "x-keel-read-by": "code:lib/context_watch.py#pick(\"KEEL_CONTEXT_STOP\", \"context_stop_pct\", STOP_PCT)"
         },
         "suite_warn_seconds": {
           "type": "integer",

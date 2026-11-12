@@ -18,15 +18,15 @@ bad() { printf '  FAIL  %s: %s\n' "$1" "$2"; fail=$((fail+1)); return 0; }
 # keel-fleet runs keel doctor, which asks the installed Claude Code for its version through
 # KEEL_CLAUDE. The same stub tests/keel-test-lib.sh exports, so these rows do not depend on whether
 # this machine has claude.
-KEEL_CLAUDE="$(mktemp -d)/claude"
+KEEL_CLAUDE="$(mktemp -d)"; [ -d "$KEEL_CLAUDE" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; KEEL_CLAUDE="$KEEL_CLAUDE/claude"
 printf '#!/bin/sh\necho "%s (Claude Code)"\n' \
   "$(bash -c ". '$ROOT/lib/harness/resolve.sh'; harness_min_version")" > "$KEEL_CLAUDE"
 chmod +x "$KEEL_CLAUDE"
 export KEEL_CLAUDE
 
-a="$(mktemp -d)"; ( cd "$a" && "$KEEL" new proj --stack minimal >/dev/null 2>&1 )
+a="$(mktemp -d)"; [ -d "$a" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; ( cd "$a" && "$KEEL" new proj --stack minimal >/dev/null 2>&1 )
 repo_a="$a/proj"
-b="$(mktemp -d)"; ( cd "$b" && "$KEEL" new proj --stack minimal >/dev/null 2>&1 )
+b="$(mktemp -d)"; [ -d "$b" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; ( cd "$b" && "$KEEL" new proj --stack minimal >/dev/null 2>&1 )
 repo_b="$b/proj"
 
 # No PATH prefix: the script finds bin/keel as its sibling, which is the install shape it exists for.
@@ -76,7 +76,7 @@ esac
 #
 # keel-fleet always prefers a sibling bin/keel over PATH, so the stub keel needs a keel-fleet
 # copy sitting next to it in order to be picked up.
-stub_dir="$(mktemp -d)"
+stub_dir="$(mktemp -d)"; [ -d "$stub_dir" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 cat > "$stub_dir/keel" <<'EOF'
 #!/usr/bin/env bash
 echo 'not json'
@@ -107,7 +107,7 @@ rm -rf "$stub_dir"
 # not a signal the JSON could not be produced or parsed. Regression test: it was treated as one,
 # which meant almost every real repository (anything with so much as a stale keel_version) reported
 # as (unreadable) even though its doctor output was perfectly valid JSON.
-c="$(mktemp -d)"; ( cd "$c" && "$KEEL" new proj --stack minimal >/dev/null 2>&1 )
+c="$(mktemp -d)"; [ -d "$c" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; ( cd "$c" && "$KEEL" new proj --stack minimal >/dev/null 2>&1 )
 repo_c="$c/proj"
 python3 - "$repo_c/.claude/settings.json" <<'PY'
 import json, sys

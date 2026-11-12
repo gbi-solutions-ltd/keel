@@ -55,7 +55,8 @@
 # tests/test-harness-resolve.sh keeps schema words out of this column.
 #
 # `subagent_transcript_path` is PROVIDED and required by nothing, deliberately. done-guard reads it
-# only on SubagentStop and falls back to transcript_path when it is absent (hooks/done-guard:232-233),
+# only on SubagentStop and falls back to transcript_path when it is absent
+# (`hooks/done-guard#own = ev.get("agent_transcript_path")`),
 # so requiring it would disable the whole gate where its Stop path works. The rule is that a gate
 # requires what it cannot function without, not everything it can use. Collapsing the three
 # transcript primitives into one would resolve done-guard ACTIVE on the strength of stop_blocking
@@ -79,6 +80,11 @@
 # call and none for the main session's. hooks/review-guard needs agent_id to tell a subagent from
 # the main session, because a main session started with `--agent` carries its agent's agent_type,
 # so it requires it. Its row keeps the 2.1.302 of the first probe, which saw the agent_id too.
+#
+# context-watch requires both as well: lib/context_watch.py tells a subagent's PreToolUse call by a
+# non-empty agent_type and agent_id, and stays silent for it. It cannot function without them:
+# unable to tell a subagent, it stops one for its coordinator's context and halts a plan run, which
+# is the hook failing its purpose.
 #
 # ADR-0014: a primitive with no source, version and date is treated as not provided. Absent
 # evidence fails, never passes. Do not add a row you have not checked.
@@ -106,6 +112,8 @@ requires|session-start|session_context_injection
 requires|done-guard|stop_blocking
 requires|done-guard|transcript_turn_tool_calls
 requires|context-watch|transcript_turn_usage
+requires|context-watch|pretooluse_agent_type
+requires|context-watch|pretooluse_agent_id
 requires|sensitive-guard|pretooluse_ask
 requires|review-guard|pretooluse_deny
 requires|review-guard|pretooluse_agent_type

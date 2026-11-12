@@ -19,7 +19,7 @@ fail=0
 ok()  { printf '  PASS  %s\n' "$1"; pass=$((pass+1)); return 0; }
 bad() { printf '  FAIL  %s: %s\n' "$1" "$2"; fail=$((fail+1)); return 0; }
 
-d="$(mktemp -d)"
+d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 
 # mkplan <file> <line>...: a plan holding a heading and then the given lines, one per argument.
 mkplan() {
@@ -443,11 +443,36 @@ cp "$p" "$d/newline.before"
   && ok "tick refuses a note holding a newline, which would split the step's line" \
   || bad "tick newline note" "rc=$rc, plan now: $(cat "$p")"
 
+# ---- tick: several ids under one lock ---------------------------------------------------------
+
+p="$d/several.md"
+mkplan "$p" '- [ ] **Step 1.1: a**' '- [ ] **Step 1.2: b**' '- [ ] **Step 1.3: c**'
+cp "$p" "$d/several.before"
+out="$("$KEEL" plan tick "$p" 1.1 1.2 --note x 2>&1)"; rc=$?
+want="$(sed -e 's/^- \[ \] \*\*Step 1\.1: a\*\*$/- [x] **Step 1.1: a** Note: x/' \
+  -e 's/^- \[ \] \*\*Step 1\.2: b\*\*$/- [x] **Step 1.2: b** Note: x/' "$d/several.before")"
+[ "$rc" -eq 0 ] && [ "$(cat "$p")" = "$want" ] && [ ! -e "$p.lock" ] \
+  && ok "tick with several ids changes each, with the same note, and no other line" \
+  || bad "tick several ids" "rc=$rc out=$out, plan now: $(cat "$p")"
+
+p="$d/several-missing.md"
+mkplan "$p" '- [ ] **Step 1.1: a**'
+cp "$p" "$d/several-missing.before"
+out="$("$KEEL" plan tick "$p" 1.1 9.9 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && cmp -s "$p" "$d/several-missing.before" \
+  && case "$out" in *"no step 9.9"*) true ;; *) false ;; esac \
+  && ok "tick with an unknown id among several changes nothing and names it" \
+  || bad "tick several ids, one missing" "rc=$rc out=$out, plan now: $(cat "$p")"
+
 help="$("$KEEL" --help 2>&1)"
 case "$help" in
-  *'plan tick <plan> <id>'*) ok "keel --help lists plan tick" ;;
-  *) bad "help" "keel --help does not list 'plan tick <plan> <id>'" ;;
+  *'plan tick <plan> <id> [<id> ...]'*) ok "keel --help lists plan tick with several ids" ;;
+  *) bad "help" "keel --help does not list 'plan tick <plan> <id> [<id> ...]'" ;;
 esac
+grep -qF -e 'keel plan tick <plan> <id> [<id> ...]' "$ROOT/docs/03-install-and-distribution.md" \
+  && ok "the install document's usage line shows several ids" \
+  || bad "doc usage" \
+       "docs/03-install-and-distribution.md lacks 'keel plan tick <plan> <id> [<id> ...]'"
 
 # A tick that cannot write the plan must fail: reporting success would leave the step unticked while
 # the caller moves on. Root can write a read-only file, so the case is skipped there.

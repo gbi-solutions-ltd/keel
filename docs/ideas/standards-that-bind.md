@@ -354,7 +354,7 @@ is the defect. Deleting a claim costs no words at all.
 | keel says this about itself in its release notes | `CHANGELOG.md#seven declared profile keys are read by nothing`: "seven declared profile keys are read by nothing (`gates.tdd`, `gates.coding_standards`, `gates.review`, ...)" | The gap is admitted, not hidden. Nothing here is news to keel |
 | `ship` has no standards item | `skills/ship/SKILL.md:16-40`, eight items, none naming standards; items 5 and 6 are prose with no command behind them | Claim B is true |
 | Two documents claim an enforcement that does not exist | `docs/02-skill-catalog.md:69` "Coding standards enforcement"; `:382` says `refactor` reads `standards.md` | The false claim is fixable for free and is arguably the whole of B |
-| Hooks cannot decide this | `hooks/done-guard:127` works by substring-matching the configured test command in a `Bash` call; `hooks/done-guard:34-36` says outright "It cannot see the exit code, and does not pretend to" | There is no observable event whose presence proves standards were followed. A hook is not available for B |
+| Hooks cannot decide this | `hooks/done-guard:379` works by substring-matching the configured test command in a `Bash` call; `hooks/done-guard:51-52` says outright "It cannot see the exit code, and does not pretend to" | There is no observable event whose presence proves standards were followed. A hook is not available for B |
 | A model acted on the inert gate unprompted | `tests/evals/results.md`: "arm 2 read the key out of the profile itself and used it to set severity" | See question 5 |
 
 ## 1. Are A and B separate problems, or one?
@@ -518,8 +518,8 @@ would join items 5 and 6 as prose with no command behind it, in a list whose wor
 command from the profile. It also crosses `ship` from 695 to about 712 and buys an eval arm.
 
 **5. A hook. Not available.** `hooks/done-guard` works because "did this turn run the test command"
-is a substring match over a `Bash` tool call (`hooks/done-guard:127`), and the file says plainly it
-"cannot see the exit code, and does not pretend to" (`:34-36`). "Did this edit follow the
+is a substring match over a `Bash` tool call (`hooks/done-guard:379`), and the file says plainly it
+"cannot see the exit code, and does not pretend to" (`:39-40`). "Did this edit follow the
 conventions" has no equivalent observable. The only hook-shaped check available is that
 `standards.md` exists when `gates.coding_standards` is `required`, and that belongs in `keel doctor`,
 whose `fail`/`warn`/`good` idiom (`bin/keel:1427-1429`) makes it about four lines of bash and zero

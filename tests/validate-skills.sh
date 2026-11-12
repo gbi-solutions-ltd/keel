@@ -582,48 +582,45 @@ if [ -f hooks/session-start ]; then
     # is a no-op returning 0. The loop would then measure this repository's own profile four times
     # and report green, which is the exact check this block exists to be. Caught in review.
     hook_abs="$PWD/hooks/session-start"
-    if probe="$(mktemp -d)"; then
-        mkdir -p "$probe/.keel"
-        for combo in "terse technical" "terse plain" "verbose technical" "verbose plain" \
-                     "terse technical styled"; do
-            rs="${combo%% *}"; rest="${combo#* }"; el="${rest%% *}"
-            form="response_style=$rs explain_level=$el"
-            printf '{"conventions": {"response_style": "%s", "explain_level": "%s"}}\n' "$rs" "$el" \
-                > "$probe/.keel/profile.json"
-            rm -rf "$probe/.claude"
-            case "$combo" in *styled)
-                form="$form outputStyle=keel:keel terse"
-                mkdir -p "$probe/.claude"
-                printf '{"outputStyle": "keel:keel terse"}\n' > "$probe/.claude/settings.json" ;;
-            esac
-            hook_chars=$( cd "$probe" && bash "$hook_abs" 2>/dev/null | wc -c | tr -d ' ' )
-            hook_tokens=$(( hook_chars * 10 / 36 ))
-            # The floor first. A hook that fails to run measures 0, which is under every ceiling, so
-            # a bound with no floor cannot tell "within budget" from "produced nothing".
-            #
-            # The floor is zero and not a size. This validator runs against arbitrary repositories
-            # and against fixtures whose hooks legitimately emit one short line, so any positive
-            # floor rejects a valid hook. Zero output is the one length that always means failure.
-            if [ "$hook_chars" -eq 0 ]; then
-                report "hooks/session-start produced no output for $form. It failed to run, and a size check with no floor would have counted that as comfortably within budget."
-            elif [ "$hook_chars" -gt 1285 ]; then
-                # Characters, and checked before the token bounds below, because NFR-01 is written
-                # in characters and this is the number a person can count. The token estimate is
-                # derived from it and rounds in a way that surprises: 1285*10/36 truncates to 356,
-                # which is not over 356, so the token bound alone first fails at 1286. Stating the
-                # limit twice in two units is deliberate, and the character one fails first so the
-                # message names the unit the requirement uses.
-                report "hooks/session-start injects $hook_chars characters for $form, over the 1285 of NFR-01 in docs/prd/plain-language-chat.md. Take words out, or re-measure and move the requirement deliberately."
-            elif [ "$hook_tokens" -gt 400 ]; then
-                report "hooks/session-start injects about $hook_tokens tokens for $form, over the 400 ceiling. It is in every request of every session."
-            elif [ "$hook_tokens" -gt 356 ]; then
-                report "hooks/session-start injects about $hook_tokens tokens for $form, over the 356 rule in docs/prd/plain-language-chat.md NFR-01. The 44 tokens below the 400 ceiling are spoken for."
-            fi
-        done
-        rm -rf "$probe"
-    else
-        report "cannot create a temporary directory to size hooks/session-start"
-    fi
+    probe="$(mktemp -d)"; [ -d "$probe" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
+    mkdir -p "$probe/.keel"
+    for combo in "terse technical" "terse plain" "verbose technical" "verbose plain" \
+                 "terse technical styled"; do
+        rs="${combo%% *}"; rest="${combo#* }"; el="${rest%% *}"
+        form="response_style=$rs explain_level=$el"
+        printf '{"conventions": {"response_style": "%s", "explain_level": "%s"}}\n' "$rs" "$el" \
+            > "$probe/.keel/profile.json"
+        rm -rf "$probe/.claude"
+        case "$combo" in *styled)
+            form="$form outputStyle=keel:keel terse"
+            mkdir -p "$probe/.claude"
+            printf '{"outputStyle": "keel:keel terse"}\n' > "$probe/.claude/settings.json" ;;
+        esac
+        hook_chars=$( cd "$probe" && bash "$hook_abs" 2>/dev/null | wc -c | tr -d ' ' )
+        hook_tokens=$(( hook_chars * 10 / 36 ))
+        # The floor first. A hook that fails to run measures 0, which is under every ceiling, so
+        # a bound with no floor cannot tell "within budget" from "produced nothing".
+        #
+        # The floor is zero and not a size. This validator runs against arbitrary repositories
+        # and against fixtures whose hooks legitimately emit one short line, so any positive
+        # floor rejects a valid hook. Zero output is the one length that always means failure.
+        if [ "$hook_chars" -eq 0 ]; then
+            report "hooks/session-start produced no output for $form. It failed to run, and a size check with no floor would have counted that as comfortably within budget."
+        elif [ "$hook_chars" -gt 1285 ]; then
+            # Characters, and checked before the token bounds below, because NFR-01 is written
+            # in characters and this is the number a person can count. The token estimate is
+            # derived from it and rounds in a way that surprises: 1285*10/36 truncates to 356,
+            # which is not over 356, so the token bound alone first fails at 1286. Stating the
+            # limit twice in two units is deliberate, and the character one fails first so the
+            # message names the unit the requirement uses.
+            report "hooks/session-start injects $hook_chars characters for $form, over the 1285 of NFR-01 in docs/prd/plain-language-chat.md. Take words out, or re-measure and move the requirement deliberately."
+        elif [ "$hook_tokens" -gt 400 ]; then
+            report "hooks/session-start injects about $hook_tokens tokens for $form, over the 400 ceiling. It is in every request of every session."
+        elif [ "$hook_tokens" -gt 356 ]; then
+            report "hooks/session-start injects about $hook_tokens tokens for $form, over the 356 rule in docs/prd/plain-language-chat.md NFR-01. The 44 tokens below the 400 ceiling are spoken for."
+        fi
+    done
+    rm -rf "$probe"
 fi
 
 # repo-snapshot deliberately does not audit: section-templates.md section 8 says so. A document that
@@ -895,15 +892,15 @@ fi
 # tree before this rule was chosen. It flagged 25 of 61 keys and 7 of the 25 are genuinely read:
 # artifacts.stories, .architecture, .decisions and .plans through the `get('artifacts',{})` map
 # iteration in cmd_doctor, gates.context_warn_pct and .context_stop_pct through
-# lib/context_watch.py:374-385, and conventions.default_branch through the sed in the pre-push hook
-# body that `keel guard install` writes.
+# `lib/context_watch.py#def _thresholds(profile):`, and conventions.default_branch through the sed
+# in the pre-push hook body that `keel guard install` writes.
 # 28% false positives, against docs/standards.md's rule that a check is never stricter than correct
 # output. It under-reports too: gates.done_verified is read as (prof.get("gates") or
-# {}).get("done_verified") at hooks/done-guard:114 and the dotted string appears in that file only
-# in comments. Bare leaf names rescue nothing: `name` occurs 337 times in this tree and `test` 484,
-# so all 22 dead keys would have passed. The two bin/keel reads above are named by phrase and not
-# by line, because a line inserted anywhere earlier in that file moves them and nothing goes red
-# when it does, which is this rule's known limit.
+# {}).get("done_verified") at `hooks/done-guard#get("done_verified") or "off"` and the dotted
+# string appears in that file only in comments. Bare leaf names rescue nothing: `name` occurs 337
+# times in this tree and `test` 484, so all 22 dead keys would have passed. The two bin/keel reads
+# above are named by phrase and not by line, because a line inserted anywhere earlier in that file
+# moves them and nothing goes red when it does, which is this rule's known limit.
 #
 # So the key declares its reader and this checks the citation, the way lib/harness/capabilities
 # declares a primitive and its source. Its rule is the one that applies here: absent evidence fails,

@@ -11,6 +11,10 @@
 # an ADR or docs/07-open-decisions.md before it is discarded. `git add -f` covers sharing one.
 .keel/handoff.*
 
+# Per-file durations tests/run-tests.sh records to start the longest file first. They describe this
+# checkout's machine, so each checkout learns its own.
+.keel/test-durations
+
 # Node, once bin/ and tests/ arrive
 node_modules/
 *.log

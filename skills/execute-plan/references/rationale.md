@@ -47,6 +47,13 @@ Review follows the references because the passes depend on what the task touches
 
 `keel:tdd` is required because the plan's steps assume it.
 
+## The full loop's one fix pass
+
+A full-loop rejection whose `Fix scope` is a list gets one fix pass because a fresh redo of the
+whole task, to add one missing test case, pays for the task twice. The fix pass is safe because it
+goes to a fresh agent, so nobody defends their own work, and it is bounded by the fix scope and by
+one round. A second rejection discards the attempt, so a wrong approach is not patched twice.
+
 ## Step 5: Stop when blocked
 
 Adjusting the plan to make a failing step pass is fixing the thermometer.

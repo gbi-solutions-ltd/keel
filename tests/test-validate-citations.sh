@@ -113,7 +113,7 @@ check() {
 
 run() {
     local name="$1" expected="$2" mutate="$3"
-    local root; root="$(mktemp -d)"
+    local root; root="$(mktemp -d)"; [ -d "$root" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
     fixture_valid "$root"
     "$mutate" "$root"
     check "$name" "$expected" "$root"
@@ -265,6 +265,39 @@ m_hot_line_in_keel_part() {
 }
 for hot_part in 2 3 4 5; do
     run "a line-number citation into tests/test-keel-$hot_part.sh from a live document is rejected" 1 m_hot_line_in_keel_part
+done
+
+# hooks/done-guard and lib/context_watch.py shift in most tasks of a plan, and the citations into
+# them by line were most of the repairs a task made outside its Files. A live document citing one
+# by line fails, naming the hot-file rule rather than any other; the same line in a record passes.
+hot_file_body() { printf '#!/usr/bin/env bash\n# A comment.\n# Another.\n# A third.\necho hi\n'; }
+m_hot_line_in_live_doc_named() {
+    mkdir -p "$1/hooks" "$1/lib"
+    hot_file_body > "$1/$hot_file"
+    printf 'The guard does it at `%s:5`.\n' "$hot_file" >> "$1/README.md"
+}
+m_hot_line_in_idea_named() {
+    mkdir -p "$1/hooks" "$1/lib"
+    hot_file_body > "$1/$hot_file"
+    printf 'The guard did it at `%s:5` on 2026-11-12.\n' "$hot_file" >> "$1/docs/ideas/example.md"
+}
+run_hot_named() {
+    local name="$1" root out
+    root="$(mktemp -d)"; [ -d "$root" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
+    fixture_valid "$root"
+    m_hot_line_in_live_doc_named "$root"
+    out="$(cd "$root" && "$CHECKER" 2>&1)"
+    case "$out" in
+        *"$hot_file changes often enough that a line number there is stale"*)
+            printf '  PASS  %s\n' "$name"; pass=$((pass+1)) ;;
+        *)
+            printf '  FAIL  %s (no hot-file failure in: %s)\n' "$name" "$out"; fail=$((fail+1)) ;;
+    esac
+    rm -rf "$root"
+}
+for hot_file in hooks/done-guard lib/context_watch.py; do
+    run_hot_named "a line-number citation into $hot_file from a live document fails on the hot-file rule"
+    run "a line-number citation into $hot_file from docs/ideas/ is left alone" 0 m_hot_line_in_idea_named
 done
 
 # Case 6j. The phrase form in a double-backtick code span, which is how a phrase holding a backtick
@@ -443,7 +476,7 @@ run "a citation into a staged fixture tree in the eval log is not flagged" 0 m_f
 # while it is present, and a document inside it is never one of the documents these checks read.
 check_says() {   # check_says <name> <yes|no> <needle> <mutate-fn>
     local name="$1" want="$2" needle="$3" mutate="$4"
-    local root; root="$(mktemp -d)"
+    local root; root="$(mktemp -d)"; [ -d "$root" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
     fixture_valid "$root"
     "$mutate" "$root"
     local out; out="$( cd "$root" && "$CHECKER" 2>&1 )"

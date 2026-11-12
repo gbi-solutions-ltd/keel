@@ -25,7 +25,7 @@ fail=0
 ok()  { printf '  PASS  %s\n' "$1"; pass=$((pass+1)); return 0; }
 bad() { printf '  FAIL  %s: %s\n' "$1" "$2"; fail=$((fail+1)); return 0; }
 
-TMP="$(mktemp -d)"
+TMP="$(mktemp -d)"; [ -d "$TMP" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 trap 'rm -rf "$TMP"' EXIT
 
 # ---- git isolation ------------------------------------------------------------------------------

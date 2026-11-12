@@ -54,7 +54,7 @@ check() {
 
 run() {
     local name="$1" expected="$2" mutate="$3"
-    local root; root="$(mktemp -d)"
+    local root; root="$(mktemp -d)"; [ -d "$root" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
     fixture_valid "$root"
     "$mutate" "$root"
     check "$name" "$expected" "$root"
@@ -115,7 +115,7 @@ check_out() {
 
 run_out() {
     local name="$1" expected="$2" mutate="$3" pattern="$4" want="$5"
-    local root; root="$(mktemp -d)"
+    local root; root="$(mktemp -d)"; [ -d "$root" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
     fixture_valid "$root"
     "$mutate" "$root"
     check_out "$name" "$expected" "$root" "$pattern" "$want"
@@ -968,7 +968,7 @@ profile_keys_fixture() {
 # rule firing from the rule staying quiet.
 check_reports() {   # check_reports <name> <yes|no> <needle> <mutate-fn>
     local name="$1" want="$2" needle="$3" mutate="$4"
-    local root; root="$(mktemp -d)"
+    local root; root="$(mktemp -d)"; [ -d "$root" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
     fixture_valid "$root"
     "$mutate" "$root"
     local out; out="$( cd "$root" && "$VALIDATOR" 2>&1 )"

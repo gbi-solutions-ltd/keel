@@ -151,13 +151,15 @@ while IFS=$'\t' read -r citing cline cit; do
     # A file that changes often, cited by line, from a document that says what is true now. These
     # take insertions in most weeks: 47 lines landed in bin/keel in one commit on 2026-09-09 and
     # moved 32 citations that had been correct. tests/test-keel-2.sh to tests/test-keel-5.sh are the
-    # parts tests/test-keel.sh was split into, and take its insertions. The list is written out
+    # parts tests/test-keel.sh was split into, and take its insertions. hooks/done-guard and
+    # lib/context_watch.py joined on 2026-11-12: on the 2026-11-11 plan run, repairing citations into
+    # them was most of the work tasks did outside their Files. The list is written out
     # rather than derived from git history, because a rule whose membership changes when somebody
     # commits is one nobody can predict, and a check people cannot predict is the one they learn to
     # ignore.
     case "$target" in
         bin/keel|tests/validate-skills.sh|tests/test-keel.sh|tests/test-keel-2.sh|tests/test-keel-3.sh|\
-        tests/test-keel-4.sh|tests/test-keel-5.sh)
+        tests/test-keel-4.sh|tests/test-keel-5.sh|hooks/done-guard|lib/context_watch.py)
             case "$citing" in
                 # Records. Each says when it was written, and that date is what tells a reader how
                 # far to trust its line numbers. Repairing a pointer in one is allowed and rewriting

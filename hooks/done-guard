@@ -27,13 +27,29 @@
 #
 # DOCUMENTATION TURNS PASS. A turn whose only edits are .md files or files under docs_root does not
 # need the test suite, and firing on every documentation commit is how this becomes the hook people
-# delete.
+# delete. An edit outside the repository passes too, the repository being every checkout of it:
+# git's top level for the event's cwd (else the cwd), each worktree `git worktree list` names, and
+# the superproject. A subagent's probe under /tmp is not this repository's code, and no suite covers
+# it. A nested repository that is neither a submodule nor a worktree is not told apart: an edit
+# inside one that sits within a checkout is read as this repository's code.
 #
 # ITS LIMIT, STATED RATHER THAN DISCOVERED. It matches the profile's test command as a substring of
-# a Bash command, so a wrapper script, a changed directory or an alias runs the suite without being
-# seen, and a command that merely mentions the string counts as having run it. This raises the cost
-# of claiming done without checking; it is not a proof that the suite passed. It cannot see the
-# exit code, and does not pretend to: `ship` is the gate that reads results.
+# a Bash command, so verify.test counts wherever it appears, even merely mentioned. The text of
+# verify.test_one or verify.test_affected before its first `{`, where that text is not empty, counts
+# only where a simple command begins with it once the command is read as a shell reads it: split
+# into words by Python's shlex, quotes removed, and into simple commands at `;`, `&&`, `||`, `|`,
+# `&`, `(`, `)`, a newline, and a `{`, `}`, `then`, `do` or `else` that begins one. Leading
+# `VAR=value`, `env`, `time`, `command`, and `bash` or `sh` before a path are dropped, and `./`, so
+# `bash tests/x.sh` and `env CI=1 tests/x.sh` count. Quoted text is no command, so
+# `grep 'tests/x' f` and a lint naming `tests/*.sh` are no run, and a scoped run satisfies the gate,
+# which proves a test ran and not that the suite did. A command shlex cannot split (an unbalanced
+# quote) falls back to a regular expression anchored at the start or after `;`, `&&`, `||`, `|`,
+# `(` or a newline, so the hook never errors on one. Tokenising does not see a run inside backticks,
+# reads from a word that starts with an unquoted `#` to the newline as a comment, and reads a
+# backslash-newline continuation as one word. A prefix has no word boundary, so the prefix `tests/`
+# counts `tests/evals/stage.sh` as a run. A changed directory or an alias goes unseen. This raises
+# the cost of claiming done without checking; it is not a proof that the suite passed. It cannot see
+# the exit code, and does not pretend to: `ship` is the gate that reads results.
 
 set -uo pipefail
 
@@ -73,7 +89,7 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 KEEL_EVENT="$event" KEEL_PROFILE_TEXT="$profile_text" python3 - <<'PY'
-import json, os, sys
+import json, os, re, shlex, subprocess, sys
 
 def emit(obj):
     print(json.dumps(obj))
@@ -115,14 +131,126 @@ mode = (prof.get("gates") or {}).get("done_verified") or "off"
 if mode == "off":
     sys.exit(0)
 
-test_cmd = (prof.get("verify") or {}).get("test")
+verify = prof.get("verify") or {}
+test_cmd = verify.get("test")
 if not test_cmd:
     sys.exit(0)          # nothing to check against, and inventing a command would be worse
+
+# A scoped run counts by its text before the first `{` where it begins a command, so a lint of
+# `tests/*.sh` is no run. An empty prefix would begin every command; a shared one is named once.
+scoped = list(dict.fromkeys(p for p in (str(verify.get(k) or "").split("{", 1)[0].strip()
+                                        for k in ("test_affected", "test_one")) if p))
+# The anchored regex, kept for a command shlex cannot tokenise, so the hook never errors on one.
+fallback_marks = [r"(?:^|[;|(\n]|&&)\s*" + re.escape(p) for p in scoped]
+
+SEPARATORS = set(";&|()\n")
+KEYWORDS = ("{", "}", "then", "do", "else")
+
+def simple_commands(cmd):
+    """The command's simple commands as word lists, read as a shell does. Raises ValueError.
+
+    A newline is a token, not whitespace, since shlex would otherwise read two lines as one
+    command. `{` and `}` are word characters, so only a standalone brace is its own token and
+    `{tests/a,b}` stays one word. A punctuation token is a separator only where the source shows
+    it bare: shlex drops the quotes of `';'`, and the source position is the one way to tell.
+    A bare keyword at a command's start ends it the same way; a quoted one is a word. A bare word
+    starting with `#` begins a comment that runs to the newline; a `#` inside a word is no comment.
+    """
+    lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
+    lex.whitespace = " \t\r"
+    lex.wordchars += "{}#"
+    lex.commenters = ""
+    cmds, words, comment = [], [], False
+    while True:
+        tok = lex.get_token()
+        if tok is None:
+            break
+        # Indices into cmd, since a slice per token makes a long heredoc quadratic. A posix token is
+        # no longer than its source, so start is never negative; a first token is never escaped.
+        end = lex.instream.tell() - len(lex._pushback_chars)
+        while end > 0 and cmd[end - 1] in " \t\r":
+            end -= 1
+        start = end - len(tok)
+        bare = (cmd.startswith(tok, start, end)
+                and not (start > 0 and cmd[start - 1] == "\\"))
+        if comment and not (bare and tok == "\n"):
+            continue
+        comment = False
+        if bare and tok.startswith("#"):
+            comment = True
+        elif bare and ((tok and set(tok) <= SEPARATORS) or (tok in KEYWORDS and not words)):
+            cmds.append(words)
+            words = []
+        else:
+            words.append(tok)
+    return cmds + [words]
+
+def leading(words):
+    """The words with wrappers dropped from the front, and a leading `./` removed."""
+    assign = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
+    while words:
+        w = words[0]
+        if w in ("env", "time", "command") or assign.match(w):
+            words = words[1:]
+        elif w in ("bash", "sh") and len(words) > 1 and not words[1].startswith("-"):
+            words = words[1:]
+        else:
+            break
+    if words and words[0].startswith("./"):
+        words = [words[0][2:]] + words[1:]
+    return words
+
+prefix_words = [leading(p.split()) for p in scoped]
+
+def begins(words, pw):
+    return (len(words) >= len(pw) and words[:len(pw) - 1] == pw[:-1]
+            and words[len(pw) - 1].startswith(pw[-1]))
+
+def is_run(cmd):
+    if test_cmd in cmd:
+        return True
+    try:
+        cmds = simple_commands(cmd)
+    except (ValueError, AttributeError):  # an unbalanced quote, or a shlex without _pushback_chars
+        return any(re.search(m, cmd) for m in fallback_marks)
+    return any(begins(leading(w), pw) for w in cmds for pw in prefix_words if pw)
 
 docs_root = (prof.get("docs_root") or "docs").rstrip("/")
 
 def is_code(p):
     return not (p.endswith(".md") or p == docs_root or p.startswith(docs_root + "/"))
+
+# An edit outside the repository is not its code. The repository is every checkout of it: git's
+# top level for the event's cwd (else the cwd itself), each worktree, and the superproject. All go
+# through realpath, because macOS hands out /var paths that are really /private/var, and an inside
+# path is made relative to the checkout that holds it before is_code reads it, since docs_root is
+# relative. git runs on the first edit, not on every stop.
+cwd = ev.get("cwd") or os.getcwd()
+roots = []
+
+def git(*args):
+    try:
+        r = subprocess.run(["git", "-C", cwd] + list(args), capture_output=True, text=True,
+                           timeout=5)
+        return r.stdout if r.returncode == 0 else ""
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+def checkouts():
+    if not roots:
+        found = [git("rev-parse", "--show-toplevel").strip() or cwd]
+        found += [l[9:] for l in git("worktree", "list", "--porcelain").splitlines()
+                  if l.startswith("worktree ")]
+        found.append(git("rev-parse", "--show-superproject-working-tree").strip())
+        roots.extend(os.path.realpath(r) for r in found if r)
+    return roots
+
+def in_repo(p):
+    """The path relative to the innermost checkout holding it, or None when none does."""
+    full = os.path.realpath(os.path.join(cwd, p))
+    rels = [os.path.relpath(full, r) for r in checkouts()]
+    rels = [r for r in rels if not (r == ".." or r.startswith("../"))]
+    return min(rels, key=len) if rels else None
 
 # WHERE THE TURN'S TOOL CALLS COME FROM, AND WHY NOT FROM THE EVENT.
 #
@@ -245,9 +373,10 @@ for c in calls:
     ti = c.get("input") or {}
     if name in ("Edit", "Write", "NotebookEdit"):
         p = ti.get("file_path") or ti.get("notebook_path") or ""
-        if p and is_code(p):
-            edited.append(p)
-    elif name == "Bash" and test_cmd in (ti.get("command") or ""):
+        rel = in_repo(p) if p else None
+        if rel is not None and is_code(rel):
+            edited.append(rel)
+    elif name == "Bash" and is_run(ti.get("command") or ""):
         ran = True
 
 if not edited or ran:
@@ -262,11 +391,14 @@ shown = ", ".join(uniq[:5]) + (" and %d more" % (len(uniq) - 5) if len(uniq) > 5
 # statement of what happened. Until 2026-09-05 both carried the instruction, which meant warn mode
 # told the user to go and run a command, in the voice of an order aimed at somebody else. warn is
 # what `keel init` writes by default, so that was the text most repositories actually saw.
-where = "%s edited %d file(s) including %s and never ran `%s`" % (who, len(uniq), shown, test_cmd)
+# A checkpointed implementer is satisfied by a scoped run, so the text names one beside the suite.
+cmds = "`%s`" % test_cmd + "".join(" or a command beginning `%s`" % p for p in scoped)
+where = "%s edited %d file(s) including %s and never ran %s" % (who, len(uniq), shown, cmds)
 
 if mode == "required":
-    block("%s. Run it and report what it printed before ending the turn. If the work is genuinely "
-          "incomplete, say what remains instead of ending on it." % where)
+    block("%s. Run %s and report what it printed before ending the turn. If the work is "
+          "genuinely incomplete, say what remains instead of ending on it."
+          % (where, "one" if scoped else "it"))
 warn("%s. The turn was allowed to end because gates.done_verified is `warn`; set it to `required` "
      "to stop on this instead." % where)
 PY

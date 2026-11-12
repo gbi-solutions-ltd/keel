@@ -81,17 +81,17 @@ reason_has() {    # reason_has <name> <text>, after run
 
 # The author's checkout. mktemp puts it under the temp directory, as a `claude plugin eval`
 # workspace is, which is exactly why "under the temp directory" alone cannot mean "the reviewer's".
-repo="$(mktemp -d)"
+repo="$(mktemp -d)"; [ -d "$repo" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 git -C "$repo" init -q
 mkdir -p "$repo/src"
 : > "$repo/src/a.sh"
 # A checkout under /tmp by name, for the example that says so.
-tmprepo="$(mktemp -d /tmp/review-guard.XXXXXX)"
+tmprepo="$(mktemp -d /tmp/review-guard.XXXXXX)"; [ -d "$tmprepo" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 git -C "$tmprepo" init -q
 # A PATH carrying bash and nothing else. It must carry bash: the shebang is `/usr/bin/env bash`,
 # and env resolves bash through PATH, so an empty shim stops the hook starting at all rather than
 # exercising the branch under test.
-shim="$(mktemp -d)"
+shim="$(mktemp -d)"; [ -d "$shim" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ln -s "$(command -v bash)" "$shim/bash"
 # pyfail is made further down; it is named here, empty until then, so an early exit still cleans it.
 pyfail=""
@@ -357,7 +357,7 @@ run "$ev" "$repo" PATH="$shim"
 expect_allow "without python3 a command mentioning the reviewer is untouched"
 
 # A python3 that fails for another reason says so, rather than blaming the input.
-pyfail="$(mktemp -d)"
+pyfail="$(mktemp -d)"; [ -d "$pyfail" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ln -s "$(command -v bash)" "$pyfail/bash"
 printf '#!/bin/sh\nexit 1\n' > "$pyfail/python3"
 chmod +x "$pyfail/python3"
@@ -428,7 +428,7 @@ run "$(event - "echo '\"agent_type\": \"general-purpose\"'; git stash" "$repo")"
 expect_allow "without python3 a main-session command naming a subagent's agent_type is untouched"
 # Behaviour 7: a subagent call without the word `stash` starts no python3. The shim only records
 # that it ran, and fails, so the hook falls back for the call that does start it.
-pyrec="$(mktemp -d)"
+pyrec="$(mktemp -d)"; [ -d "$pyrec" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ln -s "$(command -v bash)" "$pyrec/bash"
 printf '#!/bin/sh\n: > "%s/ran"\nexit 1\n' "$pyrec" > "$pyrec/python3"
 chmod +x "$pyrec/python3"

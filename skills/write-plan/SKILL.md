@@ -40,7 +40,8 @@ fails.
 
 ## Step 2: Map the files before writing tasks
 
-List every file to create or modify and what each is responsible for.
+List each file created or modified and its job, live documents included
+([references/plan-template.md](references/plan-template.md)).
 
 **Where the area to map is larger than you can hold, delegate the reading**: subagents in one
 message, delegation profile `keel-fanout`, with each dispatch's description starting
@@ -93,9 +94,9 @@ not.
 
 ## Step 6: Hand off
 
-Report task count, story coverage, any concurrent batches and anything the plan could not settle.
-Then ask one question carrying the routing and the delivery choice, for example "Approve, implement
-on keel-implementer, deliver to a pull request", and write the answer into `**Implementer
-routing:**` and `**Delivery:**`. Commit the plan alone, `docs(plans): <slug>`. On the default
+Report task count, story coverage, concurrent batches and anything the plan could not settle.
+Then ask one question on routing, suite checkpoints, delivery and commits that ask, like
+"Approve, keel-implementer, suite every 3 tasks, pull request", and write the answers into the
+plan header. Commit the plan alone, `docs(plans): <slug>`. On the default
 branch, leave it uncommitted, start nothing and say so. Otherwise, on `pull-request`, start
 `execute-plan`; on `hand-off`, name it and do not start it.

@@ -11,8 +11,8 @@ its plan as a draft and not as the plan. Harden the draft: give each task its `F
 `Behaviours` with examples, `Depends on:` and `Done when:` from the profile, and size the tasks
 as "Task granularity" says. Plan mode blocks writes until it is left, so write the file where
 `write-plan` step 3 says only after leaving it. Plan mode's approval covers the draft; the
-question at step 6 still carries the routing and the delivery. A headless or scheduled run
-writes the plan directly, and nothing else here changes.
+question at step 6 still carries the routing, the suite checkpoints, the delivery and the commits
+that ask. A headless or scheduled run writes the plan directly, and nothing else here changes.
 
 ## Header
 
@@ -35,6 +35,8 @@ that has loaded nothing else.
 **ADRs:** ADR-0003
 **Architecture:** two or three sentences on the approach.
 **Implementer routing:** inherit
+**Suite checkpoints:** every 3 tasks
+**Commits that ask:** none
 **Delivery:** hand-off
 
 ## Global constraints
@@ -43,7 +45,7 @@ Copied verbatim from the stories, ADRs, the standards document, and profile. Eve
 these.
 
 - Verify commands: test `./gradlew test`, one test `./gradlew test --tests '{name}'`, lint
-  `./gradlew check`
+  `./gradlew spotlessCheck`
 - Never start on `main`
 - ADR-0003 requires that a missing or empty credential fails startup
 - `<docs_root>/standards.md` requires a named exception type, never a bare catch
@@ -53,6 +55,14 @@ these.
 
 Copy the constraints in full rather than linking. A task executed by a fresh agent that reads
 only its own section must still obey them.
+
+Where the project has a citation validator, the constraints tell implementers: repair the
+citations it flags, and do not look for shifted citations in records. keel's own validator,
+`tests/validate-citations.sh`, counts as records `docs/plans`, `docs/prd`, `docs/stories`,
+`docs/architecture`, `docs/decisions`, `docs/audits`, `docs/ideas`, `docs/07-open-decisions.md`,
+`docs/harness-support.md`, the eval fixtures and `CHANGELOG.md`. On the 2026-11-11 run the open
+instruction to fix shifted citations caused most repairs outside a task's Files, in 11 of 13 tasks:
+each agent hunted through records the validator deliberately leaves alone.
 
 **The routing line** takes `inherit` or `keel-implementer`, and the person approving the plan can
 change it before `execute-plan` runs. `keel-implementer` fits where every task has a `Done when:`
@@ -64,6 +74,23 @@ before. `pull-request` runs through to an open pull request, stopping wherever
 `skills/execute-plan/references/delivery.md` says. The person approving the plan chooses, and can
 change the line before `execute-plan` runs: `execute-plan` reads the line from the plan and not from
 the request, so the choice made at approval is the one a later session finds.
+
+**The suite checkpoints line** says how often `execute-plan`'s coordinator runs `verify.test`: once
+before the first dispatch, after every N committed tasks and after the last. Its implementers run
+no `verify.test`; each starts from the last checkpoint's record. 3 is the default, and the person
+approving the plan can change it. The reason is ADR-0017
+(`docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md`): on a measured run the
+suite, run twice per task, took 22% of the wall clock, and one run every few tasks still bounds how
+far back a break can hide. A plan with no such line runs its steps as written, so its build steps
+name `verify.test`, or `verify.test_affected` where set, as the boundary run. `execute-plan` offers
+such a plan checkpoints when it has 3 or more open tasks, and on a yes rewrites those steps to the
+checkpoint form below.
+
+**The commits that ask line** names each task that stages a `hard_block_paths` path, with those
+paths, or says `none`. `hooks/sensitive-guard` asks the person at each such commit, and only the
+person can answer it. So order those tasks as early as their `Depends on:` allows, while the person
+who approved the plan is likely still there, and state the line in the approval question, so the
+person knows when they are needed. Approving the plan answers none of those asks.
 
 ## Task shape
 
@@ -96,11 +123,11 @@ Run: `./gradlew test --tests '*SecurityPropertiesTest'`
 Expected before the implementation: FAIL, the case for behaviour 1 fails because startup
 succeeds. Expected after: PASS. Quote the failing output in your report.
 
-Run: `./gradlew test`. Where the profile sets `verify.test_affected`, run that instead, with
-`{base}` filled with the start record's commit, or `verify.test` where `keel:tdd`'s affected-tests
-reference says to. The task text overrides the skill, so a step naming only the suite would
-schedule it for every task, and an affected run that never selected the unit's new test would pass
-this step.
+Run: `./gradlew spotlessCheck`, and `verify.test_affected` where the profile sets it, with `{base}`
+filled with the start record's commit. With the `Done when:` run above, that is the unit boundary.
+Run no `./gradlew test`: the plan header names suite checkpoints, so the coordinator runs the suite
+at checkpoints and hands you the last one's record as your start record. The task text overrides the
+skill, so a step naming the suite would schedule it for every task, the cost checkpoints remove.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
@@ -151,6 +178,23 @@ different reason: a working tree that was already dirty when the run started.** 
 there uncommitted, someone's debugging edit, a half-finished experiment, gets swept into the first
 task's commit and attributed to work that never touched it. A batch is not what makes `git add -A`
 dangerous; a non-empty `git status` is, and that can be true on task 1 of a serial plan.
+
+### Live documents in a task's Files
+
+**When mapping the files, search the live documents for the behaviour each task changes, and list
+every hit in that task's `Files`.** Search by the names, commands and phrases a reader would look
+for. A change lands with the live documents it makes wrong, and an implementer reads only its own
+task. Live documents say what is true now: every document that is not a record. In keel they are
+`README.md` and the other root documents, `docs/NN-*.md`, `docs/runbooks/`, `skills/`, `agents/`,
+`templates/` (`templates/profile.schema.json` among them), the generated `docs/profile-keys.md`
+and the other files directly under `docs/`. Records are not
+searched: the ones the citation paragraph under "Global constraints" names (`docs/plans`,
+`docs/ideas`, `docs/prd`, `docs/stories`, `docs/architecture`, `docs/decisions`, `docs/audits`,
+`docs/07-open-decisions.md`, `docs/harness-support.md`, the eval fixtures) and the `CHANGELOG.md`
+entries already released. Where the two lists overlap, the file is a record.
+
+It costs the measured resumes: on the 2026-11-11 run, 4 of 13 tasks stopped because their Files
+missed a document the change made wrong, about 30 minutes.
 
 ### Why the Interfaces block exists
 
@@ -232,7 +276,8 @@ Rules:
   environment.` An honest gap reads as a gap. An invented command reads as coverage.
 - It is **scoped to the task's own test, never the full suite**, in every plan and not only in a
   concurrent batch. The tests run once at the unit boundary, which for a sequential task is its
-  build step and for a batched one is the `Batch gate:` line at the join. A whole-suite `Done
+  build step and for a batched one is the `Batch gate:` line at the join; in a plan with suite
+  checkpoints the whole suite runs only at the coordinator's checkpoints. A whole-suite `Done
   when:` puts the suite back inside the cycle it was moved out of, and in a batch it also proves
   nothing, for the reason in rule 1 of [concurrent-batches.md](concurrent-batches.md).
 - It appears once per task, above the steps, so a fresh agent dispatched only that section still

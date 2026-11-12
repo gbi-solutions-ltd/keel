@@ -12,6 +12,8 @@
 # `set -u`, that the function stays out of child processes, and that every variable it names starts
 # with `_gq_` (shellcheck does not scope a function's locals across the files that source it).
 #
+# Sections 12 and 13 lint the tree: quiet grep pipelines, and a `mktemp -d` result used unchecked.
+#
 # This file loads the shim on its own `set` line, as the files that use it do.
 set -uo pipefail; . "$(dirname "${BASH_SOURCE[0]}")/grep-quiet.sh"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -20,7 +22,7 @@ pass=0; fail=0
 ok()  { printf '  PASS  %s\n' "$1"; pass=$((pass+1)); return 0; }
 bad() { printf '  FAIL  %s: %s\n' "$1" "$2"; fail=$((fail+1)); return 0; }
 
-TMP="$(mktemp -d)"
+TMP="$(mktemp -d)"; [ -d "$TMP" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 trap 'rm -rf "$TMP"' EXIT
 SHIM="$ROOT/tests/grep-quiet.sh"
 
@@ -413,6 +415,121 @@ expect "rule 2: no quiet pipeline into a grep the function cannot stand in for" 
   "$(res lint_tree_rule2 "$ROOT")" "rc=0"
 expect "rule 3: no quiet pipeline in the scripts outside the tests, bar the allowed line" \
   "$(res lint_tree_rule 3 "$ROOT")" "rc=0"
+
+# 13. No test file uses a `mktemp -d` result unchecked (task 3b of
+#     docs/plans/2026-11-12-plan-execution-speed-2.md). With the disk full, a `mktemp -d` printed
+#     nothing, a fixture's `git -C ""` ran in this repository, and its `git commit -m init`
+#     committed the staged work here. A call is checked when it assigns one variable, and the same
+#     line then tests that variable is a directory and otherwise prints a message naming mktemp and
+#     stops the test file, from a subshell too:
+#
+#       d="$(mktemp -d)"; [ -d "$d" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
+#
+#     tests/keel-test-lib.sh makes its own through keel_tmpdir, whose one call has that form.
+#     Every line a case writes is assembled from pieces, so none of this file's text is a finding.
+MK_D="mk""temp -d"
+# The one allowed line: a command string that tests/test-review-guard.sh hands to the guard under
+# test as text, never run by the test file itself.
+MK_ALLOW_PATH="tests/test-review-guard.sh"
+MK_ALLOW_TEXT="'wt=\$(${MK_D}); git -C \"\$wt\" apply'"
+MK_NAME='[A-Za-z_][A-Za-z0-9_]*'
+MK_RE="^(.*[^A-Za-z0-9_])?(${MK_NAME})=\"\\\$\\(${MK_D}[^)]*\\)\"; "
+MK_RE="${MK_RE}\\[ -d \"\\\$(${MK_NAME})\" \\] \\|\\| "
+MK_RE="${MK_RE}\\{ echo \"\\\$0: ${MK_D} failed\" >&2; kill \\\$\\\$; exit 1; \\}(.*)\$"
+
+# mk_rule <file> <display>: the path and line of each unchecked call, comment lines left out.
+mk_rule() {
+  local n=0 line rest
+  while IFS= read -r line || [ -n "$line" ]; do
+    n=$((n + 1))
+    case "$line" in *"$MK_D"*) ;; *) continue ;; esac
+    [[ $line =~ ^[[:space:]]*# ]] && continue
+    if [ "$2" = "$MK_ALLOW_PATH" ]; then
+      case "$line" in *"$MK_ALLOW_TEXT"*) continue ;; esac
+    fi
+    rest="$line"
+    while [[ $rest =~ $MK_RE ]] && [ "${BASH_REMATCH[2]}" = "${BASH_REMATCH[3]}" ]; do
+      rest="${BASH_REMATCH[1]}${BASH_REMATCH[4]}"
+    done
+    case "$rest" in *"$MK_D"*) printf '%s:%s\n' "$2" "$n" ;; esac
+  done < "$1"
+  return 0
+}
+# mk_tree <root>: the findings over every tests/*.sh under the root.
+mk_tree() {
+  local f
+  for f in "$1"/tests/*.sh; do
+    [ -f "$f" ] && mk_rule "$f" "tests/${f##*/}"
+  done
+  return 0
+}
+MK_OK="{ echo \"\$0: ${MK_D} failed\" >&2; kill \$\$; exit 1; }"
+
+# 13.1 The rule over single lines.
+mk_case() {
+  local name="$1" want="$2"
+  shift 2
+  expect "mktemp rule, $name" "$(res mk_rule "$(fx mk.sh "$@")" tests/a.sh)" "$want"
+}
+mk_case "an unchecked call fails, naming the line" "tests/a.sh:2 rc=0" "x=1" "d=\"\$(${MK_D})\""
+mk_case "a status-only check fails" "tests/a.sh:1 rc=0" "d=\"\$(${MK_D})\" || exit 1"
+mk_case "a call inside a path fails" "tests/a.sh:1 rc=0" "c=\"\$(${MK_D})/claude\""
+mk_case "a checked call passes" "rc=0" "d=\"\$(${MK_D})\"; [ -d \"\$d\" ] || $MK_OK"
+mk_case "a checked call with a longer name passes" "rc=0" \
+  "work=\"\$(${MK_D})\"; [ -d \"\$work\" ] || $MK_OK"
+mk_case "a local declared first passes" "rc=0" \
+  "  local root; root=\"\$(${MK_D})\"; [ -d \"\$root\" ] || $MK_OK"
+mk_case "a check of a name the call's name ends with fails" "tests/a.sh:1 rc=0" \
+  "work=\"\$(${MK_D})\"; [ -d \"\$k\" ] || $MK_OK"
+mk_case "a checked call with a template passes" "rc=0" \
+  "  local r; r=\"\$(${MK_D} \"\${TMPDIR:-/tmp}/x-XXXXXX\")\"; [ -d \"\$r\" ] || $MK_OK; f \"\$r\""
+mk_case "a check of another variable fails" "tests/a.sh:1 rc=0" \
+  "d=\"\$(${MK_D})\"; [ -d \"\$e\" ] || $MK_OK"
+mk_case "a check that does not stop the file fails" "tests/a.sh:1 rc=0" \
+  "d=\"\$(${MK_D})\"; [ -d \"\$d\" ] || echo \"${MK_D} failed\""
+mk_case "two calls, one unchecked, fail" "tests/a.sh:1 rc=0" \
+  "a=\"\$(${MK_D})\"; [ -d \"\$a\" ] || $MK_OK; b=\"\$(${MK_D})\""
+mk_case "two calls, both checked, pass" "rc=0" \
+  "a=\"\$(${MK_D})\"; [ -d \"\$a\" ] || $MK_OK; b=\"\$(${MK_D})\"; [ -d \"\$b\" ] || $MK_OK"
+mk_case "a comment passes" "rc=0" "  # d=\"\$(${MK_D})\""
+expect "mktemp rule, the review-guard command string passes there" \
+  "$(res mk_rule "$(fx mk.sh "deny 'x' $MK_ALLOW_TEXT")" "$MK_ALLOW_PATH")" "rc=0"
+expect "mktemp rule, the review-guard command string fails elsewhere" \
+  "$(res mk_rule "$(fx mk.sh "deny 'x' $MK_ALLOW_TEXT")" tests/a.sh)" \
+  "tests/a.sh:1 rc=0"
+
+# 13.2 What the check does when mktemp fails or prints no directory: the file stops, non-zero, with
+#      a message naming mktemp, before the next command, from a subshell too. A shim first on PATH
+#      stands in for mktemp.
+mkdir -p "$TMP/mkfail" "$TMP/mknodir"
+printf '#!/bin/sh\nexit 1\n' > "$TMP/mkfail/mktemp"
+printf '#!/bin/sh\necho /no/such/dir\n' > "$TMP/mknodir/mktemp"
+chmod +x "$TMP/mkfail/mktemp" "$TMP/mknodir/mktemp"
+# shellcheck disable=SC2016
+mkf="$(fx mkrun.sh 'set -u' \
+  "f() { local d; d=\"\$(${MK_D})\"; [ -d \"\$d\" ] || $MK_OK; echo \"\$d\"; }" \
+  'x="$(f)"' 'echo "ran on with [$x]"')"
+for shim in mkfail mknodir; do
+  out13="$(PATH="$TMP/$shim:$PATH" bash "$mkf" 2>&1)"; rc13=$?
+  case "$rc13:$out13" in
+    0:* | *"ran on"*) bad "the inline check stops the file ($shim)" "rc=$rc13: $out13" ;;
+    *"$MK_D failed"*) ok "the inline check stops the file, naming mktemp ($shim)" ;;
+    *) bad "the inline check stops the file ($shim)" "no mktemp in: $out13" ;;
+  esac
+  out13="$(PATH="$TMP/$shim:$PATH" bash -c '. "$0"; keel_tmpdir x; echo "ran on"' \
+    "$ROOT/tests/keel-test-lib.sh" 2>&1)"; rc13=$?
+  case "$rc13:$out13" in
+    0:* | *"ran on"*) bad "keel_tmpdir stops the file ($shim)" "rc=$rc13: $out13" ;;
+    *"$MK_D failed"*) ok "keel_tmpdir stops the file, naming mktemp ($shim)" ;;
+    *) bad "keel_tmpdir stops the file ($shim)" "no mktemp in: $out13" ;;
+  esac
+done
+out13="$(bash -c '. "$0"; keel_tmpdir x; [ -d "$x" ] && echo "dir" && rm -rf "$x"' \
+  "$ROOT/tests/keel-test-lib.sh" 2>&1)"
+expect "keel_tmpdir stores a directory in the variable it names" "$out13" "dir"
+
+# 13.3 The tree: every test file, as it stands, checks every call.
+expect "mktemp rule: no test file uses a ${MK_D} result unchecked" "$(res mk_tree "$ROOT")" "rc=0"
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

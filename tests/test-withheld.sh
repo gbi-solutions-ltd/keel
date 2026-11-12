@@ -30,7 +30,7 @@ load() {
     # shellcheck source=withheld.sh
     . "$LIB"
 }
-TMP="$(mktemp -d)"
+TMP="$(mktemp -d)"; [ -d "$TMP" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 trap 'rm -rf "$TMP"' EXIT
 
 # expect <name> <got> <want>: one comparison, one line of output.

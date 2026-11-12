@@ -210,7 +210,7 @@ rm -rf "$d"
 # plugin. So the message is a conditional the reader evaluates against its own skill list, and these
 # cases pin that it does not depend on the environment.
 
-parent="$(mktemp -d)"
+parent="$(mktemp -d)"; [ -d "$parent" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$parent" && "$KEEL" new svc-nudge --stack node >/dev/null 2>&1 )
 d="$parent/svc-nudge"
 [ -f "$d/.claude/keel-nudge" ] && ok "new writes the plugin-less nudge hook" || bad "nudge" "hook absent"
@@ -572,7 +572,7 @@ rm -rf "$d6" "$d7" "$d8" "$d9" "$d10"
 # so before the fix HERE resolved to the symlink's directory: lib/ failed to source, VERSION fell
 # back to 0.0.0, and templates were silently absent. It reported success while doing nothing.
 
-parent="$(mktemp -d)"
+parent="$(mktemp -d)"; [ -d "$parent" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ln -s "$KEEL" "$parent/keel"
 real_version="$(cat "$(dirname "$KEEL")/../VERSION")"
 [ "$("$parent/keel" version)" = "$real_version" ] \
@@ -920,7 +920,7 @@ rm -rf "$sp"
 
 # A SHA-256 repository is scanned, not refused: the scan repository names objects the way the pushed
 # one does. This case passes before the change too, since the old scan read the working tree.
-sp="$(mktemp -d)"
+sp="$(mktemp -d)"; [ -d "$sp" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 ( cd "$sp" && git init -q --object-format=sha256 -b main . && git config user.email t@t.t && git config user.name t \
   && printf 'a\n' > a.txt && git add a.txt && git commit -qm init ) >/dev/null 2>&1
 ( cd "$sp" && "$KEEL" scan --push origin HEAD >/dev/null 2>&1 ) \
@@ -958,7 +958,7 @@ rm -rf "$sp"
 # A git older than 2.32 ignores GIT_CONFIG_GLOBAL and reads ~/.gitconfig, and every git reads the
 # default global attributes file under XDG_CONFIG_HOME, so this user's own filter still ran over the
 # pushed tree. A shim that drops GIT_CONFIG_GLOBAL stands in for the older git.
-sp="$(fixture node-ts)"; fh="$(mktemp -d)"; shim="$(mktemp -d)"
+sp="$(fixture node-ts)"; fh="$(mktemp -d)"; [ -d "$fh" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; shim="$(mktemp -d)"; [ -d "$shim" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 mkdir -p "$fh/.config/git"
 printf '[filter "demo"]\n\tsmudge = touch %s/smudged; cat\n' "$fh" > "$fh/.gitconfig"
 printf '* filter=demo\n' > "$fh/.config/git/attributes"

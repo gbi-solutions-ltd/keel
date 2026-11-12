@@ -9,6 +9,107 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- `review-code` quotes a plan-end checkpoint only when `git cat-file -t <sha>` prints `tree` and
+  `git diff --name-only <sha> HEAD` exits 0, so a fresh clone without the note's tree runs the
+  suite. ADR-0017 records the amendment.
+- `review-code`'s conditions for quoting the plan-end checkpoint are in its new
+  `references/step-detail.md`; the coordinator runs a checkpoint's suite only when
+  `git status --porcelain` shows staged entries alone; a `KEEL_TEST_FILES` run with no
+  `KEEL_TEST_DURATIONS` leaves `.keel/test-durations` as it was; tests pin context-watch's
+  subagent check and its withholding without the PreToolUse agent fields.
+- The implementer prompt counts a GREEN run of exactly the `Done when:` commands, with no change
+  after it, as the `Done when:` run, so it is not run a second time.
+- `keel plan tick` takes several ids, `keel plan tick <plan> <id> [<id> ...]`, ticking each under
+  one lock with the same option; an unknown id among them changes nothing and is named.
+- `write-plan` searches the live documents for the behaviour each task changes and lists every hit
+  in that task's `Files`, leaving records unsearched; the plan reviewer asks the same question.
+- A plan's header carries `**Commits that ask:**`, naming the tasks that stage `hard_block_paths`,
+  which are ordered early and stated at approval; before committing a `loop: full` task the
+  `execute-plan` coordinator sends a `PushNotification` where that tool exists.
+- `execute-plan` offers a plan with no `**Suite checkpoints:**` line and 3 or more open tasks
+  checkpoints, in one question before the first dispatch; on a yes it writes the line, rewrites
+  each open task's boundary step to the checkpoint form, leaving ticked steps alone, and commits
+  the plan as a repair. ADR-0017 records the amendment.
+- A plan-run checkpoint note names the tree it ran on (`suite: pass at tree <sha>`, from
+  `git write-tree` before the tick), and `review-code` quotes the plan-end note in place of its own
+  suite run when HEAD differs from that tree only under `docs/plans/` and the working tree is
+  clean; `ship` still runs its own. ADR-0017 records the amendment.
+- The execute-plan spec and quality review prompts tell reviewers not to run `verify.test` or
+  the lint command; the spec reviewer re-runs the task's `Done when:` commands and quotes the
+  report's output for the rest.
+- Every `mktemp -d` in `tests/*.sh` is checked: when it fails or prints no directory, the test
+  file stops with a message naming mktemp, from a subshell too, before a fixture's git command
+  can fall back to this repository; `tests/keel-test-lib.sh` has `keel_tmpdir`, and
+  `tests/test-grep-quiet.sh` fails any unchecked call.
+- `hooks/done-guard` and `lib/context_watch.py` are hot files to `tests/validate-citations.sh`:
+  a live document cites them by phrase, and every live line citation into them is now a phrase
+  citation (records still cite them by line); the plan template says to repair flagged
+  citations and not hunt records for shifted ones;
+  `lib/harness/capabilities` records that context-watch requires `pretooluse_agent_type` and
+  `pretooluse_agent_id`.
+- `tests/run-tests.sh` starts files longest-first by the durations it records in the git-ignored
+  `.keel/test-durations`, runs `KEEL_TEST_JOBS` jobs or one per CPU up to 8, and says when a run
+  takes over twice the last; `KEEL_TEST_FILES` and `KEEL_TEST_DURATIONS` let
+  `tests/test-run-tests.sh` drive it over stubs.
+- `lib/context_watch.py` says nothing to a subagent, told by a non-empty `agent_type` and
+  `agent_id` as `hooks/review-guard` tells one, and writes no state for it: the transcript its
+  event names measures its coordinator.
+- `hooks/done-guard`'s bare check drops two guards that could never fire; tests pin that a token
+  at the start of a command is never read as escaped, and time a heredoc of N lines against one
+  of 4N, asserting the time grows less than eightfold.
+- `hooks/done-guard` tells a bare token from a quoted one by indices into the command rather than
+  a slice per token, so a 440 KB command is judged in linear time; the context-watch stop text
+  asks for no `session:` line when the event carries no session id; tests pin the session id
+  rule in `hooks/context-watch`'s cached shortcut, an escaped separator, a quoted `#` and an
+  edit in the superproject made from a submodule's `cwd`.
+- The context-watch stop text asks for a `session: <id>` line in the handoff, and `PreCompact`
+  keeps a handoff only when it is newer than the stop marker and carries this session's line; a
+  marker it cannot remove has its mtime set to now, and only a failed touch writes the stderr line;
+  a session id holding `/`, `\`, `..` or a NUL names the `nosession` state files, in
+  `lib/context_watch.py` and in `hooks/context-watch`'s cached shortcut alike.
+- The context watchdog measures 0 past a main-thread `compact_boundary` entry until a new assistant
+  turn reports usage, so it neither warns nor stops on the pre-compaction figure, and a boundary in
+  the transcript's tail settles that without reading the whole file; `PreCompact` removes the
+  session's measurement cache, and keeps a handoff whose mtime equals the stop marker's.
+- `tdd`'s RED step says a plan run's handed start record replaces the first unit's `verify.test`;
+  the plan template's example lint is `./gradlew spotlessCheck`, which runs no tests; `write-plan`'s
+  rationale names `**Suite checkpoints:**` among the header lines `execute-plan` reads; and the
+  implementer report gives the `Done when:` command's summary lines and failing cases, not all
+  its output.
+- The context-watch stop text says a plan run resumes after compaction from
+  `keel plan status <plan>`, the handoff's `next:` line recording only where it stood at the stop;
+  `PreCompact` still exits 0 when it cannot remove the stop marker.
+- `hooks/done-guard` ignores an edit whose path resolves outside every checkout of the repository
+  (git's top level for the event's `cwd`, each worktree and the superproject), and runs git only
+  when the turn edited something. It counts as a test run a Bash command containing `verify.test`,
+  or one with a simple command that, read as a shell reads it by `shlex` with `env`, `time`,
+  `command`, `VAR=value`, `bash` or `sh` and `./` dropped, begins with the text of
+  `verify.test_one` or `verify.test_affected` before its first `{`; quoted text is no command, and
+  a command `shlex` cannot split falls back to an anchored regular expression. A scoped test run
+  satisfies `gates.done_verified` and proves a test ran, not that the suite did, and
+  `shellcheck tests/*.sh` is no run. Its block and warn text names each scoped command once beside
+  `verify.test`, and the block text asks to run one of them.
+- `write-plan`'s template carries `**Suite checkpoints:** every 3 tasks` and its approval asks for
+  N; `execute-plan`'s "Suite checkpoints" section and `=== START RECORD ===` block, and `tdd`'s
+  affected-tests reference, carry out ADR-0017 for such plans.
+- ADR-0017: under `execute-plan` with a `**Suite checkpoints:** every N tasks` plan line, the
+  coordinator runs `verify.test` at plan start, every N committed tasks and after the last, and an
+  implementer starts from the last checkpoint's record; it amends ADR-0006 and ADR-0009 for such
+  units only.
+- `execute-plan`'s implementer and review prompts, and the `keel-implementer` and `keel-reviewer`
+  agents, run every command in the foreground and end no turn with work still running; the
+  coordinator reviews only a report ending in its `git status --porcelain` line, and voids a review
+  whose author notifies again.
+- `execute-plan`'s implementer report gives each verify command's exit code and at most 15 summary
+  lines plus every failing case, and the red run's failing case and message, not whole outputs;
+  both review prompts cap the report at 250 words with the verdict first.
+- The context-watch stop text tells a session coordinating `keel:execute-plan` to write the handoff
+  naming the plan file and its `next:` line and carry on; the ordinary stop keeps its four steps.
+  `PreCompact` keeps a handoff written since the stop fired, then removes the stop marker so a later
+  stop blocks again until a newer handoff.
+- `execute-plan`'s full loop gives a first rejection one fix pass, scoped by the `Fix scope:` line
+  both review prompts now end a rejection with, unless it reads `redo`; a second rejection discards
+  the attempt and a third asks the person.
 - `hooks/review-guard` refuses every subagent a stash-writing `git stash`, wherever it runs, and
   allows `git stash list` and `git stash show` (ADR-0016). A subagent is told by a non-empty
   `agent_type` and a non-empty `agent_id` string, so the main session, which carries no `agent_id`

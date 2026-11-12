@@ -386,7 +386,7 @@ if command -v harness_active_gates >/dev/null 2>&1; then
 
     # The gate path must not need python3. Assert that against a PATH built to lack one: /usr/bin
     # carries /usr/bin/python3, so the obvious version of this test would prove nothing.
-    stub="$(mktemp -d)"
+    stub="$(mktemp -d)"; [ -d "$stub" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
     ln -s "$(command -v dirname)" "$stub/dirname"
     # `command -v` consults bash's hash table before PATH, so a python3 invoked earlier in this
     # shell would be found here and fail this control spuriously. Forget it and test PATH alone.
@@ -424,7 +424,7 @@ if command -v harness_active_gates >/dev/null 2>&1; then
 
     # Sourced through a symlink, the manifest is the one beside the file the link names, not one
     # beside the link.
-    lnk="$(mktemp -d)"
+    lnk="$(mktemp -d)"; [ -d "$lnk" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
     ln -s "$ROOT/lib/harness/resolve.sh" "$lnk/resolve.sh"
     out="$(/bin/bash -c ". '$lnk/resolve.sh'; harness_active_gates claude" 2>&1 | sort | tr '\n' ' ')"
     [ "$out" = "context-watch done-guard review-guard sensitive-guard session-start " ] \
@@ -486,7 +486,7 @@ done
 # call runs in a subshell, because before the guard the second one aborted the shell it ran in. The
 # command touches a relative path from inside the scratch directory, because a dot in the path
 # would split the field and the payload with it.
-vg="$(mktemp -d)"
+vg="$(mktemp -d)"; [ -d "$vg" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 out="$(cd "$vg" && harness_version_ge "1+a[\$(touch p)]" 2 2>&1)"; rc=$?
 [ "$rc" -eq 1 ] && [ ! -e "$vg/p" ] \
   && ok "harness_version_ge compares only versions it can read: a field holding a command returns 1 and runs nothing" \
@@ -610,6 +610,18 @@ if [ -x "$GEN" ]; then
     [ "$n" = 0 ] \
       && ok "a gate the manifest withholds is not registered" \
       || bad "a gate the manifest withholds is not registered" "done-guard still emitted $n time(s)"
+
+    # context-watch tells a subagent by the PreToolUse agent fields, as review-guard does, so a
+    # harness without them is not given it: it would hold every subagent to the stop.
+    n="$(KEEL_CAPABILITIES="$ROOT/lib/harness/capabilities" "$GEN" claude | grep -c 'context-watch' || true)"
+    [ "$n" -gt 0 ] || bad "the claude manifest carries context-watch" "absent"
+    cw_cap="$(mktemp)"
+    grep -v '^provides|claude|pretooluse_agent_id|' "$ROOT/lib/harness/capabilities" > "$cw_cap"
+    n="$(KEEL_CAPABILITIES="$cw_cap" "$GEN" claude | grep -c 'context-watch' || true)"
+    [ "$n" = 0 ] \
+      && ok "context-watch is withheld without the PreToolUse agent fields" \
+      || bad "context-watch is withheld without the PreToolUse agent fields" "still emitted $n time(s)"
+    rm -f "$cw_cap"
 
     # ...and the file it produces then is still a well-formed document, not one with a dangling
     # comma or an empty event array. An emitter that drops a group has to drop its event too.

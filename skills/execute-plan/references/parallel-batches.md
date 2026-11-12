@@ -101,7 +101,7 @@ has committed, and **an empty diff produces a confident COMPLIES over nothing.**
 Each task's loop comes from `keel plan risk --range <base>..<task-head>` over that task's commits,
 with `<base>` the commit the batch started from, and not from one answer for the whole batch: tasks
 in a batch touch different paths. The rule and its fallbacks are in
-[subagent-prompts.md](subagent-prompts.md). A light-loop fix pass inside a worktree amends the
+[subagent-prompts.md](subagent-prompts.md). A fix pass inside a worktree, in either loop, amends the
 task's commit rather than adding one, so no rejected commit reaches shared history.
 
 **If that diff is empty, stop rather than review it.** The usual cause is a batched task whose final
@@ -118,11 +118,13 @@ Then, in one place and by you:
    through a stale read.
 4. Confirm each task's own commit landed with only its own paths in it, then commit the merge.
 
-**In the full loop, a task that came back DEVIATES is not merged.** Reset or delete its worktree and
-re-dispatch it from the commit the batch started from, so the fresh subagent gets the state the
-first one had. Merging it first and correcting afterwards puts rejected work into shared history and
-leaves the re-dispatch building on top of it. A light-loop task is not reset: its one fix pass
-amends the task's commit in the worktree, as above, and it is merged once its spec pass complies.
+**In the full loop, a task that came back DEVIATES is not merged.** Its one fix pass, for a first
+rejection whose fix scope is a list, amends the task's commit in the worktree. Only a second
+rejection, or a `redo`, resets or deletes its worktree and re-dispatches it from the commit the
+batch started from, so the fresh subagent gets the state the first one had. Merging it first and
+correcting afterwards puts rejected work into shared history and leaves the re-dispatch building on
+top of it. A light-loop task is not reset: its one fix pass amends the task's commit in the
+worktree, as above, and it is merged once its spec pass complies.
 
 A red suite at the join is a real finding about the combination, which is exactly what no task could
 have discovered alone. Use `keel:debug` through Phase 3, then send its Phase 4 to a fresh

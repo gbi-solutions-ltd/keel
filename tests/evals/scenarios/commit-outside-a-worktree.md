@@ -184,11 +184,18 @@ git commit -m "feat(payouts): reject a reference longer than 35 characters"
 - Never run `git stash` other than `git stash list` or `git stash show`; a hook refuses it. The
   stash is shared by every worktree, and a stash empties the tree, so status reads clean while it
   hides your whole diff from the coordinator.
+- Run every command in the foreground, never with `run_in_background` and never with a trailing
+  `&`, and give a long command the Bash `timeout` it needs, up to 600000 ms. If the harness
+  moves a command to the background anyway, wait for it to finish before ending your turn. Do not
+  end your turn while anything you started is still running: the coordinator reads your stop as
+  your report.
 
 === REPORT ===
-Finish with: which steps you completed, the exact output of each verify command, anything you
-noticed and deliberately left alone, and anything that blocked you. Quote the output of the failing
-run that came before the implementation.
+Finish with: which steps you completed; for each verify command, the command, its exit code and its
+summary lines (at most 15: for a test runner, the per-package or per-file pass and fail lines and
+the totals), plus every failing case in full; anything you noticed and deliberately left alone; and
+anything that blocked you. From the failing run that came before the implementation, quote the
+failing case and its message, not the whole run.
 
 Name separately any step you did not perform, or whose outcome you did not see: a test passing on
 arrival is not "watch it fail". It is not completed, and whoever ticks the box needs to know.
@@ -196,6 +203,8 @@ arrival is not "watch it fail". It is not completed, and whoever ticks the box n
 Paste `git status --porcelain` as your last line. If it lists a path this task does not name, say so
 rather than staging it.
 
-Run the task's `Done when:` command after your last code change and paste its output. If you did not
-run it, say so in your first line. A report claiming completion with no command output in it is
-rejected and re-dispatched, which costs more than saying you skipped it.
+Run the task's `Done when:` command after your last code change and give its summary lines and every
+failing case in full, not its whole output. A GREEN run of exactly the `Done when:` commands, with
+no change after it, is that run: do not run them a second time. If you did not run it, say so in
+your first line. A report claiming completion with no command output in it is rejected and
+re-dispatched, which costs more than saying you skipped it.

@@ -22,7 +22,16 @@ Step 3 runs either way, because a generic reviewer does not know this project's 
 
 The driver runs `profile.verify.test` itself because `keel:tdd` runs it once at a unit boundary,
 and may run only the affected tests, so review is where the suite result is established rather than
-inherited.
+inherited from an implementer.
+
+The one exception is a plan-end checkpoint on the same tree, under the conditions in
+[step-detail.md](step-detail.md#step-3-the-pass-that-only-we-can-do). The note names a tree, from
+`git write-tree` with the task staged before the tick, because the suite runs before task and plan
+are committed together, so no commit it could name is HEAD. When HEAD's tree differs from it only
+under `docs/plans/`, where the tick lands, the checkpoint ran on the code under review and a second
+run would check nothing new.
+`ship` still runs its own, so the final commit keeps one independent run. Bernard decided this on
+2026-11-12; ADR-0017's `Amended` section records it.
 
 The sensitive files are found by the command and not taken from the conversation, because a
 sentence in chat is not a decision, and `keel plan risk` is what the review loop already uses.
@@ -33,6 +42,8 @@ production code.
 
 The pass is dispatched and not run inline because a reviewer that watched the code being written
 is anchored on it.
+
+The brief carries the six checks because a dispatch without them reviews none of these.
 
 The sixth check mutates every changed decision line on a sensitive path because those paths cost
 most when a mistake lands.

@@ -35,10 +35,10 @@ database-backed tests.
 ### RED: write the unit's failing tests
 
 The unit is every case going red for one named missing production change, named as the **smallest**
-change making that case red; a case needing a second change is a second unit. Before its first
-test, write the **start record**: the starting commit, and the tests still red after the last
-boundary (the first unit's costs one `verify.test`). Name that commit in the report. Write the cases
-together.
+change making that case red; a case needing a second change is a second unit. Before its first test,
+write the **start record**: the starting commit, and the tests still red after the last boundary
+(first unit: one `verify.test`, or [a plan run's handed record](references/affected-tests.md)). Name
+that commit in the report. Write the cases together.
 
 No VCS, and when to write one case at a time:
 [references/step-detail.md](references/step-detail.md#red-write-the-units-failing-tests). Read it
@@ -82,8 +82,8 @@ Only once green. Remove duplication, improve names, extract helpers. No new beha
 ### Unit boundary: run the tests
 
 The unit ends with one `verify.test_affected` run when the profile sets it, `{base}` the start
-record's commit, else one `verify.test`. Fallbacks to `verify.test`, carried reds, and which
-units an unmatched red names: [references/affected-tests.md](references/affected-tests.md).
+record's commit, else one `verify.test`. Fallbacks, carried and unmatched reds, handed records:
+[references/affected-tests.md](references/affected-tests.md).
 
 Red for tests this unit did not touch? Name them and match them against the start record. All
 matched means the unit is done: record them and carry on. An unmatched red goes to `keel:debug`.

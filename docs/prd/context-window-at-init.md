@@ -45,12 +45,12 @@ gates.context_window in .keel/profile.json". The residual error, recorded in the
 session below 200,000 tokens is assumed to be in a full 200,000 window and warned early.
 
 **Why the obvious fix is dangerous, which is the real finding.** `window_for` returns a configured
-value immediately at `lib/context_watch.py:142-146`, before reaching the upward observation
+value immediately at `lib/context_watch.py#def window_for(`, before reaching the upward observation
 correction at `:149-150`. Today an unset project self-corrects: occupancy above a tier is proof the
 window is larger, because the API would have refused the request otherwise. Writing 200,000 into
 every profile would remove that. A 1M session in such a project would hard-stop at 170,000 tokens
 and never lift, with the user's only escape being to edit the file keel had just written. That is
-the precise failure `lib/context_watch.py:198-201` records the function as having been rewritten to
+the precise failure `lib/context_watch.py:210-213` records the function as having been rewritten to
 prevent, found against a real 2.4MB transcript holding 401,247 tokens.
 
 ## 3. Goals and non-goals
@@ -85,9 +85,9 @@ prevent, found against a real 2.4MB transcript holding 401,247 tokens.
 
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
-| FR-01 | `gates.context_window` must act as a floor: the effective window is the larger of the configured value and the window that observed occupancy supports. | confirmed | Chosen by Bernard, 2026-08-18. Current behaviour at `lib/context_watch.py:142-150` returns the configured value before the correction |
+| FR-01 | `gates.context_window` must act as a floor: the effective window is the larger of the configured value and the window that observed occupancy supports. | confirmed | Chosen by Bernard, 2026-08-18. Current behaviour at `lib/context_watch.py#def window_for(` returns the configured value before the correction |
 | FR-02 | `KEEL_CONTEXT_WINDOW` must be used exactly as set, subject only to FR-11, and must never be raised by observation. | confirmed | Chosen by Bernard, 2026-08-18, to keep a hard override for testing and for a session that knows better |
-| FR-03 | Where both `KEEL_CONTEXT_WINDOW` and `gates.context_window` are set, the environment variable must determine the window. | confirmed | Follows from FR-02; preserves the existing precedence at `lib/context_watch.py:142` |
+| FR-03 | Where both `KEEL_CONTEXT_WINDOW` and `gates.context_window` are set, the environment variable must determine the window. | confirmed | Follows from FR-02; preserves the existing precedence at `lib/context_watch.py#def window_for(` |
 | FR-04 | `keel init` must write `gates.context_window` with the value `200000` into the gates object of a profile it creates. | confirmed | Requested by Bernard, 2026-08-18. Gates object at `bin/keel:364` |
 | FR-05 | Re-running `keel init` on a project whose profile already sets `gates.context_window` must leave that value unchanged. | inferred | `merge_profile` at `bin/keel#out[k] = v            # human value wins` already gives a non-empty human value precedence. Asserting it so the guarantee is not lost later |
 | FR-06 | After `keel init --force` on a project whose profile set a different `gates.context_window`, the value must be `200000`. | inferred | Consistent with `--force` replacing the profile at `bin/keel#if [ -f .keel/profile.json ] && [ "${FORCE:-0}" -eq 0 ]; then`. Safe only because FR-01 makes the resulting value self-correcting |
@@ -113,7 +113,7 @@ prevent, found against a real 2.4MB transcript holding 401,247 tokens.
 | ID | Constraint | Imposed by |
 |---|---|---|
 | CON-01 | `SCHEMA_VERSION` must not move for this change. `gates.context_window` is already declared at `templates/profile.schema.json:287`, so writing it adds no field. | The existing schema, and the drift rule at `tests/validate-skills.sh:351-365` |
-| CON-02 | Between the true window and 1,000,000, a configured value that overstates the window cannot be corrected downward. FR-11 bounds the damage but does not eliminate it: setting 1,000,000 on a 200,000 session still silences the watchdog. | The platform: occupancy proves a lower bound on the window and never an upper one (`lib/context_watch.py:224-225`) |
+| CON-02 | Between the true window and 1,000,000, a configured value that overstates the window cannot be corrected downward. FR-11 bounds the damage but does not eliminate it: setting 1,000,000 on a 200,000 session still silences the watchdog. | The platform: occupancy proves a lower bound on the window and never an upper one (`lib/context_watch.py:236-237`) |
 | CON-03 | `200000` is correct for the default model tier and understates a 1M session. It is written knowing it is sometimes wrong, because FR-01 makes being wrong recoverable. | The absence of any readable window field (`lib/context_watch.py:121-127`) |
 | CON-04 | `/clear` cannot be triggered by keel. No hook output clears a session and a plugin cannot start one. | Claude Code's hook interface |
 | CON-05 | The watchdog is advisory infrastructure, not a correctness gate, and must fail silently. | `hooks/context-watch:14-16` |
@@ -167,7 +167,7 @@ follow this batch of work, which orders it but does not date it.
 
 | # | Assumption | Falsified if | Checked |
 |---|---|---|---|
-| A1 | Observed occupancy above a tier proves the window is larger than that tier | A request could succeed while exceeding the window | Yes. Stated at `lib/context_watch.py:208-210`, and it follows from the API rejecting oversized requests |
+| A1 | Observed occupancy above a tier proves the window is larger than that tier | A request could succeed while exceeding the window | Yes. Stated at `lib/context_watch.py:220-222`, and it follows from the API rejecting oversized requests |
 | A2 | `200000` is the right conservative default to write | Most sessions in keel projects use a larger window | Partly. True of the default model tier; this session and this repository are both 1M |
 | A3 | No existing test breaks under the floor rule | Any current fixture configures a window below its observed occupancy | Yes, verified 2026-08-18. See NFR-04 |
 | A4 | `merge_profile` preserves a hand-set value on re-init | A non-empty existing value could be replaced by the generated one | Yes, `bin/keel#out[k] = v            # human value wins` |

@@ -28,7 +28,7 @@ bad() { printf '  FAIL  %s: %s\n' "$1" "$2"; fail=$((fail+1)); return 0; }
 # used to redo on every one of the 43 times it is called. A plain directory copy of an already
 # committed tree is far cheaper than repeating all of that per case, and every case's mutate function
 # only ever adds to or edits this same shape, never depends on which case ran before it.
-TEMPLATE_ROOT="$(mktemp -d)"
+TEMPLATE_ROOT="$(mktemp -d)"; [ -d "$TEMPLATE_ROOT" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 mkdir -p "$TEMPLATE_ROOT/skills/example" "$TEMPLATE_ROOT/templates" "$TEMPLATE_ROOT/docs" \
          "$TEMPLATE_ROOT/hooks" "$TEMPLATE_ROOT/bin" "$TEMPLATE_ROOT/tests" "$TEMPLATE_ROOT/.claude-plugin"
 # The executable rule only runs in a plugin repository, so the fixture has to be one.
@@ -53,7 +53,7 @@ trap 'rm -rf "$TEMPLATE_ROOT"' EXIT
 # adds a file and scan() below does its own `git add -A` before scanning, so a copy of the committed
 # template is exactly the clean starting state fixture() used to build from scratch.
 fixture() {
-    local root; root="$(mktemp -d)"
+    local root; root="$(mktemp -d)"; [ -d "$root" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
     cp -R "$TEMPLATE_ROOT/." "$root"
     printf '%s' "$root"
 }
@@ -353,7 +353,7 @@ rm -rf "$d_root"
 # The pattern rules read grep --null output, and a grep without it, as BusyBox's, exits 2 on it,
 # which the loop discards: every pattern rule went silent and the scan read as clean. A stub grep
 # stands in for one, refusing --null and handing everything else to the real grep.
-ng_bin="$(mktemp -d)"; real_grep="$(command -v grep)"
+ng_bin="$(mktemp -d)"; [ -d "$ng_bin" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }; real_grep="$(command -v grep)"
 printf '#!/bin/sh\nfor a in "$@"; do [ "$a" = --null ] && { echo "grep: unrecognized option: null" >&2; exit 2; }; done\nexec %s "$@"\n' "$real_grep" > "$ng_bin/grep"
 chmod +x "$ng_bin/grep"
 ng_root="$(fixture)"; m_pipe "$ng_root"
@@ -395,7 +395,7 @@ rm -rf "$x_root"
 # The injected regex is an unbalanced group, which every POSIX implementation rejects. The original
 # offender, an empty alternative, could not be used here: GNU grep accepts it, so on CI this case
 # would assert nothing while passing.
-badrule_root="$(mktemp -d)"
+badrule_root="$(mktemp -d)"; [ -d "$badrule_root" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 awk 'BEGIN{FS=OFS="\t"} /^net-pipe-shell\t/ && !done {print "broken-on-purpose","all","-","unbalanced(group","deliberately invalid"; done=1} {print}' \
   "$SCANNER" > "$badrule_root/scan.sh"
 chmod +x "$badrule_root/scan.sh"

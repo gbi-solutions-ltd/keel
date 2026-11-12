@@ -240,7 +240,7 @@ whoever picks it up next.
 | --- | --- |
 | `UserPromptSubmit` | Silent below 70%. Between 70 and 85, one short warning naming the number. Past 85, the stop instruction |
 | `PreToolUse` | Nothing below 85%. Past it, denies tool calls until a handoff is written |
-| `PreCompact` | Writes a mechanical handoff before the session's own memory is rewritten |
+| `PreCompact` | Writes a mechanical handoff before the session's own memory is rewritten, unless the session wrote one since the stop fired carrying its `session:` line |
 
 **Occupancy is read, not estimated.** Claude Code's transcript records the usage the API reported for
 each request, so the last main-thread assistant turn gives the answer directly:
@@ -253,10 +253,24 @@ The cache fields are the entire measurement, and missing them is the obvious mis
 session `input_tokens` is routinely 1, because everything before the last message is a cache read. A
 watchdog reading `input_tokens` alone reports a session at 99% of its window as using one token.
 
+**A compaction reads as 0.** A main-thread `compact_boundary` entry after the last usage row means
+that row measured a context compaction has since ended, so occupancy reads as 0, with no warning
+and no stop, until a new assistant turn carries usage. Read as current, the old row would stop a
+session compaction had just emptied. A boundary in the transcript's tail settles the measurement
+there, so the whole file is not read on every event between the compaction and the next turn.
+
 **Sidechain entries are excluded.** A subagent's context is discarded when it returns, which is the
 whole reason for the delegation table above. Counting its usage would report the main thread as full
 because a subagent read twenty files, and the watchdog would punish exactly the behaviour this
 document recommends.
+
+<!-- keel:claim gate=context-watch harness=claude -->
+**A subagent is left alone.** An event carrying a non-empty `agent_type` and a non-empty
+`agent_id` comes from a subagent, told apart as `hooks/review-guard` tells one, and the watchdog
+answers it with nothing and writes no state for it. Its context is its own and is discarded when
+it returns, and no field on its event is known to name its own transcript, so the transcript the
+event names measures its coordinator. Either field alone is the main session, held to the stop as
+before: one started with `--agent` carries `agent_type` and no `agent_id`.
 
 **It does not violate rule 1.** The hook is silent below the warn threshold, so an ordinary session
 emits nothing. What it does emit is appended after the conversation rather than into the prefix, so
@@ -297,6 +311,30 @@ sent to a summary of a conversation it never had. The marker is written when the
 compared by modification time, so a handoff is announced once and a new compaction is announced
 again. An empty handoff is not named at all, which is what makes `context-budget` step 7 emptying it
 the way to clear the pointer rather than a no-op.
+
+**A plan run carries on past the stop.** The stop instruction keeps its four steps for an ordinary
+session, which ends with telling the person to `/clear`. When coordinating a `keel:execute-plan`
+run, the session is told to write the handoff naming the plan file and the `next:` line of
+`keel plan status <plan>`, and then to carry on with the run, because compaction is safe when the
+plan file holds the place. After compaction the run resumes from `keel plan status <plan>`, since
+the handoff's `next:` line records only where the run stood at the stop and the run moves on after
+it. `PreCompact` keeps a handoff written since the stop fired rather than replacing it with the
+mechanical render, which would lose that `next:` line, and then removes the stop marker, so a later
+stop in the same session blocks again until a newer handoff is written. Every session in the project
+writes the same `.keel/handoff.md`, so the stop text asks for a line reading `session: <id>`, and
+`PreCompact` keeps only a handoff that is newer than the marker and carries this session's line;
+another session's handoff is replaced by the render. The line may carry a leading `-` or `*`,
+surrounding backticks, a capital S or no space after the colon, and the id must match whole, so
+`s-1` does not keep the handoff of `s-10`. A session with no id has no line to ask for, so for it a
+handoff newer than the marker is enough. `PreCompact` also removes the
+session's measurement cache, which describes the context compaction is about to end, so the first
+event after compaction measures again rather than reusing that figure for up to 20 seconds. When the
+marker cannot be removed, `PreCompact` sets its mtime to now, so the kept handoff is older than it
+and the next stop blocks until a new one is written. Only when that touch fails as well is a line
+naming the marker written to the library's stderr, and compaction still goes ahead; the hook sends
+that stderr to `/dev/null`, so the line is not shown in a session. The `.stop` and `.measure` state
+files are named from the session id, and an id holding `/`, `\`, `..` or a NUL is read as
+`nosession`, so no id names a file outside the state directory.
 
 ## Session hygiene, the part skills cannot enforce
 

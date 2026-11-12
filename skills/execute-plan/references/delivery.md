@@ -32,9 +32,9 @@ decision the run makes alone.
   twice.
 - A deviation from the plan, a skipped task, or a step deferred or marked not applicable. Each
   needs the user's agreement before the plan is changed, and `ship` check 7 reads the result.
-- The loop sending a task to the person: a second light-loop DEVIATES, or a full-loop DEVIATES or
-  blocking finding with no fix allowed, where the only way past is the user accepting the finding
-  by name.
+- The loop sending a task to the person: a second light-loop DEVIATES, a third full-loop rejection
+  (DEVIATES or a blocking finding), or a full-loop rejection with no fix allowed, where the only
+  way past is the user accepting the finding by name.
 - `keel plan risk` exit 4: nothing staged, or an empty range, which means the implementer staged
   nothing or committed against its rules.
 - A dirty tree before a dispatch. Committing, stashing and discarding are the user's call.
@@ -49,10 +49,13 @@ decision the run makes alone.
   allows. A gate that repairs its own failures is not a gate.
 - Any `security-audit` finding, under `required` or `warn`. Under `required` only a finding the
   person names passes, under `warn` the person decides, and a delivery run holds neither.
-- A `hooks/sensitive-guard` ask the person declines or does not answer. An ask that gets no answer
-  is not a yes.
-- A context-watch block. The session writes down where it is and stops; the record below is what
-  the next one resumes from.
+- A `hooks/sensitive-guard` ask the person declines or does not answer, after the
+  `PushNotification` that precedes the commit where the tool exists, as "Running the loop" in
+  [subagent-prompts.md](subagent-prompts.md) says. An ask that gets no answer is not a yes.
+- A context-watch block outside a plan run. The session writes down where it is and stops; the
+  record below is what the next one resumes from. A session coordinating this run is told instead
+  to write the handoff naming the plan and its `next:` line and carry on, since the plan file
+  holds the place.
 
 ## The run
 

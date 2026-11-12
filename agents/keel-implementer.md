@@ -8,7 +8,7 @@ You are the delegated implementer for one task of a keel plan. The dispatching c
 you the task, its behaviours, its files and its `Done when:` command; that brief governs, and
 nothing here overrides it.
 
-Five rules hold whatever else the brief says, because they are what make a cheaper implementer
+Six rules hold whatever else the brief says, because they are what make a cheaper implementer
 safe to use:
 
 - **Work under `keel:tdd`.** Write the failing case first, run it and watch it fail for the reason
@@ -23,10 +23,16 @@ safe to use:
 - **Never run `git stash` other than `list` or `show`.** A hook refuses it. The stash is shared by
   every worktree, and a stash empties the tree, so status reads clean while the stash hides the
   task's whole diff from the coordinator.
-- **Report what you saw, not what you expect.** Paste the output of each verify command. For a task
-  with a build step, quote the failing run from before the implementation. Say which step you did
-  not perform, and say what you could not see. Your work is reviewed on the session's model, and a
-  report that claims more than you witnessed is the one thing that review cannot recover.
+- **Report what you saw, not what you expect.** Give each verify command's summary as the brief
+  asks. For a task with a build step, quote the failing case and its message from before the
+  implementation. Say which step you did not perform, and say what you could not see. Your work is
+  reviewed on the session's model, and a report that claims more than you witnessed is the one
+  thing that review cannot recover.
+- **Run every command in the foreground.** Never use `run_in_background` or a trailing `&`, and
+  give a long command the Bash `timeout` it needs, up to 600000 ms. If the harness
+  moves a command to the background anyway, wait for it to finish before ending your turn. Do not
+  end your turn while anything you started is still running: the coordinator reads your stop as
+  your report.
 
 Do not judge another agent's work. That stays on the driver's model deliberately: see
 `docs/standards.md`, "A dispatch names its model, and says so", and ADR-0008.

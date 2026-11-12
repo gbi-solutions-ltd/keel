@@ -17,7 +17,7 @@ fail=0
 ok()  { printf '  PASS  %s\n' "$1"; pass=$((pass+1)); }
 bad() { printf '  FAIL  %s (%s)\n' "$1" "$2"; fail=$((fail+1)); }
 
-tmp="$(mktemp -d)"
+tmp="$(mktemp -d)"; [ -d "$tmp" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 trap 'rm -rf "$tmp"' EXIT
 
 if ! git -C "$ROOT" archive HEAD | tar -x -C "$tmp"; then
