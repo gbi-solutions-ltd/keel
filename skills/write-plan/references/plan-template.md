@@ -11,8 +11,8 @@ its plan as a draft and not as the plan. Harden the draft: give each task its `F
 `Behaviours` with examples, `Depends on:` and `Done when:` from the profile, and size the tasks
 as "Task granularity" says. Plan mode blocks writes until it is left, so write the file where
 `write-plan` step 3 says only after leaving it. Plan mode's approval covers the draft; the
-question at step 6 still carries the routing, the suite checkpoints and the delivery. A headless
-or scheduled run writes the plan directly, and nothing else here changes.
+question at step 6 still carries the routing, the suite checkpoints, the delivery and the commits
+that ask. A headless or scheduled run writes the plan directly, and nothing else here changes.
 
 ## Header
 
@@ -36,6 +36,7 @@ that has loaded nothing else.
 **Architecture:** two or three sentences on the approach.
 **Implementer routing:** inherit
 **Suite checkpoints:** every 3 tasks
+**Commits that ask:** none
 **Delivery:** hand-off
 
 ## Global constraints
@@ -84,6 +85,12 @@ far back a break can hide. A plan with no such line runs its steps as written, s
 name `verify.test`, or `verify.test_affected` where set, as the boundary run. `execute-plan` offers
 such a plan checkpoints when it has 3 or more open tasks, and on a yes rewrites those steps to the
 checkpoint form below.
+
+**The commits that ask line** names each task that stages a `hard_block_paths` path, with those
+paths, or says `none`. `hooks/sensitive-guard` asks the person at each such commit, and only the
+person can answer it. So order those tasks as early as their `Depends on:` allows, while the person
+who approved the plan is likely still there, and state the line in the approval question, so the
+person knows when they are needed. Approving the plan answers none of those asks.
 
 ## Task shape
 

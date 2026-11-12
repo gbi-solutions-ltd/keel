@@ -306,6 +306,12 @@ names what is wrong with the id or the plan, such as an id the plan does not hol
 never closes, or a lock still held, and is fixed rather than bypassed by editing the plan by hand,
 which would reopen the race the lock closes.
 
+**Before committing a task whose `keel plan risk --staged` printed `loop: full`, send a
+`PushNotification`** naming the task and saying a commit approval is waiting, where that tool
+exists, then commit. `hooks/sensitive-guard` may ask at that commit, and only the person can answer
+it: the notification brings them to the prompt and answers nothing. Where the tool does not exist,
+nothing changes.
+
 **You commit, not the implementer.** The implementer stages and stops, unless its task's final step
 says otherwise, which only a batched task's does. This is the order the skill body already states,
 and it is what keeps the review a gate rather than a comment on history that has already landed: a

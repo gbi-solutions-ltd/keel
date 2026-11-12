@@ -564,7 +564,7 @@ no wording that could answer sensitive-guard's `ask`: that decision stays the pe
 `grep -c 'PushNotification' skills/execute-plan/references/subagent-prompts.md
 skills/execute-plan/references/delivery.md` prints at least `1` for each file.
 
-- [ ] **Step 7.1: Make the change and check it**
+- [x] **Step 7.1: Make the change and check it** Note: No-test task; examples checked by the spec reviewer against the diff and Done when (validate-skills 134/0, validate-citations 64/0, greps 1 and 1); rounds 2 and 3 fixed three live documents the new paragraph made wrong (write-plan SKILL.md step 6, body 684 to 682; template plan-mode sentence; docs/02-skill-catalog.md); coordinator rewrapped the catalog line to 95 columns; reviewer confirmed no sentence reads as approval
 
 Edit as the behaviours say.
 Run: the `Done when:` commands and the lint command. Run no `tests/run-tests.sh`: the plan header
@@ -572,7 +572,7 @@ names suite checkpoints.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 7.2: Hand over**
+- [x] **Step 7.2: Hand over** Note: rounds: 3; routing: inherit; loop: light
 
 ```bash
 git add skills/write-plan/references/plan-template.md \

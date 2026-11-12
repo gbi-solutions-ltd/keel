@@ -261,8 +261,8 @@ approver sees the overlap they approve. It also runs a short path for small work
 Ends with a self-review pass: does every story map to a task, are there placeholders left, do the
 type names used in task 7 match what task 3 defined. Those four are mechanical and run inline. A
 dispatched reviewer then covers what they cannot reach, because all four compare the plan to itself
-and none of them opens the codebase the plan will be built on. Approval asks one question for
-routing, suite checkpoints and delivery; choosing a pull request runs `execute-plan` through to one.
+and none of them opens the codebase the plan will be built on. Approval asks one question on
+routing, checkpoints, delivery and commits that ask; a pull request runs `execute-plan` to one.
 
 ### `execute-plan`
 

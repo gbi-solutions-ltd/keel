@@ -9,6 +9,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- A plan's header carries `**Commits that ask:**`, naming the tasks that stage `hard_block_paths`,
+  which are ordered early and stated at approval; before committing a `loop: full` task the
+  `execute-plan` coordinator sends a `PushNotification` where that tool exists.
 - `execute-plan` offers a plan with no `**Suite checkpoints:**` line and 3 or more open tasks
   checkpoints, in one question before the first dispatch; on a yes it writes the line, rewrites
   each open task's boundary step to the checkpoint form, leaving ticked steps alone, and commits

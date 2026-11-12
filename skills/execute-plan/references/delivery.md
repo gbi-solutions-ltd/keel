@@ -49,8 +49,9 @@ decision the run makes alone.
   allows. A gate that repairs its own failures is not a gate.
 - Any `security-audit` finding, under `required` or `warn`. Under `required` only a finding the
   person names passes, under `warn` the person decides, and a delivery run holds neither.
-- A `hooks/sensitive-guard` ask the person declines or does not answer. An ask that gets no answer
-  is not a yes.
+- A `hooks/sensitive-guard` ask the person declines or does not answer, after the
+  `PushNotification` that precedes the commit where the tool exists, as "Running the loop" in
+  [subagent-prompts.md](subagent-prompts.md) says. An ask that gets no answer is not a yes.
 - A context-watch block outside a plan run. The session writes down where it is and stops; the
   record below is what the next one resumes from. A session coordinating this run is told instead
   to write the handoff naming the plan and its `next:` line and carry on, since the plan file
