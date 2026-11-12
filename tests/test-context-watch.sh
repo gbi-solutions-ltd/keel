@@ -760,6 +760,18 @@ fire PreCompact "$work/stop.jsonl" "$work" Bash "$sess" >/dev/null
   || bad "compaction" "the measurement cache outlived compaction"
 rm -f "$statedir/$sess.stop" "$statedir/$sess.measure" "$work/.keel/handoff.md"
 
+# A subagent's compaction empties the subagent's context, not the main thread's, so a sidechain
+# compact_boundary leaves the main thread's last usage standing.
+transcript "$work/side-compacted.jsonl" 184000       # 92%
+printf '{"type":"system","subtype":"compact_boundary","isSidechain":true}\n' \
+  >> "$work/side-compacted.jsonl"
+sess="side-compacted-$$"
+rm -f "$statedir/$sess.stop" "$statedir/$sess.measure"
+out="$(fire UserPromptSubmit "$work/side-compacted.jsonl" "$work" Bash "$sess")"
+case "$out" in *PAUSE*) ok "a subagent's compact_boundary leaves the main thread's stop text" ;;
+  *) bad "compaction" "a sidechain boundary reset the main thread's measurement: $out" ;; esac
+rm -f "$statedir/$sess.stop" "$statedir/$sess.measure" "$work/.keel/handoff.md"
+
 rm -rf "$work"
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

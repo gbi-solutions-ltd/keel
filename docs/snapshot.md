@@ -68,7 +68,7 @@ transcript, finds edits to non-documentation files inside the repository, and lo
 <!-- keel:claim gate=done-guard harness=claude -->
 `verify.test` as a substring of any Bash command in the turn, or the text of `verify.test_one` or
 `verify.test_affected` before its first `{` where it begins a command (hooks/done-guard:33-43). With
-`gates.done_verified` at `required` it blocks the stop (hooks/done-guard:301-303); otherwise it
+`gates.done_verified` at `required` it blocks the stop (hooks/done-guard:301-304); otherwise it
 warns.
 
 ## 3. Repository structure
@@ -170,7 +170,7 @@ fails a profile holding one, both reading the schema (06b8ef2, 61360b3, 3c3c306,
 
 <!-- keel:claim gate=done-guard harness=claude -->
 - **A misspelled gate weakens silently.** done-guard reads any value other than `off` and
-  `required` as `warn` (hooks/done-guard:121, 301-304), so `requird` downgrades a blocking gate.
+  `required` as `warn` (hooks/done-guard:121, 301-305), so `requird` downgrades a blocking gate.
 
 Correction: as of 2026-09-26, not silently: `doctor` fails such a value and `profile set` refuses
 it (61360b3, 06b8ef2, tasks 1 and 2). The Stop hook still reads it as `warn`.

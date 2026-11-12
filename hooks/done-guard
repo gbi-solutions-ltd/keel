@@ -127,10 +127,10 @@ test_cmd = verify.get("test")
 if not test_cmd:
     sys.exit(0)          # nothing to check against, and inventing a command would be worse
 
-# A scoped run counts by its text before the first `{`, only where it begins a command, so a lint
-# of `tests/*.sh` is no run. An empty prefix would begin every command, so it counts for nothing.
-scoped = [p for p in (str(verify.get(k) or "").split("{", 1)[0].strip()
-                      for k in ("test_affected", "test_one")) if p]
+# A scoped run counts by its text before the first `{` where it begins a command, so a lint of
+# `tests/*.sh` is no run. An empty prefix would begin every command; a shared one is named once.
+scoped = list(dict.fromkeys(p for p in (str(verify.get(k) or "").split("{", 1)[0].strip()
+                                        for k in ("test_affected", "test_one")) if p))
 run_marks = [re.escape(test_cmd)] + [r"(?:^|[;|(\n]|&&)\s*" + re.escape(p) for p in scoped]
 
 docs_root = (prof.get("docs_root") or "docs").rstrip("/")
@@ -299,8 +299,9 @@ cmds = "`%s`" % test_cmd + "".join(" or a command beginning `%s`" % p for p in s
 where = "%s edited %d file(s) including %s and never ran %s" % (who, len(uniq), shown, cmds)
 
 if mode == "required":
-    block("%s. Run it and report what it printed before ending the turn. If the work is genuinely "
-          "incomplete, say what remains instead of ending on it." % where)
+    block("%s. Run %s and report what it printed before ending the turn. If the work is "
+          "genuinely incomplete, say what remains instead of ending on it."
+          % (where, "one" if scoped else "it"))
 warn("%s. The turn was allowed to end because gates.done_verified is `warn`; set it to `required` "
      "to stop on this instead." % where)
 PY

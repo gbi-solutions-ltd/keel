@@ -90,10 +90,10 @@ def _measure_parts(path):
     where the tail settles it.
 
     A Claude Code turn in the tail settles the measurement, and so does a compaction boundary after
-    it, which measures 0, so the whole file is read only when the tail carries neither. Reporting zero there instead would read as an empty context and silence the
-    watchdog exactly when it is needed. Parsing the whole file on every cache miss, on
-    UserPromptSubmit and on PreToolUse both, is the cost _tail_entries exists to avoid, and its own
-    docstring calls paying it "a good way to have it turned off".
+    it, which measures 0, so the whole file is read only when the tail carries neither. Reporting
+    zero there instead would read as an empty context and silence the watchdog when it is needed.
+    Parsing the whole file on every cache miss, on UserPromptSubmit and PreToolUse both, is the cost
+    _tail_entries exists to avoid; its docstring calls paying it "a good way to have it turned off".
     """
     tail = _tail_entries(path)
     if tail is not None:
@@ -518,7 +518,8 @@ def hook():
                 # reaches only someone running this library directly: hooks/context-watch sends its
                 # stderr to /dev/null. Compaction still goes ahead: refusing it would cost more than
                 # a stale marker.
-                sys.stderr.write("keel context-watch: could not remove the stop marker %s\n" % stopped)
+                sys.stderr.write("keel context-watch: could not remove the stop marker %s\n"
+                                 % stopped)
         # Nothing is emitted, deliberately. This announced the file with a systemMessage until
         # 2026-09-05, and the harness discards a PreCompact hook's systemMessage and continue fields
         # outright, so the announcement was written, serialised and thrown away every time. The test

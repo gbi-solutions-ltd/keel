@@ -78,7 +78,7 @@ wrong, behaviours without examples, path comparison) and three to consider. All 
   characters in 42 task notifications, 62,385 in Bash results, 46,522 in dispatch prompts.
 - **The stop already lets a session go once the handoff is written.**
   `lib/context_watch.py:513-520` returns allow once the handoff is newer than the stop marker; only
-  the text (`lib/context_watch.py:556-575`) tells the session to have the person `/clear`.
+  the text (`lib/context_watch.py:557-576`) tells the session to have the person `/clear`.
 - **Premature review, twice in one run.** Session `07cd31ed`, 2026-11-09: task 7 implementer
   notified finished 12:07:31, spec review dispatched 12:07:45, implementer finished again 12:15:45,
   review redone as "round 2" at 12:15:57. Task 9: finished 12:59:09 and again 13:04:50, with spec
@@ -1011,7 +1011,7 @@ taken on by Bernard ("fix it, then ship")
 **Done when:** `tests/test-context-watch.sh`, `tests/test-done-guard.sh`,
 `tests/test-validate-citations.sh` and `tests/test-harness-claims.sh` pass.
 
-- [ ] **Step 13.1: Build it test first**
+- [x] **Step 13.1: Build it test first** Note: Red witnessed for behaviour 4 (47/2); behaviour 1 passed on arrival, proved by removing the sidechain filter (89/1), restored (90/0). Coordinator repointed plan citation context_watch.py:556-575 to :557-576. Citation repairs outside Files: docs/snapshot.md, docs/ideas/declared-profile-keys-take-effect.md. Quality: nothing blocks; consider a CHANGELOG phrase missing a verb.
 
 Follow `keel:tdd`. Write the case for behaviour 1 in `tests/test-context-watch.sh` and the cases for
 behaviour 4 in `tests/test-done-guard.sh`, after the existing cases. Behaviour 1 pins existing code
@@ -1024,7 +1024,7 @@ says `Run it`). Expected after: PASS. Quote the failing output in your report.
 Run: `tests/run-tests.sh` and the lint command.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 
-- [ ] **Step 13.2: Hand over**
+- [x] **Step 13.2: Hand over** Note: rounds: 1; routing: inherit; loop: full
 
 ```bash
 git add lib/context_watch.py hooks/done-guard docs/ideas/standards-that-bind.md CHANGELOG.md \

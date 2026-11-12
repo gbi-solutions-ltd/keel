@@ -26,7 +26,8 @@ Entries are terse by design; the narrative for each release is in this file's gi
   that begins with the text of `verify.test_one` or `verify.test_affected` before its first `{` (at
   the start, or after `;`, `&&`, `||`, `|`, `(` or a newline): a scoped test run satisfies
   `gates.done_verified` and proves a test ran, not that the suite did, and `shellcheck tests/*.sh`
-  is no run. Its block and warn text names those scoped commands beside `verify.test`.
+  is no run. Its block and warn text names those scoped commands beside `verify.test`, a prefix
+  the two share once, and the block text asks to run one of them.
 - `write-plan`'s template carries `**Suite checkpoints:** every 3 tasks` and its approval asks for
   N; `execute-plan`'s "Suite checkpoints" section and `=== START RECORD ===` block, and `tdd`'s
   affected-tests reference, carry out ADR-0017 for such plans.

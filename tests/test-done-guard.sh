@@ -450,5 +450,19 @@ reason_has "the reason names verify.test_one's scoped command" \
 reason_has "with no scoped command the reason names verify.test only, as before" \
     "$(send "$whole" "$whole/named.jsonl" Stop)" 'never ran `tests/run-tests.sh`. Run it' yes
 
+# With several commands named, the reason asks for one of them, and a prefix verify.test_one and
+# verify.test_affected share is named once rather than offered twice as two choices.
+both="$tmp/both"
+fixture "$both" '"done_verified": "required"' '"tests/run-tests.sh", "test_one": "go test {path}", "test_affected": "go test {packages}"'
+{ row_user "go"; row_edit "$both/a.go" ""; } > "$both/named.jsonl"
+out="$(send "$both" "$both/named.jsonl" Stop)"
+reason_has "with several commands the reason says Run one" "$out" "Run one" yes
+n="$(printf '%s' "$out" | grep -o 'go test' | wc -l | tr -d ' ')"
+if [ "$n" = 1 ]; then
+    printf '  PASS  %s\n' "a prefix both scoped commands share is named once"; pass=$((pass+1))
+else
+    printf '  FAIL  %s (named %s times: %s)\n' "a prefix both scoped commands share is named once" "$n" "${out:0:200}"; fail=$((fail+1))
+fi
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
