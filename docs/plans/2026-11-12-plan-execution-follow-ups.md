@@ -43,6 +43,8 @@ marker), `hooks/context-watch:74` and the documents the match rule appears in. A
 above as written.
 **Task 3 added:** 2026-11-12, from the `review-code` re-review of tasks 1 and 2; Bernard approved
 fixing every finding as one task, routing `inherit`.
+**Task 4 added:** 2026-11-12, from the one `review-code` re-review of task 3, which still blocked;
+Bernard chose to fix every finding as one task with no further re-review.
 **Shape:** behaviours with examples.
 
 ## Global constraints
@@ -318,3 +320,67 @@ git status --porcelain
 Stage exactly those paths, and any citation repairs by name, and stop. **Do not commit.** The
 coordinator commits after both review passes, with
 `git commit -m "fix(watchdogs): pin the surviving mutants, linear token check"`.
+
+---
+
+### Task 4: re-review fix, the first-token escape and the residue
+
+**Story:** the `review-code` re-review of 71c5023 on 2026-11-12: one surviving mutant (Blocking),
+a timing case that only just fails on the code it guards against (Should fix), two dead guards and
+review-history wording (Consider). Bernard chose on 2026-11-12 to fix all of them as one task, with
+no further re-review.
+**Files:**
+- Modify: `hooks/done-guard`
+- Modify: `CHANGELOG.md`
+- Test: `tests/test-done-guard.sh`
+- Test: `tests/test-context-watch.sh`
+
+**Depends on:** task 3
+
+**Behaviours:**
+
+1. A token at the start of the command is never read as escaped, whatever the command ends with.
+   Example: `shell_case block '#; tests/x.sh a\\'` blocks; changing `start > 0` to `start >= 0` in
+   the bare check (`hooks/done-guard:175`) turns it red.
+2. The growth-ratio case leaves a wide margin against a quadratic check: it times N lines against
+   4N and asserts the ratio stays under 8 (linear gives about 4 plus fixed costs, quadratic about
+   16). Example: with the per-token prefix slice put back in a copy of `hooks/done-guard`, the case
+   fails with a ratio well over 8; on the current code it passes.
+3. The two guards that can never fire are dropped from the bare check: `start >= 0 and` (a posix
+   shlex token is never longer than its source, so `start` is never negative) and `tok and` (an
+   empty token reaches no branch that reads `bare`). Example: every case in
+   `tests/test-done-guard.sh` still passes, and the bare check names neither.
+4. Comments and test headers state what the code and tests do now, not what a review found: the
+   comment above the bare check, the timing case's comment, and the "cases the review found
+   unpinned" headers in both test files. Example: `grep -n 'review found\|could be deleted\|3.7 s'
+   hooks/done-guard tests/test-done-guard.sh tests/test-context-watch.sh` prints nothing.
+5. `CHANGELOG.md`'s done-guard entries under `## Unreleased` say nothing this task makes untrue.
+   Example: a reader finds no line there that the change contradicts.
+
+**Done when:** `tests/test-done-guard.sh`, `tests/test-context-watch.sh`,
+`tests/test-validate-citations.sh` and `tests/test-harness-claims.sh` pass, and the grep in
+behaviour 4 prints nothing.
+
+- [ ] **Step 4.1: Build it test first**
+
+Follow `keel:tdd`. Behaviour 1 pins code that is already right: write its case, prove it by making
+the `start >= 0` mutant in a copy of the hook, watching the case go red and restoring the hook.
+Behaviour 2: rewrite the case, then prove it against the old slice the same way. Then make the
+changes for behaviours 3 to 5. Quote each red in your report.
+Run: `tests/test-done-guard.sh` and `tests/test-context-watch.sh`
+Expected after: PASS.
+
+Run: `tests/run-tests.sh` and the lint command.
+Expected: PASS, or reds this task did not cause, each named. This is the one boundary run the task
+schedules.
+
+- [ ] **Step 4.2: Hand over**
+
+```bash
+git add hooks/done-guard CHANGELOG.md tests/test-done-guard.sh tests/test-context-watch.sh
+git status --porcelain
+```
+
+Stage exactly those paths, and any flagged citation repairs by name, and stop. **Do not commit.**
+The coordinator commits after both review passes, with
+`git commit -m "fix(done-guard): a first token is never escaped, drop dead guards"`.
