@@ -511,7 +511,7 @@ checked by a reader against the diff and by the greps in `Done when:`.
 `tests/test-doc-claims.sh` pass, and `grep -c '3 or more open tasks'
 skills/execute-plan/references/subagent-prompts.md` prints at least `1`.
 
-- [ ] **Step 6.1: Make the change and check it**
+- [x] **Step 6.1: Make the change and check it** Note: No-test task; examples checked by the spec reviewer against the diff and Done when (validate-skills 134/0, validate-citations 64/0, doc-claims 65/0, grep 1); follow-ups: say a partly ticked task counts as open; B4 example word offered vs text offers
 
 Edit as the behaviours say.
 Run: the `Done when:` commands and the lint command. Run no `tests/run-tests.sh`: the plan header
@@ -519,7 +519,7 @@ names suite checkpoints.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 6.2: Hand over**
+- [x] **Step 6.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; suite: pass at tree 5bfe9db
 
 ```bash
 git add skills/execute-plan/references/subagent-prompts.md \

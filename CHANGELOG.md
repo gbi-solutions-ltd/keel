@@ -9,6 +9,10 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- `execute-plan` offers a plan with no `**Suite checkpoints:**` line and 3 or more open tasks
+  checkpoints, in one question before the first dispatch; on a yes it writes the line, rewrites
+  each open task's boundary step to the checkpoint form, leaving ticked steps alone, and commits
+  the plan as a repair. ADR-0017 records the amendment.
 - A plan-run checkpoint note names the tree it ran on (`suite: pass at tree <sha>`, from
   `git write-tree` before the tick), and `review-code` quotes the plan-end note in place of its own
   suite run when HEAD differs from that tree only under `docs/plans/` and the working tree is

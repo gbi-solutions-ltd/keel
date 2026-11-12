@@ -143,3 +143,19 @@ This changes two sentences above, which stand as written for the day they were d
 "`review-code`, `ship` and CI keep running the whole suite" under Consequences. Under a plan run,
 `review-code` now keeps running it except on the plan-end checkpoint's tree. The note formats under
 "At a checkpoint task the order is fixed" gain `at tree <tree sha>` the same way.
+
+**2026-11-12, decided by Bernard Tebandeke: a plan with no checkpoint line and 3 or more open
+tasks is offered checkpoints before the first dispatch.** Item 7 of
+[`docs/ideas/plan-execution-speed-2.md`](../ideas/plan-execution-speed-2.md). The coordinator asks
+the person one question, every 3 tasks being the default. On a yes it writes the header line and
+rewrites each open task's boundary step to the plan template's checkpoint form (`Done when:` and
+lint, `verify.test_affected` where set, and no `verify.test`), changing only that step's run lines
+and touching no ticked step, then commits the plan alone as a repair
+(`docs(plans): <slug> suite checkpoints`) before dispatching. On a no, or with fewer than 3 open
+tasks, the plan runs its steps as written. A plan written before this decision otherwise pays the
+per-task suite for every task left, and the person, not the coordinator, decides to change it.
+
+This replaces "A plan with no `**Suite checkpoints:**` line runs its steps as written" under
+Decision as the whole rule; that sentence now holds only after a no or below 3 open tasks. "What
+this forecloses" stands: a plan whose line is left out, and whose offer is declined, keeps the
+per-unit suite.

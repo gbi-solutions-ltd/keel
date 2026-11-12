@@ -364,8 +364,16 @@ into the plan file beside the task before its box is ticked.
 A plan whose header has `**Suite checkpoints:** every N tasks` takes the whole suite out of the
 implementers and gives it to you, as
 `docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md` decides: on a measured run
-the suite, run twice per task, took 22% of the wall clock. A plan with no such line is run as
-written, its steps naming the suite where they do.
+the suite, run twice per task, took 22% of the wall clock.
+
+**A plan with no such line and 3 or more open tasks is offered checkpoints before the first
+dispatch**, in one question to the person: every 3 tasks, the default. On a yes, write the header
+line and rewrite each open task's boundary step to the plan template's checkpoint form: its
+`Done when:` and the lint command, `verify.test_affected` where the profile sets it, and no
+`verify.test`. The rewrite changes only the boundary step's run lines; every other line of the task
+is kept, and a ticked step is not touched. Commit the plan alone as a repair,
+`docs(plans): <slug> suite checkpoints`, before dispatching. On a no, or with fewer than 3 open
+tasks, the plan runs as written, its steps naming the suite where they do.
 
 **Run `verify.test` before the first dispatch, after every N committed tasks, and after the last.**
 The first run is the plan-start record: its commit and the tests red on it. With N 3, a 10-task

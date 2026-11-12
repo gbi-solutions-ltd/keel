@@ -81,7 +81,9 @@ approving the plan can change it. The reason is ADR-0017
 (`docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md`): on a measured run the
 suite, run twice per task, took 22% of the wall clock, and one run every few tasks still bounds how
 far back a break can hide. A plan with no such line runs its steps as written, so its build steps
-name `verify.test`, or `verify.test_affected` where set, as the boundary run.
+name `verify.test`, or `verify.test_affected` where set, as the boundary run. `execute-plan` offers
+such a plan checkpoints when it has 3 or more open tasks, and on a yes rewrites those steps to the
+checkpoint form below.
 
 ## Task shape
 
