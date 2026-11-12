@@ -9,6 +9,8 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- The implementer prompt counts a GREEN run of exactly the `Done when:` commands, with no change
+  after it, as the `Done when:` run, so it is not run a second time.
 - `keel plan tick` takes several ids, `keel plan tick <plan> <id> [<id> ...]`, ticking each under
   one lock with the same option; an unknown id among them changes nothing and is named.
 - `write-plan` searches the live documents for the behaviour each task changes and lists every hit

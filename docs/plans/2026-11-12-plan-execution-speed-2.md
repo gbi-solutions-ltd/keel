@@ -698,6 +698,12 @@ passes, with `git commit -m "feat(plan): tick several ids at once"`.
 - Modify: `skills/tdd/SKILL.md`
 - Modify: `CHANGELOG.md`
 
+**Plan note, 2026-11-12, coordinator:** behaviour 2 is dropped by Bernard's decision on
+2026-11-12. ADR-0011, accepted, makes "read it before the step" the convention for step-detail
+links and relies on it (as does `CONTRIBUTING.md`), which `docs/standards.md` alone did not show.
+The record's evidence that implementers did not read `tdd`'s reference anyway is a follow-up for a
+deliberate decision on ADR-0011, not a change made here. `skills/tdd/SKILL.md` is left as it was.
+
 **Depends on:** task 8
 
 **Behaviours:** this task changes skill and prompt text and has no failing test; each example is
@@ -718,7 +724,7 @@ checked by a reader against the diff and by the greps in `Done when:`.
 **Done when:** `tests/test-validate-skills.sh`, `tests/test-validate-citations.sh` and
 `tests/test-eval-harness.sh` pass, and the grep in behaviour 2 prints `0`.
 
-- [ ] **Step 10.1: Make the change and check it**
+- [x] **Step 10.1: Make the change and check it** Note: No-test task; behaviour 1 checked by the spec reviewer against the diff and Done when (validate-skills 134/0, validate-citations 64/0, eval-harness 115/0, four mirrors cmp-identical); behaviour 2 dropped by Bernard (ADR-0011 stands, see plan note), tdd unchanged at 698; commit message reworded to match
 
 Edit as the behaviours say.
 Run: the `Done when:` commands and the lint command. Run no `tests/run-tests.sh`: the plan header
@@ -726,7 +732,7 @@ names suite checkpoints.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 10.2: Hand over**
+- [x] **Step 10.2: Hand over** Note: rounds: 2; routing: inherit; loop: light; suite: pass at tree 54ccc12
 
 ```bash
 git add skills/execute-plan/references/subagent-prompts.md skills/tdd/SKILL.md CHANGELOG.md \

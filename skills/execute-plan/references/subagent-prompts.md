@@ -90,9 +90,10 @@ Paste `git status --porcelain` as your last line. If it lists a path this task d
 rather than staging it.
 
 Run the task's `Done when:` command after your last code change and give its summary lines and every
-failing case in full, not its whole output. If you did not run it, say so in your first line. A
-report claiming completion with no command output in it is rejected and re-dispatched, which costs
-more than saying you skipped it.
+failing case in full, not its whole output. A GREEN run of exactly the `Done when:` commands, with
+no change after it, is that run: do not run them a second time. If you did not run it, say so in
+your first line. A report claiming completion with no command output in it is rejected and
+re-dispatched, which costs more than saying you skipped it.
 ```
 
 The report asks for summaries, not whole outputs, because every report lands in your context and
