@@ -210,7 +210,7 @@ passes, with `git commit -m "perf(tests): run the suite longest-first on more wo
 **Done when:** `tests/test-context-watch.sh`, `tests/test-validate-citations.sh` and
 `tests/test-harness-claims.sh` pass.
 
-- [ ] **Step 2.1: Build it test first**
+- [x] **Step 2.1: Build it test first** Note: red 112/2 quoted (subagent denied; state written); round 2 added the empty agent_id case, red against a mutant copy; spec COMPLIES, quality 1 should-fix fixed (stray space), 1 moved to task 3 as behaviour 4 (capabilities entry); context-watch 115/0; report written to a file because the installed done-guard 0.27.0 swallowed the subagent's reports
 
 Follow `keel:tdd`. Write cases for behaviours 1 to 3 after the existing cases; `fire()` takes no
 agent fields, so these events are built by hand, as the existing hand-written events are.
@@ -223,7 +223,7 @@ Run: the lint command. With the `Done when:` run above, that is the unit boundar
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 2.2: Hand over**
+- [x] **Step 2.2: Hand over** Note: rounds: 2; routing: inherit; loop: full; extra staged: schema citation repairs and regenerated profile-keys.md
 
 ```bash
 git add lib/context_watch.py tests/test-context-watch.sh docs/05-token-and-memory-design.md \
@@ -251,6 +251,11 @@ The coordinator commits after both review passes, with
 - Modify: `skills/write-plan/references/plan-template.md`
 - Modify: `CHANGELOG.md`
 
+**Plan note, 2026-11-12, coordinator:** task 2's quality review found that
+`lib/harness/capabilities` lists only `transcript_turn_usage` as what context-watch requires, while
+context-watch now also reads `agent_type` and `agent_id` on PreToolUse, which review-guard's entry
+already names. This task already edits that file, so it adds the two requirements (behaviour 4).
+
 **Depends on:** none
 
 **Behaviours:**
@@ -270,6 +275,9 @@ The coordinator commits after both review passes, with
    citations the validator flags and not to look for shifted citations in records, and why: on the
    2026-11-11 run that instruction caused most repairs outside a task's Files (11 of 13 tasks).
    Example: `plan-template.md` contains `do not look for shifted citations in records`.
+4. `lib/harness/capabilities` records that context-watch requires the PreToolUse `agent_type` and
+   `agent_id` fields, in the form review-guard's lines use. Example: the file holds
+   `requires|context-watch|pretooluse_agent_type` and `requires|context-watch|pretooluse_agent_id`.
 
 Each phrase citation in `templates/profile.schema.json` sits within three lines below a line naming
 the key's leaf, as the existing `code:bin/keel#...` entries do (`tests/validate-skills.sh` checks

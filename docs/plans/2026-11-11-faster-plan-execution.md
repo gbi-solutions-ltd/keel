@@ -78,7 +78,7 @@ wrong, behaviours without examples, path comparison) and three to consider. All 
   characters in 42 task notifications, 62,385 in Bash results, 46,522 in dispatch prompts.
 - **The stop already lets a session go once the handoff is written.**
   `lib/context_watch.py:513-520` returns allow once the handoff is newer than the stop marker; only
-  the text (`lib/context_watch.py:557-576`) tells the session to have the person `/clear`.
+  the text (`lib/context_watch.py#def _stop_text`) tells the session to have the person `/clear`.
 - **Premature review, twice in one run.** Session `07cd31ed`, 2026-11-09: task 7 implementer
   notified finished 12:07:31, spec review dispatched 12:07:45, implementer finished again 12:15:45,
   review redone as "round 2" at 12:15:57. Task 9: finished 12:59:09 and again 13:04:50, with spec

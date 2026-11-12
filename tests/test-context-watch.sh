@@ -933,6 +933,55 @@ case "$out" in *"session: $sess"*) ok "with a session id the stop text still ask
   *) bad "session line" "the stop text does not name session: $sess: $out" ;; esac
 rm -rf "$work/ty" "$work/pyshim"
 
+# --- a subagent is left alone -----------------------------------------------------------------------
+#
+# A subagent's context is its own and is discarded when it returns, and no field on its PreToolUse
+# event is known to name its own transcript, so the main transcript's measurement says nothing about
+# it. It is told apart as hooks/review-guard tells one, by a non-empty agent_type and a non-empty
+# agent_id together. fire() takes no agent fields, so these events are written by hand. The nested
+# TMPDIR keeps their state files inside this case's own directory, where they can be counted.
+tz="$work/tz/a"
+mkdir -p "$tz/keel-context-watch"
+rm -f "$work/.keel/handoff.md"
+sess="subagent-$$"
+before="$(find "$tz/keel-context-watch" -name "$sess.*" | wc -l | tr -d ' ')"
+out="$(printf '{"hook_event_name":"PreToolUse","transcript_path":"%s","cwd":"%s","session_id":"%s","tool_name":"Bash","agent_type":"general-purpose","agent_id":"a1"}' \
+  "$work/stop.jsonl" "$work" "$sess" | TMPDIR="$tz" "$HOOK" 2>/dev/null)"
+rc=$?
+[ "$rc" -eq 0 ] && [ -z "$out" ] \
+  && ok "a subagent's tool call past the stop threshold gets no output and exit 0" \
+  || bad "subagent" "exit $rc, output: $out"
+after="$(find "$tz/keel-context-watch" -name "$sess.*" | wc -l | tr -d ' ')"
+[ "$after" = "$before" ] \
+  && ok "a subagent's event writes no stop marker and no measurement for its session" \
+  || bad "subagent" "state files for $sess went from $before to $after: $(ls "$tz/keel-context-watch")"
+
+out="$(printf '{"hook_event_name":"PreToolUse","transcript_path":"%s","cwd":"%s","session_id":"%s","tool_name":"Bash"}' \
+  "$work/stop.jsonl" "$work" "$sess" | TMPDIR="$tz" "$HOOK" 2>/dev/null)"
+case "$out" in *'"permissionDecision": "deny"'*)
+    ok "the same tool call without the agent fields is still denied" ;;
+  *) bad "subagent" "the main session's call was not denied: $out" ;; esac
+
+# A main session started with `--agent` carries agent_type and no agent_id, so either field alone is
+# the main session and is held to the stop.
+out="$(printf '{"hook_event_name":"PreToolUse","transcript_path":"%s","cwd":"%s","session_id":"%s","tool_name":"Bash","agent_type":"helper"}' \
+  "$work/stop.jsonl" "$work" "type-only-$$" | TMPDIR="$tz" "$HOOK" 2>/dev/null)"
+case "$out" in *'"permissionDecision": "deny"'*)
+    ok "agent_type without agent_id is not a subagent and is denied" ;;
+  *) bad "subagent" "agent_type alone was left alone: $out" ;; esac
+out="$(printf '{"hook_event_name":"PreToolUse","transcript_path":"%s","cwd":"%s","session_id":"%s","tool_name":"Bash","agent_id":"a1"}' \
+  "$work/stop.jsonl" "$work" "id-only-$$" | TMPDIR="$tz" "$HOOK" 2>/dev/null)"
+case "$out" in *'"permissionDecision": "deny"'*)
+    ok "agent_id without agent_type is not a subagent and is denied" ;;
+  *) bad "subagent" "agent_id alone was left alone: $out" ;; esac
+# An empty agent_id is no id at all, so it is the main session too.
+out="$(printf '{"hook_event_name":"PreToolUse","transcript_path":"%s","cwd":"%s","session_id":"%s","tool_name":"Bash","agent_type":"general-purpose","agent_id":""}' \
+  "$work/stop.jsonl" "$work" "empty-id-$$" | TMPDIR="$tz" "$HOOK" 2>/dev/null)"
+case "$out" in *'"permissionDecision": "deny"'*)
+    ok "an empty agent_id is not a subagent and is denied" ;;
+  *) bad "subagent" "an empty agent_id was left alone: $out" ;; esac
+rm -rf "$work/tz"
+
 rm -rf "$work"
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

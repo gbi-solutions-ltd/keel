@@ -440,6 +440,17 @@ def hook():
     if os.environ.get("KEEL_CONTEXT_WATCH", "").lower() in ("off", "0", "false"):
         return 0
 
+    # A subagent is left alone, and before any state is written, so its calls leave no stop marker
+    # or measurement behind under its coordinator's session id. Its context is its own and is
+    # discarded when it returns, and no field on its event is known to name its own transcript, so
+    # the transcript_path it carries measures its coordinator, not it. It is told apart as
+    # hooks/review-guard's header records, under "WHO IT TOUCHES": a non-empty agent_type and a
+    # non-empty agent_id together, since a main session started with `--agent` carries agent_type
+    # alone and stays held to the stop.
+    agent_type, agent_id = ev.get("agent_type"), ev.get("agent_id")
+    if isinstance(agent_type, str) and agent_type and isinstance(agent_id, str) and agent_id:
+        return 0
+
     event = ev.get("hook_event_name") or ""
     transcript = ev.get("transcript_path") or ""
     session = ev.get("session_id") or ""

@@ -264,6 +264,14 @@ whole reason for the delegation table above. Counting its usage would report the
 because a subagent read twenty files, and the watchdog would punish exactly the behaviour this
 document recommends.
 
+<!-- keel:claim gate=context-watch harness=claude -->
+**A subagent is left alone.** An event carrying a non-empty `agent_type` and a non-empty
+`agent_id` comes from a subagent, told apart as `hooks/review-guard` tells one, and the watchdog
+answers it with nothing and writes no state for it. Its context is its own and is discarded when
+it returns, and no field on its event is known to name its own transcript, so the transcript the
+event names measures its coordinator. Either field alone is the main session, held to the stop as
+before: one started with `--agent` carries `agent_type` and no `agent_id`.
+
 **It does not violate rule 1.** The hook is silent below the warn threshold, so an ordinary session
 emits nothing. What it does emit is appended after the conversation rather than into the prefix, so
 no cached bytes move either way. This is the one place a volatile value is acceptable, and only
