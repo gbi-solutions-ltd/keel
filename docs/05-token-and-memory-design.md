@@ -336,6 +336,25 @@ that stderr to `/dev/null`, so the line is not shown in a session. The `.stop` a
 files are named from the session id, and an id holding `/`, `\`, `..` or a NUL is read as
 `nosession`, so no id names a file outside the state directory.
 
+<!-- keel:claim gate=context-watch harness=claude -->
+**The state directory is private to its user.** The state files live in
+`$TMPDIR/keel-context-watch-<euid>` (`/tmp` when `TMPDIR` is unset or empty), made with mode
+`0700`, or, when it fails its check, in `${XDG_CACHE_HOME:-$HOME/.cache}/keel-context-watch`,
+checked the same way. A directory is used only when `lstat` shows a real directory, not a symlink,
+owned by this effective user at mode `0700`. One that is ours at any other mode is refused, not
+tightened, because a symlink planted in it while it was loose would survive a chmod, and the
+fallback is used instead. The check assumes the state directory's parent is sticky, as `/tmp` is,
+or private to the user, so nobody else can rename or replace the directory after it passes. The
+euid is predictable, so on a shared `/tmp` another local user can make the name first, as a
+directory of their own or a symlink, and wait for the watchdog to write through it. Running without
+state is no answer to that: with no stop marker, `PreCompact` writes the mechanical render over the
+session's own handoff and a plan run loses its `next:` line. An unset `HOME` falls back to the
+home directory from the user database; only a fallback that still does not resolve to an absolute
+path, as for a user with no entry there, is skipped. Only when both directories fail does the
+watchdog run without state files. The cached shortcut in bash reads only the `$TMPDIR` location,
+and only when it is a real directory this user owns (`-d`, not `-L`, and `-O`) and the cache file in
+it is a regular file this user owns, held to the same test; anything else falls through to python.
+
 ## Session hygiene, the part skills cannot enforce
 
 `context-budget` documents this and the prompting cheatsheet repeats it, because it is

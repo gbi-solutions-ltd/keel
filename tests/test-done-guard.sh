@@ -614,5 +614,71 @@ else
     printf '  FAIL  %s (took %s s, then %s s)\n' "four times the command takes under eight times as long" "$small" "$large"; fail=$((fail+1))
 fi
 
+# ---- a scoped prefix with quotes ----------------------------------------------------
+#
+# The shell removes quotes from the command, so the prefix's words must lose theirs too, or the
+# last word of Gradle's `./gradlew test --tests '*{name}'`, which is `'*`, never matches. The
+# verify.test here is not a substring of the command, so only the scoped prefix can count it.
+quoted="$tmp/quoted"
+fixture "$quoted" '"done_verified": "required"' \
+    "\"tests/run-tests.sh\", \"test_one\": \"./gradlew test --tests '*{name}'\""
+{ row_user "go"; row_edit "$quoted/lib/foo.sh" ""; row_cmd "./gradlew test --tests '*FooTest'"; } > "$quoted/run.jsonl"
+out="$(send "$quoted" "$quoted/run.jsonl" Stop)"; rc=$?
+if [ "$rc" -eq 0 ]; then
+    expect "a command that begins with a quoted scoped prefix is a test run" quiet "$out"
+else
+    printf '  FAIL  %s (rc=%s)\n' "a command that begins with a quoted scoped prefix is a test run" "$rc"; fail=$((fail+1))
+fi
+{ row_user "go"; row_edit "$quoted/lib/foo.sh" ""; row_cmd "./gradlew build"; } > "$quoted/build.jsonl"
+expect "a command that does not begin with the quoted scoped prefix still blocks" block \
+    "$(send "$quoted" "$quoted/build.jsonl" Stop)"
+
+# A prefix of quotes alone strips to nothing, and one that is only a wrapper such as `sh`, quoted
+# or not, names no test: each counts nothing, as an empty prefix does. A prefix cut after a space
+# or a quote ends in a whole word, so `sh` does not count `shellcheck` and `pytest` still counts.
+quote_case() {   # quote_case <want: quiet|block> <test_one> <command>
+    local want="$1" one="$2" cmd="$3" root="$tmp/quote-case"
+    rm -rf "$root"
+    fixture "$root" '"done_verified": "required"' \
+        "$(python3 -c 'import json,sys; print(json.dumps("tests/run-tests.sh") + ", \"test_one\": " + json.dumps(sys.argv[1]))' "$one")"
+    { row_user "go"; row_edit "$root/lib/foo.sh" ""; row_cmd "$cmd"; } > "$root/t.jsonl"
+    expect "test_one $one, then $cmd: $want" "$want" "$(send "$root" "$root/t.jsonl" Stop)"
+}
+quote_case block "'{name}'" "ls -la"
+quote_case block "sh '{script}'" "echo hi"
+quote_case quiet 'pytest "{name}"' "pytest tests/test_x.py"
+quote_case block "sh '{script}'" "shellcheck x"
+quote_case block "sh '{script}'" "sh -c ls"
+quote_case block "bash \"{script}\"" "bashtop"
+quote_case block "sh {script}" "shellcheck x"
+quote_case block "pytest {name}" "pytest-watch"
+# A prefix of `./` alone leaves an empty word once `./` is dropped, and an empty word begins every
+# command, so it must count nothing, as an empty prefix does. `./tests/{name}` counts with or
+# without the `./`.
+quote_case block "./{script}" "ls -la"
+quote_case block "sh ./{script}" "echo hi"
+quote_case quiet "./tests/{name}" "./tests/x.sh"
+quote_case quiet "./tests/{name}" "tests/x.sh"
+# A command shlex cannot split falls back to the regular expression, which uses only the prefixes
+# that can count, so a wrapper-only or `./`-only prefix counts nothing there either.
+quote_case block "sh {script}" "shellcheck 'x"
+quote_case block "./{script}" "./configure 'x"
+
+# The block reason names only prefixes that can count. One that is only a wrapper names no test, so
+# naming it would send the reader to a command the hook then ignores.
+root_wrap="$tmp/wrap-reason"
+fixture "$root_wrap" '"done_verified": "required"' '"tests/run-tests.sh", "test_one": "sh {script}"'
+{ row_user "go"; row_edit "$root_wrap/lib/foo.sh" ""; row_cmd "echo hi"; } > "$root_wrap/t.jsonl"
+out="$(send "$root_wrap" "$root_wrap/t.jsonl" Stop)"
+what="the block reason does not name a wrapper-only prefix"
+if printf '%s' "$out" | grep -q '"decision": *"block"' \
+    && ! printf '%s' "$out" | grep -qF "beginning \`sh\`"; then
+    printf '  PASS  %s\n' "$what"; pass=$((pass+1))
+else
+    printf '  FAIL  %s (got: %s)\n' "$what" "$out"; fail=$((fail+1))
+fi
+# Naming verify.test alone, the reason says `Run it`; naming more, it says `Run one`.
+reason_has "a reason naming only verify.test says Run it" "$out" "Run it and report" yes
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

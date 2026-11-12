@@ -464,6 +464,17 @@ out="$("$KEEL" plan tick "$p" 1.1 9.9 2>&1)"; rc=$?
   && ok "tick with an unknown id among several changes nothing and names it" \
   || bad "tick several ids, one missing" "rc=$rc out=$out, plan now: $(cat "$p")"
 
+# Ids reach awk one a line, so an argument holding a newline would be split into two ids and tick
+# both steps; it must be refused as not one id.
+p="$d/several-newline.md"
+mkplan "$p" '- [ ] **Step 1.1: a**' '- [ ] **Step 1.2: b**'
+cp "$p" "$d/several-newline.before"
+out="$("$KEEL" plan tick "$p" "$(printf '1.1\n1.2')" 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && cmp -s "$p" "$d/several-newline.before" \
+  && case "$out" in *"an id must be one line"*) true ;; *) false ;; esac \
+  && ok "tick refuses an id holding a newline as not one id and changes nothing" \
+  || bad "tick newline id" "rc=$rc out=$out, plan now: $(cat "$p")"
+
 help="$("$KEEL" --help 2>&1)"
 case "$help" in
   *'plan tick <plan> <id> [<id> ...]'*) ok "keel --help lists plan tick with several ids" ;;
@@ -649,13 +660,19 @@ p="$d/batch.md"
 { printf '# A plan\n\n'; i=1; while [ "$i" -le 20 ]; do printf -- '- [ ] **Step 1.%s: a step**\n' "$i"; i=$((i+1)); done; } > "$p"
 i=1
 # Their errors are kept, so a failure names its cause: one on CI showed only a count.
-while [ "$i" -le 20 ]; do "$KEEL" plan tick "$p" "1.$i" >/dev/null 2>>"$d/batch.err" & i=$((i+1)); done
+# The lock trace is kept too, because a timestamp is too coarse to order a race and the trace's line
+# order is: the failure seen twice on Linux CI was never reproduced locally.
+while [ "$i" -le 20 ]; do
+  KEEL_PLAN_LOCK_TRACE="$d/batch.trace" "$KEEL" plan tick "$p" "1.$i" >/dev/null 2>>"$d/batch.err" &
+  i=$((i+1))
+done
 wait
 n="$(grep -c '^- \[x\] \*\*Step 1\.' "$p")"
 [ "$n" -eq 20 ] && [ ! -e "$p.lock" ] \
   && ok "twenty ticks started together all land, and the lock is gone after" \
   || bad "concurrent ticks" "$n of 20 landed; lock left: $([ -e "$p.lock" ] && echo yes || echo no); \
-errors: $(sort "$d/batch.err" | uniq -c | tr '\n' ' ')"
+errors: $(sort "$d/batch.err" | uniq -c | tr '\n' ' '); \
+trace: $(tr '\n' ';' < "$d/batch.trace" 2>&1)"
 
 # A busy queue is not a stale lock: a waiter counts its polls only behind one holder, so it lands
 # however many it waited behind. A shim sleep stands in for the clock, one call a poll, so a loaded
@@ -745,6 +762,65 @@ PATH="$shim:$PATH" KEEL_TEST_RMDIR="$real_rmdir" KEEL_TEST_MARK="$d/mark" \
   && ok "a tick removes only the lock it holds" \
   || bad "tick removes only its lock" "rc=$rc, lock left: $([ -d "$p.lock" ] && echo yes || echo no)"
 rmdir "$p.lock" 2>/dev/null
+
+# ---- tick: the lock leaves a trace when asked ---------------------------------------------------
+
+# With KEEL_PLAN_LOCK_TRACE naming a file, a tick appends a line as it takes the lock, one before it
+# releases it and one after, each naming its process id. The order of the lines is the evidence for
+# a race, so one tick's three lines must come in that order and agree on the id.
+p="$d/trace.md"
+mkplan "$p" '- [ ] **Step 1.1: a**'
+KEEL_PLAN_LOCK_TRACE="$d/trace.log" "$KEEL" plan tick "$p" 1.1 >/dev/null 2>&1; rc=$?
+tpid="$(awk 'NR == 1 { print $2 }' "$d/trace.log" 2>/dev/null)"
+[ "$rc" -eq 0 ] && [ -n "$tpid" ] \
+  && [ "$(cat "$d/trace.log")" = "acquire $tpid"$'\n'"release $tpid"$'\n'"released $tpid" ] \
+  && ok "a tick with a lock trace set writes acquire, release and released, with one process id" \
+  || bad "lock trace" "rc=$rc, trace: $(cat "$d/trace.log" 2>&1)"
+
+# With the variable unset, nothing is written: ordinary ticks pay nothing for the trace. The tick
+# runs in a directory holding only its plan, which must hold only the plan after.
+mkdir "$d/notrace"
+p="$d/notrace/plan.md"
+mkplan "$p" '- [ ] **Step 1.1: a**'
+(unset KEEL_PLAN_LOCK_TRACE; cd "$d/notrace" && "$KEEL" plan tick "$p" 1.1 >/dev/null 2>&1); rc=$?
+[ "$rc" -eq 0 ] && grep -qxF -e '- [x] **Step 1.1: a**' "$p" \
+  && [ "$(find "$d/notrace" -mindepth 1)" = "$p" ] \
+  && ok "a tick with no lock trace set writes no trace" \
+  || bad "no lock trace" "rc=$rc, directory holds: $(find "$d/notrace" -mindepth 1 | tr '\n' ' ')"
+
+# A release whose rmdir fails is traced as release-failed with rmdir's error, in place of released,
+# and the error still reaches stderr. A shim rmdir fails, saying so, and leaves the lock.
+shim="$d/shim-rmfail"
+mkdir "$shim"
+printf '%s\n' '#!/bin/sh' 'echo "rmdir: $1: shim refused" >&2' 'exit 1' > "$shim/rmdir"
+chmod 755 "$shim/rmdir"
+p="$d/tracefail.md"
+mkplan "$p" '- [ ] **Step 1.1: a**'
+out="$(PATH="$shim:$PATH" KEEL_PLAN_LOCK_TRACE="$d/tracefail.log" \
+  "$KEEL" plan tick "$p" 1.1 2>&1 >/dev/null)"
+tpid="$(awk 'NR == 1 { print $2 }' "$d/tracefail.log" 2>/dev/null)"
+[ -n "$tpid" ] && case "$out" in *"shim refused"*) true ;; *) false ;; esac \
+  && [ "$(cat "$d/tracefail.log")" = "acquire $tpid"$'\n'"release $tpid"$'\n'"release-failed \
+$tpid rmdir: $p.lock: shim refused" ] \
+  && ok "a release whose rmdir fails is traced as release-failed with its error, still on stderr" \
+  || bad "lock trace release-failed" "stderr: $out, trace: $(cat "$d/tracefail.log" 2>&1)"
+rmdir "$p.lock" 2>/dev/null
+
+# A tick that dies holding the lock is released by its EXIT trap, which traces that too. A shim
+# mktemp fails, so the tick dies after taking the lock.
+shim="$d/shim-mktemp"
+mkdir "$shim"
+printf '%s\n' '#!/bin/sh' 'exit 1' > "$shim/mktemp"
+chmod 755 "$shim/mktemp"
+p="$d/tracedie.md"
+mkplan "$p" '- [ ] **Step 1.1: a**'
+PATH="$shim:$PATH" KEEL_PLAN_LOCK_TRACE="$d/tracedie.log" "$KEEL" plan tick "$p" 1.1 >/dev/null 2>&1
+rc=$?
+tpid="$(awk 'NR == 1 { print $2 }' "$d/tracedie.log" 2>/dev/null)"
+[ "$rc" -ne 0 ] && [ -n "$tpid" ] && [ ! -e "$p.lock" ] \
+  && [ "$(cat "$d/tracedie.log")" = "acquire $tpid"$'\n'"exit-released $tpid" ] \
+  && ok "a tick that dies holding the lock traces its EXIT trap's release" \
+  || bad "lock trace on exit" "rc=$rc, trace: $(cat "$d/tracedie.log" 2>&1)"
 
 # ---- tick: a failed write never costs the plan --------------------------------------------------
 

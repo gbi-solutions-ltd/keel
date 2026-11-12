@@ -9,6 +9,36 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- done-guard's regex fallback, for a command shlex cannot split, uses only the scoped prefixes
+  that can count, so `sh {script}` does not count `shellcheck 'x` and `./{script}` does not count
+  `./configure 'x`; a test pins `Run it` in a block reason that names `verify.test` alone.
+- done-guard's block reason names only scoped prefixes that can count, so `sh {script}` is not
+  offered as a test run, and a prefix that is only `./`, as in `./{script}`, counts nothing where
+  it counted every command; tests pin context-watch's refusal of a state directory symlinked to a
+  0700 one, an empty `TMPDIR` as `/tmp`, and done-guard's exact last word; the done-guard,
+  context-watch and `docs/05` text on quotes, the shortcut's mode check and an unset `HOME` is
+  corrected (audit W-09, W-11, W-12).
+- Wording: `tdd` says `review-code` runs the suite or quotes a qualifying plan-end checkpoint;
+  `review-code` reads the plans directory from `artifacts.plans`; the checkpoint offer defines an
+  open task as `keel plan status` counts it; the plan template calls `CHANGELOG.md`'s released
+  entries the records; `tests/test-run-tests.sh` wraps at 100 columns.
+- ADR-0011 gains an `Observed` entry: the 2026-11-12 speed sweep saw implementers not read
+  `tdd`'s step-detail reference despite its "read it before" sentence, Bernard kept the convention
+  the same day, and an eval arm showing the sentence makes no difference would reopen it.
+- `keel plan tick` refuses an id holding a newline as not one id, before taking the lock, and
+  changes nothing; `tests/run-tests.sh` makes the durations file's directory on every run.
+- context-watch keeps its state in `$TMPDIR/keel-context-watch-<euid>`, used only when it is a real
+  directory this user owns at mode 0700, with `${XDG_CACHE_HOME:-$HOME/.cache}/keel-context-watch`
+  as the fallback; the bash cached shortcut reads only the first, and only a cache file this user
+  owns that is not a symlink (audit W-08).
+- done-guard strips quote characters from a scoped prefix's words, so a hand-edited
+  `verify.test_one` such as `./gradlew test --tests '*{name}'` counts the command it describes; a
+  prefix cut at a space or a quote matches its last word exactly (`pytest` does not count
+  `pytest-watch`).
+- `keel plan tick` appends `acquire`, `release` and `released` (or `release-failed` with rmdir's
+  error, or `exit-released` from the EXIT trap) with its process id to the file
+  `KEEL_PLAN_LOCK_TRACE` names, and writes nothing when it is unset; the concurrent-ticks test sets
+  it and prints the trace when it fails.
 - `review-code` quotes a plan-end checkpoint only when `git cat-file -t <sha>` prints `tree` and
   `git diff --name-only <sha> HEAD` exits 0, so a fresh clone without the note's tree runs the
   suite. ADR-0017 records the amendment.

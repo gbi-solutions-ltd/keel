@@ -35,8 +35,8 @@
 #
 # ITS LIMIT, STATED RATHER THAN DISCOVERED. It matches the profile's test command as a substring of
 # a Bash command, so verify.test counts wherever it appears, even merely mentioned. The text of
-# verify.test_one or verify.test_affected before its first `{`, where that text is not empty, counts
-# only where a simple command begins with it once the command is read as a shell reads it: split
+# verify.test_one or verify.test_affected before its first `{`, quotes removed, where that text is
+# not empty, counts only where a simple command begins with it, read as a shell reads it: split
 # into words by Python's shlex, quotes removed, and into simple commands at `;`, `&&`, `||`, `|`,
 # `&`, `(`, `)`, a newline, and a `{`, `}`, `then`, `do` or `else` that begins one. Leading
 # `VAR=value`, `env`, `time`, `command`, and `bash` or `sh` before a path are dropped, and `./`, so
@@ -46,10 +46,10 @@
 # quote) falls back to a regular expression anchored at the start or after `;`, `&&`, `||`, `|`,
 # `(` or a newline, so the hook never errors on one. Tokenising does not see a run inside backticks,
 # reads from a word that starts with an unquoted `#` to the newline as a comment, and reads a
-# backslash-newline continuation as one word. A prefix has no word boundary, so the prefix `tests/`
-# counts `tests/evals/stage.sh` as a run. A changed directory or an alias goes unseen. This raises
-# the cost of claiming done without checking; it is not a proof that the suite passed. It cannot see
-# the exit code, and does not pretend to: `ship` is the gate that reads results.
+# backslash-newline continuation as one word. A prefix cut inside a word, as `tests/` is, counts
+# `tests/evals/stage.sh`; one cut at a space or quote ends in a whole word; a bare wrapper counts
+# nothing. A changed directory or an alias goes unseen. This raises the cost of claiming done
+# without checking and is no proof the suite passed: it cannot see an exit code; `ship` reads one.
 
 set -uo pipefail
 
@@ -140,8 +140,6 @@ if not test_cmd:
 # `tests/*.sh` is no run. An empty prefix would begin every command; a shared one is named once.
 scoped = list(dict.fromkeys(p for p in (str(verify.get(k) or "").split("{", 1)[0].strip()
                                         for k in ("test_affected", "test_one")) if p))
-# The anchored regex, kept for a command shlex cannot tokenise, so the hook never errors on one.
-fallback_marks = [r"(?:^|[;|(\n]|&&)\s*" + re.escape(p) for p in scoped]
 
 SEPARATORS = set(";&|()\n")
 KEYWORDS = ("{", "}", "then", "do", "else")
@@ -200,11 +198,28 @@ def leading(words):
         words = [words[0][2:]] + words[1:]
     return words
 
-prefix_words = [leading(p.split()) for p in scoped]
+# shlex strips the command's quotes, so the prefix's go too: a cut at `{` leaves `'*`, which shlex
+# refuses. Bare quotes count none. A quote just before `{` is dropped, so `bash -c '{cmd}'` counts
+# every `bash -c` command, and `pytest -k '{name}'` every `pytest -k`.
+# A prefix that is only a wrapper, as `sh {script}` is, names no test and counts nothing. Its last
+# word is matched as a start only where the text before `{` ends inside a word, as `tests/{name}`
+# does; after a space or a quote that word is complete, so `pytest` does not count `pytest-watch`.
+def prefix(head):
+    words = [w for w in leading(re.sub("['\"]", "", head).split()) if w]  # A lone `./` leaves "".
+    if len(words) == 1 and words[0] in ("bash", "sh", "env", "time", "command"):
+        words = []
+    return words, head[-1:] not in ("", " ", "\t", "'", '"')
 
-def begins(words, pw):
-    return (len(words) >= len(pw) and words[:len(pw) - 1] == pw[:-1]
-            and words[len(pw) - 1].startswith(pw[-1]))
+prefix_words = [prefix(str(verify.get(k) or "").split("{", 1)[0])
+                for k in ("test_affected", "test_one")]
+# The anchored regex, for a command shlex cannot tokenise, built from the prefixes that can count.
+fallback_marks = [r"(?:^|[;|(\n]|&&)\s*" + re.escape(p) for p in scoped if prefix(p)[0]]
+
+def begins(words, pw, open_end):
+    n = len(pw)
+    if len(words) < n or words[:n - 1] != pw[:-1]:
+        return False
+    return words[n - 1].startswith(pw[-1]) if open_end else words[n - 1] == pw[-1]
 
 def is_run(cmd):
     if test_cmd in cmd:
@@ -213,7 +228,7 @@ def is_run(cmd):
         cmds = simple_commands(cmd)
     except (ValueError, AttributeError):  # an unbalanced quote, or a shlex without _pushback_chars
         return any(re.search(m, cmd) for m in fallback_marks)
-    return any(begins(leading(w), pw) for w in cmds for pw in prefix_words if pw)
+    return any(begins(leading(w), pw, e) for w in cmds for pw, e in prefix_words if pw)
 
 docs_root = (prof.get("docs_root") or "docs").rstrip("/")
 
@@ -391,14 +406,14 @@ shown = ", ".join(uniq[:5]) + (" and %d more" % (len(uniq) - 5) if len(uniq) > 5
 # statement of what happened. Until 2026-09-05 both carried the instruction, which meant warn mode
 # told the user to go and run a command, in the voice of an order aimed at somebody else. warn is
 # what `keel init` writes by default, so that was the text most repositories actually saw.
-# A checkpointed implementer is satisfied by a scoped run, so the text names one beside the suite.
-cmds = "`%s`" % test_cmd + "".join(" or a command beginning `%s`" % p for p in scoped)
+named = [p for p in scoped if prefix(p)[0]]  # A scoped run satisfies, so each that counts is named.
+cmds = "`%s`" % test_cmd + "".join(" or a command beginning `%s`" % p for p in named)
 where = "%s edited %d file(s) including %s and never ran %s" % (who, len(uniq), shown, cmds)
 
 if mode == "required":
     block("%s. Run %s and report what it printed before ending the turn. If the work is "
           "genuinely incomplete, say what remains instead of ending on it."
-          % (where, "one" if scoped else "it"))
+          % (where, "one" if named else "it"))
 warn("%s. The turn was allowed to end because gates.done_verified is `warn`; set it to `required` "
      "to stop on this instead." % where)
 PY

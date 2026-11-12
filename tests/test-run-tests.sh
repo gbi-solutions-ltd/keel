@@ -5,8 +5,8 @@
 #
 # Every case drives the runner over stub files through KEEL_TEST_FILES, so the real suite never runs
 # inside itself, and either sets KEEL_TEST_DURATIONS to a temporary path or runs a temp copy of the
-# runner, so the repository's own .keel/test-durations is never read or written here. No case asserts wall time: the suite runs this
-# file beside others, so only counts and order are stable.
+# runner, so the repository's own .keel/test-durations is never read or written here. No case
+# asserts wall time: the suite runs this file beside others, so only counts and order are stable.
 set -uo pipefail; . "$(dirname "${BASH_SOURCE[0]}")/grep-quiet.sh"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT" || exit 1
@@ -21,9 +21,10 @@ expect() {
 TMP="$(mktemp -d)"; [ -d "$TMP" ] || { echo "$0: mktemp -d failed" >&2; kill $$; exit 1; }
 trap 'rm -rf "$TMP"' EXIT
 
-# stub <path> <body>: a test file that runs <body> and exits 0. It is run once with an argument, which
-# exits before the body, because macOS takes about half a second over the first exec of a new file:
-# unwarmed, four stubs started that far apart and never ran four at once even with four jobs free.
+# stub <path> <body>: a test file that runs <body> and exits 0. It is run once with an argument,
+# which exits before the body, because macOS takes about half a second over the first exec of a new
+# file: unwarmed, four stubs started that far apart and never ran four at once even with four jobs
+# free.
 stub() {
   printf '#!/usr/bin/env bash\n[ $# -gt 0 ] && exit 0\n%s\nexit 0\n' "$2" > "$1"
   chmod +x "$1"
@@ -35,14 +36,15 @@ stub() {
 d="$TMP/order"; mkdir "$d"
 for s in a b c; do stub "$d/$s.sh" "echo $s >> '$d/started'; sleep 0.2"; done
 printf '1 %s\n5 %s\n' "$d/a.sh" "$d/b.sh" > "$d/durations"
-out=$(KEEL_TEST_FILES="$d/a.sh $d/b.sh $d/c.sh" KEEL_TEST_JOBS=1 KEEL_TEST_DURATIONS="$d/durations" \
-  tests/run-tests.sh 2>&1)
+out=$(KEEL_TEST_FILES="$d/a.sh $d/b.sh $d/c.sh" KEEL_TEST_JOBS=1 \
+  KEEL_TEST_DURATIONS="$d/durations" tests/run-tests.sh 2>&1)
 rc=$?
 expect "longest-first: the run passes" "$rc" "0"
 expect "longest-first: an unrecorded file starts first, then the longest recorded" \
   "$(tr '\n' ' ' < "$d/started")" "c b a "
 expect "longest-first: each log is replayed in run order" \
-  "$(printf '%s\n' "$out" | sed -n 's/^== \([^ ]*\) .*/\1/p' | tr '\n' ' ')" "$d/c.sh $d/b.sh $d/a.sh "
+  "$(printf '%s\n' "$out" | sed -n 's/^== \([^ ]*\) .*/\1/p' | tr '\n' ' ')" \
+  "$d/c.sh $d/b.sh $d/a.sh "
 for s in a b c; do
   if grep -qE "^[0-9]+ $d/$s\.sh\$" "$d/durations"; then
     ok "longest-first: the durations file holds a line for $s.sh"
@@ -50,7 +52,8 @@ for s in a b c; do
     bad "longest-first: the durations file holds a line for $s.sh" "$(cat "$d/durations")"
   fi
 done
-if grep -qE '^total [0-9]+$' "$d/durations"; then ok "longest-first: the durations file holds a total line"
+if grep -qE '^total [0-9]+$' "$d/durations"; then
+  ok "longest-first: the durations file holds a total line"
 else bad "longest-first: the durations file holds a total line" "$(cat "$d/durations")"; fi
 
 # 2. KEEL_TEST_FILES skips the lint job.
@@ -62,10 +65,11 @@ else ok "KEEL_TEST_FILES: no lint job runs"; fi
 # peak <jobs>: the largest count any of four such stubs records under KEEL_TEST_JOBS=<jobs>, then
 # the runner's exit code and anything it said about an integer.
 peak() {
-  local w="$TMP/jobs-$1" s files=""
+  local w="$TMP/jobs-$1" s files="" body
   mkdir -p "$w/live"
   for s in 1 2 3 4; do
-    stub "$w/s$s.sh" "touch '$w/live/$s'; ls '$w/live' | wc -l | tr -d ' ' >> '$w/counts'; sleep 1; rm -f '$w/live/$s'"
+    body="touch '$w/live/$s'; ls '$w/live' | wc -l | tr -d ' ' >> '$w/counts'"
+    stub "$w/s$s.sh" "$body; sleep 1; rm -f '$w/live/$s'"
     files="$files $w/s$s.sh"
   done
   local rc=0
@@ -107,13 +111,14 @@ cp tests/run-tests.sh "$r/tests/"
 printf '7 tests/test-a.sh\ntotal 7\n' > "$r/.keel/test-durations"
 cp "$r/.keel/test-durations" "$TMP/durations-before"
 stub "$r/one.sh" ":"
-env -u KEEL_TEST_DURATIONS KEEL_TEST_FILES="$r/one.sh" "$r/tests/run-tests.sh" > "$TMP/partial-out" 2>&1
+env -u KEEL_TEST_DURATIONS KEEL_TEST_FILES="$r/one.sh" "$r/tests/run-tests.sh" \
+  > "$TMP/partial-out" 2>&1
 expect "partial run: the runner passes" "$?" "0"
+name="partial run: KEEL_TEST_FILES without KEEL_TEST_DURATIONS leaves the durations file unchanged"
 if cmp -s "$TMP/durations-before" "$r/.keel/test-durations"; then
-  ok "partial run: KEEL_TEST_FILES without KEEL_TEST_DURATIONS leaves the durations file unchanged"
+  ok "$name"
 else
-  bad "partial run: KEEL_TEST_FILES without KEEL_TEST_DURATIONS leaves the durations file unchanged" \
-    "$(cat "$r/.keel/test-durations")"
+  bad "$name" "$(cat "$r/.keel/test-durations")"
 fi
 
 # 6. The snapshot's development setup states the order and job count, not a fixed duration.

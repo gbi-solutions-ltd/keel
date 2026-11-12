@@ -16,7 +16,7 @@ together, never whether the cases asserting new behaviour were watched failing.
 ## Unit boundary: run the tests
 
 One `verify.test_affected` run is enough at the boundary because it runs what the unit could have
-broken, and `review-code` and `ship` still run the suite.
+broken. `review-code` runs the suite or quotes a qualifying plan-end checkpoint; `ship` always does.
 
 ## Exceptions, stated out loud
 

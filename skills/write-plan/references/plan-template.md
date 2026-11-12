@@ -60,9 +60,9 @@ Where the project has a citation validator, the constraints tell implementers: r
 citations it flags, and do not look for shifted citations in records. keel's own validator,
 `tests/validate-citations.sh`, counts as records `docs/plans`, `docs/prd`, `docs/stories`,
 `docs/architecture`, `docs/decisions`, `docs/audits`, `docs/ideas`, `docs/07-open-decisions.md`,
-`docs/harness-support.md`, the eval fixtures and `CHANGELOG.md`. On the 2026-11-11 run the open
-instruction to fix shifted citations caused most repairs outside a task's Files, in 11 of 13 tasks:
-each agent hunted through records the validator deliberately leaves alone.
+`docs/harness-support.md`, the eval fixtures and the released entries of `CHANGELOG.md`. On the
+2026-11-11 run the open instruction to fix shifted citations caused most repairs outside a task's
+Files, in 11 of 13 tasks: each agent hunted through records the validator deliberately leaves alone.
 
 **The routing line** takes `inherit` or `keel-implementer`, and the person approving the plan can
 change it before `execute-plan` runs. `keel-implementer` fits where every task has a `Done when:`
@@ -84,7 +84,8 @@ suite, run twice per task, took 22% of the wall clock, and one run every few tas
 far back a break can hide. A plan with no such line runs its steps as written, so its build steps
 name `verify.test`, or `verify.test_affected` where set, as the boundary run. `execute-plan` offers
 such a plan checkpoints when it has 3 or more open tasks, and on a yes rewrites those steps to the
-checkpoint form below.
+checkpoint form below. An open task has a step not done, deferred or not applicable, as
+`keel plan status` counts it.
 
 **The commits that ask line** names each task that stages a `hard_block_paths` path, with those
 paths, or says `none`. `hooks/sensitive-guard` asks the person at each such commit, and only the
@@ -187,11 +188,11 @@ for. A change lands with the live documents it makes wrong, and an implementer r
 task. Live documents say what is true now: every document that is not a record. In keel they are
 `README.md` and the other root documents, `docs/NN-*.md`, `docs/runbooks/`, `skills/`, `agents/`,
 `templates/` (`templates/profile.schema.json` among them), the generated `docs/profile-keys.md`
-and the other files directly under `docs/`. Records are not
-searched: the ones the citation paragraph under "Global constraints" names (`docs/plans`,
-`docs/ideas`, `docs/prd`, `docs/stories`, `docs/architecture`, `docs/decisions`, `docs/audits`,
-`docs/07-open-decisions.md`, `docs/harness-support.md`, the eval fixtures) and the `CHANGELOG.md`
-entries already released. Where the two lists overlap, the file is a record.
+and the other files directly under `docs/`. Records are not searched: the ones the citation
+paragraph under "Global constraints" names (`docs/plans`, `docs/ideas`, `docs/prd`, `docs/stories`,
+`docs/architecture`, `docs/decisions`, `docs/audits`, `docs/07-open-decisions.md`,
+`docs/harness-support.md`, the eval fixtures) and the released entries of `CHANGELOG.md`; each
+task's line goes under `## Unreleased`. Where the two lists overlap, the file is a record.
 
 It costs the measured resumes: on the 2026-11-11 run, 4 of 13 tasks stopped because their Files
 missed a document the change made wrong, about 30 minutes.

@@ -71,8 +71,15 @@ if [ "$fast" = 1 ]; then
     # pattern, and a JSON-escaped one arrives as text holding a backslash.
     case "$session" in *'/'*|*\\*|*'..'*) session="" ;; esac
 
-    cache="${TMPDIR:-/tmp}/keel-context-watch/${session:-nosession}.measure"
-    if [ -f "$cache" ]; then
+    # The cache is read only from the per-user TMPDIR directory, and only when that is a real
+    # directory this user owns. -O alone is true for a symlink to a directory we own, so -L rules
+    # it out. Unlike _private_dir, this does not test for mode 0700: a looser directory still serves
+    # only a cache file this user owns that is not a symlink (-f, ! -L, -O). A low reading allows
+    # only what python would; anything else, the XDG_CACHE_HOME fallback too, goes to python.
+    sdir="${TMPDIR:-/tmp}/keel-context-watch-$EUID"
+    cache="$sdir/${session:-nosession}.measure"
+    if [ -d "$sdir" ] && [ ! -L "$sdir" ] && [ -O "$sdir" ] \
+        && [ -f "$cache" ] && [ ! -L "$cache" ] && [ -O "$cache" ]; then
         # The same "ts tok win" line lib/context_watch.py's _cached_measure writes. Anything that
         # does not read as three plain integers is treated as no cache at all.
         read -r ts tok win < "$cache" 2>/dev/null
