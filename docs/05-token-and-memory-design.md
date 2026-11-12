@@ -348,8 +348,9 @@ or private to the user, so nobody else can rename or replace the directory after
 euid is predictable, so on a shared `/tmp` another local user can make the name first, as a
 directory of their own or a symlink, and wait for the watchdog to write through it. Running without
 state is no answer to that: with no stop marker, `PreCompact` writes the mechanical render over the
-session's own handoff and a plan run loses its `next:` line. A fallback path that is not absolute,
-as when no `HOME` leaves a literal `~`, is skipped. Only when both directories fail does the
+session's own handoff and a plan run loses its `next:` line. An unset `HOME` falls back to the
+home directory from the user database; only a fallback that still does not resolve to an absolute
+path, as for a user with no entry there, is skipped. Only when both directories fail does the
 watchdog run without state files. The cached shortcut in bash reads only the `$TMPDIR` location,
 and only when it is a real directory this user owns (`-d`, not `-L`, and `-O`) and the cache file in
 it is a regular file this user owns, held to the same test; anything else falls through to python.

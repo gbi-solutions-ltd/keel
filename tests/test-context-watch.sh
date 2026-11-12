@@ -1103,6 +1103,43 @@ grep -q 'context_watch.py hook' "$work/pyshim/calls" \
   && ok "the cached shortcut does not read from a state directory planted as a symlink" \
   || bad "private state" "no python call was recorded, so bash answered from the planted directory"
 rm -rf "$work/tp" "$work/planted" "$work/xdg-planted" "$work/pyshim"
+# The shortcut's -O test on the cache file is not pinned by a case: failing it needs a file owned by
+# another user, which only root can make, and this suite does not run as root.
+
+# A symlink to a directory that passes every other check, ours and at 0700, is still refused, so
+# the test is on the link and not on what it points at. Both are made under umask 077, so the link
+# itself reads as 0700 where link modes follow the umask, as on macOS, and only the type check
+# refuses it.
+mkdir -p "$tp"
+(umask 077; mkdir "$work/target0700" && ln -s "$work/target0700" "$tp/keel-context-watch-$EUID")
+sess="linked-$$"
+TMPDIR="$tp" XDG_CACHE_HOME="$work/xdg-linked/cache" \
+  fire PreToolUse "$work/quiet.jsonl" "$work" Bash "$sess" >/dev/null
+rc=$?
+[ "$rc" -eq 0 ] && [ -z "$(ls -A "$work/target0700")" ] \
+  && [ -f "$work/xdg-linked/cache/keel-context-watch/$sess.measure" ] \
+  && ok "a state directory that is a symlink to a 0700 directory of ours is refused" \
+  || bad "private state" "exit $rc; in the target: $(ls -A "$work/target0700")"
+rm -rf "$work/tp" "$work/target0700" "$work/xdg-linked"
+
+# An empty TMPDIR means /tmp, as an unset one does, and never the current directory. The state for
+# this case lands in the real /tmp, so only its own session file is removed afterwards, and the
+# directory too when that leaves it empty.
+mkdir -p "$work/scratch"
+sess="emptytmp-$$"
+(cd "$work/scratch" && TMPDIR="" XDG_CACHE_HOME="$work/xdg-empty/cache" \
+  fire PreToolUse "$work/quiet.jsonl" "$work" Bash "$sess" >/dev/null)
+rc=$?
+stored=no
+[ -f "/tmp/keel-context-watch-$EUID/$sess.measure" ] && stored=tmp
+[ -f "$work/xdg-empty/cache/keel-context-watch/$sess.measure" ] && stored=xdg
+rm -f "/tmp/keel-context-watch-$EUID/$sess.measure"
+rmdir "/tmp/keel-context-watch-$EUID" 2>/dev/null
+[ "$rc" -eq 0 ] && [ "$stored" != no ] && [ -z "$(ls -A "$work/scratch")" ] \
+  && ok "an empty TMPDIR puts the state under /tmp, not in the current directory" \
+  || bad "private state" \
+       "exit $rc; measure stored: $stored; in the current directory: $(ls -A "$work/scratch")"
+rm -rf "$work/scratch" "$work/xdg-empty"
 
 rm -rf "$work"
 printf '\n%s passed, %s failed\n' "$pass" "$fail"

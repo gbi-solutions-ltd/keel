@@ -497,7 +497,7 @@ re-review.
 `tests/test-validate-citations.sh`, `tests/test-harness-claims.sh` and `tests/test-profile-keys.sh`
 pass, and `grep -c 'never looser' hooks/done-guard` prints `0`.
 
-- [ ] **Step 7.1: Build it test first**
+- [x] **Step 7.1: Build it test first** Note: reds quoted: symlink-to-0700 (lstat and S_ISDIR mutants), empty TMPDIR mutant, open_end mutant, wrapper-only block message; round 2 fixed a pre-existing fail-open (a ./{script} prefix matched every command, reds 99/2) and tightened the empty-TMPDIR case; spec COMPLIES, quality nothing blocking; done-guard 101/0, context-watch 131/0; -O on the cache file recorded untestable without root; ~/.cache untouched
 
 Follow `keel:tdd`. Behaviours 1 to 3 pin code that is already right: write each case, prove it with
 the named mutant in a throwaway worktree or copy (with `TMPDIR` and `XDG_CACHE_HOME` set to temp
@@ -508,7 +508,7 @@ runs the plan-end checkpoint after this task.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 7.2: Hand over**
+- [x] **Step 7.2: Hand over** Note: rounds: 2; routing: inherit; loop: full; suite: pass at tree a97876d
 
 ```bash
 git add lib/context_watch.py hooks/context-watch hooks/done-guard templates/profile.schema.json \

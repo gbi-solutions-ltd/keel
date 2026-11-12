@@ -72,10 +72,10 @@ if [ "$fast" = 1 ]; then
     case "$session" in *'/'*|*\\*|*'..'*) session="" ;; esac
 
     # The cache is read only from the per-user TMPDIR directory, and only when that is a real
-    # directory this user owns, the check _private_dir makes in lib/context_watch.py. -O alone is
-    # true for a symlink to a directory we own, so -L rules the symlink out. The cache file is held
-    # to the same test, since a directory that was ever loose may hold a symlink someone planted.
-    # Anything else, including the XDG_CACHE_HOME fallback, falls through to python.
+    # directory this user owns. -O alone is true for a symlink to a directory we own, so -L rules
+    # it out. Unlike _private_dir, this does not test for mode 0700: the cache file must also pass
+    # -f, ! -L and -O, which no other user can arrange, and a low reading only allows what python
+    # would. Anything else, including the XDG_CACHE_HOME fallback, falls through to python.
     sdir="${TMPDIR:-/tmp}/keel-context-watch-$EUID"
     cache="$sdir/${session:-nosession}.measure"
     if [ -d "$sdir" ] && [ ! -L "$sdir" ] && [ -O "$sdir" ] \

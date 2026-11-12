@@ -200,13 +200,14 @@ def leading(words):
         words = [words[0][2:]] + words[1:]
     return words
 
-# shlex strips the command's quotes, so the prefix's go too, by hand: a cut at `{` leaves `'*`,
-# which shlex refuses. That is stricter (a quoted space), never looser; bare quotes count none.
+# shlex strips the command's quotes, so the prefix's go too: a cut at `{` leaves `'*`, which shlex
+# refuses. Bare quotes count none. It loosens any quote just before `{`, which once matched nothing:
+# `bash -c '{cmd}'` now counts every `bash -c` command, and `pytest -k '{name}'` every `pytest -k`.
 # A prefix that is only a wrapper, as `sh {script}` is, names no test and counts nothing. Its last
 # word is matched as a start only where the text before `{` ends inside a word, as `tests/{name}`
 # does; after a space or a quote that word is complete, so `pytest` does not count `pytest-watch`.
 def prefix(head):
-    words = leading(re.sub("['\"]", "", head).split())
+    words = [w for w in leading(re.sub("['\"]", "", head).split()) if w]  # A lone `./` leaves "".
     if len(words) == 1 and words[0] in ("bash", "sh", "env", "time", "command"):
         words = []
     return words, head[-1:] not in ("", " ", "\t", "'", '"')
@@ -405,14 +406,14 @@ shown = ", ".join(uniq[:5]) + (" and %d more" % (len(uniq) - 5) if len(uniq) > 5
 # statement of what happened. Until 2026-09-05 both carried the instruction, which meant warn mode
 # told the user to go and run a command, in the voice of an order aimed at somebody else. warn is
 # what `keel init` writes by default, so that was the text most repositories actually saw.
-# A checkpointed implementer is satisfied by a scoped run, so the text names one beside the suite.
-cmds = "`%s`" % test_cmd + "".join(" or a command beginning `%s`" % p for p in scoped)
+named = [p for p in scoped if prefix(p)[0]]  # A scoped run satisfies, so each that counts is named.
+cmds = "`%s`" % test_cmd + "".join(" or a command beginning `%s`" % p for p in named)
 where = "%s edited %d file(s) including %s and never ran %s" % (who, len(uniq), shown, cmds)
 
 if mode == "required":
     block("%s. Run %s and report what it printed before ending the turn. If the work is "
           "genuinely incomplete, say what remains instead of ending on it."
-          % (where, "one" if scoped else "it"))
+          % (where, "one" if named else "it"))
 warn("%s. The turn was allowed to end because gates.done_verified is `warn`; set it to `required` "
      "to stop on this instead." % where)
 PY

@@ -391,8 +391,8 @@ def _state_dir():
 
     With no state there is no stop marker, and PreCompact renders over the session's own handoff,
     so a directory that fails the check falls back to a second private one, not to no state. An
-    empty TMPDIR or XDG_CACHE_HOME counts as unset; a fallback that is not absolute (no HOME leaves
-    a literal `~`) names no fixed place and is skipped.
+    empty TMPDIR or XDG_CACHE_HOME counts as unset. With no HOME, `~` is the user database's home;
+    a fallback still not absolute (a uid with no entry) names no fixed place and is skipped.
     """
     tmp = os.path.join(os.environ.get("TMPDIR") or "/tmp", "keel-context-watch-%d" % os.geteuid())
     cache = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")

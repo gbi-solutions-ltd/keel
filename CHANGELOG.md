@@ -9,6 +9,12 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- done-guard's block reason names only scoped prefixes that can count, so `sh {script}` is not
+  offered as a test run, and a prefix that is only `./`, as in `./{script}`, counts nothing where
+  it counted every command; tests pin context-watch's refusal of a state directory symlinked to a
+  0700 one, an empty `TMPDIR` as `/tmp`, and done-guard's exact last word; the done-guard,
+  context-watch and `docs/05` text on quotes, the shortcut's mode check and an unset `HOME` is
+  corrected (audit W-09, W-11, W-12).
 - Wording: `tdd` says `review-code` runs the suite or quotes a qualifying plan-end checkpoint;
   `review-code` reads the plans directory from `artifacts.plans`; the checkpoint offer defines an
   open task as `keel plan status` counts it; the plan template calls `CHANGELOG.md`'s released
@@ -23,7 +29,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
   as the fallback; the bash cached shortcut reads only the first, and only a cache file this user
   owns that is not a symlink (audit W-08).
 - done-guard strips quote characters from a scoped prefix's words, so a hand-edited
-  `verify.test_one` such as `./gradlew test --tests '*{name}'` counts the command it describes.
+  `verify.test_one` such as `./gradlew test --tests '*{name}'` counts the command it describes; a
+  prefix cut at a space or a quote matches its last word exactly (`pytest` does not count
+  `pytest-watch`).
 - `keel plan tick` appends `acquire`, `release` and `released` (or `release-failed` with rmdir's
   error, or `exit-released` from the EXIT trap) with its process id to the file
   `KEEL_PLAN_LOCK_TRACE` names, and writes nothing when it is unset; the concurrent-ticks test sets

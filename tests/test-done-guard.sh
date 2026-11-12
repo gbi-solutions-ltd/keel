@@ -651,6 +651,28 @@ quote_case block "sh '{script}'" "shellcheck x"
 quote_case block "sh '{script}'" "sh -c ls"
 quote_case block "bash \"{script}\"" "bashtop"
 quote_case block "sh {script}" "shellcheck x"
+quote_case block "pytest {name}" "pytest-watch"
+# A prefix of `./` alone leaves an empty word once `./` is dropped, and an empty word begins every
+# command, so it must count nothing, as an empty prefix does. `./tests/{name}` counts with or
+# without the `./`.
+quote_case block "./{script}" "ls -la"
+quote_case block "sh ./{script}" "echo hi"
+quote_case quiet "./tests/{name}" "./tests/x.sh"
+quote_case quiet "./tests/{name}" "tests/x.sh"
+
+# The block reason names only prefixes that can count. One that is only a wrapper names no test, so
+# naming it would send the reader to a command the hook then ignores.
+root_wrap="$tmp/wrap-reason"
+fixture "$root_wrap" '"done_verified": "required"' '"tests/run-tests.sh", "test_one": "sh {script}"'
+{ row_user "go"; row_edit "$root_wrap/lib/foo.sh" ""; row_cmd "echo hi"; } > "$root_wrap/t.jsonl"
+out="$(send "$root_wrap" "$root_wrap/t.jsonl" Stop)"
+what="the block reason does not name a wrapper-only prefix"
+if printf '%s' "$out" | grep -q '"decision": *"block"' \
+    && ! printf '%s' "$out" | grep -qF "beginning \`sh\`"; then
+    printf '  PASS  %s\n' "$what"; pass=$((pass+1))
+else
+    printf '  FAIL  %s (got: %s)\n' "$what" "$out"; fail=$((fail+1))
+fi
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
