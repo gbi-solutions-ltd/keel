@@ -361,7 +361,7 @@ no further re-review.
 `tests/test-validate-citations.sh` and `tests/test-harness-claims.sh` pass, and the grep in
 behaviour 4 prints nothing.
 
-- [ ] **Step 4.1: Build it test first**
+- [x] **Step 4.1: Build it test first** Note: B1 red (start >= 0 mutant) and B2 red (old slice, ratio 13.4) witnessed by the implementer, B1 reproduced by the spec reviewer; test written double-quoted, the plan's single-quoted form trips SC1003; spec COMPLIES, quality 1 should-fix (timing comment wording) applied by the coordinator; routing inherit; loop full; implementer ran run-tests.sh green after its last code change
 
 Follow `keel:tdd`. Behaviour 1 pins code that is already right: write its case, prove it by making
 the `start >= 0` mutant in a copy of the hook, watching the case go red and restoring the hook.
@@ -374,7 +374,7 @@ Run: `tests/run-tests.sh` and the lint command.
 Expected: PASS, or reds this task did not cause, each named. This is the one boundary run the task
 schedules.
 
-- [ ] **Step 4.2: Hand over**
+- [x] **Step 4.2: Hand over** Note: staged by the implementer; coordinator restaged the comment fix
 
 ```bash
 git add hooks/done-guard CHANGELOG.md tests/test-done-guard.sh tests/test-context-watch.sh

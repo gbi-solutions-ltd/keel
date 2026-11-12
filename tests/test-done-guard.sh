@@ -560,13 +560,15 @@ else
     printf '  FAIL  %s (no git call recorded, out=%s)\n' "a Stop with an edit runs git" "${out:0:80}"; fail=$((fail+1))
 fi
 
-# ---- the cases the review found unpinned ---------------------------------------------
+# ---- escapes, comments, the superproject and a long command --------------------------
 #
-# Each of these pins one line of the hook that could be deleted with the suite staying green.
 # A backslash before a punctuation token makes it a word, so it separates nothing.
 shell_case block 'echo \; tests/x.sh'
 # A `#` inside quotes is a word, so it begins no comment and the run after the `;` counts.
 shell_case quiet "echo '#'; tests/x.sh"
+# A token at the start of the command has nothing before it to escape it, so a backslash at the
+# command's end is never read as one: the `#` begins a comment, and the run inside it is no run.
+shell_case block "#; tests/x.sh a\\\\"
 
 # An edit in the superproject, made from a submodule's cwd, is in the repository: the submodule's
 # own top level and worktree list both stop at the submodule, so only the superproject names it.
@@ -586,10 +588,10 @@ else
     printf '  FAIL  %s\n' "the submodule fixture was not built"; fail=$((fail+1))
 fi
 
-# Telling a bare token from a quoted one is linear in the command. A slice of the command per token
-# made a 440 KB heredoc take 3.7 s. A fixed time limit fails a correct hook on a slow runner and
-# passes a quadratic one on a fast machine, so the case times a heredoc of N lines and one of 2N
-# and asserts on how the time grows: linear doubles it, quadratic quadruples it, and 3 sits between.
+# Telling a bare token from a quoted one is linear in the command. A fixed time limit fails a
+# correct hook on a slow runner and passes a quadratic one on a fast machine, so the case times a
+# heredoc of N lines and one of 4N and asserts on how the time grows: linear gives at most 4,
+# quadratic at most 16 (fixed costs pull both lower, about 13 measured), and 8 sits between.
 # Each row is written by python, since one argument that size is over Linux's per-argument limit.
 heredoc_run() {   # heredoc_run <lines> <transcript>; prints the seconds, the output goes to <transcript>.out
     { row_user "go"; row_edit "$begins/lib/foo.sh" ""; } > "$2"
@@ -602,14 +604,14 @@ print(json.dumps({"type":"assistant","message":{"role":"assistant","content":[{"
     t1="$(python3 -c 'import time; print(time.time())')"
     python3 -c 'import sys; print("%.3f" % (float(sys.argv[2]) - float(sys.argv[1])))' "$t0" "$t1"
 }
-small="$(heredoc_run 63000 "$begins/big1.jsonl")"
-expect "a 440 KB heredoc followed by a run is judged a run" quiet "$(cat "$begins/big1.jsonl.out")"
-large="$(heredoc_run 126000 "$begins/big2.jsonl")"
-expect "an 880 KB heredoc followed by a run is judged a run" quiet "$(cat "$begins/big2.jsonl.out")"
-if python3 -c 'import sys; sys.exit(float(sys.argv[2]) >= 3 * float(sys.argv[1]))' "$small" "$large"; then
-    printf '  PASS  %s\n' "doubling the command less than triples the time ($small s, $large s)"; pass=$((pass+1))
+small="$(heredoc_run 40000 "$begins/big1.jsonl")"
+expect "a 280 KB heredoc followed by a run is judged a run" quiet "$(cat "$begins/big1.jsonl.out")"
+large="$(heredoc_run 160000 "$begins/big2.jsonl")"
+expect "a 1.1 MB heredoc followed by a run is judged a run" quiet "$(cat "$begins/big2.jsonl.out")"
+if python3 -c 'import sys; sys.exit(float(sys.argv[2]) >= 8 * float(sys.argv[1]))' "$small" "$large"; then
+    printf '  PASS  %s\n' "four times the command takes under eight times as long ($small s, $large s)"; pass=$((pass+1))
 else
-    printf '  FAIL  %s (took %s s, then %s s)\n' "doubling the command less than triples the time" "$small" "$large"; fail=$((fail+1))
+    printf '  FAIL  %s (took %s s, then %s s)\n' "four times the command takes under eight times as long" "$small" "$large"; fail=$((fail+1))
 fi
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"

@@ -9,6 +9,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- `hooks/done-guard`'s bare check drops two guards that could never fire; tests pin that a token
+  at the start of a command is never read as escaped, and time a heredoc of N lines against one
+  of 4N, asserting the time grows less than eightfold.
 - `hooks/done-guard` tells a bare token from a quoted one by indices into the command rather than
   a slice per token, so a 440 KB command is judged in linear time; the context-watch stop text
   asks for no `session:` line when the event carries no session id; tests pin the session id

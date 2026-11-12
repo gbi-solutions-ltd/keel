@@ -900,7 +900,7 @@ case "$err" in *'keel context-watch'*'stop marker'*)
   || bad "stuck marker" "PreCompact exited $rc"
 rm -f "$statedir/$sess.stop" "$statedir/$sess.measure" "$work/.keel/handoff.md"
 
-# --- the cases the review found unpinned ------------------------------------------------------------
+# --- the cached shortcut's session id rule, and a stop with no session id ---------------------------
 #
 # The cached shortcut in hooks/context-watch applies the session id rule in bash. A fresh, low
 # measurement planted where `../../victim` reaches would let that shortcut answer from a file the
