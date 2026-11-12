@@ -54,6 +54,8 @@ task 6's two files, plus `$EUID`, an empty `TMPDIR`, portable mode checks and th
 failure line. All folded in.
 **Approved:** by Bernard, 2026-11-12: routing `inherit`, delivered to a pull request, with the
 decisions above as written.
+**Task 7 added:** 2026-11-12, from `review-code` on 68fcc8f..3454f62 (five surviving mutants) and
+the security audit's comment and doc leads, as `review-code` step 5 sends blocking findings back.
 **Shape:** behaviours with examples.
 
 ## Global constraints
@@ -433,3 +435,88 @@ git status --porcelain
 
 Stage exactly those paths and stop. **Do not commit.** The coordinator commits after the review
 pass, with `git commit -m "docs(skills): small follow-up wording"`.
+
+---
+
+### Task 7: review fix, pin the state-directory and prefix rules
+
+**Story:** `review-code` on 68fcc8f..3454f62 (2026-11-12): five surviving mutants on
+`hard_block_paths` (Blocking) and should-fix items; the security audit
+`docs/audits/2026-11-12-security-follow-ups-after-pr-12.md` (no findings; leads W-09, W-11 and W-12
+are wrong comments or docs). `review-code` step 5 sends blocking findings back before its one
+re-review.
+**Files:**
+- Modify: `lib/context_watch.py` (comments only, if any)
+- Modify: `hooks/context-watch` (comment only)
+- Modify: `hooks/done-guard`
+- Modify: `templates/profile.schema.json`
+- Modify: `docs/profile-keys.md`
+- Modify: `docs/05-token-and-memory-design.md`
+- Modify: `CHANGELOG.md`
+- Test: `tests/test-context-watch.sh`
+- Test: `tests/test-done-guard.sh`
+
+**Depends on:** task 6
+
+**Behaviours:**
+
+1. A state directory that is a symlink to a 0700 directory this user owns is refused, and nothing
+   is written in the target. Example: `(umask 077; mkdir target)` and
+   `ln -s target "<TMPDIR>/keel-context-watch-$EUID"`, then a `Bash` PreToolUse event writes
+   `<sid>.measure` under `<XDG_CACHE_HOME>/keel-context-watch` and leaves `target` empty. Mutating
+   `os.lstat` to `os.stat`, or dropping the `S_ISDIR` test, in `_private_dir` turns it red.
+2. An empty `TMPDIR` means `/tmp`, not the current directory. Example: from a scratch directory,
+   a `Bash` PreToolUse event with `TMPDIR=""` (and a nested `XDG_CACHE_HOME`) creates no
+   `keel-context-watch-*` in the scratch directory. Mutating `get("TMPDIR") or "/tmp"` to
+   `get("TMPDIR", "/tmp")` turns it red.
+3. A scoped prefix cut at a space matches its last word exactly. Example:
+   `quote_case block "pytest {name}" "pytest-watch"`; making `open_end` always true turns it red.
+4. The block message names only prefixes that can count: a prefix that is empty or only a wrapper
+   after `prefix()` is left out of it. Example: with `verify.test_one` `sh {script}`, the block
+   reason does not contain `beginning \`sh\``.
+5. The `-O "$cache"` check in `hooks/context-watch` cannot be exercised without a file owned by
+   another user, which a non-root test cannot make; the test file says so in one comment beside
+   the shortcut cases, rather than leaving the line silently unpinned. Example: the comment names
+   `-O` and root.
+6. Text that is wrong now says what is true:
+   - the `CHANGELOG.md` done-guard line, the `gates.done_verified` description in
+     `templates/profile.schema.json` and the regenerated `docs/profile-keys.md` state that a prefix
+     cut at a space or quote matches its last word exactly (`pytest` does not count
+     `pytest-watch`);
+   - the comment beside the quote strip in `hooks/done-guard` no longer says "never looser": a
+     prefix such as `bash -c '{cmd}'` counts commands it counted none of before (audit W-09);
+   - `hooks/context-watch`'s shortcut comment says it does not test the directory's mode and why
+     that is safe (`! -L` and `-O` on the cache file) (audit W-12);
+   - `docs/05-token-and-memory-design.md` says an unset `HOME` falls back to the home directory
+     from the user database, and only a home that still does not resolve to an absolute path skips
+     the fallback (audit W-11).
+   Example: `grep -c 'never looser' hooks/done-guard` prints `0`, and the schema description
+   contains `pytest-watch`.
+
+**Done when:** `tests/test-context-watch.sh`, `tests/test-done-guard.sh`,
+`tests/test-validate-citations.sh`, `tests/test-harness-claims.sh` and `tests/test-profile-keys.sh`
+pass, and `grep -c 'never looser' hooks/done-guard` prints `0`.
+
+- [ ] **Step 7.1: Build it test first**
+
+Follow `keel:tdd`. Behaviours 1 to 3 pin code that is already right: write each case, prove it with
+the named mutant in a throwaway worktree or copy (with `TMPDIR` and `XDG_CACHE_HOME` set to temp
+paths, never the real `~/.cache`), and quote the red. Behaviour 4 is new: its case fails first.
+Behaviours 5 and 6 are text.
+Run: the `Done when:` commands and the lint command. Run no `tests/run-tests.sh`: the coordinator
+runs the plan-end checkpoint after this task.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+This is the one boundary run the task schedules.
+
+- [ ] **Step 7.2: Hand over**
+
+```bash
+git add lib/context_watch.py hooks/context-watch hooks/done-guard templates/profile.schema.json \
+        docs/profile-keys.md docs/05-token-and-memory-design.md CHANGELOG.md \
+        tests/test-context-watch.sh tests/test-done-guard.sh
+git status --porcelain
+```
+
+Stage exactly the paths you changed among those, and any flagged citation repairs by name, and
+stop. **Do not commit.** The coordinator commits after both review passes, with
+`git commit -m "fix(watchdogs): pin the state-directory and prefix rules"`.
