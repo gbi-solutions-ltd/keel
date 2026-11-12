@@ -7,6 +7,7 @@
 | Deciders | Bernard Tebandeke, accepted 2026-11-11 |
 | Requirements | none; driver is item 1 of [`docs/ideas/plan-execution-speed.md`](../ideas/plan-execution-speed.md), "the suite runs twice per task" |
 | Supersedes | none; amends [ADR-0006](ADR-0006-the-tdd-cycle-unit-is-a-behavioural-unit.md) and [ADR-0009](ADR-0009-the-unit-boundary-may-run-the-affected-tests.md), for a unit run under `execute-plan` with a checkpoint line only |
+| Amended by | its own [Amended](#amended) section, 2026-11-12 |
 
 ## Context
 
@@ -117,3 +118,28 @@ dispatched past an unexplained checkpoint red, or if the wall clock per task doe
 project whose suite dominated it.
 
 Not checked on the day of this decision: no plan has run with a checkpoint line yet.
+
+## Amended
+
+**2026-11-12, decided by Bernard Tebandeke: the checkpoint note names the tree it ran on, and
+`review-code` quotes the plan-end checkpoint in place of its own run on the same tree.** Item 6 of
+[`docs/ideas/plan-execution-speed-2.md`](../ideas/plan-execution-speed-2.md). The coordinator runs
+`git write-tree` with the task staged, before the tick, and the note ends
+`suite: pass at tree <tree sha>` or `suite: red at tree <tree sha> <names>`. It names a tree, not a
+commit, because the suite runs before task and plan are committed together, so no commit the note
+could name is HEAD.
+
+`review-code` runs no suite of its own when the plan's last ticked step carries
+`suite: pass at tree <sha>`, `git diff --name-only <sha> HEAD` names nothing outside
+`docs/plans/`, and `git status --porcelain` prints nothing; it quotes that note as the suite result
+instead. HEAD then differs from the checked tree only under `docs/plans/`, where the tick lands,
+so a second run would check nothing new. This removes one of the three suite runs on the final
+commit (the plan-end checkpoint, `review-code` and `ship`). `ship` is unchanged and still runs its
+own, so the final commit keeps an independent run besides the checkpoint, and CI and a declared
+batch's join gate are unchanged.
+
+This changes two sentences above, which stand as written for the day they were decided:
+"`review-code`, `ship`, CI and a declared batch's join gate are unchanged" under Decision, and
+"`review-code`, `ship` and CI keep running the whole suite" under Consequences. Under a plan run,
+`review-code` now keeps running it except on the plan-end checkpoint's tree. The note formats under
+"At a checkpoint task the order is fixed" gain `at tree <tree sha>` the same way.

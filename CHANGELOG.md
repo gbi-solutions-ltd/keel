@@ -9,6 +9,10 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- A plan-run checkpoint note names the tree it ran on (`suite: pass at tree <sha>`, from
+  `git write-tree` before the tick), and `review-code` quotes the plan-end note in place of its own
+  suite run when HEAD differs from that tree only under `docs/plans/` and the working tree is
+  clean; `ship` still runs its own. ADR-0017 records the amendment.
 - The execute-plan spec and quality review prompts tell reviewers not to run `verify.test` or
   the lint command; the spec reviewer re-runs the task's `Done when:` commands and quotes the
   report's output for the rest.

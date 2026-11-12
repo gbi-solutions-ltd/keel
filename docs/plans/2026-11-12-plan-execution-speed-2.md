@@ -456,7 +456,7 @@ checked by a reader against the diff and by the greps in `Done when:`.
 `tests/test-doc-claims.sh` pass, and `grep -c 'suite: pass at tree' skills/review-code/SKILL.md`
 prints at least `1`.
 
-- [ ] **Step 5.1: Make the change and check it**
+- [x] **Step 5.1: Make the change and check it** Note: No-test task; examples checked by the spec reviewer against the diff and Done when (validate-skills 134/0, validate-citations 64/0, doc-claims 65/0, grep 1); review-code body 592 before and after, a reason sentence moved to rationale.md (coordinator accepted); round 2 fixed rubric-pass.md's stale suite wording; reviewer confirmed git diff takes a tree sha; follow-ups: tdd rationale.md:19 wording, rule hardcodes docs/plans not artifacts.plans
 
 Edit as the behaviours say.
 Run: the `Done when:` commands and the lint command. Run no `tests/run-tests.sh`: the plan header
@@ -464,7 +464,7 @@ names suite checkpoints.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 5.2: Hand over**
+- [x] **Step 5.2: Hand over** Note: rounds: 2; routing: inherit; loop: light
 
 ```bash
 git add skills/review-code/SKILL.md skills/review-code/references/rationale.md \

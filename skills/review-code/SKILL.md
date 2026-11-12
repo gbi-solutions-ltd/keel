@@ -38,7 +38,8 @@ Either way, run step 3.
 
 ## Step 3: The pass that only we can do
 
-Run `profile.verify.test` yourself first.
+Run `profile.verify.test` yourself, or quote a qualifying
+[`suite: pass at tree`](references/rationale.md) note.
 
 **Find the sensitive files before dispatching.** Run the command in
 [../security-audit/references/sensitive-match.md](../security-audit/references/sensitive-match.md)
@@ -52,8 +53,8 @@ subagent as it says, with model `inherit` and a description starting `inherit: `
 the rubric, the sensitive files and six checks a generic reviewer lacks: the diff matches the plan,
 every changed line traces to the request, the tests came first, no accepted decision is
 contradicted, a test was proved able to fail, and every changed decision line on a sensitive path
-was mutated. A dispatch without them reviews none of these. Where step 2's plugin ran, both stand:
-it is the correctness pass, and this one settles a conflict.
+was mutated. Where step 2's plugin ran, both stand: it is the correctness pass, and this one
+settles a conflict.
 
 ## Step 4: Rank, and say what blocks
 

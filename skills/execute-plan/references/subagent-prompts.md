@@ -376,14 +376,16 @@ it. The record is yours because you are the one agent that sees every task.
 **At a checkpoint task the order is fixed:**
 
 1. Its review passes, as "Running the loop" says.
-2. Run `verify.test` on the tree with the task staged.
-3. Tick its last step once, the note ending `; suite: pass`, or `; suite: red <names>` with each red
-   matched against the record, for example `rounds: 1; routing: inherit; loop: full; suite: pass`.
+2. Run `verify.test` on the tree with the task staged, then `git write-tree` for that tree's sha.
+3. Tick its last step once, the note ending `; suite: pass at tree <tree sha>`, or
+   `; suite: red at tree <tree sha> <names>` with each red matched against the record, for example
+   `rounds: 1; routing: inherit; loop: full; suite: pass at tree 3f9a1c2`.
 4. Commit task and plan together, as for any task.
 
 So the suite result is in the one tick, no re-tick replaces the note, and the tree is clean before
 the next dispatch. Running the suite before the tick, not after the commit, keeps a red out of a
-commit whose note says nothing of it.
+commit whose note says nothing of it. The note names a tree, not a commit, because task and plan
+are committed after the run, so no commit it could name is HEAD.
 
 **A red not on the previous record stops the run before that tick.** Run `keel:debug` through
 Phase 3, naming as candidates the staged task and every task committed since the previous
@@ -391,13 +393,16 @@ checkpoint: a red at the task-6 checkpoint names tasks 4, 5 and 6. An earlier ta
 have hidden the break, so naming the staged task alone sends `debug` to the wrong diff.
 
 - If the staged task caused it, it is a rejection of that task, handled as the loop handles one.
-- If an earlier task did, tick and commit the staged task with `suite: red <names>`, and send
-  Phase 4 to a fresh implementer as a task appended to the plan, in the full loop, before any
-  further dispatch. The earlier task is already committed, so the fix can only be a new commit, and
-  dispatching past a known red would let later tasks build on it.
+- If an earlier task did, tick and commit the staged task with
+  `suite: red at tree <tree sha> <names>`, and send Phase 4 to a fresh implementer as a task
+  appended to the plan, in the full loop, before any further dispatch. The earlier task is already
+  committed, so the fix can only be a new commit, and dispatching past a known red would let later
+  tasks build on it.
 
-`review-code`, `ship`, CI and a declared batch's join gate still run the whole suite, and remain
-the backstop for what a checkpoint has not yet seen.
+`ship`, CI and a declared batch's join gate still run the whole suite, and remain the backstop for
+what a checkpoint has not yet seen. `review-code` does too, except that it quotes the plan-end
+`suite: pass at tree` note in place of its own run when HEAD differs from that tree only under
+`docs/plans/` and the working tree is clean, as its `references/rationale.md` says.
 
 ## Which model each prompt goes to
 
