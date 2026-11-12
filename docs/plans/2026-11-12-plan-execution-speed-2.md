@@ -60,7 +60,8 @@ a commit can never be HEAD; task 1's red run would recurse through the runner), 
 items on wrapped greps, the records the validator flags, task 1's test isolation and its timing
 case, a usage line in `docs/03-install-and-distribution.md`, and ship's quoting. All folded in.
 **Approved:** by Bernard, 2026-11-12: routing `inherit`, onto PR #12's branch, with the decisions
-above as written.
+above as written. Task 3b added and approved the same day, after a test fixture committed into the
+working repository at task 3's checkpoint.
 **Shape:** behaviours with examples.
 
 ## Global constraints
@@ -286,7 +287,7 @@ it).
 **Done when:** `tests/test-validate-citations.sh`, `tests/test-profile-keys.sh` and
 `tests/test-harness-claims.sh` pass, and `tests/validate-citations.sh` exits 0.
 
-- [ ] **Step 3.1: Build it test first**
+- [x] **Step 3.1: Build it test first** Note: red 62/2 quoted; 14 live citations converted to phrases; behaviour 4 added by coordinator plan note; round 2 reflows and wording (quality), plus a grep-quiet red the first checkpoint found; round 3 removed a tests/evals mention the checkpoint's eval-harness case caught; first checkpoint run hit a full disk, during which a test fixture committed the staged task as 'init' into this repo (undone with git reset --soft; task 3b added)
 
 Follow `keel:tdd`. Write behaviour 1's cases in `tests/test-validate-citations.sh` first.
 Run: `tests/test-validate-citations.sh`
@@ -300,7 +301,7 @@ Run: the lint command. With the `Done when:` run above, that is the unit boundar
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 3.2: Hand over**
+- [x] **Step 3.2: Hand over** Note: rounds: 3; routing: inherit; loop: full; suite: pass
 
 ```bash
 git add tests/validate-citations.sh tests/test-validate-citations.sh templates/profile.schema.json \
@@ -314,6 +315,68 @@ passes, with `git commit -m "fix(citations): done-guard and context_watch are ho
 
 ---
 
+### Task 3b: a test fixture never runs in the working repository
+
+**Story:** none; found on 2026-11-12 at task 3's checkpoint. With the disk full, a `mktemp -d` in a
+test returned nothing, a fixture's `git commit -m init` ran in this repository, and it committed
+the staged task as `init` under the person's identity, past review and past sensitive-guard (which
+sees tool calls, not what a test runs). The coordinator undid it with `git reset --soft`. Bernard
+approved this task on 2026-11-12.
+**Files:**
+- Modify: `tests/keel-test-lib.sh`
+- Modify: every `tests/*.sh` file whose `mktemp -d` result is used unchecked (35 files at
+  44aacb1; `grep -n 'mktemp -d' tests/*.sh` lists them)
+- Modify: `CHANGELOG.md`
+- Test: `tests/test-grep-quiet.sh` (or a new `tests/test-fixture-safety.sh`, added to the runner's
+  list, if the rule fits there less well)
+
+**Depends on:** task 3
+
+**Behaviours:**
+
+1. No test file uses a `mktemp -d` result without checking it: each either goes through one shared
+   helper in `tests/keel-test-lib.sh` that exits the test file non-zero with a message naming
+   `mktemp` when the call fails or returns something that is not an existing directory, or checks
+   the result inline the same way. A test asserts the rule over `tests/*.sh`, as
+   `tests/test-grep-quiet.sh` asserts its own. Example: a fixture file holding
+   `d="$(mktemp -d)"` and no check fails the rule, naming the file and line; the repository passes.
+2. With `mktemp` failing, a test file stops before any git command runs, and the working repository
+   gains no commit. Example: running `tests/test-done-guard.sh` with a `mktemp` shim first on `PATH`
+   that prints nothing and exits 1 exits non-zero naming `mktemp`, and `git rev-parse HEAD` in this
+   repository is unchanged afterwards. Run it from a throwaway clone, not the working tree, so a
+   failure of the guard cannot repeat the incident.
+3. The report names which fixture made the `init` commit at the checkpoint, from the files whose
+   `git commit -m init` runs in a directory taken from an unchecked `mktemp -d`. Example: the report
+   names the file and line.
+
+**Done when:** the rule's test file passes, and behaviour 2's run exits non-zero with HEAD
+unchanged.
+
+- [ ] **Step 3b.1: Build it test first**
+
+Follow `keel:tdd`. Write behaviour 1's rule first and run it: it fails, naming the unchecked calls.
+Then add the helper and convert each call, keeping each file's behaviour otherwise unchanged.
+Run: the rule's test file, then behaviour 2's run from a throwaway clone.
+Expected before the implementation: FAIL, the rule names the unchecked calls. Expected after:
+PASS. Quote the failing output.
+
+Run: the lint command. With the `Done when:` run above, that is the unit boundary. Run no
+`tests/run-tests.sh`: the plan header names suite checkpoints.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+This is the one boundary run the task schedules.
+
+- [ ] **Step 3b.2: Hand over**
+
+```bash
+git add tests/keel-test-lib.sh CHANGELOG.md <each converted tests/*.sh file, by name>
+git status --porcelain
+```
+
+Stage exactly those paths, by name, and stop. **Do not commit.** The coordinator commits after both
+review passes, with `git commit -m "fix(tests): a fixture never runs in the working repository"`.
+
+---
+
 ### Task 4: reviewers keep to the scoped re-run
 
 **Story:** idea record item 1
@@ -321,7 +384,7 @@ passes, with `git commit -m "fix(citations): done-guard and context_watch are ho
 - Modify: `skills/execute-plan/references/subagent-prompts.md`
 - Modify: `CHANGELOG.md`
 
-**Depends on:** task 3
+**Depends on:** task 3b
 
 **Behaviours:** this task changes prompt text and has no failing test; each example is checked by
 a reader against the diff and by the greps in `Done when:`.

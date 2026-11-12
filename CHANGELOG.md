@@ -9,6 +9,12 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- `hooks/done-guard` and `lib/context_watch.py` are hot files to `tests/validate-citations.sh`:
+  a live document cites them by phrase, and every live line citation into them is now a phrase
+  citation (records still cite them by line); the plan template says to repair flagged
+  citations and not hunt records for shifted ones;
+  `lib/harness/capabilities` records that context-watch requires `pretooluse_agent_type` and
+  `pretooluse_agent_id`.
 - `tests/run-tests.sh` starts files longest-first by the durations it records in the git-ignored
   `.keel/test-durations`, runs `KEEL_TEST_JOBS` jobs or one per CPU up to 8, and says when a run
   takes over twice the last; `KEEL_TEST_FILES` and `KEEL_TEST_DURATIONS` let

@@ -55,6 +55,14 @@ these.
 Copy the constraints in full rather than linking. A task executed by a fresh agent that reads
 only its own section must still obey them.
 
+Where the project has a citation validator, the constraints tell implementers: repair the
+citations it flags, and do not look for shifted citations in records. keel's own validator,
+`tests/validate-citations.sh`, counts as records `docs/plans`, `docs/prd`, `docs/stories`,
+`docs/architecture`, `docs/decisions`, `docs/audits`, `docs/ideas`, `docs/07-open-decisions.md`,
+`docs/harness-support.md`, the eval fixtures and `CHANGELOG.md`. On the 2026-11-11 run the open
+instruction to fix shifted citations caused most repairs outside a task's Files, in 11 of 13 tasks:
+each agent hunted through records the validator deliberately leaves alone.
+
 **The routing line** takes `inherit` or `keel-implementer`, and the person approving the plan can
 change it before `execute-plan` runs. `keel-implementer` fits where every task has a `Done when:`
 command and concrete behaviours. A plan with any task touching `hard_block_paths` names `inherit`,

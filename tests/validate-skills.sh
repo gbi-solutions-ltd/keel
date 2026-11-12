@@ -895,15 +895,15 @@ fi
 # tree before this rule was chosen. It flagged 25 of 61 keys and 7 of the 25 are genuinely read:
 # artifacts.stories, .architecture, .decisions and .plans through the `get('artifacts',{})` map
 # iteration in cmd_doctor, gates.context_warn_pct and .context_stop_pct through
-# lib/context_watch.py:386-397, and conventions.default_branch through the sed in the pre-push hook
-# body that `keel guard install` writes.
+# `lib/context_watch.py#def _thresholds(profile):`, and conventions.default_branch through the sed
+# in the pre-push hook body that `keel guard install` writes.
 # 28% false positives, against docs/standards.md's rule that a check is never stricter than correct
 # output. It under-reports too: gates.done_verified is read as (prof.get("gates") or
-# {}).get("done_verified") at hooks/done-guard:130 and the dotted string appears in that file only
-# in comments. Bare leaf names rescue nothing: `name` occurs 337 times in this tree and `test` 484,
-# so all 22 dead keys would have passed. The two bin/keel reads above are named by phrase and not
-# by line, because a line inserted anywhere earlier in that file moves them and nothing goes red
-# when it does, which is this rule's known limit.
+# {}).get("done_verified") at `hooks/done-guard#get("done_verified") or "off"` and the dotted
+# string appears in that file only in comments. Bare leaf names rescue nothing: `name` occurs 337
+# times in this tree and `test` 484, so all 22 dead keys would have passed. The two bin/keel reads
+# above are named by phrase and not by line, because a line inserted anywhere earlier in that file
+# moves them and nothing goes red when it does, which is this rule's known limit.
 #
 # So the key declares its reader and this checks the citation, the way lib/harness/capabilities
 # declares a primitive and its source. Its rule is the one that applies here: absent evidence fails,

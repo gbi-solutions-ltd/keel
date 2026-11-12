@@ -267,6 +267,39 @@ for hot_part in 2 3 4 5; do
     run "a line-number citation into tests/test-keel-$hot_part.sh from a live document is rejected" 1 m_hot_line_in_keel_part
 done
 
+# hooks/done-guard and lib/context_watch.py shift in most tasks of a plan, and the citations into
+# them by line were most of the repairs a task made outside its Files. A live document citing one
+# by line fails, naming the hot-file rule rather than any other; the same line in a record passes.
+hot_file_body() { printf '#!/usr/bin/env bash\n# A comment.\n# Another.\n# A third.\necho hi\n'; }
+m_hot_line_in_live_doc_named() {
+    mkdir -p "$1/hooks" "$1/lib"
+    hot_file_body > "$1/$hot_file"
+    printf 'The guard does it at `%s:5`.\n' "$hot_file" >> "$1/README.md"
+}
+m_hot_line_in_idea_named() {
+    mkdir -p "$1/hooks" "$1/lib"
+    hot_file_body > "$1/$hot_file"
+    printf 'The guard did it at `%s:5` on 2026-11-12.\n' "$hot_file" >> "$1/docs/ideas/example.md"
+}
+run_hot_named() {
+    local name="$1" root out
+    root="$(mktemp -d)"
+    fixture_valid "$root"
+    m_hot_line_in_live_doc_named "$root"
+    out="$(cd "$root" && "$CHECKER" 2>&1)"
+    case "$out" in
+        *"$hot_file changes often enough that a line number there is stale"*)
+            printf '  PASS  %s\n' "$name"; pass=$((pass+1)) ;;
+        *)
+            printf '  FAIL  %s (no hot-file failure in: %s)\n' "$name" "$out"; fail=$((fail+1)) ;;
+    esac
+    rm -rf "$root"
+}
+for hot_file in hooks/done-guard lib/context_watch.py; do
+    run_hot_named "a line-number citation into $hot_file from a live document fails on the hot-file rule"
+    run "a line-number citation into $hot_file from docs/ideas/ is left alone" 0 m_hot_line_in_idea_named
+done
+
 # Case 6j. The phrase form in a double-backtick code span, which is how a phrase holding a backtick
 # has to be written, and how docs/snapshot.md writes every citation in its tables. The single
 # backtick pattern never matched it, so a citation of this shape went stale with nothing reporting
