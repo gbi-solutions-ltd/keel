@@ -192,3 +192,22 @@ restore. Re-run each pruned body's arm when its body or its `step-detail.md` cha
 
 If the next relief anyone proposes is a higher number, the dominant force has won again and this
 ADR needs superseding with a different kind of remedy, not amending with a larger figure.
+
+## Observed
+
+**2026-11-12, decided by Bernard Tebandeke: the "read it before" sentence stays the convention,
+though implementers were seen not to read `tdd`'s step-detail reference with it in place.** Item 8
+of [`docs/ideas/plan-execution-speed-2.md`](../ideas/plan-execution-speed-2.md), the second speed
+sweep, lists "the tdd lines telling an implementer to read a reference none read". The run that
+sweep measured is the 13-task execution of `docs/plans/2026-11-11-faster-plan-execution.md` on the
+installed keel 0.27.0: one run, not an eval arm, so it is an observation, not a rate.
+
+Bernard decided the same day to keep the convention. The plan note on task 10 of
+`docs/plans/2026-11-12-plan-execution-speed-2.md` records it: ADR-0011 makes "read it before the
+step" the convention for step-detail links and relies on it, as does `CONTRIBUTING.md`, so the
+evidence is "a follow-up for a deliberate decision on ADR-0011", and `skills/tdd/SKILL.md` was left
+as it was. The decision and its status stand.
+
+What would reopen it: an eval arm showing the sentence makes no difference to whether the reference
+is read, such as `tdd`'s arm opening `step-detail.md` at its step no more often with the sentence
+than without it.

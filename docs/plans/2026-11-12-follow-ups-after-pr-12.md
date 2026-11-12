@@ -359,14 +359,14 @@ checked by a reader against the diff and by the commands in `Done when:`.
 **Done when:** `tests/test-doc-claims.sh` and `tests/test-validate-citations.sh` pass, and
 `grep -c 'plan-execution-speed-2' docs/decisions/ADR-0011*.md` prints at least `1`.
 
-- [ ] **Step 5.1: Make the change and check it**
+- [x] **Step 5.1: Make the change and check it** Note: No-test task; checked by the spec reviewer against the diff, the sources and Done when (doc-claims 65/0, validate-citations 64/0, grep 2); quotes verbatim, evidence stated as one run, status unchanged
 
 Edit as the behaviours say.
 Run: the `Done when:` commands and the lint command. Run no `tests/run-tests.sh`.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 5.2: Hand over**
+- [x] **Step 5.2: Hand over** Note: rounds: 1; routing: inherit; loop: light
 
 ```bash
 git add docs/decisions/ADR-0011-skill-bodies-hold-instructions-and-references-hold-the-rest.md \

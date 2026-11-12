@@ -9,6 +9,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- ADR-0011 gains an `Observed` entry: the 2026-11-12 speed sweep saw implementers not read
+  `tdd`'s step-detail reference despite its "read it before" sentence, Bernard kept the convention
+  the same day, and an eval arm showing the sentence makes no difference would reopen it.
 - `keel plan tick` refuses an id holding a newline as not one id, before taking the lock, and
   changes nothing; `tests/run-tests.sh` makes the durations file's directory on every run.
 - context-watch keeps its state in `$TMPDIR/keel-context-watch-<euid>`, used only when it is a real
