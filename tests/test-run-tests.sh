@@ -4,8 +4,8 @@
 # Plan: docs/plans/2026-11-12-plan-execution-speed-2.md, task 1.
 #
 # Every case drives the runner over stub files through KEEL_TEST_FILES, so the real suite never runs
-# inside itself, and sets KEEL_TEST_DURATIONS to a temporary path, so the repository's own
-# .keel/test-durations is never read or written here. No case asserts wall time: the suite runs this
+# inside itself, and either sets KEEL_TEST_DURATIONS to a temporary path or runs a temp copy of the
+# runner, so the repository's own .keel/test-durations is never read or written here. No case asserts wall time: the suite runs this
 # file beside others, so only counts and order are stable.
 set -uo pipefail; . "$(dirname "${BASH_SOURCE[0]}")/grep-quiet.sh"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -98,6 +98,23 @@ fi
 # 5. The durations file is git-ignored.
 if git check-ignore -q .keel/test-durations; then ok "durations file: git-ignored"
 else bad "durations file: git-ignored" "git check-ignore .keel/test-durations exited non-zero"; fi
+
+# 5b. A KEEL_TEST_FILES run with no KEEL_TEST_DURATIONS leaves the default durations file as it
+#     was: a partial run's durations would replace the whole suite's. The runner runs from a temp
+#     copy of its root, so the default path it writes to is that copy's, never this repository's.
+r="$TMP/root"; mkdir -p "$r/tests" "$r/.keel"
+cp tests/run-tests.sh "$r/tests/"
+printf '7 tests/test-a.sh\ntotal 7\n' > "$r/.keel/test-durations"
+cp "$r/.keel/test-durations" "$TMP/durations-before"
+stub "$r/one.sh" ":"
+env -u KEEL_TEST_DURATIONS KEEL_TEST_FILES="$r/one.sh" "$r/tests/run-tests.sh" > "$TMP/partial-out" 2>&1
+expect "partial run: the runner passes" "$?" "0"
+if cmp -s "$TMP/durations-before" "$r/.keel/test-durations"; then
+  ok "partial run: KEEL_TEST_FILES without KEEL_TEST_DURATIONS leaves the durations file unchanged"
+else
+  bad "partial run: KEEL_TEST_FILES without KEEL_TEST_DURATIONS leaves the durations file unchanged" \
+    "$(cat "$r/.keel/test-durations")"
+fi
 
 # 6. The snapshot's development setup states the order and job count, not a fixed duration.
 if grep -q 'about 6 minutes' docs/snapshot.md; then

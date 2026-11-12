@@ -15,17 +15,21 @@ cd "$(dirname "$0")/.." || exit 1
 # "against this repo" below, only read the tree and are safe alongside everything else. That
 # makes all of the jobs below independent, so they run in parallel rather than one after another.
 # The runner's one write into the tree is its own: .keel/test-durations, git-ignored, which records
-# each file's last duration so the next run can start the longest first.
+# each file's last duration so the next run can start the longest first. A KEEL_TEST_FILES run
+# writes it only when KEEL_TEST_DURATIONS names it.
 
 names=(); cmds=()
 add() { names+=("$1"); cmds+=("$2"); }
 
 # KEEL_TEST_FILES replaces the list below, and the lint job with it, so tests/test-run-tests.sh can
 # drive this runner over stub files without running the whole suite inside itself.
-# KEEL_TEST_DURATIONS moves the durations file for the same reason: the test never touches the real
-# one.
+# KEEL_TEST_DURATIONS moves the durations file for the same reason. Without it a KEEL_TEST_FILES run
+# reads the default file and leaves it as it was: a partial run's durations would replace the
+# whole suite's.
 DURATIONS="${KEEL_TEST_DURATIONS:-.keel/test-durations}"
+RECORD=1
 if [ -n "${KEEL_TEST_FILES:-}" ]; then
+    [ -n "${KEEL_TEST_DURATIONS:-}" ] || RECORD=0
     for f in $KEEL_TEST_FILES; do add "$f" "$f"; done
 else
 
@@ -150,9 +154,10 @@ wall=$(( $(date +%s) - run_start ))
 
 # The durations are rewritten for the next run, gathered while the logs replay and written once at
 # the end, so a run stopped during the jobs leaves the last record in place. This is the one file
-# the runner writes into the repository's tree.
+# the runner writes into the repository's tree, and a partial run with no KEEL_TEST_DURATIONS skips
+# the write.
 failed=0
-mkdir -p "$(dirname "$DURATIONS")"
+[ "$RECORD" -eq 0 ] || mkdir -p "$(dirname "$DURATIONS")"
 : > "$LOG_DIR/durations"
 for i in $order; do
     read -r rc elapsed < "$LOG_DIR/$i.meta"
@@ -162,7 +167,7 @@ for i in $order; do
     printf '%s %s\n' "$elapsed" "${names[$i]}" >> "$LOG_DIR/durations"
 done
 printf 'total %s\n' "$wall" >> "$LOG_DIR/durations"
-mv "$LOG_DIR/durations" "$DURATIONS"
+[ "$RECORD" -eq 0 ] || mv "$LOG_DIR/durations" "$DURATIONS"
 
 printf '\n'
 # A run over twice the last one usually means something new is slow, or the machine is busy.

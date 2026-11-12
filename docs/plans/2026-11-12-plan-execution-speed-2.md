@@ -806,7 +806,7 @@ blocking findings back to the author before its one re-review.
 `tests/test-run-tests.sh`, `tests/test-validate-skills.sh`, `tests/test-validate-citations.sh` and
 `tests/test-eval-harness.sh` pass.
 
-- [ ] **Step 11.1: Build it test first**
+- [x] **Step 11.1: Build it test first** Note: B1 three mutants red (117/1 each), B2 capabilities-row mutant red (99/1), B5 red before fix (16/1); B3 and B4 text checked by the spec reviewer; review-code body 592 to 580; spec COMPLIES; follow-ups: test-run-tests.sh header line 133 columns, ADR-0011 eval-arm re-run for a changed step-detail
 
 Follow `keel:tdd`. Behaviours 1 and 2 pin code that is already right: write each case, prove it by
 making the named mutant in a throwaway worktree or copy, watching the case go red and restoring.
@@ -817,7 +817,7 @@ runs the plan-end checkpoint again after this task.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 11.2: Hand over**
+- [x] **Step 11.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; suite: pass at tree 74fa675
 
 ```bash
 git add skills/review-code/SKILL.md skills/review-code/references/rationale.md \

@@ -9,6 +9,11 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- `review-code`'s conditions for quoting the plan-end checkpoint are in its new
+  `references/step-detail.md`; the coordinator runs a checkpoint's suite only when
+  `git status --porcelain` shows staged entries alone; a `KEEL_TEST_FILES` run with no
+  `KEEL_TEST_DURATIONS` leaves `.keel/test-durations` as it was; tests pin context-watch's
+  subagent check and its withholding without the PreToolUse agent fields.
 - The implementer prompt counts a GREEN run of exactly the `Done when:` commands, with no change
   after it, as the `Done when:` run, so it is not run a second time.
 - `keel plan tick` takes several ids, `keel plan tick <plan> <id> [<id> ...]`, ticking each under

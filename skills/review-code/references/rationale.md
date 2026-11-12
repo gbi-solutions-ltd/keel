@@ -24,17 +24,12 @@ The driver runs `profile.verify.test` itself because `keel:tdd` runs it once at 
 and may run only the affected tests, so review is where the suite result is established rather than
 inherited from an implementer.
 
-The one exception is a plan-end checkpoint on the same tree. Quote it as the suite result, and run
-nothing, when all three hold:
-
-- the plan's last ticked step carries a `suite: pass at tree <sha>` note;
-- `git diff --name-only <sha> HEAD` names nothing outside `docs/plans/`;
-- `git status --porcelain` prints nothing.
-
-Otherwise run `profile.verify.test`. The note names a tree, from `git write-tree` with the task
-staged before the tick, because the suite runs before task and plan are committed together, so no
-commit it could name is HEAD. When HEAD's tree differs from it only under `docs/plans/`, where the
-tick lands, the checkpoint ran on the code under review and a second run would check nothing new.
+The one exception is a plan-end checkpoint on the same tree, under the conditions in
+[step-detail.md](step-detail.md#step-3-the-pass-that-only-we-can-do). The note names a tree, from
+`git write-tree` with the task staged before the tick, because the suite runs before task and plan
+are committed together, so no commit it could name is HEAD. When HEAD's tree differs from it only
+under `docs/plans/`, where the tick lands, the checkpoint ran on the code under review and a second
+run would check nothing new.
 `ship` still runs its own, so the final commit keeps one independent run. Bernard decided this on
 2026-11-12; ADR-0017's `Amended` section records it.
 

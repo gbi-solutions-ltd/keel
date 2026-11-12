@@ -611,6 +611,18 @@ if [ -x "$GEN" ]; then
       && ok "a gate the manifest withholds is not registered" \
       || bad "a gate the manifest withholds is not registered" "done-guard still emitted $n time(s)"
 
+    # context-watch tells a subagent by the PreToolUse agent fields, as review-guard does, so a
+    # harness without them is not given it: it would hold every subagent to the stop.
+    n="$(KEEL_CAPABILITIES="$ROOT/lib/harness/capabilities" "$GEN" claude | grep -c 'context-watch' || true)"
+    [ "$n" -gt 0 ] || bad "the claude manifest carries context-watch" "absent"
+    cw_cap="$(mktemp)"
+    grep -v '^provides|claude|pretooluse_agent_id|' "$ROOT/lib/harness/capabilities" > "$cw_cap"
+    n="$(KEEL_CAPABILITIES="$cw_cap" "$GEN" claude | grep -c 'context-watch' || true)"
+    [ "$n" = 0 ] \
+      && ok "context-watch is withheld without the PreToolUse agent fields" \
+      || bad "context-watch is withheld without the PreToolUse agent fields" "still emitted $n time(s)"
+    rm -f "$cw_cap"
+
     # ...and the file it produces then is still a well-formed document, not one with a dangling
     # comma or an empty event array. An emitter that drops a group has to drop its event too.
     KEEL_CAPABILITIES="$cut_cap" "$GEN" claude | python3 -c '

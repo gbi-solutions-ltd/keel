@@ -980,6 +980,18 @@ out="$(printf '{"hook_event_name":"PreToolUse","transcript_path":"%s","cwd":"%s"
 case "$out" in *'"permissionDecision": "deny"'*)
     ok "an empty agent_id is not a subagent and is denied" ;;
   *) bad "subagent" "an empty agent_id was left alone: $out" ;; esac
+# Both fields must be non-empty strings: an empty agent_type, or either field a number, is the main
+# session. Each case fails if its part of the check in lib/context_watch.py is dropped.
+for c in 'empty-type|"agent_type":"","agent_id":"a1"|an empty agent_type' \
+         'num-type|"agent_type":1,"agent_id":"a1"|a numeric agent_type' \
+         'num-id|"agent_type":"general-purpose","agent_id":1|a numeric agent_id'; do
+    IFS='|' read -r tag fields what <<< "$c"
+    out="$(printf '{"hook_event_name":"PreToolUse","transcript_path":"%s","cwd":"%s","session_id":"%s","tool_name":"Bash",%s}' \
+      "$work/stop.jsonl" "$work" "$tag-$$" "$fields" | TMPDIR="$tz" "$HOOK" 2>/dev/null)"
+    case "$out" in *'"permissionDecision": "deny"'*)
+        ok "$what is not a subagent and is denied" ;;
+      *) bad "subagent" "$what was left alone: $out" ;; esac
+done
 rm -rf "$work/tz"
 
 rm -rf "$work"

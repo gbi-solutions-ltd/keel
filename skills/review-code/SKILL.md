@@ -38,14 +38,14 @@ Either way, run step 3.
 
 ## Step 3: The pass that only we can do
 
-Run `profile.verify.test` yourself, or quote a qualifying
-[`suite: pass at tree`](references/rationale.md) note.
+Run `profile.verify.test` yourself, or quote a qualifying `suite: pass at tree` note. Which note
+qualifies, and how to count sensitive files:
+[references/step-detail.md](references/step-detail.md#step-3-the-pass-that-only-we-can-do).
+Read it before this step.
 
 **Find the sensitive files before dispatching.** Run the command in
 [../security-audit/references/sensitive-match.md](../security-audit/references/sensitive-match.md)
-with the review's base and read the result by its rules. Where they make every changed file
-sensitive, or read the result as touching without naming paths, count every changed production
-file and say so in the report.
+with the review's base and read the result by its rules.
 
 **Dispatch this pass; do not run it inline.**
 Read [references/rubric-pass.md](references/rubric-pass.md) now, and brief a

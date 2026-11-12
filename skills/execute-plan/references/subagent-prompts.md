@@ -392,6 +392,9 @@ it. The record is yours because you are the one agent that sees every task.
 
 1. Its review passes, as "Running the loop" says.
 2. Run `verify.test` on the tree with the task staged, then `git write-tree` for that tree's sha.
+   Before the run, `git status --porcelain` shows only staged entries, no unstaged edit and no
+   untracked file; otherwise stage the task's remaining changes or stop before running it, so the
+   suite runs on the tree the note records.
 3. Tick its last step once, the note ending `; suite: pass at tree <tree sha>`, or
    `; suite: red at tree <tree sha> <names>` with each red matched against the record, for example
    `rounds: 1; routing: inherit; loop: full; suite: pass at tree 3f9a1c2`.
@@ -417,7 +420,7 @@ have hidden the break, so naming the staged task alone sends `debug` to the wron
 `ship`, CI and a declared batch's join gate still run the whole suite, and remain the backstop for
 what a checkpoint has not yet seen. `review-code` does too, except that it quotes the plan-end
 `suite: pass at tree` note in place of its own run when HEAD differs from that tree only under
-`docs/plans/` and the working tree is clean, as its `references/rationale.md` says.
+`docs/plans/` and the working tree is clean, as its `references/step-detail.md` says.
 
 ## Which model each prompt goes to
 
