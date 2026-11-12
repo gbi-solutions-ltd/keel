@@ -26,8 +26,8 @@ through one helper that refuses an unsafe id, marks the handoff it asks for with
 and touches the marker when it cannot remove it.
 **Implementer routing:** inherit
 **Delivery:** pull-request (onto PR #12's branch, `feat/faster-plan-execution`)
-**Concurrent batches:** none. Both tasks touch `hard_block_paths` and `CHANGELOG.md`.
-**Suite checkpoints:** none; two tasks, each runs its boundary as written.
+**Concurrent batches:** none. Every task touches `hard_block_paths` and `CHANGELOG.md`.
+**Suite checkpoints:** none; each task runs its boundary as written.
 **Decided:** in this plan, put to Bernard at approval:
 - A nested git repository that is neither a submodule nor a worktree of this one is a stated limit
   (W-01's first case): telling it from an unrelated repository would mean walking up the tree on
@@ -41,6 +41,8 @@ keep cases carry no `session:` line), and should-fix items on test setup (JSON e
 marker), `hooks/context-watch:74` and the documents the match rule appears in. All folded in.
 **Approved:** by Bernard, 2026-11-12: routing `inherit`, onto PR #12's branch, with the decisions
 above as written.
+**Task 3 added:** 2026-11-12, from the `review-code` re-review of tasks 1 and 2; Bernard approved
+fixing every finding as one task, routing `inherit`.
 **Shape:** behaviours with examples.
 
 ## Global constraints
@@ -240,3 +242,79 @@ git status --porcelain
 Stage exactly those paths, and any citation repairs by name, and stop. **Do not commit.** The
 coordinator commits after both review passes, with
 `git commit -m "fix(context-watch): own handoff, safe state paths, no stale marker"`.
+
+---
+
+### Task 3: review fix, pin the surviving mutants and tidy what the review found
+
+**Story:** the `review-code` rubric re-review of 37c5d43 and 417a1a3 on 2026-11-12: three surviving
+mutants (Blocking), one untested behaviour (Should fix), three Consider items. Bernard directed on
+2026-11-12 that all of them be fixed as one task.
+**Files:**
+- Modify: `hooks/done-guard`
+- Modify: `lib/context_watch.py`
+- Modify: `CHANGELOG.md`
+- Test: `tests/test-done-guard.sh`
+- Test: `tests/test-context-watch.sh`
+
+**Depends on:** tasks 1 and 2
+
+**Behaviours:**
+
+1. The bash session-id rule in `hooks/context-watch:72` is observed by a test. Example: with
+   `TMPDIR` nested for the case, a fresh low reading (`"$(date +%s) 1 200000"`) written to
+   `<state dir>/../../victim.measure` resolved inside that nested tree, no `nosession.measure`, and
+   a `python3` shim first on `PATH` that records each call and then runs the real one, a PreToolUse
+   `Edit` with `session_id` `../../victim` records a python call. Deleting the `case` line at `:72`
+   turns the case red (bash reads the planted file and exits before python runs). No production
+   change is expected.
+2. An escaped separator is not a separator. Example: `shell_case block 'echo \; tests/x.sh'`;
+   dropping the backslash clause at `hooks/done-guard:169` turns it red.
+3. A quoted `#` is not a comment. Example: `shell_case quiet "echo '#'; tests/x.sh"`; dropping
+   `bare and` at `hooks/done-guard:173` turns it red.
+4. An edit in the superproject, made from a submodule's `cwd`, is in the repository. Example: a
+   committed superproject with a submodule added (`git -c protocol.file.allow=always submodule add`),
+   `cwd` in the submodule, an `Edit` of `<super>/lib/foo.sh`, no test run, under `required`,
+   blocks; deleting the superproject line at `hooks/done-guard:238` turns it red.
+5. Telling a bare token from a quoted one costs time linear in the command, not quadratic. Example:
+   a Bash command of about 440 KB (a heredoc of repeated short lines) followed by `; tests/x.sh` is
+   judged a run, and the hook finishes in under 2 s (it took 3.7 s with the prefix slice at
+   `hooks/done-guard:168`). Compare characters at indices into `cmd` instead of slicing and
+   stripping a prefix per token; the existing quoted and escaped cases stay green.
+6. `CHANGELOG.md`'s older `## Unreleased` line (`CHANGELOG.md:28`), which says `PreCompact` writes
+   the stderr line whenever it cannot remove the marker, is reworded or merged so it agrees with
+   the newer entry: the line is written only when the touch fails too. Example: no line under
+   `## Unreleased` says the line is written on a failed removal alone.
+7. With no session id, the stop text does not ask for a `session:` line. Example: a stop fired with
+   `"session_id":""` under a nested `TMPDIR` produces text without `session: `; with an id, the
+   text still contains `session: <id>`.
+8. Any citation the edit shifts is repaired, wherever it lives (a citation in a plan under
+   `docs/plans/` is reported to the coordinator rather than edited). Example:
+   `tests/test-validate-citations.sh` and `tests/test-harness-claims.sh` pass.
+
+**Done when:** `tests/test-done-guard.sh`, `tests/test-context-watch.sh`,
+`tests/test-validate-citations.sh` and `tests/test-harness-claims.sh` pass.
+
+- [ ] **Step 3.1: Build it test first**
+
+Follow `keel:tdd`. Write cases for behaviours 1 to 5 and 7 after the existing cases.
+Run: `tests/test-done-guard.sh` and `tests/test-context-watch.sh`
+Expected before the implementation: behaviours 5 and 7 fail; behaviours 1 to 4 pin code that is
+already right, so each is proved instead by deleting the line it names, watching the case go red,
+and restoring the line. Quote each red in your report. Expected after: PASS.
+
+Run: `tests/run-tests.sh` and the lint command.
+Expected: PASS, or reds this task did not cause, each named. This is the one boundary run the task
+schedules.
+
+- [ ] **Step 3.2: Hand over**
+
+```bash
+git add hooks/done-guard lib/context_watch.py CHANGELOG.md tests/test-done-guard.sh \
+        tests/test-context-watch.sh
+git status --porcelain
+```
+
+Stage exactly those paths, and any citation repairs by name, and stop. **Do not commit.** The
+coordinator commits after both review passes, with
+`git commit -m "fix(watchdogs): pin the surviving mutants, linear token check"`.
