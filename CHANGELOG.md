@@ -9,6 +9,11 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- `hooks/done-guard` tells a bare token from a quoted one by indices into the command rather than
+  a slice per token, so a 440 KB command is judged in linear time; the context-watch stop text
+  asks for no `session:` line when the event carries no session id; tests pin the session id
+  rule in `hooks/context-watch`'s cached shortcut, an escaped separator, a quoted `#` and an
+  edit in the superproject made from a submodule's `cwd`.
 - The context-watch stop text asks for a `session: <id>` line in the handoff, and `PreCompact`
   keeps a handoff only when it is newer than the stop marker and carries this session's line; a
   marker it cannot remove has its mtime set to now, and only a failed touch writes the stderr line;
@@ -25,7 +30,7 @@ Entries are terse by design; the narrative for each release is in this file's gi
   its output.
 - The context-watch stop text says a plan run resumes after compaction from
   `keel plan status <plan>`, the handoff's `next:` line recording only where it stood at the stop;
-  `PreCompact` writes a line to stderr naming a stop marker it cannot remove, and still exits 0.
+  `PreCompact` still exits 0 when it cannot remove the stop marker.
 - `hooks/done-guard` ignores an edit whose path resolves outside every checkout of the repository
   (git's top level for the event's `cwd`, each worktree and the superproject), and runs git only
   when the turn edited something. It counts as a test run a Bash command containing `verify.test`,

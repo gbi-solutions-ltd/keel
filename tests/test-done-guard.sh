@@ -560,5 +560,57 @@ else
     printf '  FAIL  %s (no git call recorded, out=%s)\n' "a Stop with an edit runs git" "${out:0:80}"; fail=$((fail+1))
 fi
 
+# ---- the cases the review found unpinned ---------------------------------------------
+#
+# Each of these pins one line of the hook that could be deleted with the suite staying green.
+# A backslash before a punctuation token makes it a word, so it separates nothing.
+shell_case block 'echo \; tests/x.sh'
+# A `#` inside quotes is a word, so it begins no comment and the run after the `;` counts.
+shell_case quiet "echo '#'; tests/x.sh"
+
+# An edit in the superproject, made from a submodule's cwd, is in the repository: the submodule's
+# own top level and worktree list both stop at the submodule, so only the superproject names it.
+sup="$tmp/super"
+fixture "$sup" '"done_verified": "required"' '"tests/run-tests.sh"'
+( mkdir -p "$tmp/sub-src" && cd "$tmp/sub-src" && git init -q -b main . \
+  && git -c user.email=t@t.t -c user.name=t commit -q --allow-empty -m init ) >/dev/null 2>&1
+( cd "$sup" && git init -q -b main . && git config user.email t@t.t && git config user.name t \
+  && git add .keel/profile.json \
+  && git -c protocol.file.allow=always submodule add -q "$tmp/sub-src" sub \
+  && git commit -q -m init ) >/dev/null 2>&1
+{ row_user "go"; row_edit "$sup/lib/foo.sh" ""; } > "$tmp/super-edit.jsonl"
+if [ -d "$sup/sub" ] && [ -e "$sup/sub/.git" ]; then
+    expect "from a submodule's cwd, an edit in the superproject with no test run blocks" block \
+        "$(send "$sup/sub" "$tmp/super-edit.jsonl" Stop)"
+else
+    printf '  FAIL  %s\n' "the submodule fixture was not built"; fail=$((fail+1))
+fi
+
+# Telling a bare token from a quoted one is linear in the command. A slice of the command per token
+# made a 440 KB heredoc take 3.7 s. A fixed time limit fails a correct hook on a slow runner and
+# passes a quadratic one on a fast machine, so the case times a heredoc of N lines and one of 2N
+# and asserts on how the time grows: linear doubles it, quadratic quadruples it, and 3 sits between.
+# Each row is written by python, since one argument that size is over Linux's per-argument limit.
+heredoc_run() {   # heredoc_run <lines> <transcript>; prints the seconds, the output goes to <transcript>.out
+    { row_user "go"; row_edit "$begins/lib/foo.sh" ""; } > "$2"
+    python3 -c 'import json,sys
+cmd = "cat > f <<'"'"'EOF'"'"'\n" + "a line\n" * int(sys.argv[1]) + "EOF\n; tests/x.sh"
+print(json.dumps({"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":cmd}}]}}))' "$1" >> "$2"
+    local t0 t1
+    t0="$(python3 -c 'import time; print(time.time())')"
+    send "$begins" "$2" Stop > "$2.out"
+    t1="$(python3 -c 'import time; print(time.time())')"
+    python3 -c 'import sys; print("%.3f" % (float(sys.argv[2]) - float(sys.argv[1])))' "$t0" "$t1"
+}
+small="$(heredoc_run 63000 "$begins/big1.jsonl")"
+expect "a 440 KB heredoc followed by a run is judged a run" quiet "$(cat "$begins/big1.jsonl.out")"
+large="$(heredoc_run 126000 "$begins/big2.jsonl")"
+expect "an 880 KB heredoc followed by a run is judged a run" quiet "$(cat "$begins/big2.jsonl.out")"
+if python3 -c 'import sys; sys.exit(float(sys.argv[2]) >= 3 * float(sys.argv[1]))' "$small" "$large"; then
+    printf '  PASS  %s\n' "doubling the command less than triples the time ($small s, $large s)"; pass=$((pass+1))
+else
+    printf '  FAIL  %s (took %s s, then %s s)\n' "doubling the command less than triples the time" "$small" "$large"; fail=$((fail+1))
+fi
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

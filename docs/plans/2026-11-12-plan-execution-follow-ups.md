@@ -126,7 +126,7 @@ Every task inherits these.
    records each call to a file and then runs the real git, a Stop whose calls hold no `Edit`,
    `Write` or `NotebookEdit` exits 0 with no output and the shim records no call; a Stop with an
    `Edit` records at least one. (Removing git from `PATH` proves nothing: the hook already catches
-   `OSError`, `hooks/done-guard:230`.)
+   `OSError`, `hooks/done-guard:236`.)
 6. The "ITS LIMIT" header states the tokenised match, the fallback, the checkouts it knows and the
    one it does not (a nested repository that is neither a submodule nor a worktree), and what
    tokenising cannot see: a run inside backticks, anything after an unquoted `#`, and a
@@ -275,7 +275,7 @@ mutants (Blocking), one untested behaviour (Should fix), three Consider items. B
 4. An edit in the superproject, made from a submodule's `cwd`, is in the repository. Example: a
    committed superproject with a submodule added (`git -c protocol.file.allow=always submodule add`),
    `cwd` in the submodule, an `Edit` of `<super>/lib/foo.sh`, no test run, under `required`,
-   blocks; deleting the superproject line at `hooks/done-guard:238` turns it red.
+   blocks; deleting the superproject line at `hooks/done-guard:244` turns it red.
 5. Telling a bare token from a quoted one costs time linear in the command, not quadratic. Example:
    a Bash command of about 440 KB (a heredoc of repeated short lines) followed by `; tests/x.sh` is
    judged a run, and the hook finishes in under 2 s (it took 3.7 s with the prefix slice at
@@ -295,7 +295,7 @@ mutants (Blocking), one untested behaviour (Should fix), three Consider items. B
 **Done when:** `tests/test-done-guard.sh`, `tests/test-context-watch.sh`,
 `tests/test-validate-citations.sh` and `tests/test-harness-claims.sh` pass.
 
-- [ ] **Step 3.1: Build it test first**
+- [x] **Step 3.1: Build it test first** Note: B5 and B7 red witnessed before the fix; B1 to B4 proved by deleting each named line (red quoted, restored); round 2 replaced the 2 s check with a growth ratio, red against the old slice (3.69); 2 rounds (spec COMPLIES, quality 1 should-fix fixed); routing inherit; loop full; run-tests.sh green on round 1's tree, round 2 changed only the test (done-guard 85/0)
 
 Follow `keel:tdd`. Write cases for behaviours 1 to 5 and 7 after the existing cases.
 Run: `tests/test-done-guard.sh` and `tests/test-context-watch.sh`
@@ -307,7 +307,7 @@ Run: `tests/run-tests.sh` and the lint command.
 Expected: PASS, or reds this task did not cause, each named. This is the one boundary run the task
 schedules.
 
-- [ ] **Step 3.2: Hand over**
+- [x] **Step 3.2: Hand over** Note: staged by the implementer; coordinator repaired three flagged plan citations
 
 ```bash
 git add hooks/done-guard lib/context_watch.py CHANGELOG.md tests/test-done-guard.sh \

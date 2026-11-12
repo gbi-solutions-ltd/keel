@@ -900,6 +900,39 @@ case "$err" in *'keel context-watch'*'stop marker'*)
   || bad "stuck marker" "PreCompact exited $rc"
 rm -f "$statedir/$sess.stop" "$statedir/$sess.measure" "$work/.keel/handoff.md"
 
+# --- the cases the review found unpinned ------------------------------------------------------------
+#
+# The cached shortcut in hooks/context-watch applies the session id rule in bash. A fresh, low
+# measurement planted where `../../victim` reaches would let that shortcut answer from a file the
+# watchdog does not own, so with the rule in place the call falls through to python instead. A shim
+# first on PATH records each python call and runs the real one. The nested TMPDIR keeps the planted
+# file inside this case's own directory.
+ty="$work/ty/a/b"
+mkdir -p "$ty/keel-context-watch" "$work/pyshim"
+printf '%s 1 200000\n' "$(date +%s)" > "$work/ty/a/victim.measure"
+rm -f "$ty/keel-context-watch/nosession.measure"
+real_python="$(command -v python3)"
+printf '#!/bin/sh\necho "$*" >> "%s"\nexec "%s" "$@"\n' "$work/pyshim/calls" "$real_python" > "$work/pyshim/python3"
+chmod +x "$work/pyshim/python3"
+: > "$work/pyshim/calls"
+TMPDIR="$ty" PATH="$work/pyshim:$PATH" fire PreToolUse "$work/quiet.jsonl" "$work" Edit "../../victim" >/dev/null
+grep -q 'context_watch.py hook' "$work/pyshim/calls" \
+  && ok "the cached shortcut does not read a measurement a climbing session id names" \
+  || bad "state paths" "no python call was recorded, so bash answered from the planted file"
+
+# With no session id there is no session line to ask for, so the stop text does not ask for one.
+# Under the nested TMPDIR, so the nosession marker of a live session is not touched.
+out="$(printf '{"hook_event_name":"UserPromptSubmit","transcript_path":"%s","cwd":"%s","session_id":"","tool_name":"Bash"}' \
+  "$work/stop.jsonl" "$work" | TMPDIR="$ty" "$HOOK" 2>/dev/null)"
+case "$out" in *PAUSE*'session: '*) bad "session line" "the stop text asks for a session line with no id: $out" ;;
+  *PAUSE*) ok "with no session id the stop text asks for no session line" ;;
+  *) bad "session line" "no stop text with no session id: $out" ;; esac
+sess="with-id-$$"
+out="$(TMPDIR="$ty" fire UserPromptSubmit "$work/stop.jsonl" "$work" Bash "$sess")"
+case "$out" in *"session: $sess"*) ok "with a session id the stop text still asks for its session line" ;;
+  *) bad "session line" "the stop text does not name session: $sess: $out" ;; esac
+rm -rf "$work/ty" "$work/pyshim"
+
 rm -rf "$work"
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

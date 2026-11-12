@@ -648,13 +648,17 @@ def _warn_text(pct, stop_at, handoff):
 
 
 def _stop_text(pct, tokens, window, handoff, session):
+    # A session with no id has no line to ask for: _names_session keeps any newer handoff for it,
+    # and a `session: ` line naming nothing would only confuse the model asked to write it.
+    line = (", and a line reading\n"
+            "     `session: %s`, which is how compaction knows the file is this session's.\n"
+            % session) if session else ".\n"
     return (
         "PAUSE. Context is at %d%% (%s of %s tokens), past the keel stop threshold.\n"
         "\n"
         "In an ordinary session, do these, in order, and nothing else:\n"
         "  1. Write or refresh %s: what is done, what is not, the next concrete step, any\n"
-        "     decision taken that is not yet recorded anywhere else, and a line reading\n"
-        "     `session: %s`, which is how compaction knows the file is this session's.\n"
+        "     decision taken that is not yet recorded anywhere else%s"
         "  2. Move anything durable out of it and into its real home, an ADR under the docs root or\n"
         "     the artifact it belongs to. That file is git-ignored and is thrown away once the work\n"
         "     resumes, so decisions left only in it are lost.\n"
@@ -674,7 +678,7 @@ def _stop_text(pct, tokens, window, handoff, session):
         "\n"
         "If this is genuinely wrong, the user can set KEEL_CONTEXT_WATCH=off, or gates.context_watch\n"
         "to false in .keel/profile.json. Do not set either yourself: it is the user's call."
-        % (pct, f"{tokens:,}", f"{window:,}", handoff, session)
+        % (pct, f"{tokens:,}", f"{window:,}", handoff, line)
     )
 
 

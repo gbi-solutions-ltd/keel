@@ -85,7 +85,7 @@ wrong, behaviours without examples, path comparison) and three to consider. All 
   and quality reviews dispatched in between. Both implementers had first notified "waiting on its
   own background work".
 - **`done-guard` takes any `file_path` as code.** `hooks/done-guard:214-215` excludes only `.md`
-  and `docs_root`, and `hooks/done-guard:247-249` reads the path as given, so an absolute path under
+  and `docs_root`, and `hooks/done-guard:248-253` reads the path as given, so an absolute path under
   the system temp directory counts.
 - **No ADR states the full loop's discard rule.** It lives only in
   `skills/execute-plan/references/subagent-prompts.md` ("On a DEVIATES verdict in the full loop"

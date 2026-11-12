@@ -68,7 +68,7 @@ transcript, finds edits to non-documentation files inside the repository, and lo
 <!-- keel:claim gate=done-guard harness=claude -->
 `verify.test` as a substring of any Bash command in the turn, or the text of `verify.test_one` or
 `verify.test_affected` before its first `{` where a simple command begins with it, the command
-split by shlex as a shell reads it (hooks/done-guard:36-52). It blocks (hooks/done-guard:392-395)
+split by shlex as a shell reads it (hooks/done-guard:36-52). It blocks (hooks/done-guard:398-401)
 the stop when `gates.done_verified` is `required`; otherwise it warns.
 
 ## 3. Repository structure

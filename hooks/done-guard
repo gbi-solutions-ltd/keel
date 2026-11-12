@@ -165,8 +165,14 @@ def simple_commands(cmd):
         tok = lex.get_token()
         if tok is None:
             break
-        raw = cmd[:lex.instream.tell() - len(lex._pushback_chars)].rstrip(" \t\r")
-        bare = raw.endswith(tok) and not raw[:-len(tok)].endswith("\\")
+        # Indices into cmd, not a slice of it: a slice per token copies the command once per token,
+        # which took a 440 KB heredoc 3.7 s.
+        end = lex.instream.tell() - len(lex._pushback_chars)
+        while end > 0 and cmd[end - 1] in " \t\r":
+            end -= 1
+        start = end - len(tok)
+        bare = (start >= 0 and cmd.startswith(tok, start, end)
+                and not (tok and start > 0 and cmd[start - 1] == "\\"))
         if comment and not (bare and tok == "\n"):
             continue
         comment = False
