@@ -28,8 +28,8 @@ The one exception is a plan-end checkpoint on the same tree, under the condition
 [step-detail.md](step-detail.md#step-3-the-pass-that-only-we-can-do). The note names a tree, from
 `git write-tree` with the task staged before the tick, because the suite runs before task and plan
 are committed together, so no commit it could name is HEAD. When HEAD's tree differs from it only
-in the plans directory, where the tick lands, the checkpoint ran on the code under review and a second
-run would check nothing new.
+in the plans directory, where the tick lands, the checkpoint ran on the code under review and a
+second run would check nothing new.
 `ship` still runs its own, so the final commit keeps one independent run. Bernard decided this on
 2026-11-12; ADR-0017's `Amended` section records it.
 
