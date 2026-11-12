@@ -15,6 +15,10 @@ Entries are terse by design; the narrative for each release is in this file's gi
   owns that is not a symlink (audit W-08).
 - done-guard strips quote characters from a scoped prefix's words, so a hand-edited
   `verify.test_one` such as `./gradlew test --tests '*{name}'` counts the command it describes.
+- `keel plan tick` appends `acquire`, `release` and `released` (or `release-failed` with rmdir's
+  error, or `exit-released` from the EXIT trap) with its process id to the file
+  `KEEL_PLAN_LOCK_TRACE` names, and writes nothing when it is unset; the concurrent-ticks test sets
+  it and prints the trace when it fails.
 - `review-code` quotes a plan-end checkpoint only when `git cat-file -t <sha>` prints `tree` and
   `git diff --name-only <sha> HEAD` exits 0, so a fresh clone without the note's tree runs the
   suite. ADR-0017 records the amendment.

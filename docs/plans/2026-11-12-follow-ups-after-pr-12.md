@@ -259,7 +259,7 @@ reproduced in 355 local runs); the follow-up is evidence for its next occurrence
 
 **Done when:** `tests/test-plan.sh` passes.
 
-- [ ] **Step 3.1: Build it test first**
+- [x] **Step 3.1: Build it test first** Note: red 620/3 quoted; forced failure in a tree copy printed the acquire/release trace; spec COMPLIES, locking identical to HEAD with the variable unset (checked line by line), EXIT trap cannot change the exit status; test-plan 623/0; follow-up: exit-released is written even if the trap's own rmdir failed
 
 Follow `keel:tdd`. Write cases for behaviours 1 and 2, then change the concurrent-ticks case.
 Run: `tests/test-plan.sh`
@@ -271,7 +271,7 @@ Run: the lint command. With the `Done when:` run above, that is the unit boundar
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 3.2: Hand over**
+- [x] **Step 3.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; suite: pass at tree 73e4830
 
 ```bash
 git add bin/keel tests/test-plan.sh CHANGELOG.md
