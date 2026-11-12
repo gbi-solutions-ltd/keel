@@ -415,14 +415,14 @@ against the diff and by the commands in `Done when:`.
 `tests/test-eval-harness.sh`, `tests/test-run-tests.sh` and `tests/test-grep-quiet.sh` pass, and
 `awk 'length > 100' tests/test-run-tests.sh` prints nothing.
 
-- [ ] **Step 6.1: Make the change and check it**
+- [x] **Step 6.1: Make the change and check it** Note: No-test task; checked by the spec reviewer against the diff and Done when (validate-skills 134/0, validate-citations 64/0, eval-harness 115/0, run-tests 17/0, grep-quiet 111/0, awk empty); open-task definition matches plan_status; rewrap changed no behaviour; coordinator also changed review-code rationale.md's 'docs/plans/' to 'the plans directory' to match step-detail (reviewer note)
 
 Edit as the behaviours say.
 Run: the `Done when:` commands and the lint command. Run no `tests/run-tests.sh` as the suite.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 6.2: Hand over**
+- [x] **Step 6.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; suite: pass at tree 0b3a2f3
 
 ```bash
 git add skills/tdd/references/rationale.md skills/review-code/references/step-detail.md \

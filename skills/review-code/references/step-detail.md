@@ -8,7 +8,7 @@ Quote the plan-end checkpoint as the suite result, and run nothing, when all thr
 
 - the plan's last ticked step carries a `suite: pass at tree <sha>` note;
 - `git cat-file -t <sha>` prints `tree`, and `git diff --name-only <sha> HEAD` exits 0 and names
-  nothing outside `docs/plans/`;
+  nothing outside `artifacts.plans` from `.keel/profile.json`, else `<docs_root>/plans/`;
 - `git status --porcelain` prints nothing.
 
 Otherwise, or when any of these commands fails, run `profile.verify.test`. A tree absent here, as in

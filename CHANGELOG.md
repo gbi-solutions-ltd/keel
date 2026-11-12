@@ -9,6 +9,10 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- Wording: `tdd` says `review-code` runs the suite or quotes a qualifying plan-end checkpoint;
+  `review-code` reads the plans directory from `artifacts.plans`; the checkpoint offer defines an
+  open task as `keel plan status` counts it; the plan template calls `CHANGELOG.md`'s released
+  entries the records; `tests/test-run-tests.sh` wraps at 100 columns.
 - ADR-0011 gains an `Observed` entry: the 2026-11-12 speed sweep saw implementers not read
   `tdd`'s step-detail reference despite its "read it before" sentence, Bernard kept the convention
   the same day, and an eval arm showing the sentence makes no difference would reopen it.

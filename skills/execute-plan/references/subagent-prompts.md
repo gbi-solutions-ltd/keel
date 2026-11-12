@@ -374,7 +374,8 @@ implementers and gives it to you, as
 the suite, run twice per task, took 22% of the wall clock.
 
 **A plan with no such line and 3 or more open tasks is offered checkpoints before the first
-dispatch**, in one question to the person: every 3 tasks, the default. On a yes, write the header
+dispatch**, in one question to the person: every 3 tasks, the default. An open task has a step not
+done, deferred or not applicable, as `keel plan status` counts it. On a yes, write the header
 line and rewrite each open task's boundary step to the plan template's checkpoint form: its
 `Done when:` and the lint command, `verify.test_affected` where the profile sets it, and no
 `verify.test`. The rewrite changes only the boundary step's run lines; every other line of the task
