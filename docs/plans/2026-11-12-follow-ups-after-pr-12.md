@@ -56,6 +56,8 @@ failure line. All folded in.
 decisions above as written.
 **Task 7 added:** 2026-11-12, from `review-code` on 68fcc8f..3454f62 (five surviving mutants) and
 the security audit's comment and doc leads, as `review-code` step 5 sends blocking findings back.
+**Task 8 added:** 2026-11-12, after the one re-review still blocked; Bernard chose task 8 with no
+further re-review, then ship.
 **Shape:** behaviours with examples.
 
 ## Global constraints
@@ -520,3 +522,54 @@ git status --porcelain
 Stage exactly the paths you changed among those, and any flagged citation repairs by name, and
 stop. **Do not commit.** The coordinator commits after both review passes, with
 `git commit -m "fix(watchdogs): pin the state-directory and prefix rules"`.
+
+---
+
+### Task 8: re-review fix, pin the message wording and filter the regex fallback
+
+**Story:** the one `review-code` re-review of b975d9d (2026-11-12) still blocked on one untested
+line, and found a pre-existing fail-open in the regex fallback. Bernard chose this task, with no
+further re-review, then ship.
+**Files:**
+- Modify: `hooks/done-guard`
+- Modify: `hooks/context-watch` (comment only)
+- Modify: `CHANGELOG.md`
+- Test: `tests/test-done-guard.sh`
+
+**Depends on:** task 7
+
+**Behaviours:**
+
+1. The block message says `Run it` when it names only the suite command, and `Run one` when it
+   names more. Example: in the existing wrapper-only case (`verify.test_one` `sh {script}`), the
+   reason contains `Run it and report`; changing `"one" if named` to `"one" if scoped` turns it red.
+2. The regex fallback, for a command shlex cannot split, uses only prefixes that can count, the
+   same filter as the message. Example: `quote_case block "sh {script}" "shellcheck 'x"` and
+   `quote_case block "./{script}" "./configure 'x"` block; both count today.
+3. Two comments state what is true now, not history: the quote-strip comment in `hooks/done-guard`
+   says a quote just before `{` is dropped, so `bash -c '{cmd}'` counts every `bash -c` command; the
+   cached-shortcut comment in `hooks/context-watch` says a directory looser than 0700 still only
+   serves a cache file this user owns that is not a symlink. Example: the done-guard comment
+   contains neither `once` nor `now counts`.
+
+**Done when:** `tests/test-done-guard.sh`, `tests/test-context-watch.sh`,
+`tests/test-validate-citations.sh` and `tests/test-harness-claims.sh` pass.
+
+- [ ] **Step 8.1: Build it test first**
+
+Follow `keel:tdd`. Behaviour 1 pins code that is right: add the assertion and prove it with the
+named mutant in a throwaway worktree or copy. Behaviour 2's cases fail first. Quote each red.
+Run: the `Done when:` commands and the lint command. Run no `tests/run-tests.sh`.
+Expected: PASS, or reds this task did not cause, each named and matched against the start record.
+This is the one boundary run the task schedules.
+
+- [ ] **Step 8.2: Hand over**
+
+```bash
+git add hooks/done-guard hooks/context-watch CHANGELOG.md tests/test-done-guard.sh
+git status --porcelain
+```
+
+Stage exactly those paths, and any flagged citation repairs by name, and stop. **Do not commit.**
+The coordinator commits after both review passes, with
+`git commit -m "fix(done-guard): pin the message wording, filter the regex fallback"`.
