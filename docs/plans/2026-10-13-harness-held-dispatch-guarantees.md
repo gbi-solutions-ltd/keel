@@ -1059,7 +1059,7 @@ Stop there. **Do not commit.** The coordinator commits with
   step 3.2. The done condition, `2 passed, 0 failed`, holds as written.
 - **Beyond the Files list.** One table cell in
   `docs/plans/2026-09-05-tiered-multi-harness-support.md` was repointed from a line number in
-  `tests/run-tests.sh` to the phrase form `tests/run-tests.sh#capped at 4 concurrent`, because the
+  `tests/run-tests.sh` to the phrase form `tests/run-tests.sh#online CPU count capped at 8`, because the
   new line in that file moved the cited comment and `validate-citations.sh` failed. A sibling bare
   `:65` at line 1436 of that plan is invisible to the checker and was left.
 - **Considers skipped on purpose:** a check that fails when the closing `---` is missing or carries

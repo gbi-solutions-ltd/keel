@@ -14,9 +14,20 @@ cd "$(dirname "$0")/.." || exit 1
 # tests/no-internal-leaks.sh, tests/supply-chain-scan.sh and tests/validate-citations.sh, run
 # "against this repo" below, only read the tree and are safe alongside everything else. That
 # makes all of the jobs below independent, so they run in parallel rather than one after another.
+# The runner's one write into the tree is its own: .keel/test-durations, git-ignored, which records
+# each file's last duration so the next run can start the longest first.
 
 names=(); cmds=()
 add() { names+=("$1"); cmds+=("$2"); }
+
+# KEEL_TEST_FILES replaces the list below, and the lint job with it, so tests/test-run-tests.sh can
+# drive this runner over stub files without running the whole suite inside itself.
+# KEEL_TEST_DURATIONS moves the durations file for the same reason: the test never touches the real
+# one.
+DURATIONS="${KEEL_TEST_DURATIONS:-.keel/test-durations}"
+if [ -n "${KEEL_TEST_FILES:-}" ]; then
+    for f in $KEEL_TEST_FILES; do add "$f" "$f"; done
+else
 
 # The validator checks the repo; its own tests check the validator.
 add "tests/test-validate-skills.sh" "tests/test-validate-skills.sh"
@@ -45,6 +56,7 @@ add "tests/test-plan.sh"        "tests/test-plan.sh"
 add "tests/test-agents.sh" "tests/test-agents.sh"
 add "tests/test-ci-review.sh" "tests/test-ci-review.sh"
 add "tests/test-subagent-statusline.sh" "tests/test-subagent-statusline.sh"
+add "tests/test-run-tests.sh" "tests/test-run-tests.sh"
 add "tests/test-grep-quiet.sh" "tests/test-grep-quiet.sh"; add "tests/test-withheld.sh" "tests/test-withheld.sh"; add "tests/test-leak-guard.sh" "tests/test-leak-guard.sh"; add "tests/test-check-dco.sh" "tests/test-check-dco.sh"
 add "tests/validate-skills.sh (against this repo)"   "tests/validate-skills.sh"
 add "tests/no-internal-leaks.sh (against this repo)" "tests/no-internal-leaks.sh"
@@ -70,14 +82,28 @@ run_lint() {
     fi
 }
 add "lint (verify.lint from .keel/profile.json)" "run_lint"
+fi
 
-# Launched in the background, capped at 4 concurrent so a laptop is not swamped, and replayed below
-# in the order added above so the transcript reads the same as a serial run. Each job's exit code
-# and elapsed seconds go to their own file rather than a shared one, because two backgrounded jobs
-# writing "$rc" into the same variable would just race.
+# Launched in the background, longest first by the durations the last run recorded, so the slowest
+# file is not the last one started and the wall time is close to that file's own. A file with no
+# recorded duration runs before every recorded one, because unknown is treated as slow. Each job's
+# log is replayed below in the order the jobs started, so the transcript reads the same as a serial
+# run. Each job's exit code and elapsed seconds go to their own file rather than a shared one,
+# because two backgrounded jobs writing "$rc" into the same variable would just race.
 LOG_DIR="$(mktemp -d)"
 trap 'rm -rf "$LOG_DIR"' EXIT
-MAX_JOBS=4
+
+# KEEL_TEST_JOBS when it is a positive integer, else the online CPU count capped at 8 so a large
+# machine does not start every file at once, else 4.
+positive() { case "$1" in ''|*[!0-9]*) return 1 ;; esac; [ "$1" -gt 0 ]; }
+if positive "${KEEL_TEST_JOBS:-}"; then
+    MAX_JOBS=$KEEL_TEST_JOBS
+elif cpus=$(getconf _NPROCESSORS_ONLN 2>/dev/null) && positive "$cpus"; then
+    MAX_JOBS=$cpus
+    [ "$MAX_JOBS" -le 8 ] || MAX_JOBS=8
+else
+    MAX_JOBS=4
+fi
 
 # No ambient git identity, for every job below. The CI runner has none, and on 2026-09-07 three
 # cases in tests/test-keel.sh failed there with `fatal: empty ident name (for <runner@...>) not
@@ -94,9 +120,21 @@ GIT_CONFIG_GLOBAL="$LOG_DIR/gitconfig"
 printf '[user]\n\tuseConfigOnly = true\n' > "$GIT_CONFIG_GLOBAL"
 export GIT_CONFIG_SYSTEM GIT_CONFIG_GLOBAL
 
+# The run order, as indices into names: each name's recorded seconds, or one more than any second a
+# run could take when none is recorded, sorted longest first and by list position within a tie.
 n=${#names[@]}
-i=0
-while [ "$i" -lt "$n" ]; do
+order=$(
+    i=0
+    while [ "$i" -lt "$n" ]; do printf '%s\t%s\n' "$i" "${names[$i]}"; i=$((i+1)); done |
+        awk -F'\t' -v durs="$DURATIONS" '
+            BEGIN { while ((getline l < durs) > 0) { s = l; sub(/ .*/, "", s); sub(/^[^ ]* /, "", l); d[l] = s } }
+            { print (($2 in d) ? d[$2] : 999999), $1 }' |
+        sort -k1,1nr -k2,2n | cut -d' ' -f2
+)
+total=$(sed -n 's/^total \([0-9][0-9]*\)$/\1/p' "$DURATIONS" 2>/dev/null | head -1)
+run_start=$(date +%s)
+
+for i in $order; do
     while [ "$(jobs -rp | wc -l)" -ge "$MAX_JOBS" ]; do
         sleep 0.2
     done
@@ -106,20 +144,30 @@ while [ "$i" -lt "$n" ]; do
         rc=$?
         printf '%s %s\n' "$rc" "$(( $(date +%s) - start ))" > "$LOG_DIR/$i.meta"
     ) &
-    i=$((i+1))
 done
 wait
+wall=$(( $(date +%s) - run_start ))
 
+# The durations are rewritten for the next run, gathered while the logs replay and written once at
+# the end, so a run stopped during the jobs leaves the last record in place. This is the one file
+# the runner writes into the repository's tree.
 failed=0
-i=0
-while [ "$i" -lt "$n" ]; do
+mkdir -p "$(dirname "$DURATIONS")"
+: > "$LOG_DIR/durations"
+for i in $order; do
     read -r rc elapsed < "$LOG_DIR/$i.meta"
     printf '\n== %s (%ss)\n' "${names[$i]}" "$elapsed"
     cat "$LOG_DIR/$i.out"
     [ "$rc" -eq 0 ] || failed=$((failed+1))
-    i=$((i+1))
+    printf '%s %s\n' "$elapsed" "${names[$i]}" >> "$LOG_DIR/durations"
 done
+printf 'total %s\n' "$wall" >> "$LOG_DIR/durations"
+mv "$LOG_DIR/durations" "$DURATIONS"
 
 printf '\n'
+# A run over twice the last one usually means something new is slow, or the machine is busy.
+if [ -n "$total" ] && [ "$wall" -gt $((total * 2)) ]; then
+    printf 'This run took %ss, over twice the last run (%ss).\n' "$wall" "$total"
+fi
 if [ "$failed" -eq 0 ]; then printf 'All test files passed\n'; exit 0; fi
 printf '%s test file(s) failed\n' "$failed"; exit 1

@@ -3977,7 +3977,7 @@ correct.** Fixed in place:
 | The `a && ok || bad` idiom is SC2015, and CI lints at default severity | reproduced, 2 findings | tasks 1, 4 |
 | `emit_event` could not emit `PreToolUse`'s two matcher groups | read `hooks/hooks.json` | task 3 |
 | Task 8's regeneration of `docs/profile-keys.md` would wipe task 6's tags | generator output | tasks 6, 8 |
-| Task 4 step 2 mutated a tracked file while `MAX_JOBS=4` jobs read it | `tests/run-tests.sh#capped at 4 concurrent` | task 4 |
+| Task 4 step 2 mutated a tracked file while `MAX_JOBS=4` jobs read it | `tests/run-tests.sh#online CPU count capped at 8` | task 4 |
 | A one-line tag lookback fails any claim that wraps | the support page's own paragraph | task 5 |
 | Task 7's committed baseline contradicts the suite's stated policy | `tests/keel-test-lib.sh#Fixtures are generated per` | task 7 |
 | `cmd_doctor` would call functions that exist for one harness only | `bin/keel:1427` | task 7, sixth contract function |

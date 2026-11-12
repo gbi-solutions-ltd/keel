@@ -9,6 +9,10 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
+- `tests/run-tests.sh` starts files longest-first by the durations it records in the git-ignored
+  `.keel/test-durations`, runs `KEEL_TEST_JOBS` jobs or one per CPU up to 8, and says when a run
+  takes over twice the last; `KEEL_TEST_FILES` and `KEEL_TEST_DURATIONS` let
+  `tests/test-run-tests.sh` drive it over stubs.
 - `hooks/done-guard`'s bare check drops two guards that could never fire; tests pin that a token
   at the start of a command is never read as escaped, and time a heredoc of N lines against one
   of 4N, asserting the time grows less than eightfold.

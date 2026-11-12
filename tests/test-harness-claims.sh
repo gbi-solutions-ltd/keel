@@ -39,7 +39,7 @@ fi
 # nothing, because the committed artifact is correct; that is the whole hazard this file exists
 # to name, applied to itself.
 #
-# ON A COPY, NEVER ON THE TRACKED FILE. tests/run-tests.sh runs four test files at once, so a case
+# ON A COPY, NEVER ON THE TRACKED FILE. tests/run-tests.sh runs several test files at once, so a case
 # that edited hooks/hooks.json mid-run would corrupt whatever another job was reading, and a
 # suite that fails depending on scheduling is worse than one that does not check.
 stale="$(mktemp)"

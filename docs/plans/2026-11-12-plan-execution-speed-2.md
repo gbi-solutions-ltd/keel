@@ -152,7 +152,7 @@ Every task inherits these.
 **Done when:** `tests/test-run-tests.sh` passes, and `git check-ignore .keel/test-durations`
 exits 0.
 
-- [ ] **Step 1.1: Build it test first**
+- [x] **Step 1.1: Build it test first** Note: rounds: 1; routing: inherit; loop: light; red 6/9 quoted; three timed suite runs 243/169/165 s at 8 jobs, no flake; reds only two plan phrase citations, repointed by the coordinator; extra staged: test-harness-claims.sh:42 comment (coordinator's request), one docs/ideas citation repair
 
 Follow `keel:tdd`. Add the `KEEL_TEST_FILES` and `KEEL_TEST_DURATIONS` seam first (behaviour 2),
 since without it the new test would run the whole suite. Then write `tests/test-run-tests.sh` for
@@ -168,7 +168,7 @@ changes is the suite).
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 1.2: Hand over**
+- [x] **Step 1.2: Hand over** Note: staged by the implementer
 
 ```bash
 git add tests/run-tests.sh tests/test-run-tests.sh .gitignore docs/snapshot.md CHANGELOG.md

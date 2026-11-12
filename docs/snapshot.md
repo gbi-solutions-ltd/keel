@@ -113,7 +113,7 @@ and `docs/profile-keys.md#gates.security_audit`).
 Prerequisites: bash, git, python3, shellcheck. No package install.
 
 ```bash
-tests/run-tests.sh                 # full suite, about 6 minutes, silent until each file ends
+tests/run-tests.sh                 # full suite, longest file first by .keel/test-durations, on KEEL_TEST_JOBS or up to 8 CPUs, silent until each file ends
 tests/test-keel.sh                 # one test file, per verify.test_one
 shellcheck -x bin/keel bin/keel-fleet lib/*.sh lib/harness/*.sh tests/*.sh \
   tests/evals/run.sh tests/evals/stage.sh hooks/session-start hooks/context-watch \
