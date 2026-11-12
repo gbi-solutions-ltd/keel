@@ -464,5 +464,101 @@ else
     printf '  FAIL  %s (named %s times: %s)\n' "a prefix both scoped commands share is named once" "$n" "${out:0:200}"; fail=$((fail+1))
 fi
 
+# ---- a command read as a shell reads it ---------------------------------------
+#
+# The scoped prefix counts where a simple command begins with it after shell tokenising, so the
+# common wrappers are seen through and quoted text is not a command. row_bash does not escape JSON,
+# so these rows go through a JSON encoder, and each case first reads its row back: a malformed row
+# is skipped silently and would block for the wrong reason.
+row_cmd() { python3 -c 'import json,sys; print(json.dumps({"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":sys.argv[1]}}]}}))' "$1"; }
+
+shell_case() {   # shell_case <want: quiet|block> <command>; an edit of lib/foo.sh, then the command
+    local want="$1" cmd="$2" t="$begins/shell.jsonl" out rc
+    { row_user "go"; row_edit "$begins/lib/foo.sh" ""; row_cmd "$cmd"; } > "$t"
+    if ! python3 -c 'import json,sys; r=json.loads(open(sys.argv[1]).read().splitlines()[-1]); sys.exit(r["message"]["content"][0]["input"]["command"] != sys.argv[2])' "$t" "$cmd"; then
+        printf '  FAIL  %s (the row did not carry the command intact)\n' "$want: $cmd"; fail=$((fail+1)); return
+    fi
+    out="$(send "$begins" "$t" Stop)"; rc=$?
+    if [ "$rc" -ne 0 ]; then
+        printf '  FAIL  %s (rc=%s)\n' "$want: $cmd" "$rc"; fail=$((fail+1)); return
+    fi
+    expect "$want: $(printf '%s' "$cmd" | tr '\n' '~')" "$want" "$out"
+}
+
+# Behaviour 1: the wrapped forms count as a run.
+shell_case quiet 'bash tests/x.sh'
+shell_case quiet './tests/x.sh'
+shell_case quiet 'env CI=1 tests/x.sh'
+shell_case quiet 'X=1 time tests/x.sh'
+shell_case quiet 'make lint & tests/x.sh'
+shell_case quiet 'if true; then tests/x.sh; fi'
+shell_case quiet "$(printf 'echo hi\ntests/x.sh')"
+# shellcheck disable=SC2016  # the $( ) is the command's literal text
+shell_case quiet '$(tests/x.sh)'
+shell_case quiet '(cd x); tests/x.sh'
+shell_case quiet '{ tests/x.sh; }'
+# ...and nothing the anchored match did not count before, beyond those forms.
+shell_case block 'echo then tests/x.sh'
+shell_case block '{tests/a,b}'
+shell_case block "echo ';' tests/x.sh"
+shell_case block 'make >& tests/x.log'
+shell_case block "echo '' tests/x.sh"
+shell_case block 'echo "" tests/x.sh'
+shell_case block "'then' tests/x.sh"
+shell_case block '"{" tests/x.sh'
+# A `#` starting a word begins a comment that ends at the newline; one inside a word is no comment.
+shell_case quiet "$(printf 'ls # c\ntests/x.sh')"
+shell_case quiet 'echo a#b; tests/x.sh'
+shell_case block 'ls # tests/x.sh'
+
+# Behaviour 2: quoted text is not a command.
+shell_case block 'echo "a;tests/x"'
+shell_case block "grep -n 'tests/x' f"
+shell_case block 'shellcheck -x lib/foo.sh tests/*.sh'
+
+# Behaviour 3: a command shlex cannot tokenise falls back to the anchored regex.
+shell_case quiet "tests/x.sh 'oops"
+
+# ---- every checkout of the repository ---------------------------------------------
+#
+# Behaviour 4. An edit is inside the repository when it resolves inside any checkout of it, and
+# is read against the checkout that holds it. The worktree has the profile because it is committed.
+mr="$tmp/main-repo"
+fixture "$mr" '"done_verified": "required"' '"tests/run-tests.sh"'
+( cd "$mr" && git init -q -b main . && git config user.email t@t.t && git config user.name t \
+  && git add .keel/profile.json && git commit -q -m init \
+  && git worktree add -q "$tmp/wt" 2>/dev/null && git worktree add -q "$mr/inner" 2>/dev/null )
+{ row_user "go"; row_edit "$mr/lib/foo.sh" ""; } > "$tmp/wt-main.jsonl"
+expect "from a linked worktree, an edit in the main checkout with no test run blocks" block \
+    "$(send "$tmp/wt" "$tmp/wt-main.jsonl" Stop)"
+{ row_user "go"; row_write "/tmp/elsewhere/x.py"; } > "$tmp/wt-else.jsonl"
+expect "from a linked worktree, an edit outside every checkout passes" quiet \
+    "$(send "$tmp/wt" "$tmp/wt-else.jsonl" Stop)"
+{ row_user "go"; row_write "$mr/inner/docs/x.txt"; } > "$tmp/wt-inner.jsonl"
+expect "a worktree inside the main checkout reads docs_root against its own root" quiet \
+    "$(send "$mr" "$tmp/wt-inner.jsonl" Stop)"
+
+# Behaviour 5. git runs only when the turn edited something. A shim first on PATH records each call
+# and runs the real git; removing git from PATH proves nothing, since the hook catches OSError.
+real_git="$(command -v git)"
+mkdir -p "$tmp/shim"
+printf '#!/bin/sh\necho "$*" >> "%s"\nexec "%s" "$@"\n' "$tmp/shim/calls" "$real_git" > "$tmp/shim/git"
+chmod +x "$tmp/shim/git"
+{ row_user "go"; row_cmd "ls"; } > "$tmp/noedit.jsonl"
+: > "$tmp/shim/calls"
+out="$(PATH="$tmp/shim:$PATH" send "$mr" "$tmp/noedit.jsonl" Stop)"; rc=$?
+if [ "$rc" -eq 0 ] && [ -z "$out" ] && [ ! -s "$tmp/shim/calls" ]; then
+    printf '  PASS  %s\n' "a Stop with no edit runs no git"; pass=$((pass+1))
+else
+    printf '  FAIL  %s (rc=%s, out=%s, calls=%s)\n' "a Stop with no edit runs no git" "$rc" "${out:0:80}" "$(tr '\n' ';' < "$tmp/shim/calls")"; fail=$((fail+1))
+fi
+: > "$tmp/shim/calls"
+out="$(PATH="$tmp/shim:$PATH" send "$mr" "$tmp/wt-main.jsonl" Stop)"
+if [ -s "$tmp/shim/calls" ]; then
+    printf '  PASS  %s\n' "a Stop with an edit runs git"; pass=$((pass+1))
+else
+    printf '  FAIL  %s (no git call recorded, out=%s)\n' "a Stop with an edit runs git" "${out:0:80}"; fail=$((fail+1))
+fi
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

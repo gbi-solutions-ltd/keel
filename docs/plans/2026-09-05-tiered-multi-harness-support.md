@@ -2981,7 +2981,7 @@ rather than these, because the point of the two cases is the word, not the condi
 
 Run: `tests/test-done-guard.sh`
 Expected: FAIL, "emits block on codex", because the hook emits `deny` unconditionally
-(`hooks/done-guard:86`).
+(`hooks/done-guard:95`).
 
 - [ ] **Step 3: Write the minimal implementation**
 

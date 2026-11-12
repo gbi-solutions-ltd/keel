@@ -21,13 +21,16 @@ Entries are terse by design; the narrative for each release is in this file's gi
 - The context-watch stop text says a plan run resumes after compaction from
   `keel plan status <plan>`, the handoff's `next:` line recording only where it stood at the stop;
   `PreCompact` writes a line to stderr naming a stop marker it cannot remove, and still exits 0.
-- `hooks/done-guard` ignores an edit whose path resolves outside the repository (git's top level,
-  else the event's `cwd`), and counts as a test run a Bash command containing `verify.test`, or one
-  that begins with the text of `verify.test_one` or `verify.test_affected` before its first `{` (at
-  the start, or after `;`, `&&`, `||`, `|`, `(` or a newline): a scoped test run satisfies
-  `gates.done_verified` and proves a test ran, not that the suite did, and `shellcheck tests/*.sh`
-  is no run. Its block and warn text names those scoped commands beside `verify.test`, a prefix
-  the two share once, and the block text asks to run one of them.
+- `hooks/done-guard` ignores an edit whose path resolves outside every checkout of the repository
+  (git's top level for the event's `cwd`, each worktree and the superproject), and runs git only
+  when the turn edited something. It counts as a test run a Bash command containing `verify.test`,
+  or one with a simple command that, read as a shell reads it by `shlex` with `env`, `time`,
+  `command`, `VAR=value`, `bash` or `sh` and `./` dropped, begins with the text of
+  `verify.test_one` or `verify.test_affected` before its first `{`; quoted text is no command, and
+  a command `shlex` cannot split falls back to an anchored regular expression. A scoped test run
+  satisfies `gates.done_verified` and proves a test ran, not that the suite did, and
+  `shellcheck tests/*.sh` is no run. Its block and warn text names each scoped command once beside
+  `verify.test`, and the block text asks to run one of them.
 - `write-plan`'s template carries `**Suite checkpoints:** every 3 tasks` and its approval asks for
   N; `execute-plan`'s "Suite checkpoints" section and `=== START RECORD ===` block, and `tdd`'s
   affected-tests reference, carry out ADR-0017 for such plans.

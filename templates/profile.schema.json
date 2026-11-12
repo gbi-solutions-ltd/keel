@@ -121,7 +121,7 @@
           "description": "The command that runs the whole test suite, exactly as a shell would run it. Read from what the project declares rather than inferred from the stack, because the real command is frequently not the idiomatic one. null means the project genuinely has none, and a skill asks instead of substituting a guess.",
           "x-keel-read-by": [
             "code:bin/keel#t0=\"$(json_get .keel/profile.json verify.test",
-            "code:hooks/done-guard:126"
+            "code:hooks/done-guard:135"
           ]
         },
         "test_one": {
@@ -132,7 +132,7 @@
           "description": "Single test. `{path}` or `{name}` is substituted. Required by tdd and by the optional commit guard.",
           "x-keel-read-by": [
             "code:bin/keel#t1=\"$(json_get .keel/profile.json verify.test_one",
-            "code:hooks/done-guard:133"
+            "code:hooks/done-guard:142"
           ]
         },
         "test_affected": {
@@ -143,7 +143,7 @@
           "description": "The command the tdd unit boundary runs in place of `verify.test`, selecting only the tests the unit's change affects. `{base}` is replaced with the commit the unit started from, the one tdd's start record names, for example `npx vitest run --changed {base}` or `npx jest --changedSince={base}`. It must select uncommitted and untracked changes since `{base}` too, because under execute-plan an implementer stages and does not commit, so every unit of a task shares one HEAD. A value without `{base}` is accepted, for a runner that tracks changes itself. null, the default, means the boundary runs `verify.test`. Set by hand: keel init writes null and detects no runner. `verify.test` still runs in review-code, ship and CI, and a break outside what the runner selects surfaces there (ADR-0009). Read by keel doctor, which shows the value and never runs it, because it needs a commit only a tdd unit has.",
           "x-keel-read-by": [
             "code:bin/keel#ta=\"$(json_declared .keel/profile.json verify.test_affected",
-            "code:hooks/done-guard:133",
+            "code:hooks/done-guard:142",
             "advisory:skills/tdd/SKILL.md#verify.test_affected"
           ]
         },
@@ -330,8 +330,8 @@
             "warn",
             "off"
           ],
-          "description": "Drives hooks/done-guard on Stop and SubagentStop. required refuses to end a turn that edited code inside the repository and never ran a test; warn says it and allows the stop. A test run is a Bash command containing verify.test, or the text of verify.test_one or verify.test_affected before its first `{` where that text is not empty and begins a command (at the start, or after `;`, `&&`, `||`, `|`, `(` or a newline), so a scoped test run counts: the gate proves a test ran, not that the suite did. Off, or absent, and the hook does nothing.",
-          "x-keel-read-by": "code:hooks/done-guard:121"
+          "description": "Drives hooks/done-guard on Stop and SubagentStop. required refuses to end a turn that edited code inside the repository and never ran a test; warn says it and allows the stop. A test run is a Bash command containing verify.test, or one whose simple command, read as a shell reads it (shlex words, quotes removed, split at `;`, `&&`, `||`, `|`, `&`, parentheses, newlines, and a brace, `then`, `do` or `else` that begins a command, with a leading `VAR=value`, `env`, `time`, `command`, `bash` or `sh`, and `./` dropped), begins with the text of verify.test_one or verify.test_affected before its first `{` where that text is not empty, so a scoped test run counts and quoted text does not: the gate proves a test ran, not that the suite did. A command shlex cannot split falls back to a regular expression anchored at a command's start. Off, or absent, and the hook does nothing.",
+          "x-keel-read-by": "code:hooks/done-guard:130"
         },
         "context_watch": {
           "type": "boolean",

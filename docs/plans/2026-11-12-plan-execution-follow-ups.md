@@ -105,7 +105,7 @@ Every task inherits these.
    run (exit 0, no output, after an `Edit` of `<repo>/lib/foo.sh` under `required`).
 2. Quoted text is not a command. Example: `echo "a;tests/x"` and `grep -n 'tests/x' f` do not count
    (the edit blocks); `shellcheck -x lib/foo.sh tests/*.sh` still does not count. `row_bash`
-   (`tests/test-done-guard.sh:209`) does not escape JSON, so these cases build their Bash row with a
+   (`tests/test-done-guard.sh:210`) does not escape JSON, so these cases build their Bash row with a
    JSON encoder (`python3 -c 'import json,sys; print(json.dumps(...))'`) and assert the command
    arrived intact; a malformed row is skipped silently and would block for the wrong reason.
 3. A command `shlex` cannot tokenise (an unbalanced quote) falls back to the current regex, so the
@@ -118,13 +118,13 @@ Every task inherits these.
    through `realpath`, and `in_repo` returns the path relative to the checkout that holds the file,
    so `is_code` reads `docs_root` against the right root. The case needs a committed repository: a
    git identity set as `tests/keel-test-lib.sh:69` does, the profile committed so the worktree has
-   it (the hook finds the profile from `$PWD` upward, `hooks/done-guard:54-64`), then
+   it (the hook finds the profile from `$PWD` upward, `hooks/done-guard:63-73`), then
    `git worktree add`.
 5. git runs only when the turn edited something. Example: with a `git` shim first on `PATH` that
    records each call to a file and then runs the real git, a Stop whose calls hold no `Edit`,
    `Write` or `NotebookEdit` exits 0 with no output and the shim records no call; a Stop with an
    `Edit` records at least one. (Removing git from `PATH` proves nothing: the hook already catches
-   `OSError`, `hooks/done-guard:149`.)
+   `OSError`, `hooks/done-guard:230`.)
 6. The "ITS LIMIT" header states the tokenised match, the fallback, the checkouts it knows and the
    one it does not (a nested repository that is neither a submodule nor a worktree), and what
    tokenising cannot see: a run inside backticks, anything after an unquoted `#`, and a
@@ -143,7 +143,7 @@ Every task inherits these.
 **Done when:** `tests/test-done-guard.sh`, `tests/test-validate-citations.sh` and
 `tests/test-harness-claims.sh` pass.
 
-- [ ] **Step 1.1: Build it test first**
+- [x] **Step 1.1: Build it test first** Note: implementer resumed fresh after a /clear; red for behaviours 1-5 reproduced by the spec reviewer at HEAD (65/11), round-2 red witnessed (77/2); 2 rounds (spec DEVIATES on evidence only, quality 2 should-fix fixed); routing inherit; loop full; coordinator ran run-tests.sh green on the final tree
 
 Follow `keel:tdd`. Write cases for behaviours 1 to 5 in `tests/test-done-guard.sh`, after the
 existing cases.
@@ -156,7 +156,7 @@ Run: `tests/run-tests.sh` and the lint command.
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 1.2: Hand over**
+- [x] **Step 1.2: Hand over** Note: staged by the implementer; coordinator added plan citation repairs
 
 ```bash
 git add hooks/done-guard tests/test-done-guard.sh templates/profile.schema.json docs/profile-keys.md \

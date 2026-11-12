@@ -84,7 +84,7 @@ wrong, behaviours without examples, path comparison) and three to consider. All 
   review redone as "round 2" at 12:15:57. Task 9: finished 12:59:09 and again 13:04:50, with spec
   and quality reviews dispatched in between. Both implementers had first notified "waiting on its
   own background work".
-- **`done-guard` takes any `file_path` as code.** `hooks/done-guard:138-139` excludes only `.md`
+- **`done-guard` takes any `file_path` as code.** `hooks/done-guard:214-215` excludes only `.md`
   and `docs_root`, and `hooks/done-guard:247-249` reads the path as given, so an absolute path under
   the system temp directory counts.
 - **No ADR states the full loop's discard rule.** It lives only in
@@ -148,7 +148,7 @@ Every task inherits these.
    `git -C <event cwd> rev-parse --show-toplevel`, else the event's `cwd` where that fails. Both the
    root and each path go through `os.path.realpath` before comparing (macOS `/var` is
    `/private/var`), and an inside path is made relative to the root before `is_code` reads it, since
-   `is_code` compares a relative `docs_root` (`hooks/done-guard:138-139`). Example: a SubagentStop
+   `is_code` compares a relative `docs_root` (`hooks/done-guard:214-215`). Example: a SubagentStop
    whose only call is `Write` to `/tmp/keel-probe/parse.py`, in a repository with
    `gates.done_verified` `required` and no test run, exits 0 with no output.
 2. An absolute path inside the repository is still code. Example: `Edit` of `<repo>/lib/foo.sh`, no
