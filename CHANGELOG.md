@@ -13,6 +13,8 @@ Entries are terse by design; the narrative for each release is in this file's gi
   directory this user owns at mode 0700, with `${XDG_CACHE_HOME:-$HOME/.cache}/keel-context-watch`
   as the fallback; the bash cached shortcut reads only the first, and only a cache file this user
   owns that is not a symlink (audit W-08).
+- done-guard strips quote characters from a scoped prefix's words, so a hand-edited
+  `verify.test_one` such as `./gradlew test --tests '*{name}'` counts the command it describes.
 - `review-code` quotes a plan-end checkpoint only when `git cat-file -t <sha>` prints `tree` and
   `git diff --name-only <sha> HEAD` exits 0, so a fresh clone without the note's tree runs the
   suite. ADR-0017 records the amendment.

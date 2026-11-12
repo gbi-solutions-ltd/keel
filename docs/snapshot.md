@@ -67,8 +67,8 @@ Stop, SubagentStop and PreCompact. No PostToolUse hook is registered.
 transcript, finds edits to non-documentation files inside the repository, and looks for
 `verify.test` as a substring of any Bash command in the turn, or the text of `verify.test_one` or
 <!-- keel:claim gate=done-guard harness=claude -->
-`verify.test_affected` before its first `{` where a simple command begins with it, the command
-split by shlex as a shell reads it (`hooks/done-guard#ITS LIMIT, STATED RATHER THAN DISCOVERED`).
+`verify.test_affected` before its first `{`, unless only a wrapper, where a command begins with
+it, both unquoted and split by shlex (`hooks/done-guard#ITS LIMIT, STATED RATHER THAN DISCOVERED`).
 It blocks the stop (`hooks/done-guard#if mode == "required":`) when `gates.done_verified` is
 `required`; otherwise it warns.
 

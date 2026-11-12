@@ -205,7 +205,7 @@ The coordinator commits after both review passes, with
 **Done when:** `tests/test-done-guard.sh`, `tests/test-validate-citations.sh` and
 `tests/test-harness-claims.sh` pass.
 
-- [ ] **Step 2.1: Build it test first**
+- [x] **Step 2.1: Build it test first** Note: round 1 red 87/1 quoted; round 2 updated four live docs (spec DEVIATES on them); round 3 fixed a blocking loosening (quotes-only prefix matched everything, reds 89/2); round 4 fixed wrapper-only prefixes and made a complete last word match exactly (reds 91/4); final comparison with HEAD over 25 prefixes and ~90 commands: no loosening, only real test commands newly count; done-guard 95/0; coordinator repaired two follow-ups-plan citations by phrase; follow-ups: the regex fallback still uses unstripped prefixes, bash -x {script} counts any bash -x as at HEAD
 
 Follow `keel:tdd`. Write cases for behaviours 1 and 2 after the existing cases.
 Run: `tests/test-done-guard.sh`
@@ -217,7 +217,7 @@ Run: the lint command. With the `Done when:` run above, that is the unit boundar
 Expected: PASS, or reds this task did not cause, each named and matched against the start record.
 This is the one boundary run the task schedules.
 
-- [ ] **Step 2.2: Hand over**
+- [x] **Step 2.2: Hand over** Note: rounds: 4; routing: inherit; loop: full
 
 ```bash
 git add hooks/done-guard tests/test-done-guard.sh CHANGELOG.md

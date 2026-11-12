@@ -128,7 +128,7 @@ Every task inherits these.
    records each call to a file and then runs the real git, a Stop whose calls hold no `Edit`,
    `Write` or `NotebookEdit` exits 0 with no output and the shim records no call; a Stop with an
    `Edit` records at least one. (Removing git from `PATH` proves nothing: the hook already catches
-   `OSError`, `hooks/done-guard:236`.)
+   `OSError`, `hooks/done-guard#except (OSError, subprocess.SubprocessError):`.)
 6. The "ITS LIMIT" header states the tokenised match, the fallback, the checkouts it knows and the
    one it does not (a nested repository that is neither a submodule nor a worktree), and what
    tokenising cannot see: a run inside backticks, anything after an unquoted `#`, and a
@@ -277,7 +277,7 @@ mutants (Blocking), one untested behaviour (Should fix), three Consider items. B
 4. An edit in the superproject, made from a submodule's `cwd`, is in the repository. Example: a
    committed superproject with a submodule added (`git -c protocol.file.allow=always submodule add`),
    `cwd` in the submodule, an `Edit` of `<super>/lib/foo.sh`, no test run, under `required`,
-   blocks; deleting the superproject line at `hooks/done-guard:244` turns it red.
+   blocks; deleting the superproject line at `hooks/done-guard#--show-superproject-working-tree` turns it red.
 5. Telling a bare token from a quoted one costs time linear in the command, not quadratic. Example:
    a Bash command of about 440 KB (a heredoc of repeated short lines) followed by `; tests/x.sh` is
    judged a run, and the hook finishes in under 2 s (it took 3.7 s with the prefix slice at
