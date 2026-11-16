@@ -34,9 +34,10 @@ each rule pinned by a grep in `tests/test-plan.sh`.
 `settings.json`, `.github/workflows`, `templates/ci-review.yml`, `lib/context_watch.py`).
 **Delivery:** pull-request
 **Concurrent batches:** none. `keel plan batches` on 2026-11-16 prints every task `alone`, with
-`why: task 2 depends on task 1` and so on to task 6 (rerun 2026-11-16 after task 6 was added). The chain is there because every task adds a
-line under `## Unreleased` in `CHANGELOG.md` and edits `tests/test-plan.sh`, and most share
-`plan-template.md` or `subagent-prompts.md`, so they run one at a time in the order 1 to 6.
+`why: task 2 depends on task 1` and so on to task 6 (rerun 2026-11-16 after task 6 was added).
+The chain is there because every task adds a line under `## Unreleased` in `CHANGELOG.md` and edits
+`tests/test-plan.sh`, and most share `plan-template.md` or `subagent-prompts.md`, so they run one
+at a time in the order 1 to 6.
 **Decided in this plan, put to Bernard at approval:**
 - The plan-start record lives in a header line the coordinator writes, `**Suite start:** pass at
   <commit>` or `**Suite start:** red at <commit> <names>`, committed alone as
@@ -501,6 +502,9 @@ touch, say so and leave it unstaged.
 - review-code: nothing blocking after the fix pass 97dd6fe, no standards violation open
   (2026-11-16, base 5775a71). The round 1 line was written with this record, not with the fix
   commit as `delivery.md` says: a coordinator slip, recorded here.
+- review-code (task 6, base 74a2350): nothing blocking after the fix pass 76bdddd, no standards
+  violation open (2026-11-16); its one should fix, the no-checkpoint resume not committing its
+  line, was fixed in that pass
 - follow-up:
   - folded into task 6 (2026-11-16): the `**Suite start:** red at` pin, the resume guidance's
     commit and no-checkpoint case, and "followed by a commit" in the docs
@@ -510,6 +514,9 @@ touch, say so and leave it unstaged.
   - consider: "a task appended after the last checkpoint" remains in `subagent-prompts.md` and
     ADR-0017's 2026-11-16 entry; "added" would match the new section
   - consider: the comment above `plan_status` in `bin/keel` still says "a value starting"
+  - consider: "followed by a commit" is stricter than the code, whose `[^ \t\r]` accepts any
+    non-blank token (`bin/keel`)
+  - consider: ADR-0017's last three lines were rewrapped by task 6 with no change in wording
   - consider: `docs/plans/2026-11-12-plan-execution-follow-ups.md` cites `CHANGELOG.md:28`, which
     breaks whenever an odd number of lines lands above it; task 6 kept its entry to 2 lines
   - consider: plans finished under 0.28.0 with a checkpoint line now print warn lines; they are
