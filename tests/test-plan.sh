@@ -90,7 +90,8 @@ out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
   && ok "status prints no warn line when the Suite start line is there" \
   || bad "status suite start present" "rc=$rc, got: $out"
 
-# A Suite start line silences the warn only with a value starting "pass at " or "red at ".
+# A Suite start line silences the warn only with a value of "pass at " or "red at "
+# followed by a commit.
 p="$d/suite-start-bare.md"
 mkplan "$p" "$CK" '**Suite start:**' '' '- [x] **Step 1.1: a**' '- [ ] **Step 1.2: b**'
 out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
@@ -3333,6 +3334,12 @@ grep -qF "that task's commit" "$f" \
   && grep -qF 'no checkpoint yet' "$f" \
   && ok "subagent-prompts resumes from a real commit, or a run on HEAD with no checkpoint yet" \
   || bad "subagent-prompts resume" "the resume sentence names no task's commit and no case with no checkpoint yet"
+
+grep -qF 'suite start` before the next dispatch' "$f" \
+  && grep -qF 'run is the record the next implementer' "$f" \
+  && ok "subagent-prompts commits a no-checkpoint resume run as suite start and carries it" \
+  || bad "subagent-prompts resume suite start" \
+    "the no-checkpoint resume run is not committed as suite start or not carried in START RECORD"
 
 grep -qF 'run `git status --porcelain` yourself' "$f" \
   && ok "subagent-prompts has the spec reviewer read the tree's status itself" \

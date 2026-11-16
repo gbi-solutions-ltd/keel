@@ -406,7 +406,9 @@ writes the line from the last checkpoint's record, naming the commit of the task
 that `suite:` record, since the note names a tree and not a commit: `pass at <that task's commit>`
 (`red at <that task's commit> <names>` for a red one), committed alone as the repair, rather than
 rerunning the suite for it. Resuming one with no checkpoint yet, it runs `verify.test` on HEAD
-before the next dispatch and records that run as the `**Suite start:**` line. Fill each
+and records that run as the `**Suite start:**` line, committed alone as
+`docs(plans): <slug> suite start` before the next dispatch, as the first branch's line is; that
+run is the record the next implementer's `=== START RECORD ===` block carries. Fill each
 implementer's `=== START RECORD ===` block with the last checkpoint's record, its commit and the
 reds still on it. The record is yours because you are the one agent that sees every task.
 
