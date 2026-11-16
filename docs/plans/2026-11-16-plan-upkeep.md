@@ -34,10 +34,10 @@ each rule pinned by a grep in `tests/test-plan.sh`.
 `settings.json`, `.github/workflows`, `templates/ci-review.yml`, `lib/context_watch.py`).
 **Delivery:** pull-request
 **Concurrent batches:** none. `keel plan batches` on 2026-11-16 prints every task `alone`, with
-`why: task 2 depends on task 1` and so on to task 6 (rerun 2026-11-16 after task 6 was added).
+`why: task 2 depends on task 1` and so on to task 7 (rerun 2026-11-16 after tasks 6 and 7 were added).
 The chain is there because every task adds a line under `## Unreleased` in `CHANGELOG.md` and edits
 `tests/test-plan.sh`, and most share `plan-template.md` or `subagent-prompts.md`, so they run one
-at a time in the order 1 to 6.
+at a time in the order 1 to 7.
 **Decided in this plan, put to Bernard at approval:**
 - The plan-start record lives in a header line the coordinator writes, `**Suite start:** pass at
   <commit>` or `**Suite start:** red at <commit> <names>`, committed alone as
@@ -488,6 +488,61 @@ git status --porcelain
 
 Stage exactly those paths and stop. **Do not commit.** The coordinator commits after both review
 passes, with `git commit -m "docs(execute-plan): resume names a real commit, pin the red start line"`.
+Paste the `git status --porcelain` output into your report; if it lists anything this task did not
+touch, say so and leave it unstaged.
+
+### Task 7: ADR-0017 states where a fix task for an earlier task's red is written
+
+**Task 7 added:** 2026-11-16, from the delivery follow-ups of PR #15; Bernard asked to fold the
+should-fix follow-ups into the same pull request. The one left was ADR-0017's Decision saying the
+fix task is "appended to the plan"; the consider items stay follow-ups.
+
+**Story:** none (follow-up of review item 1)
+**Files:**
+- Modify: `docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md`
+- Modify: `tests/test-plan.sh`
+- Modify: `CHANGELOG.md`
+
+**Docs searched:** "appended to the plan", "task appended". Hits not listed:
+`skills/execute-plan/references/subagent-prompts.md` (its fix-task rule already names "Adding a
+task to an approved plan"; its "A task appended after the last checkpoint" is a consider item).
+
+**Depends on:** task 6
+
+**Behaviours:**
+
+1. ADR-0017's 2026-11-16 Amended entry gains a sentence: the Decision's "a task appended to the
+   plan" (the fix for an earlier task's red at a checkpoint) now means a task written straight
+   after the last committed task, as `skills/write-plan/references/plan-template.md`'s "Adding a
+   task to an approved plan" says, so file order stays run order; the Decision text stands as
+   written for the day it was decided. The Decision section itself is not edited. Pinned by grep
+   on `straight after the last committed task` in the ADR.
+
+**Done when:** `tests/test-plan.sh` passes and `tests/validate-citations.sh` exits 0.
+
+- [ ] **Step 7.1: Build it test first**
+
+Follow `keel:tdd`: write the pin, run it, and watch it fail because the phrase is absent from the
+ADR, then write the sentence and watch it pass.
+Run: `tests/test-plan.sh` and `tests/validate-citations.sh`
+Expected before the implementation: FAIL, the pin for behaviour 1 fails. Expected after: PASS.
+Quote the failing case and its message.
+
+Run: the lint command from Global constraints. Run no `tests/run-tests.sh`: the coordinator runs
+the suite at checkpoints and hands you the last one's record as your start record. Expected: PASS,
+or reds this task did not cause, each named and matched against the start record. This is the one
+boundary run the task schedules.
+
+- [ ] **Step 7.2: Hand over**
+
+```bash
+git add docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md tests/test-plan.sh \
+        CHANGELOG.md
+git status --porcelain
+```
+
+Stage exactly those paths and stop. **Do not commit.** The coordinator commits after both review
+passes, with `git commit -m "docs(adr): ADR-0017 says where a checkpoint fix task is written"`.
 Paste the `git status --porcelain` output into your report; if it lists anything this task did not
 touch, say so and leave it unstaged.
 
