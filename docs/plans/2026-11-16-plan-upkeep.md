@@ -29,6 +29,7 @@ unchanged. The rest is text in `skills/write-plan/references/` and `skills/execu
 each rule pinned by a grep in `tests/test-plan.sh`.
 **Implementer routing:** inherit
 **Suite checkpoints:** every 3 tasks
+**Suite start:** pass at a6f03d5
 **Commits that ask:** none. No task stages a `hard_block_paths` path (`hooks`, `lib/harness`,
 `settings.json`, `.github/workflows`, `templates/ci-review.yml`, `lib/context_watch.py`).
 **Delivery:** pull-request
