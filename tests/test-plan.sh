@@ -3302,6 +3302,21 @@ grep -qF 'committed alone as' "$f" \
   && ok "plan-template commits a plan repair alone" \
   || bad "plan-template plan repair" "the added-task section does not commit a plan repair alone"
 
+grep -qF 'a `**Docs searched:**` line after its `Files` block' "$f" \
+  && grep -qF 'the project'"'"'s standards document' "$f" \
+  && ok "plan-template records each task's docs search, the standards document included" \
+  || bad "plan-template docs searched" "the live documents section does not require a **Docs searched:** line"
+
+awk '/^### Task 3: Reject an empty credential at startup/ { on = 1 } /^\*\*Depends on:\*\*/ { on = 0 } on' "$f" \
+  | grep -q '^\*\*Docs searched:\*\* ' \
+  && ok "plan-template's example task carries a Docs searched line after its Files block" \
+  || bad "plan-template example docs searched" "the example task has no **Docs searched:** line before Depends on"
+
+f="$ROOT/skills/write-plan/references/plan-review.md"
+grep -qF 'each task'"'"'s `**Docs searched:**` line' "$f" \
+  && ok "plan-review question 7 reads each task's Docs searched line" \
+  || bad "plan-review docs searched" "question 7 does not read each task's **Docs searched:** line"
+
 f="$ROOT/docs/03-install-and-distribution.md"
 grep -qF 'warn: no **Suite start:** line' "$f" \
   && grep -qF 'carries no suite: note' "$f" \

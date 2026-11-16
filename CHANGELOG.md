@@ -14,6 +14,8 @@ Entries are terse by design; the narrative for each release is in this file's gi
 - A task added to an approved plan carries a `**Task <id> added:**` line, is written after the last
   committed task, and rewrites the header lines that name tasks; a plan repair is committed alone as
   `docs(plans): <slug> <what>`.
+- Each plan task carries a `**Docs searched:**` line after its `Files` block, the standards document
+  searched for any convention it changes; the plan review's question 7 reads that line.
 
 ## 0.28.0 - 2026-11-13
 

@@ -279,7 +279,7 @@ step 2 (already sends the writer to the template's live documents rule).
 
 **Done when:** `tests/test-plan.sh` passes and `tests/validate-skills.sh` exits 0.
 
-- [ ] **Step 3.1: Build it test first**
+- [x] **Step 3.1: Build it test first** Note: red witnessed by the implementer (643 passed, 3 failed)
 
 Follow `keel:tdd` for each behaviour: write its pin from the example, run it, and watch it fail
 because the phrase is absent, then write the text and watch it pass.
@@ -292,7 +292,7 @@ the suite at checkpoints and hands you the last one's record as your start recor
 or reds this task did not cause, each named and matched against the start record. This is the one
 boundary run the task schedules.
 
-- [ ] **Step 3.2: Hand over**
+- [x] **Step 3.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES; suite: pass at tree 73bdff72f433a5c1f617d82a707d9cf376ac3e20
 
 ```bash
 git add skills/write-plan/references/plan-template.md \

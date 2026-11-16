@@ -71,7 +71,9 @@ Answer seven questions.
    task and the missing decision.
 7. Does each task's `Files` name every live document the change makes wrong? Search the
    documents that say what is true now, not records such as plans, ideas, decisions or released
-   changelog entries, for the behaviour each task changes, and name each hit no task lists.
+   changelog entries, for the behaviour each task changes, and name each hit no task lists. Read
+   each task's `**Docs searched:**` line, search the terms it missed, and name any task with no
+   such line.
 
 Rank findings: blocking, should fix, consider. If nothing blocks, say so in the first line.
 ```

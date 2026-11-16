@@ -105,6 +105,9 @@ person knows when they are needed. Approving the plan answers none of those asks
 - Modify: `src/main/java/com/example/config/SecurityProperties.java`
 - Test: `src/test/java/com/example/config/SecurityPropertiesTest.java`
 
+**Docs searched:** "apiKeys", "startup". Hit not listed: docs/configuration.md (names the key, not
+its validation).
+
 **Interfaces:**
 - Consumes: `SecurityProperties.apiKeys` (List<String>), defined in task 2
 - Produces: nothing new; adds validation to an existing type
@@ -195,6 +198,12 @@ paragraph under "Global constraints" names (`docs/plans`, `docs/ideas`, `docs/pr
 `docs/architecture`, `docs/decisions`, `docs/audits`, `docs/07-open-decisions.md`,
 `docs/harness-support.md`, the eval fixtures) and the released entries of `CHANGELOG.md`; each
 task's line goes under `## Unreleased`. Where the two lists overlap, the file is a record.
+
+Record the search in a `**Docs searched:**` line after its `Files` block: the terms searched, and
+each hit left out with its reason, so the plan review can repeat it. Example: `**Docs searched:**
+"plan status", "start record". Hit not listed: docs/05 (unchanged).` For any convention the task
+adds or changes, search the project's standards document as well: on the 2026-11-16 review of four
+plans, it was the stale document in four tasks.
 
 It costs the measured resumes: on the 2026-11-11 run, 4 of 13 tasks stopped because their Files
 missed a document the change made wrong, about 30 minutes.
