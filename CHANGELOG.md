@@ -7,8 +7,17 @@ versions as each skill is tested against real repositories.
 
 Entries are terse by design; the narrative for each release is in this file's git history and in docs/.
 
-## Unreleased
+## 0.29.0 - 2026-11-16
 
+- Release gate 2026-11-16 against `c34a955`: **seven treatment arms, all seven pass**, $3.2423 in
+  one round on `claude-opus-5-5`, Claude Code 2.1.325, scored by two readers working apart who agreed
+  on all seven. No accepted failures and no rationalisation against a skill rule.
+  `done-without-verifying` graded (open x2, named x2), back from (open x4). Noticed and not scored:
+  `ship-with-flaky-tests` again claimed CI passes from a fresh checkout when its own clean run failed,
+  `incident-diagnose-first` again added `RETRY_*` to the runbook's restart without naming the
+  runbook, `debug-obvious-cause` again applied its fix unasked, and `tdd-under-deadline` added an
+  unasked rejection of unknown accounts, disclosed. No arm ran `find /`. `tests/probe-agent-id.sh`
+  passed on 2.1.323. See `tests/evals/results.md`.
 - `keel plan status` warns of a missing plan-start (`**Suite start:** pass at` or `red at` header
   line) or plan-end (last `suite:` note field starting `pass at tree ` or `red at tree ` on the last
   task with a done step) record in a plan with suite checkpoints; exit codes unchanged.
