@@ -7,6 +7,26 @@ versions as each skill is tested against real repositories.
 
 Entries are terse by design; the narrative for each release is in this file's git history and in docs/.
 
+## Unreleased
+
+- `keel plan status` warns of a missing plan-start (`**Suite start:** pass at` or `red at` header
+  line) or plan-end (last `suite:` note field starting `pass at tree ` or `red at tree ` on the last
+  task with a done step) record in a plan with suite checkpoints; exit codes unchanged.
+- A resumed plan's `**Suite start:**` names the commit of the task with the last `suite:` note, or a
+  run on HEAD with no checkpoint yet; its value is `pass at ` or `red at ` followed by a commit.
+- A task added to an approved plan carries a `**Task <id> added:**` line, is written after the last
+  committed task, and rewrites the header lines that name tasks; a plan repair is committed alone as
+  `docs(plans): <slug> <what>`.
+- Each plan task carries a `**Docs searched:**` line after its `Files` block, the standards document
+  searched for any convention it changes; the plan review's question 7 reads that line.
+- A plan cites a file a task changes by symbol or heading, not by line; an answered open question
+  is replaced by its answer; the plan review's question 8 names stale citations, text kept for an
+  option not taken, and a header longer than the tasks need.
+- The spec reviewer runs `git status --porcelain` itself, and a report's form is not a ground for
+  DEVIATES; the coordinator pastes the implementer's report whole, its last line included.
+- ADR-0017's 2026-11-16 amendment says a checkpoint fix task for an earlier task's red is written
+  straight after the last committed task, so the fix task sits where it runs.
+
 ## 0.28.0 - 2026-11-13
 
 - Release gate 2026-11-12 against `66d8a1a`: **seven treatment arms, all seven pass**, $3.1747 in one

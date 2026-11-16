@@ -875,7 +875,7 @@ fx1="tests/evals/fixtures/implement-a-small-change"
 branch="$( cd "$p" 2>/dev/null && git rev-parse --abbrev-ref HEAD 2>/dev/null )"
 dirty="$( cd "$p" 2>/dev/null && git status --porcelain 2>/dev/null | wc -l | tr -d ' ' )"
 changed="$( cd "$p" 2>/dev/null && git diff --name-only main...HEAD 2>/dev/null | tr '\n' ' ' )"
-next="$( cd "$p" 2>/dev/null && "$kl" plan status "$plan" 2>/dev/null | tail -1 )"
+next="$( cd "$p" 2>/dev/null && "$kl" plan status "$plan" 2>/dev/null | grep '^next:' )"
 light="$( cd "$p" 2>/dev/null && "$kl" plan risk src/format.sh tests/test-format.sh 2>/dev/null | tail -1 )"
 same=1
 for f in .keel/profile.json src/format.sh tests/test-format.sh src/auth/link.sh; do

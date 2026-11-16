@@ -142,7 +142,10 @@ report.
 
 Answer six questions:
 1. Is every step's stated outcome actually present?
-2. Is anything here that no step asked for? Name it.
+2. Is anything here that no step asked for? Name it, and run `git status --porcelain` yourself in
+   the tree under review, which for a declared batch is the task's own worktree, to find any path
+   no step asked for. A report's form, such as a missing or trimmed porcelain paste, is not a
+   ground for DEVIATES.
 3. Does each listed behaviour have a test asserting its example, and does no test assert something
    adjacent instead? For a task with no test, quote the line of the diff, or the check output, that
    produces each behaviour's example. For a task with no behaviours list, in the older shape, does
@@ -174,6 +177,10 @@ Question four keeps the reviewer to the scoped re-run. Across three sessions, 24
 reviewers ran the full suite, minutes each, to re-check output the report already quoted. The
 `Done when:` commands take seconds and are the check only the reviewer can make independently;
 the suite runs at the coordinator's checkpoints.
+
+Paste the implementer's report whole, its last line included. In one reviewed run, task 7 got a
+spec DEVIATES on correct code because the coordinator's brief left out the porcelain line the
+report held. Question two has the reviewer read the tree's status itself for the same reason.
 
 ## 3. Code quality review
 
@@ -384,10 +391,26 @@ is kept, and a ticked step is not touched. Commit the plan alone as a repair,
 tasks, the plan runs as written, its steps naming the suite where they do.
 
 **Run `verify.test` before the first dispatch, after every N committed tasks, and after the last.**
-The first run is the plan-start record: its commit and the tests red on it. With N 3, a 10-task
-plan runs it at start and after tasks 3, 6, 9 and 10. Fill each implementer's
-`=== START RECORD ===` block with the last checkpoint's record, its commit and the reds still on
-it. The record is yours because you are the one agent that sees every task.
+The first run is the plan-start record: its commit and the tests red on it. Write it into the plan
+header as the line `**Suite start:**`, `pass at <commit>` or `red at <commit> <names>`, and commit
+the plan alone as `docs(plans): <slug> suite start` before the first dispatch, so the tree is clean
+when task 1 is dispatched and a discarded attempt cannot take the record with it. With N 3, a
+10-task plan runs it at start and after tasks 3, 6, 9 and 10. A task appended after the last
+checkpoint moves the plan-end checkpoint to the new last task. `keel plan status` prints a `warn:`
+line when a step is done and no `**Suite start:**` line has a value of `pass at ` or `red at `
+followed by a commit, and at `next: none` when the last task with a done step (a task whose steps
+are all deferred or not applicable is skipped) has no done step whose note's last `suite:` field
+starts `pass at tree ` or `red at tree `. A coordinator resuming a plan whose
+`**Suite checkpoints:**` line was written before this rule, and so has no `**Suite start:**` line,
+writes the line from the last checkpoint's record, naming the commit of the task whose note carries
+that `suite:` record, since the note names a tree and not a commit: `pass at <that task's commit>`
+(`red at <that task's commit> <names>` for a red one), committed alone as the repair, rather than
+rerunning the suite for it. Resuming one with no checkpoint yet, it runs `verify.test` on HEAD
+and records that run as the `**Suite start:**` line, committed alone as
+`docs(plans): <slug> suite start` before the next dispatch, as the first branch's line is; that
+run is the record the next implementer's `=== START RECORD ===` block carries. Fill each
+implementer's `=== START RECORD ===` block with the last checkpoint's record, its commit and the
+reds still on it. The record is yours because you are the one agent that sees every task.
 
 **At a checkpoint task the order is fixed:**
 
@@ -414,7 +437,9 @@ have hidden the break, so naming the staged task alone sends `debug` to the wron
 - If the staged task caused it, it is a rejection of that task, handled as the loop handles one.
 - If an earlier task did, tick and commit the staged task with
   `suite: red at tree <tree sha> <names>`, and send Phase 4 to a fresh implementer as a task
-  appended to the plan, in the full loop, before any further dispatch. The earlier task is already
+  added to the plan, in the full loop, before any further dispatch. Write it straight after the
+  last committed task, as "Adding a task to an approved plan" in
+  [plan-template.md](../../write-plan/references/plan-template.md) says. The earlier task is already
   committed, so the fix can only be a new commit, and dispatching past a known red would let later
   tasks build on it.
 
@@ -468,7 +493,10 @@ honest plan edit is direction: recording a verdict, tightening a step whose asse
 found too weak, or withdrawing a claim the plan cannot support all make the task **harder** to pass,
 and those are yours to make. Loosening a gate so a failing step passes makes it easier, and that is
 the mistake the skill names. Where the repair would make a blocked task passable by changing what
-was planned, propose it and let the user rule.
+was planned, propose it and let the user rule. A plan repair (a task added, a `Files` entry added,
+a step tightened) is committed alone as `docs(plans): <slug> <what>` before the next task is sent,
+with `git commit -m <msg> -- <plan>` when the task's paths are already staged; ticks, tick notes
+and the follow-up list still ride with the task's commit.
 
 It is also usually bigger than it looks. A subagent that wrote its test first and watched it fail
 has a test asserting whatever it built, so a report saying "returns `a - b` rather than the

@@ -77,8 +77,13 @@ the request, so the choice made at approval is the one a later session finds.
 
 **The suite checkpoints line** says how often `execute-plan`'s coordinator runs `verify.test`: once
 before the first dispatch, after every N committed tasks and after the last. Its implementers run
-no `verify.test`; each starts from the last checkpoint's record. 3 is the default, and the person
-approving the plan can change it. The reason is ADR-0017
+no `verify.test`; each starts from the last checkpoint's record. The coordinator, not the planner,
+records the first run in a header line, `**Suite start:** pass at <commit>` or `red at <commit>
+<names>`. `keel plan status` warns once a step is done and no such line has a value of `pass at `
+or `red at ` followed by a commit, and at `next: none` when the last task with a done step (a task
+whose steps are all deferred or not applicable is skipped) has no done step whose note's last
+`suite:` field starts `pass at tree ` or `red at tree `. 3 is the default, and the person approving
+the plan can change it. The reason is ADR-0017
 (`docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md`): on a measured run the
 suite, run twice per task, took 22% of the wall clock, and one run every few tasks still bounds how
 far back a break can hide. A plan with no such line runs its steps as written, so its build steps
@@ -102,6 +107,9 @@ person knows when they are needed. Approving the plan answers none of those asks
 **Files:**
 - Modify: `src/main/java/com/example/config/SecurityProperties.java`
 - Test: `src/test/java/com/example/config/SecurityPropertiesTest.java`
+
+**Docs searched:** "apiKeys", "startup". Hit not listed: docs/configuration.md (names the key, not
+its validation).
 
 **Interfaces:**
 - Consumes: `SecurityProperties.apiKeys` (List<String>), defined in task 2
@@ -194,8 +202,22 @@ paragraph under "Global constraints" names (`docs/plans`, `docs/ideas`, `docs/pr
 `docs/harness-support.md`, the eval fixtures) and the released entries of `CHANGELOG.md`; each
 task's line goes under `## Unreleased`. Where the two lists overlap, the file is a record.
 
+Record the search in a `**Docs searched:**` line after its `Files` block: the terms searched, and
+each hit left out with its reason, so the plan review can repeat it. Example: `**Docs searched:**
+"plan status", "start record". Hit not listed: docs/05 (unchanged).` For any convention the task
+adds or changes, search the project's standards document as well: on the 2026-11-16 review of four
+plans, it was the stale document in four tasks.
+
 It costs the measured resumes: on the 2026-11-11 run, 4 of 13 tasks stopped because their Files
 missed a document the change made wrong, about 30 minutes.
+
+### Citations
+
+A file some task in the plan changes is cited by symbol or heading (`queue.go`,
+`func defaultQueue`), not by line, because the run moves its lines. A line number is kept only for
+a file no task changes. One plan's citations into an API spec and its Go sources were exact at the
+commit it was written on and wrong by the end of its own run; another cited line 23 of a file for
+code at line 30.
 
 ### Why the Interfaces block exists
 
@@ -356,6 +378,11 @@ starts, so a question you could have settled in one exchange costs a whole cycle
 to the user as a choice, following
 [../../keel/references/asking-questions.md](../../keel/references/asking-questions.md).
 
+Once the person answers, the question is replaced by its answer, who gave it and the date, with
+one line naming the options not taken. Text that applied only to another option goes, and a header
+line written conditionally on the answer is rewritten. One plan kept options B and C, an "Under
+option B" paragraph and a conditional `**Commits that ask:**` line after the owner chose.
+
 ## Commands come from the profile
 
 Every `Run:` line uses a command from `.keel/profile.json`. Do not guess, and do not use the
@@ -398,6 +425,27 @@ This task hands over as above.
 
 The failure mode this prevents is a fabricated test that passes without checking anything, which
 is worse than an honest gap because it reads as coverage.
+
+## Adding a task to an approved plan
+
+A task added after approval, by the coordinator, the person or a review, carries a line under its
+heading, `**Task <id> added:** <date>, <source and who decided>`, for example
+`**Task 4a added:** 2026-11-16, from the task-6 checkpoint red, decided by the coordinator`. In the
+same edit, every header line that names tasks is rewritten to match: `**Commits that ask:**` names
+the new task when it stages a `hard_block_paths` path, `**Concurrent batches:**` is rewritten from a
+fresh `keel plan batches` run, and a new last task moves the plan-end checkpoint to it.
+
+Write the task where it runs, straight after the last committed task, so file order stays run order
+and the last task `keel plan status` reads is the last one run. One reviewed plan wrote 4a between
+4 and 5 and ran it after 5. Order lives in `Depends on:` lines and file position, so a plan keeps no
+separate order table to fall out of date. A `review-code` fix pass is not an added task: it stays a
+`fix: <what> (review-code)` commit outside the task list.
+
+A plan repair (a task added, a `Files` entry added, a step tightened) is committed alone as
+`docs(plans): <slug> <what>` before the next task is sent, with `git commit -m <msg> -- <plan>` when
+the task's paths are already staged. Ticks, tick notes and the follow-up list still ride with the
+task's commit. In the 2026-11-16 review of four plans, coordinator `Files` additions landed inside
+two feature commits, where the plan change read as part of the feature.
 
 ## Self-review
 

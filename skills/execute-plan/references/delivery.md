@@ -77,6 +77,11 @@ A blocking finding, or a standards violation `ship` check 5 would refuse under
 If `keel plan risk` answers `loop: full` for the fix, the fix gets the full loop's two passes
 before the re-review, as any task would; exit 4 stops the run, as the case above says.
 
+The person may instead add tasks from the `review-code` or audit findings in place of the one fix
+pass. Each is written as "Adding a task to an approved plan" in
+[plan-template.md](../../write-plan/references/plan-template.md) says and runs through the loop as
+any task does; the fix pass itself stays a `fix: <what> (review-code)` commit outside the task list.
+
 A second blocking round stops the run, because `review-code` step 5 takes two blocking reports to
 the person rather than start a third round. Should fix and consider findings do not stop it; they
 go into the pull request body as the follow-up list that `ship` writes.
