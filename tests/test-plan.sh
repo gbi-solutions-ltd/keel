@@ -3412,6 +3412,10 @@ grep -qF '**2026-11-16, decided by Bernard Tebandeke: the plan-start record is a
   && ok "ADR-0017 is amended for the Suite start line and the warnings" \
   || bad "ADR-0017 suite start" "no 2026-11-16 Amended entry for the Suite start line"
 
+grep -qF 'straight after the last committed task' "$f" \
+  && ok "ADR-0017 says a checkpoint fix task is written after the last committed task" \
+  || bad "ADR-0017 fix task place" "the 2026-11-16 entry does not say where a fix task is written"
+
 f="$ROOT/skills/execute-plan/references/parallel-batches.md"
 grep -qF 'Tick the whole batch'"'"'s steps with `keel plan tick`' "$f" \
   && grep -qF 'By hand, tick serially' "$f" \

@@ -520,7 +520,7 @@ task to an approved plan"; its "A task appended after the last checkpoint" is a 
 
 **Done when:** `tests/test-plan.sh` passes and `tests/validate-citations.sh` exits 0.
 
-- [ ] **Step 7.1: Build it test first**
+- [x] **Step 7.1: Build it test first** Note: red witnessed by the implementer (659 passed, 1 failed)
 
 Follow `keel:tdd`: write the pin, run it, and watch it fail because the phrase is absent from the
 ADR, then write the sentence and watch it pass.
@@ -533,7 +533,7 @@ the suite at checkpoints and hands you the last one's record as your start recor
 or reds this task did not cause, each named and matched against the start record. This is the one
 boundary run the task schedules.
 
-- [ ] **Step 7.2: Hand over**
+- [x] **Step 7.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES, flagged the new sentence as reading against the paragraph's 'file order is not run order'; suite: pass at tree 62016612ada8b1cdd9d2f6ac586626661cd1a255
 
 ```bash
 git add docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md tests/test-plan.sh \

@@ -183,4 +183,7 @@ note's last `suite:` field starts `pass at tree ` or `red at tree `. It checks t
 not the cadence, since file order is not run order, and the warnings change no exit code, so
 `ship`'s gate is unaffected. A task appended after the last checkpoint moves the plan-end checkpoint
 to the new last task. The Decision's "The first run is the plan-start record" stands, now with a
-place to keep it.
+place to keep it. The Decision's "a task appended to the plan", the fix for an earlier task's red
+at a checkpoint, now means a task written straight after the last committed task, as "Adding a
+task to an approved plan" in `skills/write-plan/references/plan-template.md` says, so file order
+stays run order; the Decision text stands as written for the day it was decided.
