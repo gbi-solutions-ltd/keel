@@ -34,7 +34,8 @@ each rule pinned by a grep in `tests/test-plan.sh`.
 `settings.json`, `.github/workflows`, `templates/ci-review.yml`, `lib/context_watch.py`).
 **Delivery:** pull-request
 **Concurrent batches:** none. `keel plan batches` on 2026-11-16 prints every task `alone`, with
-`why: task 2 depends on task 1` and so on to task 7 (rerun 2026-11-16 after tasks 6 and 7 were added).
+`why: task 2 depends on task 1` and so on to task 7 (rerun 2026-11-16 after tasks 6 and 7 were
+added).
 The chain is there because every task adds a line under `## Unreleased` in `CHANGELOG.md` and edits
 `tests/test-plan.sh`, and most share `plan-template.md` or `subagent-prompts.md`, so they run one
 at a time in the order 1 to 7.
@@ -560,12 +561,14 @@ touch, say so and leave it unstaged.
 - review-code (task 6, base 74a2350): nothing blocking after the fix pass 76bdddd, no standards
   violation open (2026-11-16); its one should fix, the no-checkpoint resume not committing its
   line, was fixed in that pass
+- review (task 7, 2026-11-16): spec COMPLIES; its one finding, the new ADR sentence reading
+  against the same paragraph's "file order is not run order", was fixed in 7d6501a and read by
+  the coordinator; no further review round
 - follow-up:
   - folded into task 6 (2026-11-16): the `**Suite start:** red at` pin, the resume guidance's
     commit and no-checkpoint case, and "followed by a commit" in the docs
-  - should fix: ADR-0017's Decision still says the fix task is "appended to the plan"; ADR
-    Decision text stands as written, so a further dated Amended note is the route if it should be
-    stated (`docs/decisions/ADR-0017-...`)
+  - folded into task 7 (2026-11-16): ADR-0017's Decision saying the fix task is "appended to the
+    plan", answered by a sentence in its 2026-11-16 Amended entry
   - consider: "a task appended after the last checkpoint" remains in `subagent-prompts.md` and
     ADR-0017's 2026-11-16 entry; "added" would match the new section
   - consider: the comment above `plan_status` in `bin/keel` still says "a value starting"
