@@ -395,7 +395,7 @@ touch, say so and leave it unstaged.
 **Done when:** `tests/test-plan.sh` passes, and `tests/test-agents.sh` and
 `tests/validate-skills.sh` exit 0.
 
-- [ ] **Step 5.1: Build it test first**
+- [x] **Step 5.1: Build it test first** Note: red witnessed by the implementer (649 passed, 2 failed)
 
 Follow `keel:tdd` for each behaviour: write its pin from the example, run it, and watch it fail
 because the phrase is absent, then write the text and watch it pass.
@@ -408,7 +408,7 @@ the suite at checkpoints and hands you the last one's record as your start recor
 or reds this task did not cause, each named and matched against the start record. This is the one
 boundary run the task schedules.
 
-- [ ] **Step 5.2: Hand over**
+- [x] **Step 5.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES; suite: pass at tree 128fb684843245e482ff6303e3a454e19675a30b
 
 ```bash
 git add skills/execute-plan/references/subagent-prompts.md tests/test-plan.sh CHANGELOG.md

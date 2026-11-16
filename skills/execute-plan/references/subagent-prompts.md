@@ -142,7 +142,9 @@ report.
 
 Answer six questions:
 1. Is every step's stated outcome actually present?
-2. Is anything here that no step asked for? Name it.
+2. Is anything here that no step asked for? Name it, and run `git status --porcelain` yourself to
+   find any path no step asked for. A report's form, such as a missing or trimmed porcelain paste,
+   is not a ground for DEVIATES.
 3. Does each listed behaviour have a test asserting its example, and does no test assert something
    adjacent instead? For a task with no test, quote the line of the diff, or the check output, that
    produces each behaviour's example. For a task with no behaviours list, in the older shape, does
@@ -174,6 +176,10 @@ Question four keeps the reviewer to the scoped re-run. Across three sessions, 24
 reviewers ran the full suite, minutes each, to re-check output the report already quoted. The
 `Done when:` commands take seconds and are the check only the reviewer can make independently;
 the suite runs at the coordinator's checkpoints.
+
+Paste the implementer's report whole, its last line included. In one reviewed run, task 7 got a
+spec DEVIATES on correct code because the coordinator's brief left out the porcelain line the
+report held. Question two has the reviewer read the tree's status itself for the same reason.
 
 ## 3. Code quality review
 

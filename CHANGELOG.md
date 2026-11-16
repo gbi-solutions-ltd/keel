@@ -19,6 +19,8 @@ Entries are terse by design; the narrative for each release is in this file's gi
 - A plan cites a file a task changes by symbol or heading, not by line; an answered open question
   is replaced by its answer; the plan review's question 8 names stale citations, text kept for an
   option not taken, and a header longer than the tasks need.
+- The spec reviewer runs `git status --porcelain` itself, and a report's form is not a ground for
+  DEVIATES; the coordinator pastes the implementer's report whole, its last line included.
 
 ## 0.28.0 - 2026-11-13
 

@@ -3283,6 +3283,14 @@ grep -qF 'Adding a task to an approved plan' "$f" \
   && ok "subagent-prompts points an appended fix task to the added-task section" \
   || bad "subagent-prompts added task" "the checkpoint rule does not name Adding a task to an approved plan"
 
+grep -qF 'run `git status --porcelain` yourself' "$f" \
+  && ok "subagent-prompts has the spec reviewer read the tree's status itself" \
+  || bad "subagent-prompts spec status" "spec question 2 does not have the reviewer run git status --porcelain itself"
+
+grep -qF 'its last line included' "$f" \
+  && ok "subagent-prompts hands the spec reviewer the whole report" \
+  || bad "subagent-prompts whole report" "the spec prompt's notes do not paste the report whole, its last line included"
+
 f="$ROOT/skills/execute-plan/references/delivery.md"
 grep -qF 'Adding a task to an approved plan' "$f" \
   && ok "delivery points tasks added from review findings to the added-task section" \
