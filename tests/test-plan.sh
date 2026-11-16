@@ -98,6 +98,14 @@ out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
   && ok "status warns when the Suite start line has no pass at or red at value" \
   || bad "status suite start bare" "rc=$rc, got: $out"
 
+p="$d/suite-start-red.md"
+mkplan "$p" "$CK" '**Suite start:** red at 3f9a1c2 test-x' '' '- [x] **Step 1.1: a**' \
+  '- [ ] **Step 1.2: b**'
+out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
+[ "$rc" -eq 0 ] && ! printf '%s\n' "$out" | grep -q '^warn:' \
+  && ok "status prints no warn line when the Suite start line is red at a commit" \
+  || bad "status suite start red" "rc=$rc, got: $out"
+
 p="$d/suite-not-started.md"
 mkplan "$p" "$CK" '' '- [ ] **Step 1.1: a**' '- [ ] **Step 1.2: b**' \
   '- [-] **Step 2.1: c** Deferred: later' '- [~] **Step 2.2: d** Not applicable: none'
@@ -3321,6 +3329,11 @@ grep -qF 'Adding a task to an approved plan' "$f" \
   && ok "subagent-prompts points an appended fix task to the added-task section" \
   || bad "subagent-prompts added task" "the checkpoint rule does not name Adding a task to an approved plan"
 
+grep -qF "that task's commit" "$f" \
+  && grep -qF 'no checkpoint yet' "$f" \
+  && ok "subagent-prompts resumes from a real commit, or a run on HEAD with no checkpoint yet" \
+  || bad "subagent-prompts resume" "the resume sentence names no task's commit and no case with no checkpoint yet"
+
 grep -qF 'run `git status --porcelain` yourself' "$f" \
   && ok "subagent-prompts has the spec reviewer read the tree's status itself" \
   || bad "subagent-prompts spec status" "spec question 2 does not have the reviewer run git status --porcelain itself"
@@ -3382,6 +3395,10 @@ grep -qF 'warn: no **Suite start:** line' "$f" \
   && grep -qF 'warn lines leave the exit code alone' "$f" \
   && ok "the install doc names both plan status warn lines" \
   || bad "install doc suite warns" "the keel plan status section does not name both warn lines"
+
+grep -qF 'followed by a commit' "$f" \
+  && ok "the install doc says a Suite start value is followed by a commit" \
+  || bad "install doc suite start commit" "the plan status section does not say pass at or red at followed by a commit"
 
 f="$ROOT/docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md"
 grep -qF '**2026-11-16, decided by Bernard Tebandeke: the plan-start record is a `**Suite start:**`' "$f" \

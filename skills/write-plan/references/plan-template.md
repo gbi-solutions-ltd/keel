@@ -79,11 +79,11 @@ the request, so the choice made at approval is the one a later session finds.
 before the first dispatch, after every N committed tasks and after the last. Its implementers run
 no `verify.test`; each starts from the last checkpoint's record. The coordinator, not the planner,
 records the first run in a header line, `**Suite start:** pass at <commit>` or `red at <commit>
-<names>`. `keel plan status` warns once a step is done and no such line has a value starting
-`pass at ` or `red at `, and at `next: none` when the last task with a done step (a task whose
-steps are all deferred or not applicable is skipped) has no done step whose note's last `suite:`
-field starts `pass at tree ` or `red at tree `. 3 is the default, and the person approving the plan
-can change it. The reason is ADR-0017
+<names>`. `keel plan status` warns once a step is done and no such line has a value of `pass at `
+or `red at ` followed by a commit, and at `next: none` when the last task with a done step (a task
+whose steps are all deferred or not applicable is skipped) has no done step whose note's last
+`suite:` field starts `pass at tree ` or `red at tree `. 3 is the default, and the person approving
+the plan can change it. The reason is ADR-0017
 (`docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md`): on a measured run the
 suite, run twice per task, took 22% of the wall clock, and one run every few tasks still bounds how
 far back a break can hide. A plan with no such line runs its steps as written, so its build steps

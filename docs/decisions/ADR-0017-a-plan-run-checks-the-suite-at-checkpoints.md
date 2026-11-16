@@ -176,11 +176,11 @@ line, and `keel plan status` warns when a start or end record is missing.** Item
 writes `**Suite start:** pass at <commit>` or `**Suite start:** red at <commit> <names>` and commits
 the plan alone as `docs(plans): <slug> suite start` before the first dispatch, so the record is in
 the plan and a discarded attempt cannot take it. For a plan with a checkpoint line, `plan status`
-prints a `warn:` line when a step is done and no `**Suite start:**` line has a value starting
-`pass at ` or `red at `, and, at `next: none`, one when the last task in file order with a done
-step (a task whose steps are all deferred or not applicable is skipped) has no done step whose
+prints a `warn:` line when a step is done and no `**Suite start:**` line has a value of `pass at `
+or `red at ` followed by a commit, and, at `next: none`, one when the last task in file order with a
+done step (a task whose steps are all deferred or not applicable is skipped) has no done step whose
 note's last `suite:` field starts `pass at tree ` or `red at tree `. It checks the end state only,
 not the cadence, since file order is not run order, and the warnings change no exit code, so
-`ship`'s gate is unaffected. A task appended after the last checkpoint moves the plan-end
-checkpoint to the new last task. The Decision's "The first run is the plan-start record" stands,
-now with a place to keep it.
+`ship`'s gate is unaffected. A task appended after the last checkpoint moves the plan-end checkpoint
+to the new last task. The Decision's "The first run is the plan-start record" stands, now with a
+place to keep it.

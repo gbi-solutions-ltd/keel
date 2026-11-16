@@ -450,8 +450,8 @@ counted. It exits 1, with a `problem:` line for each, where a deferred or not-ap
 reason, an id appears twice, an open checkbox is not a step it can read, or a fence never closes.
 A plan with a `**Suite checkpoints:**` line also gets `warn:` lines after `next:` and before any
 `problem:` line: `warn: no **Suite start:** line, so the plan-start suite run is not recorded` once
-a step is done and no `**Suite start:**` line has a value starting `pass at ` or
-`red at `, and, at `next: none`,
+a step is done and no `**Suite start:**` line has a value of `pass at ` or `red at `
+followed by a commit, and, at `next: none`,
 `warn: task <id> is the last task and carries no suite: note, so the plan-end suite run is not recorded`
 when the last task with a done step (a task whose steps are all deferred or not applicable is
 skipped) has no done step whose note's last `suite:` field starts `pass at tree ` or `red at tree `.

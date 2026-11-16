@@ -460,7 +460,7 @@ files above; `CHANGELOG.md`'s task 1 line names `pass at` and `red at` and stays
 **Done when:** `tests/test-plan.sh` passes and `tests/validate-skills.sh` and
 `tests/validate-citations.sh` exit 0.
 
-- [ ] **Step 6.1: Build it test first**
+- [x] **Step 6.1: Build it test first** Note: red witnessed by the implementer (656 passed, 2 failed); behaviour 3 passed on arrival and was shown red by mutating the start regex, bin/keel restored
 
 Follow `keel:tdd` for each behaviour: write its case or pin, run it, and watch it fail for the
 reason the behaviour names (behaviour 3's case passes on arrival, since the code already accepts
@@ -475,7 +475,7 @@ the suite at checkpoints and hands you the last one's record as your start recor
 or reds this task did not cause, each named and matched against the start record. This is the one
 boundary run the task schedules.
 
-- [ ] **Step 6.2: Hand over**
+- [x] **Step 6.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES; suite: pass at tree 1cf54d10c86f9e8350a7c8eaddc5a279b6f4899c
 
 ```bash
 git add skills/execute-plan/references/subagent-prompts.md docs/03-install-and-distribution.md \
@@ -502,23 +502,19 @@ touch, say so and leave it unstaged.
   (2026-11-16, base 5775a71). The round 1 line was written with this record, not with the fix
   commit as `delivery.md` says: a coordinator slip, recorded here.
 - follow-up:
-  - should fix: no case pins `**Suite start:** red at <commit> <names>`; dropping `red` from the
-    start regex survives the suite (`bin/keel`, `tests/test-plan.sh`)
-  - should fix: ADR-0017's Decision still says the fix task is "appended to the plan"; ADRs here
-    are records whose Decision text stands as written, so a further dated Amended note is the
-    route if it should be stated (`docs/decisions/ADR-0017-...`)
-  - consider: the resume guidance says to write `pass at <that commit>` from the last checkpoint,
-    whose note holds a tree sha, not a commit; and it has no step for a pre-rule plan with no
-    checkpoint yet (`subagent-prompts.md`)
-  - consider: the code needs a non-blank value after `pass at `/`red at `; the docs say only "a
-    value starting" (`docs/03-install-and-distribution.md`)
+  - folded into task 6 (2026-11-16): the `**Suite start:** red at` pin, the resume guidance's
+    commit and no-checkpoint case, and "followed by a commit" in the docs
+  - should fix: ADR-0017's Decision still says the fix task is "appended to the plan"; ADR
+    Decision text stands as written, so a further dated Amended note is the route if it should be
+    stated (`docs/decisions/ADR-0017-...`)
   - consider: "a task appended after the last checkpoint" remains in `subagent-prompts.md` and
     ADR-0017's 2026-11-16 entry; "added" would match the new section
+  - consider: the comment above `plan_status` in `bin/keel` still says "a value starting"
+  - consider: `docs/plans/2026-11-12-plan-execution-follow-ups.md` cites `CHANGELOG.md:28`, which
+    breaks whenever an odd number of lines lands above it; task 6 kept its entry to 2 lines
   - consider: plans finished under 0.28.0 with a checkpoint line now print warn lines; they are
     records, so the warnings are true and left alone
-  - consider: the awk change was not run under mawk or gawk locally (neither installed); CI on
-    Ubuntu is the check
-  - consider: in this run the done-guard stop hook (installed keel 0.27.0) asked each implementer
-    to run the full suite despite the checkpoint brief, and on task 1 its forced reply replaced
-    the report as the agent's final message; check whether 0.28.0's scoped prefixes fix this
-    before filing it
+  - consider: CI's Ubuntu job failed once on the known concurrent-ticks race (19 of 20 landed,
+    two holders at once), unrelated to this branch; the rerun request got HTTP 500
+  - resolved: the done-guard stop prompts in this run came from the session's keel 0.27.0 hooks,
+    which have no scoped-run rule; 0.28.0 counts `tests/test-plan.sh` through `verify.test_one`

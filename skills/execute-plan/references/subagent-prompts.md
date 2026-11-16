@@ -397,15 +397,18 @@ the plan alone as `docs(plans): <slug> suite start` before the first dispatch, s
 when task 1 is dispatched and a discarded attempt cannot take the record with it. With N 3, a
 10-task plan runs it at start and after tasks 3, 6, 9 and 10. A task appended after the last
 checkpoint moves the plan-end checkpoint to the new last task. `keel plan status` prints a `warn:`
-line when a step is done and no `**Suite start:**` line has a value starting `pass at ` or
-`red at `, and at `next: none` when the last task with a done step (a task whose steps are all
-deferred or not applicable is skipped) has no done step whose note's last `suite:` field starts
-`pass at tree ` or `red at tree `. A coordinator resuming a plan whose `**Suite checkpoints:**`
-line was written before this rule, and so has no `**Suite start:**` line, writes the line from the
-last checkpoint's record, `pass at <that commit>` (`red at <that commit> <names>` for a red one),
-committed alone as the repair, rather than rerunning the suite for it. Fill each implementer's
-`=== START RECORD ===` block with the last checkpoint's record, its commit and the reds still on
-it. The record is yours because you are the one agent that sees every task.
+line when a step is done and no `**Suite start:**` line has a value of `pass at ` or `red at `
+followed by a commit, and at `next: none` when the last task with a done step (a task whose steps
+are all deferred or not applicable is skipped) has no done step whose note's last `suite:` field
+starts `pass at tree ` or `red at tree `. A coordinator resuming a plan whose
+`**Suite checkpoints:**` line was written before this rule, and so has no `**Suite start:**` line,
+writes the line from the last checkpoint's record, naming the commit of the task whose note carries
+that `suite:` record, since the note names a tree and not a commit: `pass at <that task's commit>`
+(`red at <that task's commit> <names>` for a red one), committed alone as the repair, rather than
+rerunning the suite for it. Resuming one with no checkpoint yet, it runs `verify.test` on HEAD
+before the next dispatch and records that run as the `**Suite start:**` line. Fill each
+implementer's `=== START RECORD ===` block with the last checkpoint's record, its commit and the
+reds still on it. The record is yours because you are the one agent that sees every task.
 
 **At a checkpoint task the order is fixed:**
 
