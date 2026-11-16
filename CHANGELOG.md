@@ -25,7 +25,7 @@ Entries are terse by design; the narrative for each release is in this file's gi
 - The spec reviewer runs `git status --porcelain` itself, and a report's form is not a ground for
   DEVIATES; the coordinator pastes the implementer's report whole, its last line included.
 - ADR-0017's 2026-11-16 amendment says a checkpoint fix task for an earlier task's red is written
-  straight after the last committed task, so file order stays run order.
+  straight after the last committed task, so the fix task sits where it runs.
 
 ## 0.28.0 - 2026-11-13
 
