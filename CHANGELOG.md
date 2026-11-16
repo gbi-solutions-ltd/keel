@@ -7,6 +7,11 @@ versions as each skill is tested against real repositories.
 
 Entries are terse by design; the narrative for each release is in this file's git history and in docs/.
 
+## Unreleased
+
+- `keel plan status` warns of a missing plan-start (`**Suite start:**` header line) or plan-end
+  (`suite:` note on the last task) record in a plan with suite checkpoints; exit codes unchanged.
+
 ## 0.28.0 - 2026-11-13
 
 - Release gate 2026-11-12 against `66d8a1a`: **seven treatment arms, all seven pass**, $3.1747 in one

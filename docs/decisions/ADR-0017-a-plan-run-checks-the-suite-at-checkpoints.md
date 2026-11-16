@@ -7,7 +7,7 @@
 | Deciders | Bernard Tebandeke, accepted 2026-11-11 |
 | Requirements | none; driver is item 1 of [`docs/ideas/plan-execution-speed.md`](../ideas/plan-execution-speed.md), "the suite runs twice per task" |
 | Supersedes | none; amends [ADR-0006](ADR-0006-the-tdd-cycle-unit-is-a-behavioural-unit.md) and [ADR-0009](ADR-0009-the-unit-boundary-may-run-the-affected-tests.md), for a unit run under `execute-plan` with a checkpoint line only |
-| Amended by | its own [Amended](#amended) section, 2026-11-12 |
+| Amended by | its own [Amended](#amended) section, 2026-11-12 and 2026-11-16 |
 
 ## Context
 
@@ -168,3 +168,17 @@ it, and `git diff --name-only <sha> HEAD` then exits 128 with empty output, whic
 outside `docs/plans/`" and let a stale note skip the suite on code it never checked. The diff
 condition above now also needs `git cat-file -t <sha>` to print `tree` and the `git diff` to exit
 0; a failed command means `review-code` runs the suite.
+
+**2026-11-16, decided by Bernard Tebandeke: the plan-start record is a `**Suite start:**` header
+line, and `keel plan status` warns when a start or end record is missing.** Item 2 of the
+2026-11-16 review of four plans written under 0.28.0, in
+[`docs/plans/2026-11-16-plan-upkeep.md`](../plans/2026-11-16-plan-upkeep.md). The coordinator
+writes `**Suite start:** pass at <commit>` or `**Suite start:** red at <commit> <names>` and commits
+the plan alone as `docs(plans): <slug> suite start` before the first dispatch, so the record is in
+the plan and a discarded attempt cannot take it. For a plan with a checkpoint line, `plan status`
+prints a `warn:` line when a step is done and no `**Suite start:**` line is there, and, at
+`next: none`, one when the last task in file order with a done step carries no
+`suite: pass at tree` or `suite: red at tree` field. It checks the end state only, not the cadence,
+since file order is not run order, and the warnings change no exit code, so `ship`'s gate is
+unaffected. A task appended after the last checkpoint moves the plan-end checkpoint to the new last
+task. The Decision's "The first run is the plan-start record" stands, now with a place to keep it.

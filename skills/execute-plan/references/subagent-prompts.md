@@ -384,8 +384,14 @@ is kept, and a ticked step is not touched. Commit the plan alone as a repair,
 tasks, the plan runs as written, its steps naming the suite where they do.
 
 **Run `verify.test` before the first dispatch, after every N committed tasks, and after the last.**
-The first run is the plan-start record: its commit and the tests red on it. With N 3, a 10-task
-plan runs it at start and after tasks 3, 6, 9 and 10. Fill each implementer's
+The first run is the plan-start record: its commit and the tests red on it. Write it into the plan
+header as the line `**Suite start:**`, `pass at <commit>` or `red at <commit> <names>`, and commit
+the plan alone as `docs(plans): <slug> suite start` before the first dispatch, so the tree is clean
+when task 1 is dispatched and a discarded attempt cannot take the record with it. With N 3, a
+10-task plan runs it at start and after tasks 3, 6, 9 and 10. A task appended after the last
+checkpoint moves the plan-end checkpoint to the new last task. `keel plan status` prints a `warn:`
+line when a started plan has no `**Suite start:**` line, or at `next: none` when its last task's
+note has no `suite:` field. Fill each implementer's
 `=== START RECORD ===` block with the last checkpoint's record, its commit and the reds still on
 it. The record is yours because you are the one agent that sees every task.
 

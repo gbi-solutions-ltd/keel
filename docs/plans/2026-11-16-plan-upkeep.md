@@ -144,7 +144,7 @@ its output; the warn lines change no exit code, and its body has 3 words of ceil
 
 **Done when:** `tests/test-plan.sh` passes and `tests/validate-skills.sh` exits 0.
 
-- [ ] **Step 1.1: Build it test first**
+- [x] **Step 1.1: Build it test first** Note: red witnessed by the implementer (629 passed, 9 failed); the plan-template pin was reworded after the red run and checked against HEAD by grep, not seen failing in a test run
 
 Follow `keel:tdd` for each behaviour: write its test from the example, run it, and watch it fail
 for the reason the behaviour names, then write the minimal implementation and watch it pass.
@@ -159,7 +159,7 @@ text overrides the skill, so a step naming the suite would schedule it for every
 checkpoints remove. Expected: PASS, or reds this task did not cause, each named and matched against
 the start record. This is the one boundary run the task schedules.
 
-- [ ] **Step 1.2: Hand over**
+- [x] **Step 1.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES; report recovered from the transcript after done-guard's stop prompt replaced the final message
 
 ```bash
 git add bin/keel tests/test-plan.sh docs/03-install-and-distribution.md \

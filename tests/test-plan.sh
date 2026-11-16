@@ -65,6 +65,106 @@ case "$out" in
   *) bad "status parked" "rc=$rc, got: $out" ;;
 esac
 
+# ---- status: the plan-start and plan-end suite records ---------------------------------------
+
+CK='**Suite checkpoints:** every 3 tasks'
+SW='warn: no **Suite start:** line, so the plan-start suite run is not recorded'
+p="$d/suite-no-start.md"
+mkplan "$p" "$CK" '' '- [x] **Step 1.1: a**' '- [ ] **Step 1.2: b**' \
+  '- [ ] **Step 2.1: c**' '- [ ] **Step 2.2: d**'
+out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
+want="$(printf '%s\n' \
+  'task 1: 1 done, 1 open, 0 deferred, 0 not applicable' \
+  'task 2: 0 done, 2 open, 0 deferred, 0 not applicable' \
+  'next: 1.2' "$SW")"
+[ "$rc" -eq 0 ] && [ "$out" = "$want" ] \
+  && ok "status warns of a started checkpoint plan with no Suite start line, after next:" \
+  || bad "status suite start missing" "rc=$rc, got: $out"
+
+p="$d/suite-start.md"
+mkplan "$p" "$CK" '**Suite start:** pass at 3f9a1c2' '' '- [x] **Step 1.1: a**' \
+  '- [ ] **Step 1.2: b**' '- [ ] **Step 2.1: c**' '- [ ] **Step 2.2: d**'
+out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
+[ "$rc" -eq 0 ] && [ "$(printf '%s\n' "$out" | tail -1)" = "next: 1.2" ] \
+  && ok "status prints no warn line when the Suite start line is there" \
+  || bad "status suite start present" "rc=$rc, got: $out"
+
+p="$d/suite-not-started.md"
+mkplan "$p" "$CK" '' '- [ ] **Step 1.1: a**' '- [ ] **Step 1.2: b**' \
+  '- [-] **Step 2.1: c** Deferred: later' '- [~] **Step 2.2: d** Not applicable: none'
+out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
+[ "$rc" -eq 0 ] && [ "$(printf '%s\n' "$out" | tail -1)" = "next: 1.1" ] \
+  && ok "status prints no warn line for a checkpoint plan with no step done" \
+  || bad "status suite not started" "rc=$rc, got: $out"
+
+EW='warn: task 2 is the last task and carries no suite: note, so the plan-end suite run is not recorded'
+p="$d/suite-no-end.md"
+mkplan "$p" "$CK" '**Suite start:** pass at 3f9a1c2' '' '- [x] **Step 1.1: a**' \
+  '- [x] **Step 1.2: b** Note: rounds: 1; suite: pass at tree 1111111' \
+  '- [x] **Step 2.1: c**' '- [x] **Step 2.2: d** Note: rounds: 1; loop: light'
+out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
+want="$(printf '%s\n' \
+  'task 1: 2 done, 0 open, 0 deferred, 0 not applicable' \
+  'task 2: 2 done, 0 open, 0 deferred, 0 not applicable' \
+  'next: none' "$EW")"
+[ "$rc" -eq 0 ] && [ "$out" = "$want" ] \
+  && ok "status warns when the last task carries no suite: note at next: none" \
+  || bad "status suite end missing" "rc=$rc, got: $out"
+
+p="$d/suite-end.md"
+mkplan "$p" "$CK" '**Suite start:** pass at 3f9a1c2' '' '- [x] **Step 1.1: a**' \
+  '- [x] **Step 1.2: b**' '- [x] **Step 2.1: c**' \
+  '- [x] **Step 2.2: d** Note: rounds: 1; suite: pass at tree abc123'
+out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
+[ "$rc" -eq 0 ] && [ "$(printf '%s\n' "$out" | tail -1)" = "next: none" ] \
+  && ok "status prints no warn line when the last task's note has suite: pass at tree" \
+  || bad "status suite end present" "rc=$rc, got: $out"
+
+# A suite field is read as plan report reads one: in the note, at its start or after "; ".
+p="$d/suite-end-not-field.md"
+mkplan "$p" "$CK" '**Suite start:** pass at 3f9a1c2' '' '- [x] **Step 1.1: a**' \
+  '- [x] **Step 2.1: c suite: pass at tree abc123**' \
+  '- [x] **Step 2.2: d** Note: rounds: 1; presuite: pass at tree abc123'
+out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
+[ "$rc" -eq 0 ] && [ "$(printf '%s\n' "$out" | tail -1)" = "$EW" ] \
+  && ok "status reads suite: only as a note field, not in a title or inside another field" \
+  || bad "status suite end not a field" "rc=$rc, got: $out"
+
+p="$d/suite-end-skip.md"
+mkplan "$p" "$CK" '**Suite start:** pass at 3f9a1c2' '' '- [x] **Step 1.1: a**' \
+  '- [x] **Step 2.1: c** Note: rounds: 1' \
+  '- [-] **Step 3.1: e** Deferred: moved' '- [~] **Step 3.2: f** Not applicable: none'
+out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
+[ "$rc" -eq 0 ] && [ "$(printf '%s\n' "$out" | tail -1)" = "$EW" ] \
+  && ok "status skips a last task with no done step for the one before it" \
+  || bad "status suite end skip" "rc=$rc, got: $out"
+
+p="$d/suite-none.md"
+mkplan "$p" '- [x] **Step 1.1: a** Note: rounds: 1' '- [x] **Step 2.1: c** Note: loop: light'
+out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
+want="$(printf '%s\n' 'task 1: 1 done, 0 open, 0 deferred, 0 not applicable' \
+  'task 2: 1 done, 0 open, 0 deferred, 0 not applicable' 'next: none')"
+[ "$rc" -eq 0 ] && [ "$out" = "$want" ] \
+  && ok "status prints no warn line for a plan with no Suite checkpoints line" \
+  || bad "status suite no checkpoints" "rc=$rc, got: $out"
+
+p="$d/suite-fenced.md"
+mkplan "$p" '```markdown' "$CK" '```' '' '- [x] **Step 1.1: a** Note: rounds: 1' \
+  '- [x] **Step 2.1: c** Note: loop: light'
+out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
+[ "$rc" -eq 0 ] && [ "$out" = "$want" ] \
+  && ok "status ignores a Suite checkpoints line inside a fence" \
+  || bad "status suite fenced checkpoints" "rc=$rc, got: $out"
+
+p="$d/suite-problem.md"
+mkplan "$p" "$CK" '' '- [x] **Step 1.1: a**' '- [ ] **Step 1.1: b**'
+out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
+want="$(printf '%s\n' 'task 1: 1 done, 1 open, 0 deferred, 0 not applicable' 'next: 1.1' "$SW" \
+  'problem: step 1.1 appears more than once')"
+[ "$rc" -eq 1 ] && [ "$out" = "$want" ] \
+  && ok "status puts warn lines before problem lines and keeps exit 1" \
+  || bad "status suite warn and problem" "rc=$rc, got: $out"
+
 # A step inside a fenced code block is an example, as the template's own are. The ```` fence holds
 # a ``` one, which must not close it, and an indented fence follows. The last lines pin a fence
 # closed by a CRLF line and an inline span of backticks at the start of a line, neither of which
@@ -3168,6 +3268,29 @@ grep -qF 'task'"'"'s steps with `keel plan tick <plan> <id>`' "$f" \
   && grep -qF 'not installed or not on PATH' "$f" \
   && ok "subagent-prompts ticks with keel plan tick, notes with --note, and names the fallback" \
   || bad "subagent-prompts" "the tick instructions do not name keel plan tick, --note and the fallback"
+
+grep -qF '`**Suite start:**`' "$f" \
+  && grep -qF 'docs(plans): <slug> suite start' "$f" \
+  && grep -qF 'moves the plan-end checkpoint' "$f" \
+  && ok "subagent-prompts keeps the plan-start record in the Suite start line" \
+  || bad "subagent-prompts suite start" "the Suite checkpoints section does not name the Suite start line"
+
+f="$ROOT/skills/write-plan/references/plan-template.md"
+grep -qF 'header line, `**Suite start:** pass at <commit>`' "$f" \
+  && ok "plan-template names the Suite start line" \
+  || bad "plan-template suite start" "the suite checkpoints paragraph does not name the Suite start line"
+
+f="$ROOT/docs/03-install-and-distribution.md"
+grep -qF 'warn: no **Suite start:** line' "$f" \
+  && grep -qF 'carries no suite: note' "$f" \
+  && grep -qF 'warn lines leave the exit code alone' "$f" \
+  && ok "the install doc names both plan status warn lines" \
+  || bad "install doc suite warns" "the keel plan status section does not name both warn lines"
+
+f="$ROOT/docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md"
+grep -qF '**2026-11-16, decided by Bernard Tebandeke: the plan-start record is a `**Suite start:**`' "$f" \
+  && ok "ADR-0017 is amended for the Suite start line and the warnings" \
+  || bad "ADR-0017 suite start" "no 2026-11-16 Amended entry for the Suite start line"
 
 f="$ROOT/skills/execute-plan/references/parallel-batches.md"
 grep -qF 'Tick the whole batch'"'"'s steps with `keel plan tick`' "$f" \

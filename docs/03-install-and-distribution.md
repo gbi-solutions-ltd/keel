@@ -448,6 +448,12 @@ prints one line per task counting its steps by state, open, done, deferred and n
 opens with its id, `**Step 3.2: ...**`; one inside a fenced code block is an example and is not
 counted. It exits 1, with a `problem:` line for each, where a deferred or not-applicable step has no
 reason, an id appears twice, an open checkbox is not a step it can read, or a fence never closes.
+A plan with a `**Suite checkpoints:**` line also gets `warn:` lines after `next:` and before any
+`problem:` line: `warn: no **Suite start:** line, so the plan-start suite run is not recorded` once
+a step is done and the header has no `**Suite start:**` line, and, at `next: none`,
+`warn: task <id> is the last task and carries no suite: note, so the plan-end suite run is not recorded`
+when no done step of the last task with a done step has a `suite: pass at tree` or
+`suite: red at tree` field in its note. The warn lines leave the exit code alone.
 A plan with no step ids, such as one written before steps carried them, is unaddressable: `status`
 and `tick` say so, change nothing, and exit 3, and the plan is read and ticked by hand.
 

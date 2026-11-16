@@ -77,7 +77,9 @@ the request, so the choice made at approval is the one a later session finds.
 
 **The suite checkpoints line** says how often `execute-plan`'s coordinator runs `verify.test`: once
 before the first dispatch, after every N committed tasks and after the last. Its implementers run
-no `verify.test`; each starts from the last checkpoint's record. 3 is the default, and the person
+no `verify.test`; each starts from the last checkpoint's record. The coordinator, not the planner,
+records the first run in a header line, `**Suite start:** pass at <commit>`, and `keel plan status`
+warns of a started plan without it. 3 is the default, and the person
 approving the plan can change it. The reason is ADR-0017
 (`docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md`): on a measured run the
 suite, run twice per task, took 22% of the wall clock, and one run every few tasks still bounds how

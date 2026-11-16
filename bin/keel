@@ -3371,6 +3371,14 @@ plan_unaddressable() {
 # would otherwise pass. An unclosed fence hides every step after the line it opens on, so an
 # unfinished plan would read as done. A plan with no step ids exits 3; a fence that never closes is
 # reported as such rather than as a plan without ids.
+#
+# A plan with a `**Suite checkpoints:**` line outside a fence also gets `warn:` lines, after `next:`
+# and before any `problem:` line, for the checkpoint records ADR-0017 has the coordinator keep: one
+# when a step is done and no `**Suite start:**` line holds the plan-start record, and, at
+# `next: none`, one naming the last task in file order with a done step when none of its done steps'
+# notes has a `suite:` field starting `pass at tree ` or `red at tree `, read as plan report reads a
+# field. Only the end state is checked, not the cadence, since file order is not run order. The warn
+# lines never change the exit code, so ship's gate and context-watch's `next:` read are unaffected.
 plan_status() {
     [ -f "$1" ] || die "no such plan: $1"
     local rc
@@ -3389,9 +3397,22 @@ plan_status() {
                 problem[++nproblem] = "step " sid " is deferred with no reason"
             if (smark == "~" && stail !~ /^ Not applicable: [^ \t\r]/)
                 problem[++nproblem] = "step " sid " is not applicable with no reason"
+            if (smark == "x") { anydone = 1; hasdone[task] = 1; if (suitenote(stail)) hassuite[task] = 1 }
         }
+        /^\*\*Suite checkpoints:\*\*/ { ckpt = 1 }
+        /^\*\*Suite start:\*\*/ { sstart = 1 }
         /^[ \t>]*([-*+]|[0-9]+[.)])[ \t]+\[ \]/ && !step($0) {
             problem[++nproblem] = "line " NR " is an open checkbox that is not a step keel can read"
+        }
+        # 1 when the note, the text after the last " Note: ", holds a suite field that begins it or
+        # follows "; " and whose value starts "pass at tree " or "red at tree ", as plan report reads
+        # a field.
+        function suitenote(s,   i, at, off) {
+            s = " " s; at = 0; off = 0
+            while ((i = index(substr(s, off + 1), " Note: ")) > 0) { at = off + i; off = at }
+            if (!at) return 0
+            s = substr(s, at + 7); sub(/^[ \t]+/, "", s)
+            return ("; " s) ~ /; suite: [ \t]*(pass|red) at tree /
         }
         END {
             if (!nstep && !infence) exit 3
@@ -3401,6 +3422,13 @@ plan_status() {
                     t, count[t, "x"], count[t, " "], count[t, "-"], count[t, "~"]
             }
             print "next: " (nextid == "" ? "none" : nextid)
+            if (ckpt && !sstart && anydone)
+                print "warn: no **Suite start:** line, so the plan-start suite run is not recorded"
+            if (ckpt && nextid == "") {
+                for (k = ntask; k > 0 && !(order[k] in hasdone); k--) ;
+                if (k > 0 && !(order[k] in hassuite))
+                    printf "warn: task %s is the last task and carries no suite: note, so the plan-end suite run is not recorded\n", order[k]
+            }
             if (infence) problem[++nproblem] = "line " fline " opens a fence that never closes"
             for (k = 1; k <= nproblem; k++) print "problem: " problem[k]
             exit (nproblem > 0 ? 1 : 0)
