@@ -34,9 +34,9 @@ each rule pinned by a grep in `tests/test-plan.sh`.
 `settings.json`, `.github/workflows`, `templates/ci-review.yml`, `lib/context_watch.py`).
 **Delivery:** pull-request
 **Concurrent batches:** none. `keel plan batches` on 2026-11-16 prints every task `alone`, with
-`why: task 2 depends on task 1` and so on to task 5. The chain is there because every task adds a
+`why: task 2 depends on task 1` and so on to task 6 (rerun 2026-11-16 after task 6 was added). The chain is there because every task adds a
 line under `## Unreleased` in `CHANGELOG.md` and edits `tests/test-plan.sh`, and most share
-`plan-template.md` or `subagent-prompts.md`, so they run one at a time in the order 1 to 5.
+`plan-template.md` or `subagent-prompts.md`, so they run one at a time in the order 1 to 6.
 **Decided in this plan, put to Bernard at approval:**
 - The plan-start record lives in a header line the coordinator writes, `**Suite start:** pass at
   <commit>` or `**Suite start:** red at <commit> <names>`, committed alone as
@@ -417,6 +417,76 @@ git status --porcelain
 
 Stage exactly those paths and stop. **Do not commit.** The coordinator commits after both review
 passes, with `git commit -m "docs(execute-plan): the spec reviewer reads the tree's status itself"`.
+Paste the `git status --porcelain` output into your report; if it lists anything this task did not
+touch, say so and leave it unstaged.
+
+### Task 6: the resume guidance names a real commit, and the red start line is pinned
+
+**Task 6 added:** 2026-11-16, from the delivery follow-ups of PR #15; Bernard asked to fold the
+critical ones into the same pull request. Left as follow-ups: ADR-0017's Decision wording (a
+record) and "appended" in the checkpoint paragraph (no contradiction, per the re-review).
+
+**Story:** none (follow-ups of review items 2 and 1)
+**Files:**
+- Modify: `skills/execute-plan/references/subagent-prompts.md`
+- Modify: `docs/03-install-and-distribution.md`
+- Modify: `skills/write-plan/references/plan-template.md`
+- Modify: `docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md`
+- Modify: `tests/test-plan.sh`
+- Modify: `CHANGELOG.md`
+
+**Docs searched:** "Suite start", "pass at ", "that commit". Hits not listed: none outside the
+files above; `CHANGELOG.md`'s task 1 line names `pass at` and `red at` and stays true.
+
+**Depends on:** task 5
+
+**Behaviours:**
+
+1. The resume sentence in `subagent-prompts.md`'s "Suite checkpoints" section names a commit a
+   coordinator can find: the commit of the task whose note carries the last `suite:` record (that
+   note names a tree, which is not a commit), for example `pass at <that task's commit>`. And it
+   covers a resumed plan with no checkpoint yet: the coordinator runs `verify.test` on HEAD before
+   the next dispatch and records that run as the `**Suite start:**` line. Pinned by grep on
+   `that task's commit` and on `no checkpoint yet`.
+2. Every document that says what silences the start warn says the value is `pass at ` or `red at `
+   followed by a commit, matching `bin/keel`'s `/^\*\*Suite start:\*\*[ \t]+(pass|red) at [^ \t\r]/`:
+   `docs/03-install-and-distribution.md`'s `keel plan status` section, the same sentence in
+   `subagent-prompts.md`, and ADR-0017's 2026-11-16 Amended entry. Pinned by grep on
+   `followed by a commit` in `docs/03-install-and-distribution.md`.
+3. `tests/test-plan.sh` has a case: a checkpoint plan with `**Suite start:** red at 3f9a1c2 test-x`
+   and one step done prints no line starting `warn:`. Example: dropping `red` from the start regex
+   in `bin/keel` makes this case fail.
+
+**Done when:** `tests/test-plan.sh` passes and `tests/validate-skills.sh` and
+`tests/validate-citations.sh` exit 0.
+
+- [ ] **Step 6.1: Build it test first**
+
+Follow `keel:tdd` for each behaviour: write its case or pin, run it, and watch it fail for the
+reason the behaviour names (behaviour 3's case passes on arrival, since the code already accepts
+`red at`: show it red by the mutation its example names, then restore `bin/keel` and confirm it is
+unchanged with `git diff --quiet -- bin/keel`), then write the text and watch it pass.
+Run: `tests/test-plan.sh`, `tests/validate-skills.sh` and `tests/validate-citations.sh`
+Expected before the implementation: FAIL, the pins for behaviours 1 and 2 fail. Expected after:
+PASS. Quote the failing cases and their messages.
+
+Run: the lint command from Global constraints. Run no `tests/run-tests.sh`: the coordinator runs
+the suite at checkpoints and hands you the last one's record as your start record. Expected: PASS,
+or reds this task did not cause, each named and matched against the start record. This is the one
+boundary run the task schedules.
+
+- [ ] **Step 6.2: Hand over**
+
+```bash
+git add skills/execute-plan/references/subagent-prompts.md docs/03-install-and-distribution.md \
+        skills/write-plan/references/plan-template.md \
+        docs/decisions/ADR-0017-a-plan-run-checks-the-suite-at-checkpoints.md \
+        tests/test-plan.sh CHANGELOG.md
+git status --porcelain
+```
+
+Stage exactly those paths and stop. **Do not commit.** The coordinator commits after both review
+passes, with `git commit -m "docs(execute-plan): resume names a real commit, pin the red start line"`.
 Paste the `git status --porcelain` output into your report; if it lists anything this task did not
 touch, say so and leave it unstaged.
 
