@@ -142,9 +142,10 @@ report.
 
 Answer six questions:
 1. Is every step's stated outcome actually present?
-2. Is anything here that no step asked for? Name it, and run `git status --porcelain` yourself to
-   find any path no step asked for. A report's form, such as a missing or trimmed porcelain paste,
-   is not a ground for DEVIATES.
+2. Is anything here that no step asked for? Name it, and run `git status --porcelain` yourself in
+   the tree under review, which for a declared batch is the task's own worktree, to find any path
+   no step asked for. A report's form, such as a missing or trimmed porcelain paste, is not a
+   ground for DEVIATES.
 3. Does each listed behaviour have a test asserting its example, and does no test assert something
    adjacent instead? For a task with no test, quote the line of the diff, or the check output, that
    produces each behaviour's example. For a task with no behaviours list, in the older shape, does
@@ -396,8 +397,13 @@ the plan alone as `docs(plans): <slug> suite start` before the first dispatch, s
 when task 1 is dispatched and a discarded attempt cannot take the record with it. With N 3, a
 10-task plan runs it at start and after tasks 3, 6, 9 and 10. A task appended after the last
 checkpoint moves the plan-end checkpoint to the new last task. `keel plan status` prints a `warn:`
-line when a started plan has no `**Suite start:**` line, or at `next: none` when its last task's
-note has no `suite:` field. Fill each implementer's
+line when a step is done and no `**Suite start:**` line has a value starting `pass at ` or
+`red at `, and at `next: none` when the last task with a done step (a task whose steps are all
+deferred or not applicable is skipped) has no done step whose note's last `suite:` field starts
+`pass at tree ` or `red at tree `. A coordinator resuming a plan whose `**Suite checkpoints:**`
+line was written before this rule, and so has no `**Suite start:**` line, writes the line from the
+last checkpoint's record, `pass at <that commit>` (`red at <that commit> <names>` for a red one),
+committed alone as the repair, rather than rerunning the suite for it. Fill each implementer's
 `=== START RECORD ===` block with the last checkpoint's record, its commit and the reds still on
 it. The record is yours because you are the one agent that sees every task.
 
@@ -426,10 +432,11 @@ have hidden the break, so naming the staged task alone sends `debug` to the wron
 - If the staged task caused it, it is a rejection of that task, handled as the loop handles one.
 - If an earlier task did, tick and commit the staged task with
   `suite: red at tree <tree sha> <names>`, and send Phase 4 to a fresh implementer as a task
-  appended to the plan, in the full loop, before any further dispatch. The earlier task is already
+  added to the plan, in the full loop, before any further dispatch. Write it straight after the
+  last committed task, as "Adding a task to an approved plan" in
+  [plan-template.md](../../write-plan/references/plan-template.md) says. The earlier task is already
   committed, so the fix can only be a new commit, and dispatching past a known red would let later
-  tasks build on it. Write the task as "Adding a task to an approved plan" in
-  [plan-template.md](../../write-plan/references/plan-template.md) says.
+  tasks build on it.
 
 `ship`, CI and a declared batch's join gate still run the whole suite, and remain the backstop for
 what a checkpoint has not yet seen. `review-code` does too, except that it quotes the plan-end
@@ -481,10 +488,10 @@ honest plan edit is direction: recording a verdict, tightening a step whose asse
 found too weak, or withdrawing a claim the plan cannot support all make the task **harder** to pass,
 and those are yours to make. Loosening a gate so a failing step passes makes it easier, and that is
 the mistake the skill names. Where the repair would make a blocked task passable by changing what
-was planned, propose it and let the user rule. A plan repair (a task added, a `Files` entry added, a step tightened) is committed alone as
-`docs(plans): <slug> <what>` before the next task is sent, with `git commit -m <msg> -- <plan>` when
-the task's paths are already staged; ticks, tick notes and the follow-up list still ride with the
-task's commit.
+was planned, propose it and let the user rule. A plan repair (a task added, a `Files` entry added,
+a step tightened) is committed alone as `docs(plans): <slug> <what>` before the next task is sent,
+with `git commit -m <msg> -- <plan>` when the task's paths are already staged; ticks, tick notes
+and the follow-up list still ride with the task's commit.
 
 It is also usually bigger than it looks. A subagent that wrote its test first and watched it fail
 has a test asserting whatever it built, so a report saying "returns `a - b` rather than the

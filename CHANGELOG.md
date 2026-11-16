@@ -9,8 +9,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 ## Unreleased
 
-- `keel plan status` warns of a missing plan-start (`**Suite start:**` header line) or plan-end
-  (`suite:` note on the last task) record in a plan with suite checkpoints; exit codes unchanged.
+- `keel plan status` warns of a missing plan-start (`**Suite start:** pass at` or `red at` header
+  line) or plan-end (last `suite:` note field starting `pass at tree ` or `red at tree ` on the last
+  task with a done step) record in a plan with suite checkpoints; exit codes unchanged.
 - A task added to an approved plan carries a `**Task <id> added:**` line, is written after the last
   committed task, and rewrites the header lines that name tasks; a plan repair is committed alone as
   `docs(plans): <slug> <what>`.

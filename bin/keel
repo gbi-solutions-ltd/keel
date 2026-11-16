@@ -3241,7 +3241,8 @@ cmd_guard() {
 # reading, content at any indent, since only an item bounds it. A line opening with an inline
 # backtick span is not a fence: a backtick run followed later on its line by another backtick opens
 # none, as CommonMark rules. A closing fence may end in CR, since a CRLF checkout adds one.
-# step(line) returns 1 for a step line and sets sid, smark, stitle and stail.
+# step(line) returns 1 for a step line and sets sid, smark, stitle and stail. lastfield(tail, key,
+# numeric) reads one field of a step's note, the last of that name.
 PLAN_AWK_LIB='
 function lead(line,   i, c, n) {
     n = 0
@@ -3339,6 +3340,24 @@ function step(line,   rest, i, j, t) {
     stitle = substr(rest, 1, i - 1); stail = substr(rest, i + 2)
     return 1
 }
+# lastfield(tail, key, numeric) returns the field key in the note of a step that begins it or
+# follows "; ", the last such, as its text, or with numeric its leading digits. The note is the text
+# after the last " Note: " in the tail, the marker plan tick writes, so step text before it is never
+# read, and a tail with no such marker has no note. "; " is put before the note so the first field
+# is no special case. plan status reads the suite field and plan report the rest through it.
+function lastfield(s, key, numeric,   v, out, pre, i, at, off) {
+    s = " " s; at = 0; off = 0
+    while ((i = index(substr(s, off + 1), " Note: ")) > 0) { at = off + i; off = at }
+    if (!at) return ""
+    s = substr(s, at + 7); sub(/^[ \t]+/, "", s)
+    s = "; " s; pre = "; " key ": "; out = ""
+    while ((i = index(s, pre)) > 0) {
+        s = substr(s, i + length(pre))
+        v = s; sub(/;.*$/, "", v); gsub(/^[ \t]+|[ \t\r]+$/, "", v)
+        if (numeric) { if (match(v, /^[0-9]+/)) out = substr(v, 1, RLENGTH) + 0 } else if (v != "") out = v
+    }
+    return out
+}
 '
 
 cmd_plan() {
@@ -3374,11 +3393,12 @@ plan_unaddressable() {
 #
 # A plan with a `**Suite checkpoints:**` line outside a fence also gets `warn:` lines, after `next:`
 # and before any `problem:` line, for the checkpoint records ADR-0017 has the coordinator keep: one
-# when a step is done and no `**Suite start:**` line holds the plan-start record, and, at
-# `next: none`, one naming the last task in file order with a done step when none of its done steps'
-# notes has a `suite:` field starting `pass at tree ` or `red at tree `, read as plan report reads a
-# field. Only the end state is checked, not the cadence, since file order is not run order. The warn
-# lines never change the exit code, so ship's gate and context-watch's `next:` read are unaffected.
+# when a step is done and no `**Suite start:**` line has a value starting `pass at ` or `red at `,
+# and, at `next: none`, one naming the last task in file order with a done step when none of its
+# done steps' notes has a last `suite:` field starting `pass at tree ` or `red at tree `, read by
+# lastfield as plan report reads a field. Only the end state is checked, not the cadence, since file
+# order is not run order. The warn lines never change the exit code, so ship's gate and
+# context-watch's `next:` read are unaffected.
 plan_status() {
     [ -f "$1" ] || die "no such plan: $1"
     local rc
@@ -3397,22 +3417,15 @@ plan_status() {
                 problem[++nproblem] = "step " sid " is deferred with no reason"
             if (smark == "~" && stail !~ /^ Not applicable: [^ \t\r]/)
                 problem[++nproblem] = "step " sid " is not applicable with no reason"
-            if (smark == "x") { anydone = 1; hasdone[task] = 1; if (suitenote(stail)) hassuite[task] = 1 }
+            if (smark == "x") {
+                anydone = 1; hasdone[task] = 1
+                if (lastfield(stail, "suite", 0) ~ /^(pass|red) at tree /) hassuite[task] = 1
+            }
         }
         /^\*\*Suite checkpoints:\*\*/ { ckpt = 1 }
-        /^\*\*Suite start:\*\*/ { sstart = 1 }
+        /^\*\*Suite start:\*\*[ \t]+(pass|red) at [^ \t\r]/ { sstart = 1 }
         /^[ \t>]*([-*+]|[0-9]+[.)])[ \t]+\[ \]/ && !step($0) {
             problem[++nproblem] = "line " NR " is an open checkbox that is not a step keel can read"
-        }
-        # 1 when the note, the text after the last " Note: ", holds a suite field that begins it or
-        # follows "; " and whose value starts "pass at tree " or "red at tree ", as plan report reads
-        # a field.
-        function suitenote(s,   i, at, off) {
-            s = " " s; at = 0; off = 0
-            while ((i = index(substr(s, off + 1), " Note: ")) > 0) { at = off + i; off = at }
-            if (!at) return 0
-            s = substr(s, at + 7); sub(/^[ \t]+/, "", s)
-            return ("; " s) ~ /; suite: [ \t]*(pass|red) at tree /
         }
         END {
             if (!nstep && !infence) exit 3
@@ -3565,7 +3578,7 @@ EOF
 $(git -C "$top" rev-list --fixed-strings --grep="Reworks $rel" HEAD)
 EOF
     # shellcheck disable=SC2016  # $0 is awk's record, not a shell expansion
-    RW_N="$n" RW_H="$hashes" awk -v json="$json" -v rel="$rel" '
+    RW_N="$n" RW_H="$hashes" awk -v json="$json" -v rel="$rel" "$PLAN_AWK_LIB"'
         # The UTC date of an epoch, by the civil-from-days arithmetic, so that neither a date that
         # takes -d nor one that takes -r is needed, and BSD and GNU awk agree.
         function iso(e,   days, z, era, doe, yoe, y, doy, mp, d, m, s) {
@@ -3603,23 +3616,6 @@ EOF
             next
         }
         $1 == "H" { hdr[$2] = $3 }
-        # The field in a note that begins it or follows "; ", the last such, as its text. The note is
-        # the text after the last " Note: " in the tail, the marker plan tick writes, so step text
-        # before it is never read, and a tail with no such marker has no note. "; " is put before
-        # the note so the first field is no special case.
-        function lastfield(s, key, numeric,   v, out, pre, i, at, off) {
-            s = " " s; at = 0; off = 0
-            while ((i = index(substr(s, off + 1), " Note: ")) > 0) { at = off + i; off = at }
-            if (!at) return ""
-            s = substr(s, at + 7); sub(/^[ \t]+/, "", s)
-            s = "; " s; pre = "; " key ": "; out = ""
-            while ((i = index(s, pre)) > 0) {
-                s = substr(s, i + length(pre))
-                v = s; sub(/;.*$/, "", v); gsub(/^[ \t]+|[ \t\r]+$/, "", v)
-                if (numeric) { if (match(v, /^[0-9]+/)) out = substr(v, 1, RLENGTH) + 0 } else if (v != "") out = v
-            }
-            return out
-        }
         END {
             n = fin
             if (!nid[n]) exit 3
@@ -3656,7 +3652,7 @@ EOF
                 if (delivered == "" || tclose[t] > delivered) delivered = tclose[t]
             }
             if (open) delivered = ""
-            lead = (delivered == "") ? "" : sprintf("%.1f", (delivered - planned) / 3600)
+            leadh = (delivered == "") ? "" : sprintf("%.1f", (delivered - planned) / 3600)
             nrw = ENVIRON["RW_N"] + 0; rw = ENVIRON["RW_H"]; sub(/^ /, "", rw)
             if (json) {
                 printf "{\"plan\": %s, \"planned\": %s, \"planned_routing\": %s, \"tasks\": [",
@@ -3670,7 +3666,7 @@ EOF
                         (topen[t] || !(t in tloop) ? "null" : jstr(tloop[t]))
                 }
                 printf "], \"delivered\": %s, \"lead_time_hours\": %s, \"rework\": {\"count\": %d, \"commits\": [",
-                    (delivered == "" ? "null" : jstr(iso(delivered))), (lead == "" ? "null" : lead), nrw
+                    (delivered == "" ? "null" : jstr(iso(delivered))), (leadh == "" ? "null" : leadh), nrw
                 m = split(rw, hh, " ")
                 for (a = 1; a <= m; a++) printf "%s%s", (a > 1 ? ", " : ""), jstr(hh[a])
                 print "]}}"
@@ -3687,7 +3683,7 @@ EOF
                 printf "\n"
             }
             print "delivered: " (delivered == "" ? "not yet" : iso(delivered))
-            print "lead time: " (lead == "" ? "not yet" : lead "h")
+            print "lead time: " (leadh == "" ? "not yet" : leadh "h")
             # Held in a variable: busybox awk reads `nrw (` as a call to a function.
             rwtxt = (nrw > 0) ? " (" rw ")" : ""
             print "rework: " nrw rwtxt

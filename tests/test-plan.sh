@@ -86,14 +86,24 @@ mkplan "$p" "$CK" '**Suite start:** pass at 3f9a1c2' '' '- [x] **Step 1.1: a**' 
   '- [ ] **Step 1.2: b**' '- [ ] **Step 2.1: c**' '- [ ] **Step 2.2: d**'
 out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
 [ "$rc" -eq 0 ] && [ "$(printf '%s\n' "$out" | tail -1)" = "next: 1.2" ] \
+  && ! printf '%s\n' "$out" | grep -q '^warn:' \
   && ok "status prints no warn line when the Suite start line is there" \
   || bad "status suite start present" "rc=$rc, got: $out"
+
+# A Suite start line silences the warn only with a value starting "pass at " or "red at ".
+p="$d/suite-start-bare.md"
+mkplan "$p" "$CK" '**Suite start:**' '' '- [x] **Step 1.1: a**' '- [ ] **Step 1.2: b**'
+out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
+[ "$rc" -eq 0 ] && [ "$(printf '%s\n' "$out" | tail -1)" = "$SW" ] \
+  && ok "status warns when the Suite start line has no pass at or red at value" \
+  || bad "status suite start bare" "rc=$rc, got: $out"
 
 p="$d/suite-not-started.md"
 mkplan "$p" "$CK" '' '- [ ] **Step 1.1: a**' '- [ ] **Step 1.2: b**' \
   '- [-] **Step 2.1: c** Deferred: later' '- [~] **Step 2.2: d** Not applicable: none'
 out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
 [ "$rc" -eq 0 ] && [ "$(printf '%s\n' "$out" | tail -1)" = "next: 1.1" ] \
+  && ! printf '%s\n' "$out" | grep -q '^warn:' \
   && ok "status prints no warn line for a checkpoint plan with no step done" \
   || bad "status suite not started" "rc=$rc, got: $out"
 
@@ -117,6 +127,7 @@ mkplan "$p" "$CK" '**Suite start:** pass at 3f9a1c2' '' '- [x] **Step 1.1: a**' 
   '- [x] **Step 2.2: d** Note: rounds: 1; suite: pass at tree abc123'
 out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
 [ "$rc" -eq 0 ] && [ "$(printf '%s\n' "$out" | tail -1)" = "next: none" ] \
+  && ! printf '%s\n' "$out" | grep -q '^warn:' \
   && ok "status prints no warn line when the last task's note has suite: pass at tree" \
   || bad "status suite end present" "rc=$rc, got: $out"
 
@@ -138,6 +149,33 @@ out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
 [ "$rc" -eq 0 ] && [ "$(printf '%s\n' "$out" | tail -1)" = "$EW" ] \
   && ok "status skips a last task with no done step for the one before it" \
   || bad "status suite end skip" "rc=$rc, got: $out"
+
+p="$d/suite-end-red.md"
+mkplan "$p" "$CK" '**Suite start:** pass at 3f9a1c2' '' '- [x] **Step 1.1: a**' \
+  '- [x] **Step 2.1: c** Note: rounds: 1; suite: red at tree abc123 test-x'
+out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
+[ "$rc" -eq 0 ] && [ "$(printf '%s\n' "$out" | tail -1)" = "next: none" ] \
+  && ! printf '%s\n' "$out" | grep -q '^warn:' \
+  && ok "status prints no warn line when the last task's note has suite: red at tree" \
+  || bad "status suite end red" "rc=$rc, got: $out"
+
+# The last suite field counts, as plan report reads its fields.
+p="$d/suite-end-last-field.md"
+mkplan "$p" "$CK" '**Suite start:** pass at 3f9a1c2' '' '- [x] **Step 1.1: a**' \
+  '- [x] **Step 2.1: c** Note: rounds: 1; suite: pass at tree abc; suite: pending'
+out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
+[ "$rc" -eq 0 ] && [ "$(printf '%s\n' "$out" | tail -1)" = "$EW" ] \
+  && ok "status reads the last suite: field of a note, as plan report does" \
+  || bad "status suite end last field" "rc=$rc, got: $out"
+
+# The note is the text after the last " Note: ", so a title holding one is not read as the note.
+p="$d/suite-end-note-in-title.md"
+mkplan "$p" "$CK" '**Suite start:** pass at 3f9a1c2' '' '- [x] **Step 1.1: a**' \
+  '- [x] **Step 2.1: c ** Note: suite: pass at tree abc123 x** Note: rounds: 1'
+out="$("$KEEL" plan status "$p" 2>&1)"; rc=$?
+[ "$rc" -eq 0 ] && [ "$(printf '%s\n' "$out" | tail -1)" = "$EW" ] \
+  && ok "status reads the note after the last Note: marker, not one in the step title" \
+  || bad "status suite end note in title" "rc=$rc, got: $out"
 
 p="$d/suite-none.md"
 mkplan "$p" '- [x] **Step 1.1: a** Note: rounds: 1' '- [x] **Step 2.1: c** Note: loop: light'
