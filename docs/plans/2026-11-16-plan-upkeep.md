@@ -419,3 +419,36 @@ Stage exactly those paths and stop. **Do not commit.** The coordinator commits a
 passes, with `git commit -m "docs(execute-plan): the spec reviewer reads the tree's status itself"`.
 Paste the `git status --porcelain` output into your report; if it lists anything this task did not
 touch, say so and leave it unstaged.
+
+## Delivery
+
+- review-code round 1: 2 blocking (2026-11-16, base 5775a71)
+  - the checkpoint-red rule said the fix task is "appended", against "Adding a task to an approved
+    plan" (`skills/execute-plan/references/subagent-prompts.md`)
+  - the docs said any `suite:` field silences the end warn; the code needs `pass at tree ` or
+    `red at tree ` on the last task with a done step (`subagent-prompts.md`, `plan-template.md`,
+    `docs/03-install-and-distribution.md`, ADR-0017, `CHANGELOG.md`)
+- review-code: nothing blocking after the fix pass 97dd6fe, no standards violation open
+  (2026-11-16, base 5775a71). The round 1 line was written with this record, not with the fix
+  commit as `delivery.md` says: a coordinator slip, recorded here.
+- follow-up:
+  - should fix: no case pins `**Suite start:** red at <commit> <names>`; dropping `red` from the
+    start regex survives the suite (`bin/keel`, `tests/test-plan.sh`)
+  - should fix: ADR-0017's Decision still says the fix task is "appended to the plan"; ADRs here
+    are records whose Decision text stands as written, so a further dated Amended note is the
+    route if it should be stated (`docs/decisions/ADR-0017-...`)
+  - consider: the resume guidance says to write `pass at <that commit>` from the last checkpoint,
+    whose note holds a tree sha, not a commit; and it has no step for a pre-rule plan with no
+    checkpoint yet (`subagent-prompts.md`)
+  - consider: the code needs a non-blank value after `pass at `/`red at `; the docs say only "a
+    value starting" (`docs/03-install-and-distribution.md`)
+  - consider: "a task appended after the last checkpoint" remains in `subagent-prompts.md` and
+    ADR-0017's 2026-11-16 entry; "added" would match the new section
+  - consider: plans finished under 0.28.0 with a checkpoint line now print warn lines; they are
+    records, so the warnings are true and left alone
+  - consider: the awk change was not run under mawk or gawk locally (neither installed); CI on
+    Ubuntu is the check
+  - consider: in this run the done-guard stop hook (installed keel 0.27.0) asked each implementer
+    to run the full suite despite the checkpoint brief, and on task 1 its forced reply replaced
+    the report as the agent's final message; check whether 0.28.0's scoped prefixes fix this
+    before filing it
