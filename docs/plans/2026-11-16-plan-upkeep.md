@@ -84,6 +84,9 @@ to a pull request, commits that ask none, with the decisions above as written.
   `docs/stories`, `docs/architecture`, `docs/decisions`, `docs/audits`, `docs/ideas`,
   `docs/07-open-decisions.md`, `docs/harness-support.md`, the eval fixtures, released
   `CHANGELOG.md` entries).
+- Skill and template text names no real project, repository or commit (`docs/standards.md`,
+  "Examples use generic names, never a real one"): where a behaviour cites evidence from a named
+  project, keep the evidence and drop the name. Added 2026-11-16 after task 2's review.
 - A wording pin in `tests/test-plan.sh` follows the file's existing form under
   "the skills name the commands, and the fallback": `grep -qF '<anchor phrase>' "$f" && ok ... || bad ...`,
   one anchor phrase per rule, short enough to survive a rewording of the sentence around it.
