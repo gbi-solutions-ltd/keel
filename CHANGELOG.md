@@ -16,6 +16,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
   `docs(plans): <slug> <what>`.
 - Each plan task carries a `**Docs searched:**` line after its `Files` block, the standards document
   searched for any convention it changes; the plan review's question 7 reads that line.
+- A plan cites a file a task changes by symbol or heading, not by line; an answered open question
+  is replaced by its answer; the plan review's question 8 names stale citations, text kept for an
+  option not taken, and a header longer than the tasks need.
 
 ## 0.28.0 - 2026-11-13
 

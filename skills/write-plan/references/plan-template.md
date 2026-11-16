@@ -208,6 +208,14 @@ plans, it was the stale document in four tasks.
 It costs the measured resumes: on the 2026-11-11 run, 4 of 13 tasks stopped because their Files
 missed a document the change made wrong, about 30 minutes.
 
+### Citations
+
+A file some task in the plan changes is cited by symbol or heading (`queue.go`,
+`func defaultQueue`), not by line, because the run moves its lines. A line number is kept only for
+a file no task changes. One plan's citations into an API spec and its Go sources were exact at the
+commit it was written on and wrong by the end of its own run; another cited line 23 of a file for
+code at line 30.
+
 ### Why the Interfaces block exists
 
 A task's implementer may see only their own section. `Consumes` tells them the exact signatures
@@ -366,6 +374,11 @@ Then ask it. A blocker recorded in an open questions section stops `execute-plan
 starts, so a question you could have settled in one exchange costs a whole cycle instead. Put it
 to the user as a choice, following
 [../../keel/references/asking-questions.md](../../keel/references/asking-questions.md).
+
+Once the person answers, the question is replaced by its answer, who gave it and the date, with
+one line naming the options not taken. Text that applied only to another option goes, and a header
+line written conditionally on the answer is rewritten. One plan kept options B and C, an "Under
+option B" paragraph and a conditional `**Commits that ask:**` line after the owner chose.
 
 ## Commands come from the profile
 

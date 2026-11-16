@@ -3312,10 +3312,23 @@ awk '/^### Task 3: Reject an empty credential at startup/ { on = 1 } /^\*\*Depen
   && ok "plan-template's example task carries a Docs searched line after its Files block" \
   || bad "plan-template example docs searched" "the example task has no **Docs searched:** line before Depends on"
 
+grep -qF 'cited by symbol or heading' "$f" \
+  && ok "plan-template cites a file a task changes by symbol or heading" \
+  || bad "plan-template citations" "no Citations section citing a changing file by symbol or heading"
+
+grep -qF 'replaced by its answer' "$f" \
+  && ok "plan-template replaces an answered open question by its answer" \
+  || bad "plan-template answered question" "No placeholders does not replace an answered question by its answer"
+
 f="$ROOT/skills/write-plan/references/plan-review.md"
 grep -qF 'each task'"'"'s `**Docs searched:**` line' "$f" \
   && ok "plan-review question 7 reads each task's Docs searched line" \
   || bad "plan-review docs searched" "question 7 does not read each task's **Docs searched:** line"
+
+grep -qF 'Answer eight questions' "$f" \
+  && grep -qF 'option not taken' "$f" \
+  && ok "plan-review question 8 reviews stale citations, dead options and the header's size" \
+  || bad "plan-review question 8" "the prompt does not answer eight questions naming text kept for an option not taken"
 
 f="$ROOT/docs/03-install-and-distribution.md"
 grep -qF 'warn: no **Suite start:** line' "$f" \

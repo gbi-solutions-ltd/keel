@@ -342,7 +342,7 @@ touch, say so and leave it unstaged.
 
 **Done when:** `tests/test-plan.sh` passes and `tests/validate-skills.sh` exits 0.
 
-- [ ] **Step 4.1: Build it test first**
+- [x] **Step 4.1: Build it test first** Note: red witnessed by the implementer (646 passed, 3 failed)
 
 Follow `keel:tdd` for each behaviour: write its pin from the example, run it, and watch it fail
 because the phrase is absent, then write the text and watch it pass.
@@ -355,7 +355,7 @@ the suite at checkpoints and hands you the last one's record as your start recor
 or reds this task did not cause, each named and matched against the start record. This is the one
 boundary run the task schedules.
 
-- [ ] **Step 4.2: Hand over**
+- [x] **Step 4.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES; evidence kept in generic form per the generic-names constraint
 
 ```bash
 git add skills/write-plan/references/plan-template.md \
