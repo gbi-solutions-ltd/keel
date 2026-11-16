@@ -217,7 +217,7 @@ plan at approval, unchanged), `docs/02-skill-catalog.md` (the approval question,
 
 **Done when:** `tests/test-plan.sh` passes and `tests/validate-skills.sh` exits 0.
 
-- [ ] **Step 2.1: Build it test first**
+- [x] **Step 2.1: Build it test first** Note: red witnessed by the implementer (638 passed, 5 failed)
 
 Follow `keel:tdd` for each behaviour: write its pin from the example, run it, and watch it fail
 because the phrase is absent, then write the text and watch it pass.
@@ -230,7 +230,7 @@ the suite at checkpoints and hands you the last one's record as your start recor
 or reds this task did not cause, each named and matched against the start record. This is the one
 boundary run the task schedules.
 
-- [ ] **Step 2.2: Hand over**
+- [x] **Step 2.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES; deviation agreed by the reviewer: real project names and hashes dropped from the template text per docs/standards.md generic-names rule, evidence kept
 
 ```bash
 git add skills/write-plan/references/plan-template.md \

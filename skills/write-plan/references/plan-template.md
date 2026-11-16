@@ -401,6 +401,27 @@ This task hands over as above.
 The failure mode this prevents is a fabricated test that passes without checking anything, which
 is worse than an honest gap because it reads as coverage.
 
+## Adding a task to an approved plan
+
+A task added after approval, by the coordinator, the person or a review, carries a line under its
+heading, `**Task <id> added:** <date>, <source and who decided>`, for example
+`**Task 4a added:** 2026-11-16, from the task-6 checkpoint red, decided by the coordinator`. In the
+same edit, every header line that names tasks is rewritten to match: `**Commits that ask:**` names
+the new task when it stages a `hard_block_paths` path, `**Concurrent batches:**` is rewritten from a
+fresh `keel plan batches` run, and a new last task moves the plan-end checkpoint to it.
+
+Write the task where it runs, straight after the last committed task, so file order stays run order
+and the last task `keel plan status` reads is the last one run. One reviewed plan wrote 4a between
+4 and 5 and ran it after 5. Order lives in `Depends on:` lines and file position, so a plan keeps no
+separate order table to fall out of date. A `review-code` fix pass is not an added task: it stays a
+`fix: <what> (review-code)` commit outside the task list.
+
+A plan repair (a task added, a `Files` entry added, a step tightened) is committed alone as
+`docs(plans): <slug> <what>` before the next task is sent, with `git commit -m <msg> -- <plan>` when
+the task's paths are already staged. Ticks, tick notes and the follow-up list still ride with the
+task's commit. In the 2026-11-16 review of four plans, coordinator `Files` additions landed inside
+two feature commits, where the plan change read as part of the feature.
+
 ## Self-review
 
 1. Every story in scope maps to at least one task.

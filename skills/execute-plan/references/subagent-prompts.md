@@ -422,7 +422,8 @@ have hidden the break, so naming the staged task alone sends `debug` to the wron
   `suite: red at tree <tree sha> <names>`, and send Phase 4 to a fresh implementer as a task
   appended to the plan, in the full loop, before any further dispatch. The earlier task is already
   committed, so the fix can only be a new commit, and dispatching past a known red would let later
-  tasks build on it.
+  tasks build on it. Write the task as "Adding a task to an approved plan" in
+  [plan-template.md](../../write-plan/references/plan-template.md) says.
 
 `ship`, CI and a declared batch's join gate still run the whole suite, and remain the backstop for
 what a checkpoint has not yet seen. `review-code` does too, except that it quotes the plan-end
@@ -474,7 +475,10 @@ honest plan edit is direction: recording a verdict, tightening a step whose asse
 found too weak, or withdrawing a claim the plan cannot support all make the task **harder** to pass,
 and those are yours to make. Loosening a gate so a failing step passes makes it easier, and that is
 the mistake the skill names. Where the repair would make a blocked task passable by changing what
-was planned, propose it and let the user rule.
+was planned, propose it and let the user rule. A plan repair (a task added, a `Files` entry added, a step tightened) is committed alone as
+`docs(plans): <slug> <what>` before the next task is sent, with `git commit -m <msg> -- <plan>` when
+the task's paths are already staged; ticks, tick notes and the follow-up list still ride with the
+task's commit.
 
 It is also usually bigger than it looks. A subagent that wrote its test first and watched it fail
 has a test asserting whatever it built, so a report saying "returns `a - b` rather than the

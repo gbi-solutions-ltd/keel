@@ -3275,10 +3275,32 @@ grep -qF '`**Suite start:**`' "$f" \
   && ok "subagent-prompts keeps the plan-start record in the Suite start line" \
   || bad "subagent-prompts suite start" "the Suite checkpoints section does not name the Suite start line"
 
+grep -qF 'committed alone as' "$f" \
+  && ok "subagent-prompts commits a plan repair alone" \
+  || bad "subagent-prompts plan repair" "the plan file paragraph does not commit a plan repair alone"
+
+grep -qF 'Adding a task to an approved plan' "$f" \
+  && ok "subagent-prompts points an appended fix task to the added-task section" \
+  || bad "subagent-prompts added task" "the checkpoint rule does not name Adding a task to an approved plan"
+
+f="$ROOT/skills/execute-plan/references/delivery.md"
+grep -qF 'Adding a task to an approved plan' "$f" \
+  && ok "delivery points tasks added from review findings to the added-task section" \
+  || bad "delivery added task" "The run does not name Adding a task to an approved plan"
+
 f="$ROOT/skills/write-plan/references/plan-template.md"
 grep -qF 'header line, `**Suite start:** pass at <commit>`' "$f" \
   && ok "plan-template names the Suite start line" \
   || bad "plan-template suite start" "the suite checkpoints paragraph does not name the Suite start line"
+
+grep -qF 'Adding a task to an approved plan' "$f" \
+  && grep -qF '**Task <id> added:**' "$f" \
+  && ok "plan-template has a section for a task added to an approved plan, with its added line" \
+  || bad "plan-template added task" "no Adding a task to an approved plan section naming the **Task <id> added:** line"
+
+grep -qF 'committed alone as' "$f" \
+  && ok "plan-template commits a plan repair alone" \
+  || bad "plan-template plan repair" "the added-task section does not commit a plan repair alone"
 
 f="$ROOT/docs/03-install-and-distribution.md"
 grep -qF 'warn: no **Suite start:** line' "$f" \
