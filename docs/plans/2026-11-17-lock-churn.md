@@ -1,4 +1,4 @@
-# Lock Churn Implementation Plan
+# Plan Lock File Implementation Plan
 
 > **For agentic workers:** use `keel:execute-plan` to implement this task by task.
 > Steps are checkboxes with ids, `**Step <task>.<step>: ...**`. Find your place with
@@ -8,15 +8,20 @@
 > and did not witness (`--note <text>`), or left unticked and reported.
 > **REQUIRED SUB-SKILL:** `keel:tdd` for every task.
 
-**Goal:** a `keel plan tick` waiting on a busy lock keeps waiting when the lock changes hands
-between its checks, instead of dying with "cannot create ... lock" and losing its tick.
+**Goal:** `keel plan tick` takes its lock with a primitive that is atomic whatever `mkdir` the
+system ships, so concurrent ticks never both hold it, and a waiter whose lock changes hands keeps
+waiting instead of dying with "cannot create".
 **Stories:** none, short path: behaviours approved by Bernard, 2026-11-17
 **ADRs:** none
-**Architecture:** `plan_lock` in `bin/keel` retries a failed `mkdir` once when the lock is absent,
-then dies if the lock is still absent, reading that as a directory it cannot write. Under load
-another tick can take and free the lock inside that window twice, so the waiter dies wrongly. The
-fix decides "cannot be locked" from the plan's directory (not a writable directory), and otherwise
-keeps polling as for a held lock.
+**Architecture:** the cause, measured 2026-11-17: Ubuntu 26.04 (GitHub's `ubuntu-latest`) ships
+uutils coreutils, whose `mkdir` 0.10.0 exits 0 for both of two processes racing to create one
+path (965 of 2000 trials), so `plan_lock`'s `mkdir "$1.lock"` let two ticks hold the lock and one
+tick was lost. A CI probe (draft PR #17) traced two `mkdir` successes back to back on a fresh path.
+Bash's own exclusive create, `set -C` then `>`, which opens with `O_EXCL`, double-succeeded 0 of
+2000 times on the same image. `<plan>.lock` becomes a file created that way, holding the tick's
+pid; release removes it. The wait, stale-lock and trace behaviour stay as they are. Separately,
+under load a waiter could see the lock absent twice and die as if its directory were unwritable;
+"cannot be locked" is now decided from the directory itself.
 **Implementer routing:** inherit
 **Commits that ask:** none
 **Delivery:** pull-request
@@ -31,58 +36,84 @@ keeps polling as for a held lock.
 - Never commit on `main`; this runs on `fix/lock-churn`.
 - No em dash, no en dash, no dash longer than a hyphen. No attribution footers. Commits are
   conventional and signed off (`git commit -s`), since CI checks DCO.
-- One line under a new `## Unreleased` heading above `## 0.29.0` in `CHANGELOG.md`, terse, in the
-  style of the 0.29.0 entries. Released entries are records: never edit them.
-- `bin/keel`'s comment above `plan_lock` is the live description of the lock: it states what is
-  true after the change.
+- One entry under a new `## Unreleased` heading above `## 0.29.0` in `CHANGELOG.md`, terse, in the
+  style of the 0.29.0 entries. Released entries are records: never edit them. Keep the entry to an
+  even number of lines: `docs/plans/2026-11-12-plan-execution-follow-ups.md` cites `CHANGELOG.md:28`
+  and `tests/validate-citations.sh` fails when a blank line lands there.
+- Skill and doc text names no real project. The comment above `plan_lock` in `bin/keel` and the
+  lock paragraph in `docs/03-install-and-distribution.md` are the live descriptions of the lock and
+  must state what is true after the change.
 
-### Task 1: a waiter that sees the lock change hands keeps waiting
+### Task 1: the plan lock is a file created exclusively
 
 **Story:** none (short path)
 **Files:**
 - Modify: `bin/keel`
 - Modify: `tests/test-plan.sh`
+- Modify: `docs/03-install-and-distribution.md`
 - Modify: `CHANGELOG.md`
 
-**Docs searched:** "cannot create", "retried once", "plan_lock". Hits: only the comment above
-`plan_lock` in `bin/keel` and the existing read-only-directory case in `tests/test-plan.sh`; no
-live document describes the retry.
+**Docs searched:** "<plan>.lock", "plan.lock", "rm -r", "cannot create", "owner file". Hits:
+`docs/03-install-and-distribution.md` (the lock paragraph in the `keel plan status` section), the
+comment above `plan_lock` and its messages in `bin/keel`, and the lock cases in
+`tests/test-plan.sh`. `skills/execute-plan/references/parallel-batches.md` names `.git/index.lock`,
+which is git's and unchanged.
 
 **Depends on:** none
 
 **Behaviours:**
 
-1. A tick whose lock `mkdir` fails while the lock is absent, in a directory it can write, keeps
-   polling and lands. Example: a PATH shim `mkdir` that fails for the lock path on its first three
-   calls (the lock never existing) and then runs the real `mkdir`; `keel plan tick <plan> 1.1`
-   exits 0, step 1.1 is ticked, no `<plan>.lock` is left, and the output has no "cannot create".
-2. A tick on a plan whose directory it cannot write still fails at once with "cannot create" and
-   no "is held", in under 5 seconds, changing nothing: the existing case
-   "tick that cannot create its lock fails at once, saying so" passes unchanged.
-3. Twenty ticks started together all land: the existing concurrent-ticks case passes unchanged.
+1. The lock does not depend on `mkdir`: with a PATH shim `mkdir` that always exits 0 without
+   creating anything (as a racing uutils `mkdir` can), twenty ticks started together on one plan
+   all land and no `<plan>.lock` is left. Example: the concurrent-ticks case run with that shim
+   first on PATH gives 20 of 20.
+2. `<plan>.lock` is a regular file holding the holding tick's pid while it is held, created with
+   `set -C`, and removed on release; the EXIT trap still removes it when a tick dies holding it.
+   Example: the existing trace cases still read `acquire <pid>`, `release <pid>`,
+   `released <pid>` and `exit-released <pid>`, and a tick that dies after taking the lock leaves
+   no `<plan>.lock`.
+3. Waiting keeps its rules, on the file: a waiter counts polls only behind one holder (the pid in
+   the file), restarting when it changes, an empty lock file counts as one holder, and after 100
+   polls behind one holder the tick gives up naming the lock and changing nothing; the message
+   says to remove it with `rm -f <plan>.lock`. Example: the busy-queue, no-owner and stale-lock
+   cases pass with the lock faked as a file (`echo 12345 > <plan>.lock`, or an empty file).
+4. A lock that keeps changing hands is waited on, not reported as uncreatable: "cannot create" is
+   printed only when the plan's directory is missing or not writable, and a failed exclusive
+   create with the lock already gone again in a writable directory polls again. The window is a
+   few microseconds, so no shim reaches it; the example is the code and its absence from load:
+   `plan_lock` has no branch that dies on the lock being absent while the directory is writable,
+   and the concurrent-ticks case collects no "cannot create" in any tick's stderr.
+5. A plan in a directory the tick cannot write still fails at once with "cannot create" and no
+   "is held", in under 5 seconds, changing nothing (the existing case, unchanged). A directory
+   left at `<plan>.lock` by an older keel is treated as a held lock, and the give-up message names
+   it so it can be removed (`rm -r` for a directory). Example: `mkdir <plan>.lock` then a tick
+   gives up after the poll limit with the path in its message.
 
 **Done when:** `tests/test-plan.sh` passes.
 
 - [ ] **Step 1.1: Build it test first**
 
-Follow `keel:tdd` for behaviour 1: write its case from the example, run it, and watch it fail
-because the tick dies with "cannot create", then change `plan_lock` and watch it pass, with
-behaviours 2 and 3 still passing.
+Follow `keel:tdd` for each behaviour: write or adapt its case from the example, run it, and watch
+it fail for the reason the behaviour names (behaviour 1 fails because the shim `mkdir` lets ticks
+share the lock), then change `plan_lock`, `plan_unlock` and the EXIT trap, and watch every case
+pass. The existing lock cases that fake a held lock with `mkdir` change to a file; say which you
+changed and why in the report.
 Run: `tests/test-plan.sh`
-Expected before the implementation: FAIL, behaviour 1's case fails with "cannot create" in the
-output. Expected after: PASS. Quote the failing case and its message.
+Expected before the implementation: FAIL, the cases for behaviours 1, 3 (faked as a file) and 4
+fail. Expected after: PASS. Quote the failing cases and their messages.
 
-Run: the lint command from Global constraints. Run no `tests/run-tests.sh`: the coordinator runs it
-once after this task. Expected: PASS. This is the one boundary run the task schedules.
+Run: the lint command from Global constraints, and `tests/validate-citations.sh`. Run no
+`tests/run-tests.sh`: the coordinator runs it once after this task. Expected: PASS. This is the
+one boundary run the task schedules.
 
 - [ ] **Step 1.2: Hand over**
 
 ```bash
-git add bin/keel tests/test-plan.sh CHANGELOG.md
+git add bin/keel tests/test-plan.sh docs/03-install-and-distribution.md CHANGELOG.md
 git status --porcelain
 ```
 
 Stage exactly those paths and stop. **Do not commit.** The coordinator commits after the review
-pass, with `git commit -s -m "fix(plan): a tick waiting on a lock that changes hands keeps waiting"`.
+pass, with `git commit -s -m "fix(plan): take the plan lock with an exclusive file create, not mkdir"`.
 Paste the `git status --porcelain` output into your report; if it lists anything this task did not
 touch, say so and leave it unstaged.
