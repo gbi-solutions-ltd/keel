@@ -177,3 +177,23 @@ Stage exactly those paths and stop. **Do not commit.** The coordinator commits a
 pass, with `git commit -s -m "fix(plan): a pid that cannot be written leaves no lock behind"`.
 Paste the `git status --porcelain` output into your report; if it lists anything this task did not
 touch, say so and leave it unstaged.
+
+## Delivery
+
+- review-code round 1: 1 blocking (2026-11-17, base 2dcb4e4)
+  - bash `set -C` refuses only an existing regular file, so a symlink to `/dev/null` at
+    `<plan>.lock` let every tick acquire it and a FIFO there blocked every tick (`bin/keel`)
+- review-code: nothing blocking after the fix pass 46b29a2, no standards violation open
+  (2026-11-17, base 2dcb4e4); its one should fix, an empty lock left when the pid write fails,
+  became task 2, which passed its spec review
+- follow-up:
+  - consider: a stale lock could be recognised at once from its pid (`kill -0`) instead of after
+    100 polls (`bin/keel`)
+  - consider: a signal between the create and the EXIT trap leaves the lock behind (`bin/keel`)
+  - consider: an older keel ticking the same plan reads the file lock as an ownerless directory
+    lock and advises `rm -r` (mixed versions only)
+  - consider: release removes the lock by path; an owner check would contain a lock removed by
+    hand while held (`bin/keel`)
+  - consider: if the holder releases exactly as the 100th poll ends, the message says "cannot
+    create" for what was a held lock (`bin/keel`)
+  - consider: the `plan_unlock` comment and a test comment still narrate past measurements
