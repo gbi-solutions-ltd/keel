@@ -803,19 +803,30 @@ out="$("$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
 
 # Twenty ticks on one plan, started together. Without a lock each reads the plan before the others
 # write it and most ticks are lost: 3, 9 and 6 of 20 landed in three runs while planning.
+# The lock must not rest on mkdir: uutils mkdir, as Ubuntu 26.04 ships it, can report success to two
+# processes racing to create one path, so both would hold the lock. A shim mkdir that exits 0 and
+# creates nothing, as that race can, is first on PATH for the ticks alone, so a lock taken with
+# mkdir lets them collide.
 p="$d/batch.md"
 { printf '# A plan\n\n'; i=1; while [ "$i" -le 20 ]; do printf -- '- [ ] **Step 1.%s: a step**\n' "$i"; i=$((i+1)); done; } > "$p"
+shim="$d/shim-mkdir"
+mkdir "$shim"
+printf '%s\n' '#!/bin/sh' 'exit 0' > "$shim/mkdir"
+chmod 755 "$shim/mkdir"
 i=1
 # Their errors are kept, so a failure names its cause: one on CI showed only a count.
 # The lock trace is kept too, because a timestamp is too coarse to order a race and the trace's line
 # order is: the failure seen twice on Linux CI was never reproduced locally.
 while [ "$i" -le 20 ]; do
-  KEEL_PLAN_LOCK_TRACE="$d/batch.trace" "$KEEL" plan tick "$p" "1.$i" >/dev/null 2>>"$d/batch.err" &
+  PATH="$shim:$PATH" KEEL_PLAN_LOCK_TRACE="$d/batch.trace" \
+    "$KEEL" plan tick "$p" "1.$i" >/dev/null 2>>"$d/batch.err" &
   i=$((i+1))
 done
 wait
 n="$(grep -c '^- \[x\] \*\*Step 1\.' "$p")"
-[ "$n" -eq 20 ] && [ ! -e "$p.lock" ] \
+# A waiter that sees the lock change hands between its failed create and its look keeps waiting,
+# so no tick reports the lock as one it cannot create.
+[ "$n" -eq 20 ] && [ ! -e "$p.lock" ] && ! grep -q 'cannot create' "$d/batch.err" \
   && ok "twenty ticks started together all land, and the lock is gone after" \
   || bad "concurrent ticks" "$n of 20 landed; lock left: $([ -e "$p.lock" ] && echo yes || echo no); \
 errors: $(sort "$d/batch.err" | uniq -c | tr '\n' ' '); \
@@ -823,7 +834,7 @@ trace: $(tr '\n' ';' < "$d/batch.trace" 2>&1)"
 
 # A busy queue is not a stale lock: a waiter counts its polls only behind one holder, so it lands
 # however many it waited behind. A shim sleep stands in for the clock, one call a poll, so a loaded
-# machine cannot stretch the count: every 30th call writes a new owner, as a queue of holders would,
+# machine cannot stretch the count: every 30th call writes a new holder's pid, as a queue would,
 # and the 150th releases the lock, past the 100 polls a waiter gives one holder. Without
 # KEEL_TEST_ROTATE it only counts, a holder that never changes.
 sl="$d/sleepshim"
@@ -833,44 +844,125 @@ real_sleep="$(command -v sleep)"
 # shellcheck disable=SC2016  # the shim's own variables, expanded when it runs
 printf '%s\n' '#!/bin/sh' 'n=0; [ -f "$KEEL_TEST_POLLS" ] && read -r n < "$KEEL_TEST_POLLS"' \
   'n=$((n + 1)); echo "$n" > "$KEEL_TEST_POLLS"' \
-  'if [ -n "$KEEL_TEST_ROTATE" ] && [ $((n % 30)) -eq 0 ]; then echo "$n" > "$KEEL_TEST_LOCK/owner"; fi' \
-  'if [ -n "$KEEL_TEST_ROTATE" ] && [ "$n" -ge 150 ]; then' \
-  '  rm -f "$KEEL_TEST_LOCK/owner"; rmdir "$KEEL_TEST_LOCK"; fi' \
+  'if [ -n "$KEEL_TEST_ROTATE" ] && [ $((n % 30)) -eq 0 ]; then echo "$n" > "$KEEL_TEST_LOCK"; fi' \
+  'if [ -n "$KEEL_TEST_ROTATE" ] && [ "$n" -ge 150 ]; then rm -f "$KEEL_TEST_LOCK"; fi' \
   'exec "$KEEL_TEST_SLEEP" 0.01' > "$sl/sleep"
 chmod 755 "$sl/sleep"
 p="$d/queue.md"
 mkplan "$p" '- [ ] **Step 1.1: a**'
-mkdir "$p.lock"; echo 1 > "$p.lock/owner"
+echo 1 > "$p.lock"
 out="$(PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/queue.polls" \
   KEEL_TEST_LOCK="$p.lock" KEEL_TEST_ROTATE=1 "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
 [ "$rc" -eq 0 ] && grep -qxF -e '- [x] **Step 1.1: a**' "$p" && [ ! -e "$p.lock" ] \
   && ok "a tick behind a lock changing hands waits for it, past 100 polls" \
   || bad "queued tick" "rc=$rc out=$out"
 
-# A lock with no owner, as an older keel or a tick killed before writing one leaves it, counts as
-# one holder: the tick gives up after 100 polls, naming the lock, and changes nothing.
+# An empty lock, as a tick killed between creating it and writing its pid leaves it, counts as one
+# holder: the tick gives up after 100 polls, naming the lock, and changes nothing.
 p="$d/noowner.md"
 mkplan "$p" '- [ ] **Step 1.1: a**'
 cp "$p" "$d/noowner.before"
-mkdir "$p.lock"
+: > "$p.lock"
 out="$(PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/noowner.polls" \
   "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
 [ "$rc" -ne 0 ] && cmp -s "$p" "$d/noowner.before" && case "$out" in *"$p.lock"*) true ;; *) false ;; esac \
   && ok "tick facing a lock with no owner gives up naming it, and changes nothing" \
   || bad "lock with no owner" "rc=$rc out=$out"
+rm -f "$p.lock"
+# The limit is 100 polls behind one holder, with a sleep between each, so the shim counts 99.
+[ "$(cat "$d/noowner.polls" 2>&1)" = 99 ] \
+  && ok "a tick behind one holder gives up after exactly 100 polls" \
+  || bad "poll limit" "sleeps counted: $(cat "$d/noowner.polls" 2>&1)"
+
+# Anything already at the lock's path is a held lock, not only a regular file: set -C refuses only
+# a regular file, so a symlink to /dev/null would let every tick take the lock at once.
+p="$d/symlink.md"
+mkplan "$p" '- [ ] **Step 1.1: a**'
+cp "$p" "$d/symlink.before"
+ln -s /dev/null "$p.lock"
+out="$(PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/symlink.polls" \
+  "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && cmp -s "$p" "$d/symlink.before" && [ -L "$p.lock" ] \
+  && case "$out" in *"$p.lock"*) true ;; *) false ;; esac \
+  && ok "tick facing a symlink at the lock's path gives up naming it, and changes nothing" \
+  || bad "symlink lock" "rc=$rc out=$out"
+rm -f "$p.lock"
+
+# A FIFO at the lock's path is held too, and the waiter never opens it, which would block the tick.
+# The tick runs in the background and is killed if it has not given up within ten seconds.
+p="$d/fifo.md"
+mkplan "$p" '- [ ] **Step 1.1: a**'
+cp "$p" "$d/fifo.before"
+mkfifo "$p.lock"
+PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/fifo.polls" \
+  "$KEEL" plan tick "$p" 1.1 >"$d/fifo.out" 2>&1 &
+fpid=$!
+i=0
+while kill -0 "$fpid" 2>/dev/null && [ "$i" -lt 100 ]; do "$real_sleep" 0.1; i=$((i + 1)); done
+kill "$fpid" 2>/dev/null && hung=yes || hung=no
+wait "$fpid"; rc=$?
+out="$(cat "$d/fifo.out")"
+[ "$hung" = no ] && [ "$rc" -ne 0 ] && cmp -s "$p" "$d/fifo.before" \
+  && case "$out" in *"$p.lock"*) true ;; *) false ;; esac \
+  && ok "tick facing a FIFO at the lock's path gives up naming it, without blocking on it" \
+  || bad "FIFO lock" "hung=$hung rc=$rc out=$out"
+rm -f "$p.lock"
+
+# A create that keeps failing with no lock there is not a held lock, even in a writable directory:
+# a lock name one past the longest a file name can be fails every create, and nothing is left.
+p="$d/$(printf '%0248d' 0).md"
+mkplan "$p" '- [ ] **Step 1.1: a**'
+cp "$p" "$d/longname.before"
+out="$(PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/longname.polls" \
+  "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && cmp -s "$p" "$d/longname.before" && [ ! -e "$p.lock" ] && [ ! -L "$p.lock" ] \
+  && case "$out" in *"cannot create"*) true ;; *) false ;; esac \
+  && case "$out" in *"is held"*) false ;; *) true ;; esac \
+  && ok "tick whose lock cannot be created in a writable directory says so, not that it is held" \
+  || bad "lock create fails, nothing there" "rc=$rc out=$out"
+rm -f "$p"
+
+# A create that succeeds with a pid write that fails, as on a full disk, leaves no empty lock that
+# would read as held: the tick removes what it made and says the lock cannot be created. A file
+# size limit of 0, with SIGXFSZ ignored so the write fails rather than killing the tick, stands in
+# for the full disk; the plan is written before the limit is set, and the shim counts its polls
+# into /dev/null, which the limit does not reach.
+p="$d/nopid.md"
+mkplan "$p" '- [ ] **Step 1.1: a**'
+cp "$p" "$d/nopid.before"
+out="$(trap '' XFSZ; ulimit -f 0; PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" \
+  KEEL_TEST_POLLS=/dev/null "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && cmp -s "$p" "$d/nopid.before" && [ ! -e "$p.lock" ] && [ ! -L "$p.lock" ] \
+  && case "$out" in *"cannot create"*) true ;; *) false ;; esac \
+  && ok "tick whose pid cannot be written leaves no lock and says it cannot be created" \
+  || bad "pid write fails" "rc=$rc lock left: $([ -e "$p.lock" ] && echo yes || echo no) out=$out"
+rm -f "$p.lock"
+
+# A directory at the lock's path, as an older keel leaves it, is a held lock: the tick gives up
+# after 100 polls with the command that removes a directory.
+p="$d/olddir.md"
+mkplan "$p" '- [ ] **Step 1.1: a**'
+cp "$p" "$d/olddir.before"
+mkdir "$p.lock"
+out="$(PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/olddir.polls" \
+  "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && cmp -s "$p" "$d/olddir.before" \
+  && case "$out" in *"rm -r $p.lock"*) true ;; *) false ;; esac \
+  && ok "tick facing a directory lock from an older keel gives up naming it, and changes nothing" \
+  || bad "directory lock" "rc=$rc out=$out"
 rmdir "$p.lock"
 
-# A lock left by a killed tick, with the owner it wrote: the tick waits, then names the lock and
+# A lock left by a killed tick, with the pid it wrote: the tick waits, then names the lock and
 # changes nothing.
 p="$d/stale.md"
 mkplan "$p" '- [ ] **Step 1.1: a**'
 cp "$p" "$d/stale.before"
-mkdir "$p.lock"; echo 12345 > "$p.lock/owner"
+echo 12345 > "$p.lock"
 out="$("$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
-[ "$rc" -ne 0 ] && cmp -s "$p" "$d/stale.before" && case "$out" in *"$p.lock"*) true ;; *) false ;; esac \
+[ "$rc" -ne 0 ] && cmp -s "$p" "$d/stale.before" && case "$out" in *"rm -f $p.lock"*) true ;; *) false ;; esac \
   && ok "tick facing a held lock gives up naming it, and changes nothing" \
   || bad "stale lock" "rc=$rc out=$out"
-rm -f "$p.lock/owner"; rmdir "$p.lock"
+rm -f "$p.lock"
 
 # A lock that cannot be created is not a lock that is held: waiting ten seconds and then blaming a
 # killed tick sends the reader after a lock that does not exist. Root can write any directory.
@@ -893,22 +985,25 @@ else
     || bad "lock cannot be created" "rc=$rc secs=$secs out=$out"
 fi
 
-# A tick removes only the lock it holds: once released, another tick may hold it. A shim rmdir has
-# another holder take the lock right after the tick's own release, so a second rmdir would show.
+# A tick removes only the lock it holds: once released, another tick may hold it. A shim rm has
+# another holder take the lock right after the tick's own release, so a second removal would show.
+# Only a call naming the lock is touched; any other rm, such as the tick's temporary file, is the
+# real one, resolved before PATH holds the shim.
+real_rm="$(command -v rm)"
 shim="$d/shim"
 mkdir "$shim"
-printf '%s\n' '#!/bin/sh' '"$KEEL_TEST_RMDIR" "$@" || exit $?' '[ -e "$KEEL_TEST_MARK" ] && exit 0' \
-  ': > "$KEEL_TEST_MARK"' 'mkdir "$1"' > "$shim/rmdir"
-chmod 755 "$shim/rmdir"
-real_rmdir="$(command -v rmdir)"
+printf '%s\n' '#!/bin/sh' 'lock=""; for a; do [ "$a" = "$KEEL_TEST_LOCK" ] && lock=1; done' \
+  '"$KEEL_TEST_RM" "$@" || exit $?' '[ -n "$lock" ] || exit 0' '[ -e "$KEEL_TEST_MARK" ] && exit 0' \
+  ': > "$KEEL_TEST_MARK"' 'echo 999 > "$KEEL_TEST_LOCK"' > "$shim/rm"
+chmod 755 "$shim/rm"
 p="$d/relock.md"
 mkplan "$p" '- [ ] **Step 1.1: a**'
-PATH="$shim:$PATH" KEEL_TEST_RMDIR="$real_rmdir" KEEL_TEST_MARK="$d/mark" \
+PATH="$shim:$PATH" KEEL_TEST_RM="$real_rm" KEEL_TEST_LOCK="$p.lock" KEEL_TEST_MARK="$d/mark" \
   "$KEEL" plan tick "$p" 1.1 >/dev/null 2>&1; rc=$?
-[ "$rc" -eq 0 ] && grep -qxF -e '- [x] **Step 1.1: a**' "$p" && [ -d "$p.lock" ] \
+[ "$rc" -eq 0 ] && grep -qxF -e '- [x] **Step 1.1: a**' "$p" && [ -f "$p.lock" ] \
   && ok "a tick removes only the lock it holds" \
-  || bad "tick removes only its lock" "rc=$rc, lock left: $([ -d "$p.lock" ] && echo yes || echo no)"
-rmdir "$p.lock" 2>/dev/null
+  || bad "tick removes only its lock" "rc=$rc, lock left: $([ -f "$p.lock" ] && echo yes || echo no)"
+rm -f "$p.lock"
 
 # ---- tick: the lock leaves a trace when asked ---------------------------------------------------
 
@@ -935,39 +1030,47 @@ mkplan "$p" '- [ ] **Step 1.1: a**'
   && ok "a tick with no lock trace set writes no trace" \
   || bad "no lock trace" "rc=$rc, directory holds: $(find "$d/notrace" -mindepth 1 | tr '\n' ' ')"
 
-# A release whose rmdir fails is traced as release-failed with rmdir's error, in place of released,
-# and the error still reaches stderr. A shim rmdir fails, saying so, and leaves the lock.
+# A release whose rm fails is traced as release-failed with rm's error, in place of released, and
+# the error still reaches stderr. A shim rm fails on the lock, saying so, and leaves it; any other
+# rm is the real one.
 shim="$d/shim-rmfail"
 mkdir "$shim"
-printf '%s\n' '#!/bin/sh' 'echo "rmdir: $1: shim refused" >&2' 'exit 1' > "$shim/rmdir"
-chmod 755 "$shim/rmdir"
+printf '%s\n' '#!/bin/sh' 'for a; do' \
+  '  [ "$a" = "$KEEL_TEST_LOCK" ] && { echo "rm: $a: shim refused" >&2; exit 1; }' 'done' \
+  'exec "$KEEL_TEST_RM" "$@"' > "$shim/rm"
+chmod 755 "$shim/rm"
 p="$d/tracefail.md"
 mkplan "$p" '- [ ] **Step 1.1: a**'
-out="$(PATH="$shim:$PATH" KEEL_PLAN_LOCK_TRACE="$d/tracefail.log" \
-  "$KEEL" plan tick "$p" 1.1 2>&1 >/dev/null)"
+out="$(PATH="$shim:$PATH" KEEL_TEST_RM="$real_rm" KEEL_TEST_LOCK="$p.lock" \
+  KEEL_PLAN_LOCK_TRACE="$d/tracefail.log" "$KEEL" plan tick "$p" 1.1 2>&1 >/dev/null)"
 tpid="$(awk 'NR == 1 { print $2 }' "$d/tracefail.log" 2>/dev/null)"
 [ -n "$tpid" ] && case "$out" in *"shim refused"*) true ;; *) false ;; esac \
   && [ "$(cat "$d/tracefail.log")" = "acquire $tpid"$'\n'"release $tpid"$'\n'"release-failed \
-$tpid rmdir: $p.lock: shim refused" ] \
-  && ok "a release whose rmdir fails is traced as release-failed with its error, still on stderr" \
+$tpid rm: $p.lock: shim refused" ] \
+  && ok "a release whose rm fails is traced as release-failed with its error, still on stderr" \
   || bad "lock trace release-failed" "stderr: $out, trace: $(cat "$d/tracefail.log" 2>&1)"
-rmdir "$p.lock" 2>/dev/null
+rm -f "$p.lock"
 
 # A tick that dies holding the lock is released by its EXIT trap, which traces that too. A shim
-# mktemp fails, so the tick dies after taking the lock.
+# mktemp fails, so the tick dies after taking the lock; first it keeps what the lock held, which
+# must be a regular file holding the tick's pid.
 shim="$d/shim-mktemp"
 mkdir "$shim"
-printf '%s\n' '#!/bin/sh' 'exit 1' > "$shim/mktemp"
+printf '%s\n' '#!/bin/sh' '[ -f "$KEEL_TEST_LOCK" ] && cat "$KEEL_TEST_LOCK" > "$KEEL_TEST_SEEN"' \
+  'exit 1' > "$shim/mktemp"
 chmod 755 "$shim/mktemp"
 p="$d/tracedie.md"
 mkplan "$p" '- [ ] **Step 1.1: a**'
-PATH="$shim:$PATH" KEEL_PLAN_LOCK_TRACE="$d/tracedie.log" "$KEEL" plan tick "$p" 1.1 >/dev/null 2>&1
+PATH="$shim:$PATH" KEEL_TEST_LOCK="$p.lock" KEEL_TEST_SEEN="$d/tracedie.seen" \
+  KEEL_PLAN_LOCK_TRACE="$d/tracedie.log" "$KEEL" plan tick "$p" 1.1 >/dev/null 2>&1
 rc=$?
 tpid="$(awk 'NR == 1 { print $2 }' "$d/tracedie.log" 2>/dev/null)"
 [ "$rc" -ne 0 ] && [ -n "$tpid" ] && [ ! -e "$p.lock" ] \
+  && [ "$(cat "$d/tracedie.seen" 2>/dev/null)" = "$tpid" ] \
   && [ "$(cat "$d/tracedie.log")" = "acquire $tpid"$'\n'"exit-released $tpid" ] \
   && ok "a tick that dies holding the lock traces its EXIT trap's release" \
-  || bad "lock trace on exit" "rc=$rc, trace: $(cat "$d/tracedie.log" 2>&1)"
+  || bad "lock trace on exit" "rc=$rc, trace: $(cat "$d/tracedie.log" 2>&1), \
+lock held: $(cat "$d/tracedie.seen" 2>&1)"
 
 # ---- tick: a failed write never costs the plan --------------------------------------------------
 

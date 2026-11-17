@@ -7,6 +7,17 @@ versions as each skill is tested against real repositories.
 
 Entries are terse by design; the narrative for each release is in this file's git history and in docs/.
 
+## Unreleased
+
+- `keel plan tick`'s lock `<plan>.lock` is a file created with bash's `set -C`, holding the tick's
+  pid, not a `mkdir` directory: uutils `mkdir` let two racing ticks both hold it and lost a tick.
+  A waiter whose lock changes hands keeps waiting. "cannot create" means the plan's directory is
+  not writable, or the create still fails at the poll limit with nothing at the path (a full disk).
+  Anything already at the path, a symlink or a directory lock from an older keel included, is a
+  held lock, and the give-up message names `rm -r` for a directory.
+  A tick that creates the lock but cannot write its pid into it removes it again, so a full disk
+  leaves no empty lock behind to be read as held.
+
 ## 0.29.0 - 2026-11-16
 
 - Release gate 2026-11-16 against `c34a955`: **seven treatment arms, all seven pass**, $3.2423 in

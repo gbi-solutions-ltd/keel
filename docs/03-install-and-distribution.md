@@ -473,9 +473,15 @@ rather than read as a plan without ids.
 ` Not applicable: <reason>`, and refuse without a reason. Ticking a parked step done drops its
 reason. Parking replaces anything after the title, a note included, and a reason must start with a
 non-blank character, since `plan status` reads one that starts with a space, tab or CR as missing.
-Ticks on one plan take turns through a lock, the directory `<plan>.lock`, so a concurrent batch's
-ticks all land. A tick fails naming the lock once one holder, named in the lock's `owner` file,
-has kept it about ten seconds, since a killed tick can leave it behind.
+Ticks on one plan take turns through a lock, the file `<plan>.lock`, created exclusively (bash's
+`set -C`, not `mkdir`, whose uutils build can let two processes both create one path) and holding
+the holder's process id, so a concurrent batch's ticks all land. A tick fails naming the lock once
+one holder has kept it about ten seconds, since a killed tick can leave it behind, and says to
+remove it with `rm -f <plan>.lock`, or `rm -r` for a directory an older keel left there. Anything
+already at `<plan>.lock`, a symlink, FIFO or directory included, counts as held. A tick that
+creates the lock but cannot write its process id into it removes it again, so it leaves no empty
+lock behind. "cannot create" `<plan>.lock` means the lock could not be made in the plan's
+directory: the directory is not writable, or the file system is full.
 
 ```bash
 keel plan report <plan> [--json]
