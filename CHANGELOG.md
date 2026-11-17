@@ -15,6 +15,8 @@ Entries are terse by design; the narrative for each release is in this file's gi
   not writable, or the create still fails at the poll limit with nothing at the path (a full disk).
   Anything already at the path, a symlink or a directory lock from an older keel included, is a
   held lock, and the give-up message names `rm -r` for a directory.
+  A tick that creates the lock but cannot write its pid into it removes it again, so a full disk
+  leaves no empty lock behind to be read as held.
 
 ## 0.29.0 - 2026-11-16
 

@@ -915,12 +915,28 @@ mkplan "$p" '- [ ] **Step 1.1: a**'
 cp "$p" "$d/longname.before"
 out="$(PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/longname.polls" \
   "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
-[ "$rc" -ne 0 ] && cmp -s "$p" "$d/longname.before" \
+[ "$rc" -ne 0 ] && cmp -s "$p" "$d/longname.before" && [ ! -e "$p.lock" ] && [ ! -L "$p.lock" ] \
   && case "$out" in *"cannot create"*) true ;; *) false ;; esac \
   && case "$out" in *"is held"*) false ;; *) true ;; esac \
   && ok "tick whose lock cannot be created in a writable directory says so, not that it is held" \
   || bad "lock create fails, nothing there" "rc=$rc out=$out"
 rm -f "$p"
+
+# A create that succeeds with a pid write that fails, as on a full disk, leaves no empty lock that
+# would read as held: the tick removes what it made and says the lock cannot be created. A file
+# size limit of 0, with SIGXFSZ ignored so the write fails rather than killing the tick, stands in
+# for the full disk; the plan is written before the limit is set, and the shim counts its polls
+# into /dev/null, which the limit does not reach.
+p="$d/nopid.md"
+mkplan "$p" '- [ ] **Step 1.1: a**'
+cp "$p" "$d/nopid.before"
+out="$(trap '' XFSZ; ulimit -f 0; PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" \
+  KEEL_TEST_POLLS=/dev/null "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && cmp -s "$p" "$d/nopid.before" && [ ! -e "$p.lock" ] && [ ! -L "$p.lock" ] \
+  && case "$out" in *"cannot create"*) true ;; *) false ;; esac \
+  && ok "tick whose pid cannot be written leaves no lock and says it cannot be created" \
+  || bad "pid write fails" "rc=$rc lock left: $([ -e "$p.lock" ] && echo yes || echo no) out=$out"
+rm -f "$p.lock"
 
 # A directory at the lock's path, as an older keel leaves it, is a held lock: the tick gives up
 # after 100 polls with the command that removes a directory.

@@ -155,7 +155,7 @@ entry in `CHANGELOG.md`.
 **Done when:** `tests/test-plan.sh` passes under bash 5 and `/bin/bash` 3.2, and
 `tests/validate-citations.sh` exits 0.
 
-- [ ] **Step 2.1: Build it test first**
+- [x] **Step 2.1: Build it test first** Note: red witnessed by the implementer (665 passed, 1 failed)
 
 Follow `keel:tdd`: write behaviour 1's and 2's cases, run them, and watch behaviour 1 fail because
 an empty lock is left and the message says "held", then change `plan_lock` and watch them pass.
@@ -166,7 +166,7 @@ failing case and its message.
 Run: the lint command from Global constraints. Run no `tests/run-tests.sh`: the coordinator runs it
 after this task. Expected: PASS. This is the one boundary run the task schedules.
 
-- [ ] **Step 2.2: Hand over**
+- [x] **Step 2.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES; Ubuntu 26.04 race: 0 of 100 rounds lost
 
 ```bash
 git add bin/keel tests/test-plan.sh docs/03-install-and-distribution.md CHANGELOG.md

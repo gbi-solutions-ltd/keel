@@ -4709,11 +4709,16 @@ plan_batches() {
 # keel, which the give-up message says to remove with rm -r. A failed create with no lock there is
 # a lock released in between, so it is polled again, unless the plan's directory cannot be
 # written, which no wait would change: that fails at once. A create still failing at the limit
-# with nothing at the path is not a held lock, so the message says the lock cannot be created.
+# with nothing at the path is not a held lock, so the message says the lock cannot be created. A
+# create whose pid write then fails, as on a full disk, removes the file it made and counts as a
+# failed create, so it leaves no empty lock to be read as held. The create and the write are two
+# steps so that only a failed write removes the file: a create refused because another tick won the
+# race must leave that tick's lock alone.
 plan_lock() {
     local n=0 owner seen="" hint="rm -f"
     until ( set -C; [ -L "$1.lock" ] || [ -e "$1.lock" ] && exit 1
-            printf '%s\n' "$$" > "$1.lock" ) 2>/dev/null; do
+            : > "$1.lock" || exit 1
+            printf '%s\n' "$$" >> "$1.lock" || { rm -f -- "$1.lock"; exit 1; } ) 2>/dev/null; do
         [ -e "$1.lock" ] || [ -w "$(dirname -- "$1")" ] || die "cannot create $1.lock, so the plan \
 cannot be locked: check its directory is writable"
         owner=""; [ -f "$1.lock" ] && { read -r owner < "$1.lock"; } 2>/dev/null
