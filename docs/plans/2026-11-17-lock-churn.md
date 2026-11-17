@@ -117,3 +117,63 @@ Stage exactly those paths and stop. **Do not commit.** The coordinator commits a
 pass, with `git commit -s -m "fix(plan): take the plan lock with an exclusive file create, not mkdir"`.
 Paste the `git status --porcelain` output into your report; if it lists anything this task did not
 touch, say so and leave it unstaged.
+
+### Task 2: a pid that cannot be written leaves no lock behind
+
+**Task 2 added:** 2026-11-17, from the re-review of fix pass 46b29a2; Bernard's standing ask is
+that should-fix follow-ups go into the same pull request.
+
+**Story:** none (short path)
+**Files:**
+- Modify: `bin/keel`
+- Modify: `tests/test-plan.sh`
+- Modify: `docs/03-install-and-distribution.md`
+- Modify: `CHANGELOG.md`
+
+**Docs searched:** "cannot create", "<plan>.lock", "held". Hits: the lock paragraph of
+`docs/03-install-and-distribution.md`, the comment above `plan_lock`, and the `## Unreleased`
+entry in `CHANGELOG.md`.
+
+**Depends on:** task 1
+
+**Behaviours:**
+
+1. When the exclusive create succeeds but writing the pid into the new file fails (a full disk),
+   the tick removes the file it just made and treats the attempt as failed, so it leaves no empty
+   lock behind and its poll ends with "cannot create". Example: a test that makes the pid write
+   fail after the create (for instance `printf` failing by writing to a file system object that
+   accepts the create; if no portable shim reaches it, a `KEEL_TEST_` hook named in the report)
+   ends with rc non-zero, "cannot create" in the output, and no `<plan>.lock` left.
+2. The ENAMETOOLONG case also asserts that nothing is left at `<plan>.lock`. Example: after the
+   tick gives up, `[ ! -e <plan>.lock ] && [ ! -L <plan>.lock ]` holds.
+3. `docs/03-install-and-distribution.md`'s lock paragraph says that anything already at
+   `<plan>.lock` counts as held, and that "cannot create" means the lock could not be made in the
+   plan's directory (unwritable, or the file system is full). Example: grep finds both statements.
+4. The comment above `plan_lock` and the `## Unreleased` entry state behaviour 1, and the entry
+   keeps an even number of lines.
+
+**Done when:** `tests/test-plan.sh` passes under bash 5 and `/bin/bash` 3.2, and
+`tests/validate-citations.sh` exits 0.
+
+- [ ] **Step 2.1: Build it test first**
+
+Follow `keel:tdd`: write behaviour 1's and 2's cases, run them, and watch behaviour 1 fail because
+an empty lock is left and the message says "held", then change `plan_lock` and watch them pass.
+Run: `tests/test-plan.sh`, `/bin/bash tests/test-plan.sh` and `tests/validate-citations.sh`
+Expected before the implementation: FAIL, behaviour 1's case. Expected after: PASS. Quote the
+failing case and its message.
+
+Run: the lint command from Global constraints. Run no `tests/run-tests.sh`: the coordinator runs it
+after this task. Expected: PASS. This is the one boundary run the task schedules.
+
+- [ ] **Step 2.2: Hand over**
+
+```bash
+git add bin/keel tests/test-plan.sh docs/03-install-and-distribution.md CHANGELOG.md
+git status --porcelain
+```
+
+Stage exactly those paths and stop. **Do not commit.** The coordinator commits after the review
+pass, with `git commit -s -m "fix(plan): a pid that cannot be written leaves no lock behind"`.
+Paste the `git status --porcelain` output into your report; if it lists anything this task did not
+touch, say so and leave it unstaged.
