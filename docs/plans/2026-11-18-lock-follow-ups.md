@@ -198,11 +198,13 @@ should-fix follow-ups go into the same pull request.
 **Files:**
 - Modify: `bin/keel`
 - Modify: `tests/test-plan.sh`
+- Modify: `docs/03-install-and-distribution.md`
 
 **Docs searched:** "not running on this machine", "was no longer this tick's", "ps -p". Hits: the
 messages and the comment above `plan_lock` in `bin/keel`, the lock paragraph of
-`docs/03-install-and-distribution.md` (which states neither message's wording, so is unchanged),
-and the lock cases in `tests/test-plan.sh`.
+`docs/03-install-and-distribution.md`, which states the dead-holder rule and the not-ours outcome,
+and the lock cases in `tests/test-plan.sh`. (Amended 2026-11-18 after the first attempt: the plan
+first said the paragraph was unchanged, which was wrong.)
 
 **Depends on:** task 2
 
@@ -223,6 +225,12 @@ and the lock cases in `tests/test-plan.sh`.
    dead pid in the lock, gives up after 99 sleeps with the held message.
 3. The not-ours message is true on both release paths: it says that if this tick wrote the plan,
    the write was not exclusive. Example: the four taken-while-held cases match the new wording.
+4. (Added after the first attempt.) A pid write that fails prints nothing: bash keeps a failed
+   builtin write's output and flushes it to the tick's own stdout, so the pid appeared once a poll.
+   The create's subshell sends its stdout to /dev/null. Example: the full-disk (`ulimit -f 0`) case
+   and behaviour 1's case assert that the tick's output holds no line that is only its pid.
+5. (Added after the first attempt.) The lock paragraph of `docs/03-install-and-distribution.md`
+   states behaviour 2's `ps -p` condition and behaviour 3's wording. Example: grep finds both.
 
 **Done when:** `tests/test-plan.sh` passes under bash 5 and `/bin/bash` 3.2, and
 `tests/validate-citations.sh` exits 0.
@@ -245,7 +253,7 @@ after this task. Expected: PASS. This is the one boundary run the task schedules
 - [ ] **Step 3.2: Hand over**
 
 ```bash
-git add bin/keel tests/test-plan.sh
+git add bin/keel tests/test-plan.sh docs/03-install-and-distribution.md
 git status --porcelain
 ```
 
