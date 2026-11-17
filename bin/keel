@@ -4745,27 +4745,42 @@ directory is writable and its filesystem is not full"
     done
     PLAN_LOCK="$1.lock"
     plan_trace acquire
-    trap 'rm -f -- "$PLAN_LOCK"; plan_trace exit-released' EXIT
+    trap 'plan_lock_ours && { rm -f -- "$PLAN_LOCK"; plan_trace exit-released; }' EXIT
     trap 'exit 130' INT TERM
 }
 
 # plan_unlock: clears the traps before releasing, because an EXIT trap left set would remove the
-# lock a second time at exit, by which point another tick may hold it. Planning saw exactly that: 18
-# of 20 concurrent ticks landed until the traps were cleared first.
+# lock a second time at exit, by which point another tick may hold it. Like the EXIT trap, it
+# removes the lock only while plan_lock_ours finds it still the tick's, and fails otherwise.
 # With a trace asked for, rm's error is caught so the trace can name it, then passed on to stderr
 # as it would have gone anyway.
 plan_unlock() {
     local e rc
     trap - EXIT INT TERM
+    plan_trace release
+    plan_lock_ours || return 1
     # shellcheck disable=SC2217  # rm asks before removing a write-protected file if stdin is a terminal
     [ -n "${KEEL_PLAN_LOCK_TRACE:-}" ] || { rm -- "$PLAN_LOCK" </dev/null; return; }
-    plan_trace release
     # shellcheck disable=SC2217  # rm asks before removing a write-protected file if stdin is a terminal
     e="$(rm -- "$PLAN_LOCK" </dev/null 2>&1)"; rc=$?
     if [ "$rc" -eq 0 ]; then plan_trace released; return 0; fi
     printf '%s\n' "$e" >&2
     plan_trace release-failed "$e"
     return "$rc"
+}
+
+# plan_lock_ours: whether PLAN_LOCK is still this tick's, a regular file whose first line is its pid.
+# Anything else there, or nothing, means the lock was removed or taken while the tick held it, so the
+# tick's write was not exclusive: it says so, traces release-not-ours with the first line found, and
+# fails, and the caller leaves the lock to whoever holds it now.
+plan_lock_ours() {
+    local found=""
+    [ -f "$PLAN_LOCK" ] && [ ! -L "$PLAN_LOCK" ] && { read -r found < "$PLAN_LOCK"; } 2>/dev/null
+    [ "$found" = "$$" ] && return 0
+    err "$PLAN_LOCK was no longer this tick's lock, so it is left as it is: it was removed or taken \
+while held, so this tick's write was not exclusive"
+    plan_trace release-not-ours "$found"
+    return 1
 }
 
 # plan_trace <event> [<detail>]: appends `<event> <pid> [<detail>]` to the file KEEL_PLAN_LOCK_TRACE
@@ -4894,7 +4909,7 @@ plan status $plan"; rc=1 ;;
         5) err "step $id appears more than once in $plan, so it names no one step"; rc=1 ;;
     esac
     rm -f "$tmp"
-    plan_unlock
+    plan_unlock || rc=1
     return "$rc"
 }
 

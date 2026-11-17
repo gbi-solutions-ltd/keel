@@ -475,7 +475,12 @@ reason. Parking replaces anything after the title, a note included, and a reason
 non-blank character, since `plan status` reads one that starts with a space, tab or CR as missing.
 Ticks on one plan take turns through a lock, the file `<plan>.lock`, created exclusively (bash's
 `set -C`, not `mkdir`, whose uutils build can let two processes both create one path) and holding
-the holder's process id, so a concurrent batch's ticks all land. A waiter never removes the lock.
+the holder's process id, so a concurrent batch's ticks all land. A waiter never removes the lock,
+and a tick releases it only while it is still a regular file holding the tick's own id: one removed
+or taken while held is left as it is, and the tick says so and fails, since its write was not
+exclusive. A 0.29.0 or older tick on the same plan still takes turns with a newer one, but its
+give-up message advises `rm -r` for what is now a file, so `rm -f <plan>.lock` is the command; every
+tick on a plan should run the same keel.
 When the holder's process id is not running on this machine (`kill -0` fails, `ps -p` exits 1, and
 the lock still holds that id), the tick fails at once, naming the lock and the id and saying to
 remove it with `rm -f <plan>.lock` if no tick on another machine shares the plan. Otherwise, or

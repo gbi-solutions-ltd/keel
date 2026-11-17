@@ -19,6 +19,9 @@ Entries are terse by design; the narrative for each release is in this file's gi
   held lock, and the give-up message names `rm -r` for a directory.
   A tick that creates the lock but cannot write its pid into it removes it again, so a full disk
   leaves no empty lock behind to be read as held.
+  A tick releases only a lock holding its pid, else leaves it, says so, and fails (`release-not-ours`).
+  A 0.29.0 or older tick on the same plan still takes turns with a newer one, but its give-up
+  message advises `rm -r` for what is now a file: `rm -f` is the command; every tick on a plan should run the same keel.
 
 ## 0.29.0 - 2026-11-16
 

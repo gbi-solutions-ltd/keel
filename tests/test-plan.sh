@@ -802,7 +802,7 @@ out="$("$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
 # ---- tick: concurrent ticks all land ------------------------------------------------------------
 
 # Twenty ticks on one plan, started together. Without a lock each reads the plan before the others
-# write it and most ticks are lost: 3, 9 and 6 of 20 landed in three runs while planning.
+# write it and drops their changes, so every tick landing shows the lock held each in turn.
 # The lock must not rest on mkdir: uutils mkdir, as Ubuntu 26.04 ships it, can report success to two
 # processes racing to create one path, so both would hold the lock. A shim mkdir that exits 0 and
 # creates nothing, as that race can, is first on PATH for the ticks alone, so a lock taken with
@@ -830,7 +830,7 @@ n="$(grep -c '^- \[x\] \*\*Step 1\.' "$p")"
 [ "$n" -eq 20 ] && [ ! -e "$p.lock" ] && ! grep -q 'cannot create' "$d/batch.err" \
   && ! grep -q 'not running' "$d/batch.err" \
   && ok "twenty ticks started together all land, and the lock is gone after" \
-  || bad "concurrent ticks" "$n of 20 landed; lock left: $([ -e "$p.lock" ] && echo yes || echo no); \
+  || bad "concurrent ticks" "$n/20 landed; lock left: $([ -e "$p.lock" ] && echo yes || echo no); \
 errors: $(sort "$d/batch.err" | uniq -c | tr '\n' ' '); \
 trace: $(tr '\n' ';' < "$d/batch.trace" 2>&1)"
 
@@ -1094,6 +1094,30 @@ PATH="$shim:$PATH" KEEL_TEST_RM="$real_rm" KEEL_TEST_LOCK="$p.lock" KEEL_TEST_MA
   || bad "tick removes only its lock" "rc=$rc, lock left: $([ -f "$p.lock" ] && echo yes || echo no)"
 rm -f "$p.lock"
 
+# A tick releases the lock only while it still holds the tick's pid: one removed or taken while
+# held is left as it is, and the tick says so and fails, since its write was not exclusive. A shim
+# mktemp has another holder take the lock while the tick holds it, then runs the real mktemp, so
+# the tick releases through plan_unlock, or with no real mktemp named exits 1, so the tick dies and
+# its EXIT trap releases.
+real_mktemp="$(command -v mktemp)"
+shim="$d/shim-takelock"
+mkdir "$shim"
+printf '%s\n' '#!/bin/sh' 'echo 999 > "$KEEL_TEST_LOCK"' \
+  '[ -n "$KEEL_TEST_MKTEMP" ] && exec "$KEEL_TEST_MKTEMP" "$@"' 'exit 1' > "$shim/mktemp"
+chmod 755 "$shim/mktemp"
+for how in unlock exit; do
+  real=""; [ "$how" = unlock ] && real="$real_mktemp"
+  p="$d/taken-$how.md"
+  mkplan "$p" '- [ ] **Step 1.1: a**'
+  out="$(PATH="$shim:$PATH" KEEL_TEST_LOCK="$p.lock" KEEL_TEST_MKTEMP="$real" \
+    "$KEEL" plan tick "$p" 1.1 2>&1 >/dev/null)"; rc=$?
+  [ "$rc" -ne 0 ] && [ "$(cat "$p.lock" 2>/dev/null)" = 999 ] \
+    && case "$out" in *"$p.lock"*"no longer this tick's"*) true ;; *) false ;; esac \
+    && ok "a tick whose lock was taken while held leaves it and fails, saying so ($how)" \
+    || bad "lock taken while held ($how)" "rc=$rc lock: $(cat "$p.lock" 2>&1) out=$out"
+  rm -f "$p.lock"
+done
+
 # The running holders the lock cases used are stopped, so the suite leaves nothing running.
 # shellcheck disable=SC2086  # one pid a word
 kill $holders 2>/dev/null
@@ -1166,6 +1190,24 @@ tpid="$(awk 'NR == 1 { print $2 }' "$d/tracedie.log" 2>/dev/null)"
   && ok "a tick that dies holding the lock traces its EXIT trap's release" \
   || bad "lock trace on exit" "rc=$rc, trace: $(cat "$d/tracedie.log" 2>&1), \
 lock held: $(cat "$d/tracedie.seen" 2>&1)"
+
+# A release that finds the lock no longer the tick's is traced as release-not-ours with what the
+# lock held, in place of released or exit-released. The shim is the one that takes the lock above.
+for how in unlock exit; do
+  real=""; [ "$how" = unlock ] && real="$real_mktemp"
+  p="$d/tracetaken-$how.md"
+  mkplan "$p" '- [ ] **Step 1.1: a**'
+  PATH="$d/shim-takelock:$PATH" KEEL_TEST_LOCK="$p.lock" KEEL_TEST_MKTEMP="$real" \
+    KEEL_PLAN_LOCK_TRACE="$d/tracetaken-$how.log" "$KEEL" plan tick "$p" 1.1 >/dev/null 2>&1; rc=$?
+  tpid="$(awk 'NR == 1 { print $2 }' "$d/tracetaken-$how.log" 2>/dev/null)"
+  want="acquire $tpid"$'\n'
+  [ "$how" = unlock ] && want="${want}release $tpid"$'\n'
+  [ "$rc" -ne 0 ] && [ -n "$tpid" ] \
+    && [ "$(cat "$d/tracetaken-$how.log")" = "${want}release-not-ours $tpid 999" ] \
+    && ok "a release finding the lock taken is traced as release-not-ours ($how)" \
+    || bad "lock trace release-not-ours ($how)" "rc=$rc, trace: $(cat "$d/tracetaken-$how.log" 2>&1)"
+  rm -f "$p.lock"
+done
 
 # ---- tick: a failed write never costs the plan --------------------------------------------------
 
