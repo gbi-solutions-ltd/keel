@@ -189,4 +189,73 @@ pass, with `git commit -s -m "fix(plan): a tick removes only a lock holding its 
 Paste the `git status --porcelain` output into your report; if it lists anything this task did not
 touch, say so and leave it unstaged.
 
+### Task 3: the cannot-create count is proved, and a dead holder is judged only by a working ps
+
+**Task 3 added:** 2026-11-18, from the review-code pass on e9e09db; Bernard's standing ask is that
+should-fix follow-ups go into the same pull request.
+
+**Story:** none (short path)
+**Files:**
+- Modify: `bin/keel`
+- Modify: `tests/test-plan.sh`
+
+**Docs searched:** "not running on this machine", "was no longer this tick's", "ps -p". Hits: the
+messages and the comment above `plan_lock` in `bin/keel`, the lock paragraph of
+`docs/03-install-and-distribution.md` (which states neither message's wording, so is unchanged),
+and the lock cases in `tests/test-plan.sh`.
+
+**Depends on:** task 2
+
+**Behaviours:**
+
+1. Task 1's behaviour 5 has a case that can fail: polls finding nothing at the path are counted
+   apart from held polls, and a held poll resets them, so a lock that is held on one poll and
+   absent on the next, with every create failing, is not reported as uncreatable at poll 100.
+   Example: the tick runs under `ulimit -S -f 0` with SIGXFSZ ignored, so every create's pid write
+   fails and nothing is left; a sleep shim raises its own soft limit, writes a live pid into the
+   lock on odd calls and removes it on even ones, and removes it for good at call 150. The tick's
+   message is "cannot create", given only once the lock has been absent for 100 polls in a row
+   after call 150 (the shim counts at least 249 sleeps). Reverting the reset of the nothing-there
+   count makes the case fail, giving up near call 175.
+2. A dead holder is judged only where `ps -p` works: `ps -p $$` must exit 0 before an exit 1 for
+   the holder's pid counts as not running; otherwise the 100-poll wait is kept. Example: a PATH
+   shim `ps` that exits 1 for every pid, its own included (as a `ps` without `-p` would), with a
+   dead pid in the lock, gives up after 99 sleeps with the held message.
+3. The not-ours message is true on both release paths: it says that if this tick wrote the plan,
+   the write was not exclusive. Example: the four taken-while-held cases match the new wording.
+
+**Done when:** `tests/test-plan.sh` passes under bash 5 and `/bin/bash` 3.2, and
+`tests/validate-citations.sh` exits 0.
+
+- [ ] **Step 3.1: Build it test first**
+
+Follow `keel:tdd`: write behaviour 1's and 2's cases and adapt behaviour 3's, run them, and watch
+behaviour 2's and 3's fail for the reasons they name. Behaviour 1's case passes on arrival, since
+task 1 already counts apart: prove it can fail instead by reverting the reset of the nothing-there
+count (in a scratch copy or by hand, restored after), running it, and quoting the failure. Then
+change `plan_lock` and `plan_lock_ours` and watch every case pass. Keep the comment above
+`plan_lock` true.
+Run: `tests/test-plan.sh`, `/bin/bash tests/test-plan.sh` and `tests/validate-citations.sh`
+Expected before the implementation: FAIL, behaviours 2's and 3's cases, and behaviour 1's under
+the revert. Expected after: PASS. Quote the failing cases and their messages.
+
+Run: the lint command from Global constraints. Run no `tests/run-tests.sh`: the coordinator runs it
+after this task. Expected: PASS. This is the one boundary run the task schedules.
+
+- [ ] **Step 3.2: Hand over**
+
+```bash
+git add bin/keel tests/test-plan.sh
+git status --porcelain
+```
+
+Stage exactly those paths and stop. **Do not commit.** The coordinator commits after the review
+pass, with `git commit -s -m "fix(plan): prove the cannot-create count, and trust ps -p only where it works"`.
+Paste the `git status --porcelain` output into your report; if it lists anything this task did not
+touch, say so and leave it unstaged.
+
 ## Delivery
+
+- review-code: nothing blocking (2026-11-18, base 182baa9); its one should fix, behaviour 5's case
+  unable to fail, became task 3 with two of its considers (a `ps` without `-p`, the not-ours
+  message on the EXIT path)
