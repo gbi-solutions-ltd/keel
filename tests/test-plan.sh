@@ -826,7 +826,9 @@ wait
 n="$(grep -c '^- \[x\] \*\*Step 1\.' "$p")"
 # A waiter that sees the lock change hands between its failed create and its look keeps waiting,
 # so no tick reports the lock as one it cannot create.
+# Nor does a waiter that reads a holder's pid just as it releases report that holder as not running.
 [ "$n" -eq 20 ] && [ ! -e "$p.lock" ] && ! grep -q 'cannot create' "$d/batch.err" \
+  && ! grep -q 'not running' "$d/batch.err" \
   && ok "twenty ticks started together all land, and the lock is gone after" \
   || bad "concurrent ticks" "$n of 20 landed; lock left: $([ -e "$p.lock" ] && echo yes || echo no); \
 errors: $(sort "$d/batch.err" | uniq -c | tr '\n' ' '); \
@@ -836,26 +838,113 @@ trace: $(tr '\n' ';' < "$d/batch.trace" 2>&1)"
 # however many it waited behind. A shim sleep stands in for the clock, one call a poll, so a loaded
 # machine cannot stretch the count: every 30th call writes a new holder's pid, as a queue would,
 # and the 150th releases the lock, past the 100 polls a waiter gives one holder. Without
-# KEEL_TEST_ROTATE it only counts, a holder that never changes.
+# KEEL_TEST_ROTATE it only counts, a holder that never changes. The holders' pids are those of
+# running processes, five backgrounded sleeps, since a dead holder ends the wait at once; they are
+# killed after the lock cases. With KEEL_TEST_FLIP the shim instead releases the lock on even calls
+# and gives it to a running holder on odd ones, until the 150th call releases it for good.
 sl="$d/sleepshim"
 mkdir "$sl"
 # Resolved before PATH holds the shim, or the shim finds itself and never sleeps.
 real_sleep="$(command -v sleep)"
+holders=""
+i=1
+while [ "$i" -le 5 ]; do
+  "$real_sleep" 1000 >/dev/null 2>&1 &
+  holders="$holders $!"
+  i=$((i + 1))
+done
 # shellcheck disable=SC2016  # the shim's own variables, expanded when it runs
 printf '%s\n' '#!/bin/sh' 'n=0; [ -f "$KEEL_TEST_POLLS" ] && read -r n < "$KEEL_TEST_POLLS"' \
   'n=$((n + 1)); echo "$n" > "$KEEL_TEST_POLLS"' \
-  'if [ -n "$KEEL_TEST_ROTATE" ] && [ $((n % 30)) -eq 0 ]; then echo "$n" > "$KEEL_TEST_LOCK"; fi' \
+  'if [ -n "$KEEL_TEST_ROTATE" ] && [ $((n % 30)) -eq 0 ]; then' \
+  '  set -- $KEEL_TEST_HOLDERS; shift $((n / 30 - 1)); echo "$1" > "$KEEL_TEST_LOCK"; fi' \
   'if [ -n "$KEEL_TEST_ROTATE" ] && [ "$n" -ge 150 ]; then rm -f "$KEEL_TEST_LOCK"; fi' \
+  'if [ -n "$KEEL_TEST_FLIP" ] && [ "$n" -lt 150 ] && [ $((n % 2)) -eq 1 ]; then' \
+  '  set -- $KEEL_TEST_HOLDERS; echo "$1" > "$KEEL_TEST_LOCK"; else' \
+  '  [ -z "$KEEL_TEST_FLIP" ] || rm -f "$KEEL_TEST_LOCK"; fi' \
   'exec "$KEEL_TEST_SLEEP" 0.01' > "$sl/sleep"
 chmod 755 "$sl/sleep"
 p="$d/queue.md"
 mkplan "$p" '- [ ] **Step 1.1: a**'
 echo 1 > "$p.lock"
 out="$(PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/queue.polls" \
-  KEEL_TEST_LOCK="$p.lock" KEEL_TEST_ROTATE=1 "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
+  KEEL_TEST_LOCK="$p.lock" KEEL_TEST_HOLDERS="$holders" KEEL_TEST_ROTATE=1 \
+  "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
 [ "$rc" -eq 0 ] && grep -qxF -e '- [x] **Step 1.1: a**' "$p" && [ ! -e "$p.lock" ] \
   && ok "a tick behind a lock changing hands waits for it, past 100 polls" \
   || bad "queued tick" "rc=$rc out=$out"
+
+# "cannot create" at the limit counts only polls that found nothing at the lock's path, apart from
+# polls behind a holder, so a lock that is held and released on alternate polls is never reported
+# as one that cannot be created.
+p="$d/flip.md"
+mkplan "$p" '- [ ] **Step 1.1: a**'
+echo 1 > "$p.lock"
+out="$(PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/flip.polls" \
+  KEEL_TEST_LOCK="$p.lock" KEEL_TEST_HOLDERS="$holders" KEEL_TEST_FLIP=1 \
+  "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
+[ "$rc" -eq 0 ] && grep -qxF -e '- [x] **Step 1.1: a**' "$p" && [ ! -e "$p.lock" ] \
+  && case "$out" in *"cannot create"*) false ;; *) true ;; esac \
+  && ok "a tick behind a lock held and released on alternate polls lands, never 'cannot create'" \
+  || bad "lock held and released in turn" "rc=$rc polls=$(cat "$d/flip.polls" 2>&1) out=$out"
+
+# A holder that is not running on this machine, as a killed tick leaves its lock, ends the wait at
+# once: the tick names the lock and the pid, says to remove it, and changes nothing. A finished
+# background job's pid stands in for the killed tick's.
+"$real_sleep" 0 &
+dead=$!
+wait "$dead"
+p="$d/dead.md"
+mkplan "$p" '- [ ] **Step 1.1: a**'
+cp "$p" "$d/dead.before"
+echo "$dead" > "$p.lock"
+out="$(PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/dead.polls" \
+  "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && cmp -s "$p" "$d/dead.before" && [ "$(cat "$p.lock" 2>/dev/null)" = "$dead" ] \
+  && [ "$(cat "$d/dead.polls" 2>/dev/null || echo 0)" -le 1 ] \
+  && case "$out" in *"$dead"*"not running on this machine"*"rm -f $p.lock"*) true ;; *) false ;; esac \
+  && ok "a tick behind a holder that is not running names it at once, and changes nothing" \
+  || bad "dead holder" "rc=$rc polls=$(cat "$d/dead.polls" 2>&1) out=$out"
+rm -f "$p.lock"
+
+# Without a ps that answers, a holder kill -0 cannot reach is not judged dead, since kill -0 also
+# fails for another user's running process: a shim ps that exits 127, as a missing one does, leaves
+# the tick waiting the full 100 polls behind the dead pid.
+psshim="$d/psshim"
+mkdir "$psshim"
+printf '%s\n' '#!/bin/sh' 'exit 127' > "$psshim/ps"
+chmod 755 "$psshim/ps"
+p="$d/nops.md"
+mkplan "$p" '- [ ] **Step 1.1: a**'
+cp "$p" "$d/nops.before"
+echo "$dead" > "$p.lock"
+out="$(PATH="$psshim:$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/nops.polls" \
+  "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && cmp -s "$p" "$d/nops.before" && [ "$(cat "$d/nops.polls" 2>&1)" = 99 ] \
+  && case "$out" in *"is held"*"rm -f $p.lock"*) true ;; *) false ;; esac \
+  && case "$out" in *"not running"*) false ;; *) true ;; esac \
+  && ok "a tick whose ps does not answer waits the full 100 polls behind a dead pid" \
+  || bad "no ps" "rc=$rc polls=$(cat "$d/nops.polls" 2>&1) out=$out"
+rm -f "$p.lock"
+
+# A running holder is waited on the full 100 polls, whether kill -0 reaches it (a backgrounded
+# sleep) or refuses it with EPERM, as for pid 1 to a user other than root, where ps -p finds it.
+for holder in "${holders# }" 1; do
+  holder="${holder%% *}"
+  p="$d/live-$holder.md"
+  mkplan "$p" '- [ ] **Step 1.1: a**'
+  cp "$p" "$d/live-$holder.before"
+  echo "$holder" > "$p.lock"
+  out="$(PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/live-$holder.polls" \
+    "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
+  [ "$rc" -ne 0 ] && cmp -s "$p" "$d/live-$holder.before" \
+    && [ "$(cat "$d/live-$holder.polls" 2>&1)" = 99 ] \
+    && case "$out" in *"is held"*"rm -f $p.lock"*) true ;; *) false ;; esac \
+    && case "$out" in *"not running"*) false ;; *) true ;; esac \
+    && ok "a tick behind running holder pid $holder waits the full 100 polls" \
+    || bad "live holder $holder" "rc=$rc polls=$(cat "$d/live-$holder.polls" 2>&1) out=$out"
+  rm -f "$p.lock"
+done
 
 # An empty lock, as a tick killed between creating it and writing its pid leaves it, counts as one
 # holder: the tick gives up after 100 polls, naming the lock, and changes nothing.
@@ -952,12 +1041,12 @@ out="$(PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/olddir
   || bad "directory lock" "rc=$rc out=$out"
 rmdir "$p.lock"
 
-# A lock left by a killed tick, with the pid it wrote: the tick waits, then names the lock and
-# changes nothing.
+# A lock whose holder is still running: the tick waits, then names the lock and changes nothing.
+# The holder is one of the running sleeps, since a made-up pid may name no process at all.
 p="$d/stale.md"
 mkplan "$p" '- [ ] **Step 1.1: a**'
 cp "$p" "$d/stale.before"
-echo 12345 > "$p.lock"
+echo "${holders##* }" > "$p.lock"
 out="$("$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
 [ "$rc" -ne 0 ] && cmp -s "$p" "$d/stale.before" && case "$out" in *"rm -f $p.lock"*) true ;; *) false ;; esac \
   && ok "tick facing a held lock gives up naming it, and changes nothing" \
@@ -1004,6 +1093,12 @@ PATH="$shim:$PATH" KEEL_TEST_RM="$real_rm" KEEL_TEST_LOCK="$p.lock" KEEL_TEST_MA
   && ok "a tick removes only the lock it holds" \
   || bad "tick removes only its lock" "rc=$rc, lock left: $([ -f "$p.lock" ] && echo yes || echo no)"
 rm -f "$p.lock"
+
+# The running holders the lock cases used are stopped, so the suite leaves nothing running.
+# shellcheck disable=SC2086  # one pid a word
+kill $holders 2>/dev/null
+# shellcheck disable=SC2086
+wait $holders 2>/dev/null
 
 # ---- tick: the lock leaves a trace when asked ---------------------------------------------------
 

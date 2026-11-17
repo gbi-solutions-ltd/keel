@@ -4693,42 +4693,53 @@ plan_batches() {
 }
 
 # plan_lock <plan>: holds <plan>.lock until plan_unlock, so two ticks on one plan cannot each
-# read it before the other writes and drop one's change, which a concurrent batch's ticks otherwise
-# do. The lock is a file the holder creates with bash's own exclusive create, `set -C` then `>`,
-# which opens it with O_EXCL, and writes its process id into. It is not mkdir, because uutils
-# mkdir, as Ubuntu 26.04 ships it, can report success to two processes racing to create one path,
-# and it is not flock, which macOS lacks. set -C refuses only an existing regular file, so the
-# create first refuses anything at the path, a symlink or a FIFO included, as a held lock, and a
-# waiter reads the holder's pid only from a regular file, since opening a FIFO would block it.
-# set -C is set in the subshell that creates the file, so noclobber never reaches the rest of keel,
-# and $$ there is still the tick's own id. A waiter gives up after 100 polls, about ten seconds,
-# behind one holder, naming the lock, because a tick killed with SIGKILL leaves it behind and
-# nothing else would say so; a new pid in the lock restarts the count, because a waiter behind a
-# busy queue is not behind a stale lock. An empty lock, from a tick killed between creating and
-# writing it, counts as one holder, and so does a directory left at the lock's path by an older
-# keel, which the give-up message says to remove with rm -r. A failed create with no lock there is
-# a lock released in between, so it is polled again, unless the plan's directory cannot be
-# written, which no wait would change: that fails at once. A create still failing at the limit
-# with nothing at the path is not a held lock, so the message says the lock cannot be created. A
-# create whose pid write then fails, as on a full disk, removes the file it made and counts as a
-# failed create, so it leaves no empty lock to be read as held. The create and the write are two
-# steps so that only a failed write removes the file: a create refused because another tick won the
-# race must leave that tick's lock alone.
+# read it before the other writes and drop one's change. The lock is a file created with bash's
+# exclusive create, `set -C` then `>`, which opens it with O_EXCL, holding the creator's pid. Not
+# mkdir, which uutils (as Ubuntu 26.04 ships it) can report as created to two racing processes, and
+# not flock, which macOS lacks. set -C refuses only a regular file, so anything at the path, a
+# symlink or FIFO included, is refused first as a held lock, and a pid is read only from a regular
+# file, since opening a FIFO would block. set -C stays in the create's subshell, where $$ is still
+# the tick's. The pid is written as a second step, and only a failed write (a full disk) removes
+# the file, so no empty lock is left while a create that lost the race leaves the winner's alone.
+# A waiter never removes the lock, even a stale one: two waiters judging it stale would each remove
+# the other's fresh lock. It counts polls behind one holder, restarting when the pid changes, since
+# a busy queue is not a stale lock, and gives up after 100, about ten seconds, naming the lock: a
+# tick killed with SIGKILL leaves it, and an empty lock or an older keel's directory counts as one
+# holder (rm -r for the directory). A holder found not running ends the wait at once: kill -0
+# fails, ps -p exits 1 (kill -0 alone also fails for another user's process), and the lock still
+# holds that pid when read again, since the holder may release in between. Without ps, or on any
+# other answer, the wait goes on. The pid is checked on this machine only, which the message says.
+# Polls finding nothing at the path, a lock released between the create and the look, are counted
+# apart and reset by any held poll; 100 in a row mean the lock cannot be created, as does an
+# unwritable plan directory at once.
 plan_lock() {
-    local n=0 owner seen="" hint="rm -f"
+    local n=0 none=0 owner seen="" hint="rm -f"
     until ( set -C; [ -L "$1.lock" ] || [ -e "$1.lock" ] && exit 1
             : > "$1.lock" || exit 1
             printf '%s\n' "$$" >> "$1.lock" || { rm -f -- "$1.lock"; exit 1; } ) 2>/dev/null; do
-        [ -e "$1.lock" ] || [ -w "$(dirname -- "$1")" ] || die "cannot create $1.lock, so the plan \
-cannot be locked: check its directory is writable"
-        owner=""; [ -f "$1.lock" ] && { read -r owner < "$1.lock"; } 2>/dev/null
-        [ -n "$owner" ] && [ "$owner" != "$seen" ] && { seen="$owner"; n=0; }
-        n=$((n + 1))
-        if [ "$n" -ge 100 ]; then
-            [ -e "$1.lock" ] || [ -L "$1.lock" ] || die "cannot create $1.lock, so the plan cannot \
-be locked: check its directory is writable and its filesystem is not full"
-            [ -d "$1.lock" ] && hint="rm -r"
-            die "$1.lock is held by another keel plan tick. If none is running, one was killed: remove it with $hint $1.lock"
+        if [ -e "$1.lock" ] || [ -L "$1.lock" ]; then
+            none=0
+            owner=""; [ -f "$1.lock" ] && { read -r owner < "$1.lock"; } 2>/dev/null
+            [ -n "$owner" ] && [ "$owner" != "$seen" ] && { seen="$owner"; n=0; }
+            if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
+                ps -p "$owner" >/dev/null 2>&1
+                if [ $? -eq 1 ] && [ -f "$1.lock" ] && { read -r owner < "$1.lock"; } 2>/dev/null \
+                    && [ "$owner" = "$seen" ]; then
+                    die "$1.lock is held by pid $owner, which is not running on this machine: if no \
+keel plan tick on another machine shares this plan, remove it with rm -f $1.lock"
+                fi
+            fi
+            n=$((n + 1))
+            if [ "$n" -ge 100 ]; then
+                [ -d "$1.lock" ] && hint="rm -r"
+                die "$1.lock is held by another keel plan tick. If none is running, one was killed: remove it with $hint $1.lock"
+            fi
+        else
+            [ -w "$(dirname -- "$1")" ] || die "cannot create $1.lock, so the plan cannot be locked: \
+check its directory is writable"
+            none=$((none + 1))
+            [ "$none" -ge 100 ] && die "cannot create $1.lock, so the plan cannot be locked: check its \
+directory is writable and its filesystem is not full"
         fi
         sleep 0.1
     done

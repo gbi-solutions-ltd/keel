@@ -101,7 +101,7 @@ of `docs/03-install-and-distribution.md`, the comment above `plan_lock` and its 
 **Done when:** `tests/test-plan.sh` passes under bash 5 and `/bin/bash` 3.2, and
 `tests/validate-citations.sh` exits 0.
 
-- [ ] **Step 1.1: Build it test first**
+- [x] **Step 1.1: Build it test first** Note: red witnessed by the implementer (670 passed, 1 failed, behaviour 1); behaviours 4 and 5 green on arrival, by design; bash 5.2 run by the coordinator in a container, 667 passed (3 skipped as root or no checkout)
 
 Follow `keel:tdd` for each behaviour: write or adapt its case from the example, run it, and watch
 it fail for the reason the behaviour names, then change `plan_lock` and watch every case pass. Say
@@ -113,7 +113,7 @@ PASS. Quote the failing cases and their messages.
 Run: the lint command from Global constraints. Run no `tests/run-tests.sh`: the coordinator runs it
 once after this task. Expected: PASS. This is the one boundary run the task schedules.
 
-- [ ] **Step 1.2: Hand over**
+- [x] **Step 1.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES
 
 ```bash
 git add bin/keel tests/test-plan.sh docs/03-install-and-distribution.md CHANGELOG.md
