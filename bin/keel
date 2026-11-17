@@ -4695,37 +4695,41 @@ plan_batches() {
 # plan_lock <plan>: holds <plan>.lock until plan_unlock, so two ticks on one plan cannot each
 # read it before the other writes and drop one's change, which a concurrent batch's ticks otherwise
 # do. The lock is a file the holder creates with bash's own exclusive create, `set -C` then `>`,
-# which opens it with O_EXCL, and writes its process id into. It is not mkdir, because uutils'
-# mkdir, the one Ubuntu 26.04 ships, exits 0 for both of two processes racing to create one path
-# (965 of 2000 trials), which let two ticks hold the lock and lost one; the exclusive create
-# double-succeeded 0 of 2000 times on the same image, and it needs no flock, which macOS lacks.
+# which opens it with O_EXCL, and writes its process id into. It is not mkdir, because uutils
+# mkdir, as Ubuntu 26.04 ships it, can report success to two processes racing to create one path,
+# and it is not flock, which macOS lacks. set -C refuses only an existing regular file, so the
+# create first refuses anything at the path, a symlink or a FIFO included, as a held lock, and a
+# waiter reads the holder's pid only from a regular file, since opening a FIFO would block it.
 # set -C is set in the subshell that creates the file, so noclobber never reaches the rest of keel,
-# and $$ there is still the tick's own id. A waiter gives up after about ten seconds behind one
-# holder, naming the lock, because a tick killed with SIGKILL leaves it behind and nothing else
-# would say so; a new pid in the lock restarts the count, because a waiter behind a busy queue is not
-# behind a stale lock, and a count that ignored that lost ticks on a loaded CI runner. An empty
-# lock, from a tick killed between creating and writing it, counts as one holder, and so does a
-# directory left at the lock's path by an older keel, which the give-up message says to remove
-# with rm -r. A failed create with no lock there is a lock released in between, so it is polled
-# again, unless the plan's directory cannot be written, which no wait would change: that fails at
-# once.
+# and $$ there is still the tick's own id. A waiter gives up after 100 polls, about ten seconds,
+# behind one holder, naming the lock, because a tick killed with SIGKILL leaves it behind and
+# nothing else would say so; a new pid in the lock restarts the count, because a waiter behind a
+# busy queue is not behind a stale lock. An empty lock, from a tick killed between creating and
+# writing it, counts as one holder, and so does a directory left at the lock's path by an older
+# keel, which the give-up message says to remove with rm -r. A failed create with no lock there is
+# a lock released in between, so it is polled again, unless the plan's directory cannot be
+# written, which no wait would change: that fails at once. A create still failing at the limit
+# with nothing at the path is not a held lock, so the message says the lock cannot be created.
 plan_lock() {
-    local n=0 owner seen="" rm="rm -f"
-    until ( set -C; printf '%s\n' "$$" > "$1.lock" ) 2>/dev/null; do
+    local n=0 owner seen="" hint="rm -f"
+    until ( set -C; [ -L "$1.lock" ] || [ -e "$1.lock" ] && exit 1
+            printf '%s\n' "$$" > "$1.lock" ) 2>/dev/null; do
         [ -e "$1.lock" ] || [ -w "$(dirname -- "$1")" ] || die "cannot create $1.lock, so the plan \
 cannot be locked: check its directory is writable"
-        owner=""; { read -r owner < "$1.lock"; } 2>/dev/null
+        owner=""; [ -f "$1.lock" ] && { read -r owner < "$1.lock"; } 2>/dev/null
         [ -n "$owner" ] && [ "$owner" != "$seen" ] && { seen="$owner"; n=0; }
         n=$((n + 1))
         if [ "$n" -ge 100 ]; then
-            [ -d "$1.lock" ] && rm="rm -r"
-            die "$1.lock is held by another keel plan tick. If none is running, one was killed: remove it with $rm $1.lock"
+            [ -e "$1.lock" ] || [ -L "$1.lock" ] || die "cannot create $1.lock, so the plan cannot \
+be locked: check its directory is writable and its filesystem is not full"
+            [ -d "$1.lock" ] && hint="rm -r"
+            die "$1.lock is held by another keel plan tick. If none is running, one was killed: remove it with $hint $1.lock"
         fi
         sleep 0.1
     done
     PLAN_LOCK="$1.lock"
     plan_trace acquire
-    trap 'rm -f "$PLAN_LOCK"; plan_trace exit-released' EXIT
+    trap 'rm -f -- "$PLAN_LOCK"; plan_trace exit-released' EXIT
     trap 'exit 130' INT TERM
 }
 
@@ -4737,9 +4741,11 @@ cannot be locked: check its directory is writable"
 plan_unlock() {
     local e rc
     trap - EXIT INT TERM
-    [ -n "${KEEL_PLAN_LOCK_TRACE:-}" ] || { rm "$PLAN_LOCK"; return; }
+    # shellcheck disable=SC2217  # rm asks before removing a write-protected file if stdin is a terminal
+    [ -n "${KEEL_PLAN_LOCK_TRACE:-}" ] || { rm -- "$PLAN_LOCK" </dev/null; return; }
     plan_trace release
-    e="$(rm "$PLAN_LOCK" 2>&1)"; rc=$?
+    # shellcheck disable=SC2217  # rm asks before removing a write-protected file if stdin is a terminal
+    e="$(rm -- "$PLAN_LOCK" </dev/null 2>&1)"; rc=$?
     if [ "$rc" -eq 0 ]; then plan_trace released; return 0; fi
     printf '%s\n' "$e" >&2
     plan_trace release-failed "$e"

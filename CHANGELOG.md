@@ -11,8 +11,10 @@ Entries are terse by design; the narrative for each release is in this file's gi
 
 - `keel plan tick`'s lock `<plan>.lock` is a file created with bash's `set -C`, holding the tick's
   pid, not a `mkdir` directory: uutils `mkdir` let two racing ticks both hold it and lost a tick.
-  A waiter whose lock changes hands keeps waiting, and "cannot create" now means the plan's
-  directory is missing or not writable. A directory lock from an older keel is removed with `rm -r`.
+  A waiter whose lock changes hands keeps waiting. "cannot create" means the plan's directory is
+  not writable, or the create still fails at the poll limit with nothing at the path (a full disk).
+  Anything already at the path, a symlink or a directory lock from an older keel included, is a
+  held lock, and the give-up message names `rm -r` for a directory.
 
 ## 0.29.0 - 2026-11-16
 

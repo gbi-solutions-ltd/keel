@@ -803,9 +803,10 @@ out="$("$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
 
 # Twenty ticks on one plan, started together. Without a lock each reads the plan before the others
 # write it and most ticks are lost: 3, 9 and 6 of 20 landed in three runs while planning.
-# The lock must not rest on mkdir: uutils' mkdir exits 0 for both of two processes racing to create
-# one path, which lost a tick on ubuntu-latest. A shim mkdir that exits 0 and creates nothing, as
-# that race can, is first on PATH for the ticks alone, so a lock taken with mkdir lets them collide.
+# The lock must not rest on mkdir: uutils mkdir, as Ubuntu 26.04 ships it, can report success to two
+# processes racing to create one path, so both would hold the lock. A shim mkdir that exits 0 and
+# creates nothing, as that race can, is first on PATH for the ticks alone, so a lock taken with
+# mkdir lets them collide.
 p="$d/batch.md"
 { printf '# A plan\n\n'; i=1; while [ "$i" -le 20 ]; do printf -- '- [ ] **Step 1.%s: a step**\n' "$i"; i=$((i+1)); done; } > "$p"
 shim="$d/shim-mkdir"
@@ -868,6 +869,58 @@ out="$(PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/noowne
   && ok "tick facing a lock with no owner gives up naming it, and changes nothing" \
   || bad "lock with no owner" "rc=$rc out=$out"
 rm -f "$p.lock"
+# The limit is 100 polls behind one holder, with a sleep between each, so the shim counts 99.
+[ "$(cat "$d/noowner.polls" 2>&1)" = 99 ] \
+  && ok "a tick behind one holder gives up after exactly 100 polls" \
+  || bad "poll limit" "sleeps counted: $(cat "$d/noowner.polls" 2>&1)"
+
+# Anything already at the lock's path is a held lock, not only a regular file: set -C refuses only
+# a regular file, so a symlink to /dev/null would let every tick take the lock at once.
+p="$d/symlink.md"
+mkplan "$p" '- [ ] **Step 1.1: a**'
+cp "$p" "$d/symlink.before"
+ln -s /dev/null "$p.lock"
+out="$(PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/symlink.polls" \
+  "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && cmp -s "$p" "$d/symlink.before" && [ -L "$p.lock" ] \
+  && case "$out" in *"$p.lock"*) true ;; *) false ;; esac \
+  && ok "tick facing a symlink at the lock's path gives up naming it, and changes nothing" \
+  || bad "symlink lock" "rc=$rc out=$out"
+rm -f "$p.lock"
+
+# A FIFO at the lock's path is held too, and the waiter never opens it, which would block the tick.
+# The tick runs in the background and is killed if it has not given up within ten seconds.
+p="$d/fifo.md"
+mkplan "$p" '- [ ] **Step 1.1: a**'
+cp "$p" "$d/fifo.before"
+mkfifo "$p.lock"
+PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/fifo.polls" \
+  "$KEEL" plan tick "$p" 1.1 >"$d/fifo.out" 2>&1 &
+fpid=$!
+i=0
+while kill -0 "$fpid" 2>/dev/null && [ "$i" -lt 100 ]; do "$real_sleep" 0.1; i=$((i + 1)); done
+kill "$fpid" 2>/dev/null && hung=yes || hung=no
+wait "$fpid"; rc=$?
+out="$(cat "$d/fifo.out")"
+[ "$hung" = no ] && [ "$rc" -ne 0 ] && cmp -s "$p" "$d/fifo.before" \
+  && case "$out" in *"$p.lock"*) true ;; *) false ;; esac \
+  && ok "tick facing a FIFO at the lock's path gives up naming it, without blocking on it" \
+  || bad "FIFO lock" "hung=$hung rc=$rc out=$out"
+rm -f "$p.lock"
+
+# A create that keeps failing with no lock there is not a held lock, even in a writable directory:
+# a lock name one past the longest a file name can be fails every create, and nothing is left.
+p="$d/$(printf '%0248d' 0).md"
+mkplan "$p" '- [ ] **Step 1.1: a**'
+cp "$p" "$d/longname.before"
+out="$(PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/longname.polls" \
+  "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && cmp -s "$p" "$d/longname.before" \
+  && case "$out" in *"cannot create"*) true ;; *) false ;; esac \
+  && case "$out" in *"is held"*) false ;; *) true ;; esac \
+  && ok "tick whose lock cannot be created in a writable directory says so, not that it is held" \
+  || bad "lock create fails, nothing there" "rc=$rc out=$out"
+rm -f "$p"
 
 # A directory at the lock's path, as an older keel leaves it, is a held lock: the tick gives up
 # after 100 polls with the command that removes a directory.
