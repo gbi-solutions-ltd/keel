@@ -841,7 +841,8 @@ trace: $(tr '\n' ';' < "$d/batch.trace" 2>&1)"
 # KEEL_TEST_ROTATE it only counts, a holder that never changes. The holders' pids are those of
 # running processes, five backgrounded sleeps, since a dead holder ends the wait at once; they are
 # killed after the lock cases. With KEEL_TEST_FLIP the shim instead releases the lock on even calls
-# and gives it to a running holder on odd ones, until the 150th call releases it for good.
+# and gives it to a running holder on odd ones, until the 150th call releases it for good. It
+# raises its own soft file size limit first, so it can write under a tick's limit of 0.
 sl="$d/sleepshim"
 mkdir "$sl"
 # Resolved before PATH holds the shim, or the shim finds itself and never sleeps.
@@ -854,7 +855,8 @@ while [ "$i" -le 5 ]; do
   i=$((i + 1))
 done
 # shellcheck disable=SC2016  # the shim's own variables, expanded when it runs
-printf '%s\n' '#!/bin/sh' 'n=0; [ -f "$KEEL_TEST_POLLS" ] && read -r n < "$KEEL_TEST_POLLS"' \
+printf '%s\n' '#!/bin/sh' 'ulimit -S -f unlimited 2>/dev/null' \
+  'n=0; [ -f "$KEEL_TEST_POLLS" ] && read -r n < "$KEEL_TEST_POLLS"' \
   'n=$((n + 1)); echo "$n" > "$KEEL_TEST_POLLS"' \
   'if [ -n "$KEEL_TEST_ROTATE" ] && [ $((n % 30)) -eq 0 ]; then' \
   '  set -- $KEEL_TEST_HOLDERS; shift $((n / 30 - 1)); echo "$1" > "$KEEL_TEST_LOCK"; fi' \
@@ -874,19 +876,23 @@ out="$(PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/queue.
   && ok "a tick behind a lock changing hands waits for it, past 100 polls" \
   || bad "queued tick" "rc=$rc out=$out"
 
-# "cannot create" at the limit counts only polls that found nothing at the lock's path, apart from
-# polls behind a holder, so a lock that is held and released on alternate polls is never reported
-# as one that cannot be created.
+# "cannot create" counts only polls in a row that found nothing at the lock's path, so a held poll
+# resets it. Under a soft file size limit of 0, with SIGXFSZ ignored, every create's pid write fails
+# and leaves nothing, while the shim holds the lock on odd calls and releases it on even ones, then
+# for good at its 150th. Without the reset the tick gives up near call 175; with it, after call 249,
+# 100 polls after the release, while the 75 held polls stay short of the held limit.
 p="$d/flip.md"
 mkplan "$p" '- [ ] **Step 1.1: a**'
-echo 1 > "$p.lock"
-out="$(PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/flip.polls" \
-  KEEL_TEST_LOCK="$p.lock" KEEL_TEST_HOLDERS="$holders" KEEL_TEST_FLIP=1 \
-  "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
-[ "$rc" -eq 0 ] && grep -qxF -e '- [x] **Step 1.1: a**' "$p" && [ ! -e "$p.lock" ] \
-  && case "$out" in *"cannot create"*) false ;; *) true ;; esac \
-  && ok "a tick behind a lock held and released on alternate polls lands, never 'cannot create'" \
-  || bad "lock held and released in turn" "rc=$rc polls=$(cat "$d/flip.polls" 2>&1) out=$out"
+cp "$p" "$d/flip.before"
+out="$(trap '' XFSZ; ulimit -S -f 0; PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" \
+  KEEL_TEST_POLLS="$d/flip.polls" KEEL_TEST_LOCK="$p.lock" KEEL_TEST_HOLDERS="$holders" \
+  KEEL_TEST_FLIP=1 "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && cmp -s "$p" "$d/flip.before" && [ ! -e "$p.lock" ] && [ ! -L "$p.lock" ] \
+  && [ "$(cat "$d/flip.polls" 2>/dev/null || echo 0)" -ge 249 ] \
+  && case "$out" in *"cannot create"*) true ;; *) false ;; esac \
+  && ! printf '%s\n' "$out" | grep -qxE '[0-9]+' \
+  && ok "a lock held and absent in turn is called uncreatable only after 100 absent polls in a row" \
+  || bad "lock held and absent in turn" "rc=$rc polls=$(cat "$d/flip.polls" 2>&1) out=$out"
 
 # A holder that is not running on this machine, as a killed tick leaves its lock, ends the wait at
 # once: the tick names the lock and the pid, says to remove it, and changes nothing. A finished
@@ -925,6 +931,26 @@ out="$(PATH="$psshim:$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$
   && case "$out" in *"not running"*) false ;; *) true ;; esac \
   && ok "a tick whose ps does not answer waits the full 100 polls behind a dead pid" \
   || bad "no ps" "rc=$rc polls=$(cat "$d/nops.polls" 2>&1) out=$out"
+rm -f "$p.lock"
+
+# A ps whose -p does not work, exiting 1 for every pid as a ps without -p would, is not trusted to
+# judge a holder dead: a shim ps exits 1 even for the tick's own pid, so the tick waits the full 100
+# polls behind the dead pid.
+psbad="$d/psbad"
+mkdir "$psbad"
+printf '%s\n' '#!/bin/sh' 'exit 1' > "$psbad/ps"
+chmod 755 "$psbad/ps"
+p="$d/badps.md"
+mkplan "$p" '- [ ] **Step 1.1: a**'
+cp "$p" "$d/badps.before"
+echo "$dead" > "$p.lock"
+out="$(PATH="$psbad:$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep" KEEL_TEST_POLLS="$d/badps.polls" \
+  "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && cmp -s "$p" "$d/badps.before" && [ "$(cat "$d/badps.polls" 2>&1)" = 99 ] \
+  && case "$out" in *"is held"*"rm -f $p.lock"*) true ;; *) false ;; esac \
+  && case "$out" in *"not running"*) false ;; *) true ;; esac \
+  && ok "a tick whose ps -p exits 1 for its own pid waits the full 100 polls behind a dead pid" \
+  || bad "ps -p not working" "rc=$rc polls=$(cat "$d/badps.polls" 2>&1) out=$out"
 rm -f "$p.lock"
 
 # A running holder is waited on the full 100 polls, whether kill -0 reaches it (a backgrounded
@@ -1023,6 +1049,7 @@ out="$(trap '' XFSZ; ulimit -f 0; PATH="$sl:$PATH" KEEL_TEST_SLEEP="$real_sleep"
   KEEL_TEST_POLLS=/dev/null "$KEEL" plan tick "$p" 1.1 2>&1)"; rc=$?
 [ "$rc" -ne 0 ] && cmp -s "$p" "$d/nopid.before" && [ ! -e "$p.lock" ] && [ ! -L "$p.lock" ] \
   && case "$out" in *"cannot create"*) true ;; *) false ;; esac \
+  && ! printf '%s\n' "$out" | grep -qxE '[0-9]+' \
   && ok "tick whose pid cannot be written leaves no lock and says it cannot be created" \
   || bad "pid write fails" "rc=$rc lock left: $([ -e "$p.lock" ] && echo yes || echo no) out=$out"
 rm -f "$p.lock"
@@ -1112,7 +1139,8 @@ for how in unlock exit; do
   out="$(PATH="$shim:$PATH" KEEL_TEST_LOCK="$p.lock" KEEL_TEST_MKTEMP="$real" \
     "$KEEL" plan tick "$p" 1.1 2>&1 >/dev/null)"; rc=$?
   [ "$rc" -ne 0 ] && [ "$(cat "$p.lock" 2>/dev/null)" = 999 ] \
-    && case "$out" in *"$p.lock"*"no longer this tick's"*) true ;; *) false ;; esac \
+    && case "$out" in *"$p.lock"*"no longer this tick's"*"if this tick wrote the plan, the write was \
+not exclusive"*) true ;; *) false ;; esac \
     && ok "a tick whose lock was taken while held leaves it and fails, saying so ($how)" \
     || bad "lock taken while held ($how)" "rc=$rc lock: $(cat "$p.lock" 2>&1) out=$out"
   rm -f "$p.lock"
@@ -1197,15 +1225,17 @@ for how in unlock exit; do
   real=""; [ "$how" = unlock ] && real="$real_mktemp"
   p="$d/tracetaken-$how.md"
   mkplan "$p" '- [ ] **Step 1.1: a**'
-  PATH="$d/shim-takelock:$PATH" KEEL_TEST_LOCK="$p.lock" KEEL_TEST_MKTEMP="$real" \
-    KEEL_PLAN_LOCK_TRACE="$d/tracetaken-$how.log" "$KEEL" plan tick "$p" 1.1 >/dev/null 2>&1; rc=$?
+  out="$(PATH="$d/shim-takelock:$PATH" KEEL_TEST_LOCK="$p.lock" KEEL_TEST_MKTEMP="$real" \
+    KEEL_PLAN_LOCK_TRACE="$d/tracetaken-$how.log" "$KEEL" plan tick "$p" 1.1 2>&1 >/dev/null)"; rc=$?
   tpid="$(awk 'NR == 1 { print $2 }' "$d/tracetaken-$how.log" 2>/dev/null)"
   want="acquire $tpid"$'\n'
   [ "$how" = unlock ] && want="${want}release $tpid"$'\n'
   [ "$rc" -ne 0 ] && [ -n "$tpid" ] \
     && [ "$(cat "$d/tracetaken-$how.log")" = "${want}release-not-ours $tpid 999" ] \
+    && case "$out" in *"if this tick wrote the plan, the write was not exclusive"*) true ;; \
+      *) false ;; esac \
     && ok "a release finding the lock taken is traced as release-not-ours ($how)" \
-    || bad "lock trace release-not-ours ($how)" "rc=$rc, trace: $(cat "$d/tracetaken-$how.log" 2>&1)"
+    || bad "lock trace release-not-ours ($how)" "rc=$rc, trace: $(cat "$d/tracetaken-$how.log" 2>&1) out=$out"
   rm -f "$p.lock"
 done
 

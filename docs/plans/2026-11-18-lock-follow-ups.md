@@ -235,7 +235,7 @@ first said the paragraph was unchanged, which was wrong.)
 **Done when:** `tests/test-plan.sh` passes under bash 5 and `/bin/bash` 3.2, and
 `tests/validate-citations.sh` exits 0.
 
-- [ ] **Step 3.1: Build it test first**
+- [x] **Step 3.1: Build it test first** Note: red witnessed by the implementer (671 passed, 5 failed; behaviour 1 red under the revert, 174 polls); fix pass for behaviours 4 and 5 red witnessed (674 passed, 2 failed); bash 5.2 run by the coordinator in a container, 672 passed (as root)
 
 Follow `keel:tdd`: write behaviour 1's and 2's cases and adapt behaviour 3's, run them, and watch
 behaviour 2's and 3's fail for the reasons they name. Behaviour 1's case passes on arrival, since
@@ -250,7 +250,7 @@ the revert. Expected after: PASS. Quote the failing cases and their messages.
 Run: the lint command from Global constraints. Run no `tests/run-tests.sh`: the coordinator runs it
 after this task. Expected: PASS. This is the one boundary run the task schedules.
 
-- [ ] **Step 3.2: Hand over**
+- [x] **Step 3.2: Hand over** Note: rounds: 2; routing: inherit; loop: light; spec COMPLIES
 
 ```bash
 git add bin/keel tests/test-plan.sh docs/03-install-and-distribution.md

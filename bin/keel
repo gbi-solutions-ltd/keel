@@ -4692,39 +4692,39 @@ plan_batches() {
     return "$rc"
 }
 
-# plan_lock <plan>: holds <plan>.lock until plan_unlock, so two ticks on one plan cannot each
-# read it before the other writes and drop one's change. The lock is a file created with bash's
-# exclusive create, `set -C` then `>`, which opens it with O_EXCL, holding the creator's pid. Not
-# mkdir, which uutils (as Ubuntu 26.04 ships it) can report as created to two racing processes, and
-# not flock, which macOS lacks. set -C refuses only a regular file, so anything at the path, a
-# symlink or FIFO included, is refused first as a held lock, and a pid is read only from a regular
-# file, since opening a FIFO would block. set -C stays in the create's subshell, where $$ is still
-# the tick's. The pid is written as a second step, and only a failed write (a full disk) removes
-# the file, so no empty lock is left while a create that lost the race leaves the winner's alone.
-# A waiter never removes the lock, even a stale one: two waiters judging it stale would each remove
-# the other's fresh lock. It counts polls behind one holder, restarting when the pid changes, since
-# a busy queue is not a stale lock, and gives up after 100, about ten seconds, naming the lock: a
-# tick killed with SIGKILL leaves it, and an empty lock or an older keel's directory counts as one
-# holder (rm -r for the directory). A holder found not running ends the wait at once: kill -0
-# fails, ps -p exits 1 (kill -0 alone also fails for another user's process), and the lock still
-# holds that pid when read again, since the holder may release in between. Without ps, or on any
-# other answer, the wait goes on. The pid is checked on this machine only, which the message says.
-# Polls finding nothing at the path, a lock released between the create and the look, are counted
-# apart and reset by any held poll; 100 in a row mean the lock cannot be created, as does an
+# plan_lock <plan>: holds <plan>.lock until plan_unlock, so two ticks on one plan cannot each read
+# it before the other writes and drop one's change. The lock is a file created with bash's exclusive
+# create, `set -C` then `>`, which opens it with O_EXCL, holding the creator's pid. Not mkdir, which
+# uutils (as Ubuntu 26.04 ships it) can report as created to two racing processes, and not flock,
+# which macOS lacks. set -C refuses only a regular file, so anything at the path, a symlink or FIFO
+# included, is refused first as a held lock, and a pid is read only from a regular file, since
+# opening a FIFO would block. set -C stays in the create's subshell, where $$ is still the tick's.
+# The pid is written as a second step, and only a failed write (a full disk) removes the file, so no
+# empty lock is left while a create that lost the race leaves the winner's alone. A waiter never
+# removes the lock, even a stale one: two waiters judging it stale would each remove the other's
+# fresh lock. It counts polls behind one holder, restarting when the pid changes, since a busy queue
+# is not a stale lock, and gives up after 100, about ten seconds, naming the lock: a tick killed
+# with SIGKILL leaves it, and an empty lock or an older keel's directory counts as one holder (rm -r
+# for the directory). A holder found not running on this machine, as the message says, ends the wait
+# at once: kill -0 fails, ps -p exits 1 for it but 0 for the tick itself (kill -0 alone also fails
+# for another user's process, and a ps without -p exits 1 for any pid), and the lock still holds
+# that pid when read again, since the holder may release in between. Any other answer keeps the
+# wait. Polls finding nothing at the path, a lock released between the create and the look, count
+# apart and any held poll resets them: 100 in a row mean the lock cannot be created, as does an
 # unwritable plan directory at once.
 plan_lock() {
     local n=0 none=0 owner seen="" hint="rm -f"
     until ( set -C; [ -L "$1.lock" ] || [ -e "$1.lock" ] && exit 1
             : > "$1.lock" || exit 1
-            printf '%s\n' "$$" >> "$1.lock" || { rm -f -- "$1.lock"; exit 1; } ) 2>/dev/null; do
+            printf '%s\n' "$$" >> "$1.lock" || { rm -f -- "$1.lock"; exit 1; } ) >/dev/null 2>&1; do
         if [ -e "$1.lock" ] || [ -L "$1.lock" ]; then
             none=0
             owner=""; [ -f "$1.lock" ] && { read -r owner < "$1.lock"; } 2>/dev/null
             [ -n "$owner" ] && [ "$owner" != "$seen" ] && { seen="$owner"; n=0; }
             if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
                 ps -p "$owner" >/dev/null 2>&1
-                if [ $? -eq 1 ] && [ -f "$1.lock" ] && { read -r owner < "$1.lock"; } 2>/dev/null \
-                    && [ "$owner" = "$seen" ]; then
+                if [ $? -eq 1 ] && ps -p "$$" >/dev/null 2>&1 && [ -f "$1.lock" ] \
+                    && { read -r owner < "$1.lock"; } 2>/dev/null && [ "$owner" = "$seen" ]; then
                     die "$1.lock is held by pid $owner, which is not running on this machine: if no \
 keel plan tick on another machine shares this plan, remove it with rm -f $1.lock"
                 fi
@@ -4770,15 +4770,15 @@ plan_unlock() {
 }
 
 # plan_lock_ours: whether PLAN_LOCK is still this tick's, a regular file whose first line is its pid.
-# Anything else there, or nothing, means the lock was removed or taken while the tick held it, so the
-# tick's write was not exclusive: it says so, traces release-not-ours with the first line found, and
-# fails, and the caller leaves the lock to whoever holds it now.
+# Anything else there, or nothing, means the lock was removed or taken while the tick held it, so any
+# write the tick made was not exclusive: it says so, traces release-not-ours with the first line
+# found, and fails, and the caller leaves the lock to whoever holds it now.
 plan_lock_ours() {
     local found=""
     [ -f "$PLAN_LOCK" ] && [ ! -L "$PLAN_LOCK" ] && { read -r found < "$PLAN_LOCK"; } 2>/dev/null
     [ "$found" = "$$" ] && return 0
     err "$PLAN_LOCK was no longer this tick's lock, so it is left as it is: it was removed or taken \
-while held, so this tick's write was not exclusive"
+while held, so if this tick wrote the plan, the write was not exclusive"
     plan_trace release-not-ours "$found"
     return 1
 }
