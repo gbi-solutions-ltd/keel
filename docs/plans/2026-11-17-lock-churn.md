@@ -91,7 +91,7 @@ which is git's and unchanged.
 
 **Done when:** `tests/test-plan.sh` passes.
 
-- [ ] **Step 1.1: Build it test first**
+- [x] **Step 1.1: Build it test first** Note: red witnessed by the implementer (655 passed, 6 failed); behaviour 4 cannot be shown red by design
 
 Follow `keel:tdd` for each behaviour: write or adapt its case from the example, run it, and watch
 it fail for the reason the behaviour names (behaviour 1 fails because the shim `mkdir` lets ticks
@@ -106,7 +106,7 @@ Run: the lint command from Global constraints, and `tests/validate-citations.sh`
 `tests/run-tests.sh`: the coordinator runs it once after this task. Expected: PASS. This is the
 one boundary run the task schedules.
 
-- [ ] **Step 1.2: Hand over**
+- [x] **Step 1.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES; Ubuntu 26.04 container: main lost a tick in 39 of 100 rounds, the fix in 0 of 100
 
 ```bash
 git add bin/keel tests/test-plan.sh docs/03-install-and-distribution.md CHANGELOG.md

@@ -4694,48 +4694,52 @@ plan_batches() {
 
 # plan_lock <plan>: holds <plan>.lock until plan_unlock, so two ticks on one plan cannot each
 # read it before the other writes and drop one's change, which a concurrent batch's ticks otherwise
-# do. mkdir is the lock because it is atomic on every filesystem keel runs on and needs no flock,
-# which macOS lacks. The holder writes its process id to `owner` inside it. A waiter gives up after
-# about ten seconds behind one owner, naming the lock, because a tick killed with SIGKILL leaves it
-# behind and nothing else would say so; a new owner restarts the count, because a waiter behind a
-# busy queue is not behind a stale lock, and a count that ignored that lost ticks on a loaded CI
-# runner. A lock with no owner, from a tick killed before writing it, counts as one owner. A mkdir
-# that fails with no lock present is retried once, since a lock released between the failed mkdir
-# and the check is not an error; if that fails with still no lock, as in a directory it cannot
-# write, it fails at once.
+# do. The lock is a file the holder creates with bash's own exclusive create, `set -C` then `>`,
+# which opens it with O_EXCL, and writes its process id into. It is not mkdir, because uutils'
+# mkdir, the one Ubuntu 26.04 ships, exits 0 for both of two processes racing to create one path
+# (965 of 2000 trials), which let two ticks hold the lock and lost one; the exclusive create
+# double-succeeded 0 of 2000 times on the same image, and it needs no flock, which macOS lacks.
+# set -C is set in the subshell that creates the file, so noclobber never reaches the rest of keel,
+# and $$ there is still the tick's own id. A waiter gives up after about ten seconds behind one
+# holder, naming the lock, because a tick killed with SIGKILL leaves it behind and nothing else
+# would say so; a new pid in the lock restarts the count, because a waiter behind a busy queue is not
+# behind a stale lock, and a count that ignored that lost ticks on a loaded CI runner. An empty
+# lock, from a tick killed between creating and writing it, counts as one holder, and so does a
+# directory left at the lock's path by an older keel, which the give-up message says to remove
+# with rm -r. A failed create with no lock there is a lock released in between, so it is polled
+# again, unless the plan's directory cannot be written, which no wait would change: that fails at
+# once.
 plan_lock() {
-    local n=0 owner seen=""
-    until mkdir "$1.lock" 2>/dev/null; do
-        if [ ! -e "$1.lock" ]; then
-            mkdir "$1.lock" 2>/dev/null && break
-            [ -e "$1.lock" ] || die "cannot create $1.lock, so the plan cannot be locked: check its \
-directory is writable"
-        fi
-        owner=""; { read -r owner < "$1.lock/owner"; } 2>/dev/null
+    local n=0 owner seen="" rm="rm -f"
+    until ( set -C; printf '%s\n' "$$" > "$1.lock" ) 2>/dev/null; do
+        [ -e "$1.lock" ] || [ -w "$(dirname -- "$1")" ] || die "cannot create $1.lock, so the plan \
+cannot be locked: check its directory is writable"
+        owner=""; { read -r owner < "$1.lock"; } 2>/dev/null
         [ -n "$owner" ] && [ "$owner" != "$seen" ] && { seen="$owner"; n=0; }
         n=$((n + 1))
-        [ "$n" -lt 100 ] || die "$1.lock is held by another keel plan tick. If none is running, one was killed: remove it with rm -r $1.lock"
+        if [ "$n" -ge 100 ]; then
+            [ -d "$1.lock" ] && rm="rm -r"
+            die "$1.lock is held by another keel plan tick. If none is running, one was killed: remove it with $rm $1.lock"
+        fi
         sleep 0.1
     done
-    { printf '%s\n' "$$" > "$1.lock/owner"; } 2>/dev/null
     PLAN_LOCK="$1.lock"
     plan_trace acquire
-    trap 'rm -f "$PLAN_LOCK/owner"; rmdir "$PLAN_LOCK" 2>/dev/null; plan_trace exit-released' EXIT
+    trap 'rm -f "$PLAN_LOCK"; plan_trace exit-released' EXIT
     trap 'exit 130' INT TERM
 }
 
-# plan_unlock: clears the traps before releasing, because an EXIT trap left set would rmdir the lock
-# a second time at exit, by which point another tick may hold it. Planning saw exactly that: 18 of
-# 20 concurrent ticks landed until the traps were cleared first.
-# With a trace asked for, rmdir's error is caught so the trace can name it, then passed on to
-# stderr as it would have gone anyway.
+# plan_unlock: clears the traps before releasing, because an EXIT trap left set would remove the
+# lock a second time at exit, by which point another tick may hold it. Planning saw exactly that: 18
+# of 20 concurrent ticks landed until the traps were cleared first.
+# With a trace asked for, rm's error is caught so the trace can name it, then passed on to stderr
+# as it would have gone anyway.
 plan_unlock() {
     local e rc
     trap - EXIT INT TERM
-    rm -f "$PLAN_LOCK/owner"
-    [ -n "${KEEL_PLAN_LOCK_TRACE:-}" ] || { rmdir "$PLAN_LOCK"; return; }
+    [ -n "${KEEL_PLAN_LOCK_TRACE:-}" ] || { rm "$PLAN_LOCK"; return; }
     plan_trace release
-    e="$(rmdir "$PLAN_LOCK" 2>&1)"; rc=$?
+    e="$(rm "$PLAN_LOCK" 2>&1)"; rc=$?
     if [ "$rc" -eq 0 ]; then plan_trace released; return 0; fi
     printf '%s\n' "$e" >&2
     plan_trace release-failed "$e"
