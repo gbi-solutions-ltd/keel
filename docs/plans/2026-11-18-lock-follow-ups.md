@@ -262,6 +262,63 @@ pass, with `git commit -s -m "fix(plan): prove the cannot-create count, and trus
 Paste the `git status --porcelain` output into your report; if it lists anything this task did not
 touch, say so and leave it unstaged.
 
+### Task 4: test holders never outlive the run, and the changelog entry is exact
+
+**Task 4 added:** 2026-11-18, at Bernard's request to wire in the smaller considers from
+review-code round 2 (PR #19).
+
+**Story:** none (short path)
+**Files:**
+- Modify: `tests/test-plan.sh`
+- Modify: `CHANGELOG.md`
+
+**Docs searched:** "kill -0", "ps -p", "sleep 1000". Hits: the `## Unreleased` entry in
+`CHANGELOG.md` and the holder lines of `tests/test-plan.sh`. The lock paragraph of
+`docs/03-install-and-distribution.md` already states the `ps -p` self-check, so is unchanged.
+
+**Depends on:** task 3
+
+**Behaviours:**
+
+1. The running holders the lock cases start are killed however the run ends: an EXIT trap set as
+   soon as they start kills them, alongside the existing kill and wait at the end of the lock
+   cases, and does not replace any trap the file already sets (extend it if one exists). Example:
+   `tests/test-plan.sh` interrupted with SIGINT while the lock cases run leaves no `sleep 1000`
+   behind (`pgrep -f 'sleep 1000'` finds none afterwards); a full run still passes and leaves none.
+2. The `## Unreleased` entry states the `ps -p` self-check (a holder is judged not running only
+   where `ps -p` on the tick's own pid exits 0) in place of "(`kill -0` and `ps -p` agree)", and
+   every line of the entry wraps at 100 characters or fewer, as the rest of the file does.
+   `tests/validate-citations.sh` still exits 0 (it fails when a blank line lands on
+   `CHANGELOG.md:28`, so choose the entry's line count with that in mind). Example: `awk` finds no
+   line over 100 characters in the entry, and grep finds "ps -p" with the self-check.
+
+**Done when:** `tests/test-plan.sh` passes under `/bin/bash` 3.2, and
+`tests/validate-citations.sh` exits 0.
+
+- [ ] **Step 4.1: Build it test first**
+
+Behaviour 1 is test infrastructure, so it has no case in the suite: check it by its example, run
+before the change (the interrupted run leaves holders, which you then kill by hand) and after
+(none left), and quote both `pgrep` results. Behaviour 2 is checked by its example and
+`tests/validate-citations.sh`.
+Run: `tests/test-plan.sh`, `tests/validate-citations.sh`
+Expected before: holders left after an interrupted run. Expected after: PASS and none left.
+
+Run: the lint command from Global constraints. Run no `tests/run-tests.sh`: the coordinator runs it
+after this task. Expected: PASS. This is the one boundary run the task schedules.
+
+- [ ] **Step 4.2: Hand over**
+
+```bash
+git add tests/test-plan.sh CHANGELOG.md
+git status --porcelain
+```
+
+Stage exactly those paths and stop. **Do not commit.** The coordinator commits after the review
+pass, with `git commit -s -m "test(plan): lock holders never outlive the run; exact changelog entry"`.
+Paste the `git status --porcelain` output into your report; if it lists anything this task did not
+touch, say so and leave it unstaged.
+
 ## Delivery
 
 - review-code: nothing blocking (2026-11-18, base 182baa9); its one should fix, behaviour 5's case
