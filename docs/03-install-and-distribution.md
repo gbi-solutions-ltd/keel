@@ -475,13 +475,25 @@ reason. Parking replaces anything after the title, a note included, and a reason
 non-blank character, since `plan status` reads one that starts with a space, tab or CR as missing.
 Ticks on one plan take turns through a lock, the file `<plan>.lock`, created exclusively (bash's
 `set -C`, not `mkdir`, whose uutils build can let two processes both create one path) and holding
-the holder's process id, so a concurrent batch's ticks all land. A tick fails naming the lock once
-one holder has kept it about ten seconds, since a killed tick can leave it behind, and says to
-remove it with `rm -f <plan>.lock`, or `rm -r` for a directory an older keel left there. Anything
-already at `<plan>.lock`, a symlink, FIFO or directory included, counts as held. A tick that
-creates the lock but cannot write its process id into it removes it again, so it leaves no empty
-lock behind. "cannot create" `<plan>.lock` means the lock could not be made in the plan's
-directory: the directory is not writable, or the file system is full.
+the holder's process id, so a concurrent batch's ticks all land. A waiter never removes the lock,
+and a tick releases it only while it is still a regular file holding the tick's own id: one removed
+or taken while held is left as it is, and the tick says so and fails, since if it wrote the plan,
+the write was not exclusive. A tick whose lock cannot be removed exits non-zero, its tick kept and
+rm's error on stderr, since the lock left behind would block the next tick. A 0.29.0 or older tick
+on the same plan still takes turns with a newer one, but its give-up message advises `rm -r` for
+what is now a file, so `rm -f <plan>.lock` is the command; every tick on a plan should run the same
+keel.
+When the holder's process id is not running on this machine (`kill -0` fails, `ps -p` exits 1 for it
+while `ps -p` on the tick's own id exits 0, so `ps -p` is known to work, and the lock still holds
+that id), the tick fails at once, naming the lock and the id and saying to remove it with
+`rm -f <plan>.lock` if no tick on another machine shares the plan. Otherwise, where `ps -p` does not
+work, or without `ps`, a tick fails naming the lock once one holder has kept it about ten seconds,
+since a killed tick can leave it behind, and says to remove it with `rm -f <plan>.lock`, or `rm -r`
+for a directory an older keel left there. Anything already at `<plan>.lock`, a symlink, FIFO or
+directory included, counts as held. A tick that creates the lock but cannot write its process id
+into it removes it again, so it leaves no empty lock behind. "cannot create" `<plan>.lock` means the
+lock could not be made in the plan's directory: the directory is not writable, or the create failed
+with nothing at the path on 100 polls in a row, as on a full file system.
 
 ```bash
 keel plan report <plan> [--json]
