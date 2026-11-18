@@ -478,9 +478,11 @@ Ticks on one plan take turns through a lock, the file `<plan>.lock`, created exc
 the holder's process id, so a concurrent batch's ticks all land. A waiter never removes the lock,
 and a tick releases it only while it is still a regular file holding the tick's own id: one removed
 or taken while held is left as it is, and the tick says so and fails, since if it wrote the plan,
-the write was not exclusive. A 0.29.0 or older tick on the same plan still takes turns with a newer
-one, but its give-up message advises `rm -r` for what is now a file, so `rm -f <plan>.lock` is the
-command; every tick on a plan should run the same keel.
+the write was not exclusive. A tick whose lock cannot be removed exits non-zero, its tick kept and
+rm's error on stderr, since the lock left behind would block the next tick. A 0.29.0 or older tick
+on the same plan still takes turns with a newer one, but its give-up message advises `rm -r` for
+what is now a file, so `rm -f <plan>.lock` is the command; every tick on a plan should run the same
+keel.
 When the holder's process id is not running on this machine (`kill -0` fails, `ps -p` exits 1 for it
 while `ps -p` on the tick's own id exits 0, so `ps -p` is known to work, and the lock still holds
 that id), the tick fails at once, naming the lock and the id and saying to remove it with

@@ -24,6 +24,8 @@ Entries are terse by design; the narrative for each release is in this file's gi
   (`release-not-ours`). A 0.29.0 or older tick on the same plan still takes turns with a newer
   one, but its give-up message advises `rm -r` for what is now a file: `rm -f` is the command;
   every tick on a plan should run the same keel.
+  A tick whose lock cannot be removed exits non-zero, its tick kept and rm's error on stderr, since
+  the lock left behind would block the next tick.
 
 ## 0.29.0 - 2026-11-16
 

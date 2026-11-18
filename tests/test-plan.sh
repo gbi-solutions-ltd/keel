@@ -1204,6 +1204,19 @@ $tpid rm: $p.lock: shim refused" ] \
   || bad "lock trace release-failed" "stderr: $out, trace: $(cat "$d/tracefail.log" 2>&1)"
 rm -f "$p.lock"
 
+# A tick whose plan write landed but whose lock cannot be removed fails, keeps its tick, and leaves
+# rm's error on stderr, since the lock left behind would block the next tick. No trace is set, so
+# this is plan_unlock's untraced rm, under the same shim.
+p="$d/unlockfail.md"
+mkplan "$p" '- [ ] **Step 1.1: a**'
+out="$(unset KEEL_PLAN_LOCK_TRACE; PATH="$shim:$PATH" KEEL_TEST_RM="$real_rm" \
+  KEEL_TEST_LOCK="$p.lock" "$KEEL" plan tick "$p" 1.1 2>&1 >/dev/null)"; rc=$?
+[ "$rc" -ne 0 ] && grep -qxF -e '- [x] **Step 1.1: a**' "$p" && [ -f "$p.lock" ] \
+  && case "$out" in *"shim refused"*) true ;; *) false ;; esac \
+  && ok "a tick whose lock cannot be removed fails, its tick kept and rm's error on stderr" \
+  || bad "unlock failure" "rc=$rc, stderr: $out, lock: $(ls -d "$p.lock" 2>&1)"
+rm -f "$p.lock"
+
 # A tick that dies holding the lock is released by its EXIT trap, which traces that too. A shim
 # mktemp fails, so the tick dies after taking the lock; first it keeps what the lock held, which
 # must be a regular file holding the tick's pid.

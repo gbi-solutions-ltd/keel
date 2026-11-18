@@ -352,7 +352,7 @@ in `plan_tick`, and cover it with a test, a changelog clause and the docs.
 **Done when:** `tests/test-plan.sh` passes under `/bin/bash` 3.2, and
 `tests/validate-citations.sh` exits 0.
 
-- [ ] **Step 5.1: Build it test first**
+- [x] **Step 5.1: Build it test first** Note: case green on arrival by design (code from task 2); red witnessed by the implementer and the spec reviewer under the revert of plan_unlock || rc=1 (674 passed, 3 failed)
 
 The code is already in place, so behaviour 1's case passes on arrival: write it, then prove it can
 fail by reverting `plan_unlock || rc=1` to `plan_unlock` by hand, running it, quoting the failure,
@@ -363,7 +363,7 @@ Expected: behaviour 1's case FAIL under the revert, PASS after the restore; both
 Run: the lint command from Global constraints. Run no `tests/run-tests.sh`: the coordinator runs it
 after this task. Expected: PASS. This is the one boundary run the task schedules.
 
-- [ ] **Step 5.2: Hand over**
+- [x] **Step 5.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES
 
 ```bash
 git add tests/test-plan.sh docs/03-install-and-distribution.md CHANGELOG.md
@@ -388,3 +388,5 @@ touch, say so and leave it unstaged.
     see this plan's Architecture paragraph
 - task 4, at Bernard's request, wired in two of round 2's considers: the test holders are killed
   however a run ends, and the changelog entry states the `ps -p` self-check within 100 columns
+- task 5, at Bernard's request, kept task 2's `plan_unlock || rc=1` and covered it: a tick whose
+  lock cannot be removed exits non-zero with its tick kept, with a case, the docs and the changelog
