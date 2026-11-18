@@ -7,8 +7,12 @@ versions as each skill is tested against real repositories.
 
 Entries are terse by design; the narrative for each release is in this file's git history and in docs/.
 
-## Unreleased
+## 0.30.0 - 2026-11-18
 
+- Release gate: the 0.29.0 gate transfers. `git diff --stat v0.29.0..HEAD -- skills/ tests/evals/`
+  is empty: this release changes `bin/keel`, its tests and docs, and no skill body, fixture or
+  scenario. Claude Code is 2.1.325, the version of the 0.29.0 gate, so the `agent_id` probe is
+  not owed.
 - `keel plan tick`'s lock `<plan>.lock` is a file created with bash's `set -C`, holding the tick's
   pid, not a `mkdir` directory: uutils `mkdir` let two racing ticks both hold it and lost a tick.
   A waiter whose lock changes hands keeps waiting; one whose holder's pid is not running on this
