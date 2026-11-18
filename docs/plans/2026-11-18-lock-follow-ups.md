@@ -267,3 +267,15 @@ touch, say so and leave it unstaged.
 - review-code: nothing blocking (2026-11-18, base 182baa9); its one should fix, behaviour 5's case
   unable to fail, became task 3 with two of its considers (a `ps` without `-p`, the not-ours
   message on the EXIT path)
+- review-code round 2: nothing blocking (2026-11-18, diff e9e09db...738c868, after task 3); each
+  of task 3's guards (`ps -p "$$"`, the subshell's stdout to /dev/null, the reset of the
+  nothing-there count) failed its case when reverted
+- follow-up:
+  - consider: `plan_tick` now fails a tick whose lock `rm` failed (`plan_unlock || rc=1`, from
+    task 2), a change in exit code no case or changelog line covers (`bin/keel`)
+  - consider: the test holders (`sleep 1000`) are left running if a run is interrupted; an EXIT
+    trap would kill them (`tests/test-plan.sh`)
+  - consider: the changelog's "(`kill -0` and `ps -p` agree)" omits the `ps -p` self-check, and
+    one changelog line runs to about 120 characters (`CHANGELOG.md`)
+  - the signal window before the EXIT trap stays open by design, covered by the dead-pid check:
+    see this plan's Architecture paragraph
