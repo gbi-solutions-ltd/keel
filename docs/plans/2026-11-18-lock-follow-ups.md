@@ -319,6 +319,62 @@ pass, with `git commit -s -m "test(plan): lock holders never outlive the run; ex
 Paste the `git status --porcelain` output into your report; if it lists anything this task did not
 touch, say so and leave it unstaged.
 
+### Task 5: a tick whose lock cannot be removed fails
+
+**Task 5 added:** 2026-11-18, at Bernard's request: keep task 2's side effect, `plan_unlock || rc=1`
+in `plan_tick`, and cover it with a test, a changelog clause and the docs.
+
+**Story:** none (short path)
+**Files:**
+- Modify: `tests/test-plan.sh`
+- Modify: `docs/03-install-and-distribution.md`
+- Modify: `CHANGELOG.md`
+
+**Docs searched:** "release-failed", "rm fails", "exits". Hits: the release-failed trace case in
+`tests/test-plan.sh`, the lock paragraph of `docs/03-install-and-distribution.md`, and the
+`## Unreleased` entry in `CHANGELOG.md`. `bin/keel` already has the behaviour, from task 2.
+
+**Depends on:** task 4
+
+**Behaviours:**
+
+1. A tick whose plan write landed but whose lock removal fails exits non-zero, keeps its tick in
+   the plan, and leaves rm's error on stderr, so the person learns a lock was left behind that
+   would block the next tick. Example: with a shim `rm` that refuses the lock (as the release-failed
+   trace case uses) and no trace set, `keel plan tick <plan> 1.1` exits non-zero, the step is
+   ticked, `<plan>.lock` is still there, and stderr holds the shim's refusal. Reverting
+   `plan_unlock || rc=1` to `plan_unlock` in `plan_tick` makes the case fail.
+2. The lock paragraph of `docs/03-install-and-distribution.md` and the `## Unreleased` entry say
+   that a tick whose lock cannot be removed exits non-zero, its tick kept. `tests/validate-citations.sh`
+   still exits 0 (a blank line on `CHANGELOG.md:28` fails it) and every line of the entry stays at
+   100 characters or fewer. Example: grep finds the statement in both.
+
+**Done when:** `tests/test-plan.sh` passes under `/bin/bash` 3.2, and
+`tests/validate-citations.sh` exits 0.
+
+- [ ] **Step 5.1: Build it test first**
+
+The code is already in place, so behaviour 1's case passes on arrival: write it, then prove it can
+fail by reverting `plan_unlock || rc=1` to `plan_unlock` by hand, running it, quoting the failure,
+and restoring the line (`git diff bin/keel` empty after). Then make behaviour 2's doc changes.
+Run: `tests/test-plan.sh`, `tests/validate-citations.sh`
+Expected: behaviour 1's case FAIL under the revert, PASS after the restore; both commands PASS.
+
+Run: the lint command from Global constraints. Run no `tests/run-tests.sh`: the coordinator runs it
+after this task. Expected: PASS. This is the one boundary run the task schedules.
+
+- [ ] **Step 5.2: Hand over**
+
+```bash
+git add tests/test-plan.sh docs/03-install-and-distribution.md CHANGELOG.md
+git status --porcelain
+```
+
+Stage exactly those paths and stop. **Do not commit.** The coordinator commits after the review
+pass, with `git commit -s -m "test(plan): a tick whose lock cannot be removed fails"`.
+Paste the `git status --porcelain` output into your report; if it lists anything this task did not
+touch, say so and leave it unstaged.
+
 ## Delivery
 
 - review-code: nothing blocking (2026-11-18, base 182baa9); its one should fix, behaviour 5's case
@@ -328,8 +384,6 @@ touch, say so and leave it unstaged.
   of task 3's guards (`ps -p "$$"`, the subshell's stdout to /dev/null, the reset of the
   nothing-there count) failed its case when reverted
 - follow-up:
-  - consider: `plan_tick` now fails a tick whose lock `rm` failed (`plan_unlock || rc=1`, from
-    task 2), a change in exit code no case or changelog line covers (`bin/keel`)
   - the signal window before the EXIT trap stays open by design, covered by the dead-pid check:
     see this plan's Architecture paragraph
 - task 4, at Bernard's request, wired in two of round 2's considers: the test holders are killed
