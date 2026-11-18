@@ -854,6 +854,11 @@ while [ "$i" -le 5 ]; do
   holders="$holders $!"
   i=$((i + 1))
 done
+# However the run ends they are stopped: an EXIT trap kills them, and INT and TERM end the run
+# through it. It is cleared once the lock cases have stopped them, so it never kills a reused pid.
+trap 'kill $holders 2>/dev/null' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 # shellcheck disable=SC2016  # the shim's own variables, expanded when it runs
 printf '%s\n' '#!/bin/sh' 'ulimit -S -f unlimited 2>/dev/null' \
   'n=0; [ -f "$KEEL_TEST_POLLS" ] && read -r n < "$KEEL_TEST_POLLS"' \
@@ -1151,6 +1156,7 @@ done
 kill $holders 2>/dev/null
 # shellcheck disable=SC2086
 wait $holders 2>/dev/null
+trap - EXIT INT TERM
 
 # ---- tick: the lock leaves a trace when asked ---------------------------------------------------
 

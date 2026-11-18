@@ -12,16 +12,18 @@ Entries are terse by design; the narrative for each release is in this file's gi
 - `keel plan tick`'s lock `<plan>.lock` is a file created with bash's `set -C`, holding the tick's
   pid, not a `mkdir` directory: uutils `mkdir` let two racing ticks both hold it and lost a tick.
   A waiter whose lock changes hands keeps waiting; one whose holder's pid is not running on this
-  machine (`kill -0` and `ps -p` agree) gives up at once, naming the pid, and never removes the lock.
+  machine gives up at once, naming the pid, and never removes the lock; a holder is judged not
+  running only where `ps -p` on the tick's own pid exits 0.
   "cannot create" means the plan's directory is not writable, or the create fails with nothing at
   the path on 100 polls in a row, counted apart from polls behind a holder (a full disk).
   Anything already at the path, a symlink or a directory lock from an older keel included, is a
   held lock, and the give-up message names `rm -r` for a directory.
   A tick that creates the lock but cannot write its pid into it removes it again, so a full disk
   leaves no empty lock behind to be read as held.
-  A tick releases only a lock holding its pid, else leaves it, says so, and fails (`release-not-ours`).
-  A 0.29.0 or older tick on the same plan still takes turns with a newer one, but its give-up
-  message advises `rm -r` for what is now a file: `rm -f` is the command; every tick on a plan should run the same keel.
+  A tick releases only a lock holding its pid, else leaves it, says so, and fails
+  (`release-not-ours`). A 0.29.0 or older tick on the same plan still takes turns with a newer
+  one, but its give-up message advises `rm -r` for what is now a file: `rm -f` is the command;
+  every tick on a plan should run the same keel.
 
 ## 0.29.0 - 2026-11-16
 

@@ -295,7 +295,7 @@ review-code round 2 (PR #19).
 **Done when:** `tests/test-plan.sh` passes under `/bin/bash` 3.2, and
 `tests/validate-citations.sh` exits 0.
 
-- [ ] **Step 4.1: Build it test first**
+- [x] **Step 4.1: Build it test first** Note: before witnessed by the implementer: an interrupted run left five sleep 1000 holders; after, none; changelog longest line 98
 
 Behaviour 1 is test infrastructure, so it has no case in the suite: check it by its example, run
 before the change (the interrupted run leaves holders, which you then kill by hand) and after
@@ -307,7 +307,7 @@ Expected before: holders left after an interrupted run. Expected after: PASS and
 Run: the lint command from Global constraints. Run no `tests/run-tests.sh`: the coordinator runs it
 after this task. Expected: PASS. This is the one boundary run the task schedules.
 
-- [ ] **Step 4.2: Hand over**
+- [x] **Step 4.2: Hand over** Note: rounds: 1; routing: inherit; loop: light; spec COMPLIES
 
 ```bash
 git add tests/test-plan.sh CHANGELOG.md
@@ -330,9 +330,7 @@ touch, say so and leave it unstaged.
 - follow-up:
   - consider: `plan_tick` now fails a tick whose lock `rm` failed (`plan_unlock || rc=1`, from
     task 2), a change in exit code no case or changelog line covers (`bin/keel`)
-  - consider: the test holders (`sleep 1000`) are left running if a run is interrupted; an EXIT
-    trap would kill them (`tests/test-plan.sh`)
-  - consider: the changelog's "(`kill -0` and `ps -p` agree)" omits the `ps -p` self-check, and
-    one changelog line runs to about 120 characters (`CHANGELOG.md`)
   - the signal window before the EXIT trap stays open by design, covered by the dead-pid check:
     see this plan's Architecture paragraph
+- task 4, at Bernard's request, wired in two of round 2's considers: the test holders are killed
+  however a run ends, and the changelog entry states the `ps -p` self-check within 100 columns
