@@ -63,7 +63,7 @@ whatever number is enforced**, so the remedy is text that leaves the body, not a
 
 **Example:** `skills/coding-standards/SKILL.md` is the case ADR-0001 took to show that moving
 detail out has a floor: it carried 12 reference files and 17,816 words against a body of 683 then,
-and with its reasons moved out carries 18 and 22,916 against 645 today, so the floor did not hold.
+and with its reasons moved out carries 18 and 24,419 against 645 today, so the floor did not hold.
 Reach for a reference because a reader needs it at one step, not as a way to buy words.
 
 ## Subagent briefs stay in the body, or the dispatching step says to read them

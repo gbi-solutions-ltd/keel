@@ -59,7 +59,7 @@ the hard ceiling again, warned within 30, with no eval-arm exception and no targ
 
 ADR-0001 held that moving substance into `references/` stopped at a floor near 680. ADR-0011 names
 what leaves, in order: reasons, then duplicates a linked reference states in full, then step detail,
-and the floor gave way: `coding-standards` carries **18 reference files and 22,916 words** in them
+and the floor gave way: `coding-standards` carries **18 reference files and 24,419 words** in them
 and its body is now 645, against 12, 17,816 and 683 when ADR-0001 measured it on 2026-08-16. A
 body's floor is set by its step count, not by the reasons it carries.
 
