@@ -8,6 +8,9 @@ THIRD-PARTY-LICENSES.md. SOURCES.md records which parts of this work derive
 from which project, per file, and distinguishes close adaptations from
 structural borrowings.
 
+It also includes driver.js 1.9.0 (MIT, Copyright (c) Kamran Ahmed), unchanged, in the mockup
+engine's tours module; its licence is reproduced in THIRD-PARTY-LICENSES.md and beside the file.
+
 This file exists because that paragraph used to live at the end of LICENSE,
 where it stopped GitHub's licence detector recognising the file as MIT. A public
 repository whose licence cannot be detected shows no licence to anyone browsing

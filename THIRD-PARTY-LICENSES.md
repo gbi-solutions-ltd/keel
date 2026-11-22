@@ -1,8 +1,12 @@
 # Third-party licences
 
-keel adapts material from four MIT licensed projects. MIT requires that the copyright
-notice and permission notice be included in all copies or substantial portions, so the full
-texts are reproduced verbatim below.
+keel adapts material from four MIT licensed projects, and ships one MIT licensed library unchanged
+(driver.js, in the mockup engine's tours module). MIT requires that the copyright notice and
+permission notice be included in all copies or substantial portions, so the full texts are
+reproduced verbatim below.
+
+The mockup engine's npm packages are not shipped: a user's install fetches them from the registry
+under the committed lockfiles, and `lib/mockup-engine/DEPENDENCIES.md` lists each with its licence.
 
 [`SOURCES.md`](SOURCES.md) records which parts of this work derive from which project.
 
@@ -105,3 +109,35 @@ MIT, which is a real grant of permission but leaves the copyright holder line un
 That is acceptable for a private internal repository. It should be resolved before
 keel is published or shared outside GBi Solutions Ltd, and it is listed as a
 prerequisite in `docs/07-open-decisions.md` decision 2.
+
+---
+
+## driver.js
+
+https://github.com/kamranahmedse/driver.js, version 1.9.0, vendored unchanged as
+`lib/mockup-engine/templates/modules/tours-help/assets/vendor/driver.js.iife.js` and `driver.css`,
+with this text beside them as `driver.js.LICENSE`.
+
+```
+The MIT License
+
+Copyright (c) Kamran Ahmed
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```

@@ -119,3 +119,16 @@ permissive licence is the honest match, and a public repository under an all-rig
 source nobody may legally use. Relicensing keel relicenses only keel: the adapted portions keep their
 own notices. See `LICENSE`, and `THIRD-PARTY-LICENSES.md`, which reproduces the MIT notices verbatim,
 since crediting a source in this file does not on its own discharge the MIT obligation.
+
+---
+
+## driver.js
+
+- Repository: https://github.com/kamranahmedse/driver.js
+- Author: Kamran Ahmed
+- Licence: MIT
+- Version: 1.9.0, vendored unchanged
+
+| Ours | Theirs | Relationship |
+|---|---|---|
+| `lib/mockup-engine/templates/modules/tours-help/assets/vendor/driver.js.iife.js`, `driver.css` | the IIFE build and stylesheet | Unchanged copy, with its licence as `driver.js.LICENSE` beside it. The tours module's mockups load it; a converted app installs `driver.js` from the registry instead |
