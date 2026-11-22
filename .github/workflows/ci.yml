@@ -77,6 +77,42 @@ jobs:
           PATH="$RUNNER_TEMP/bash32:$PATH" bash --version | sed -n 1p
           PATH="$RUNNER_TEMP/bash32:$PATH" /bin/bash tests/run-tests.sh
 
+  # The mockup engine (lib/mockup-engine, Node) on the two LTS lines it supports, each from its
+  # floor: 24.18.0, the first 24 with npm 11.16, which the engine's .npmrc files need for (supply-chain-scan: allow npm's project config files, named in this comment, not read)
+  # strict-allow-scripts, and 26.13.1. A separate job, so validate's required-check name does not
+  # change. Advisory, as test-macos was, until it has a week of green runs: branch protection does
+  # not list it. The engine was proven on macOS; this job is its first run on Linux (written
+  # 2026-11-22, not yet run), so a font or pixel difference there is a finding to look at, not a
+  # threshold to raise. KEEL_REQUIRE_MOCKUP_ENGINE turns the local SKIP into a failure.
+  mockup-engine:
+    name: Mockup engine on Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['24.18.0', '26.13.1']
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ matrix.node }}
+      # The locked tree only, and no package code at install (lib/mockup-engine/DEPENDENCIES.md).
+      - name: Install the engine's packages
+        working-directory: lib/mockup-engine/scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Check the lockfiles
+        working-directory: lib/mockup-engine/scripts
+        run: node check-lock.mjs && npm audit signatures
+      # The pinned Playwright's own headless shell, and the system libraries it needs on Ubuntu.
+      - name: Install the pinned browser
+        working-directory: lib/mockup-engine/scripts
+        run: node_modules/.bin/playwright install --with-deps chromium-headless-shell
+      - name: Engine tests
+        env:
+          KEEL_REQUIRE_MOCKUP_ENGINE: '1'
+          KEEL_ENGINE_JOBS: '2'
+        run: tests/test-mockup-engine.sh
+
   # ruff over the Python in lib/, in CI only, by decision on 2026-09-25: the local lint string stays
   # shellcheck, so a contributor needs nothing new. Installed by hash from ruff-requirements.txt, so
   # a ruff release cannot turn CI red on its own and a replaced file on PyPI cannot run here, and
