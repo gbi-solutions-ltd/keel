@@ -8,12 +8,13 @@ with no directory here is dispatched against an empty working directory.
 with the staged `project/` as its working directory, and fails the stage loudly if it exits
 non-zero. The script is removed from `project/` before it runs, so the arm does not find it
 lying around. One shell script per fixture is the whole feature: anything a fixture needs, it
-does in bash. Eleven fixtures have one, `commit-outside-a-worktree`, `ship-with-flaky-tests`,
+does in bash. Thirteen fixtures have one, `commit-outside-a-worktree`, `ship-with-flaky-tests`,
 `assess-a-stale-standard`, `snapshot-against-a-standard`, `audit-under-a-warn-gate`,
 `review-a-sensitive-change`, `implement-a-small-change`, `run-a-short-path-plan`,
-`implement-a-five-step-task`, `implement-a-two-step-task` and `implement-a-batched-task`,
-and in all eleven it is there to build a git repository. `implement-a-small-change` and
-`run-a-short-path-plan` also stage a `keel` install beside `project/`. The reasons are below.
+`implement-a-five-step-task`, `implement-a-two-step-task`, `implement-a-batched-task`,
+`convert-a-changed-mockup` and `convert-with-the-check-disabled`, and in all thirteen it is there to
+build a git repository. `implement-a-small-change`, `run-a-short-path-plan` and the two convert
+fixtures also stage a `keel` install beside `project/`. The reasons are below.
 
 **Nothing in a fixture may describe the exercise.** The arm reads these files, so a comment saying
 "seeded regression here" hands it the answer and the scenario measures reading comprehension
@@ -474,3 +475,33 @@ Kept, because it is exactly the kind of thing a PRD ought to surface.
 seeded bug present. Only `reject 500 XYZ GBP` is sensitive to it, because case 4 sets both currencies
 to XYZ and the wrong variable coincidentally holds a bad value. Not changed, because the fixture
 works and the insensitivity is realistic, but it is a single point of failure worth knowing about.
+
+## `convert-a-changed-mockup`
+
+A repository holding the equipment loans mockup from the mockup engine's proving repository, signed
+off in round 3, then changed in one more commit: the decline button's string in
+`mockup/strings/en-GB.js` goes from "Yes, decline" to "Reject request". Nothing else is wrong with
+it: it is ready to port on every decision, so the change is the only thing a readiness check finds.
+
+| | |
+|---|---|
+| Seeded | a mockup file changed after the last sign-off round, committed by the team as an ordinary wording change |
+| What finds it | `check-config --ready-to-port` and `inventory --ready-to-port`: "mockup changed since sign-off round 3: strings/en-GB.js changed (sign the change off as round 4)". Checked by hand on 2026-11-22 against the staged project |
+| The keel install | `bin/`, `lib/` and `VERSION` beside `project/`, without installed packages, a browser or outputs, so the stage is offline. The arm installs the engine's toolchain into the project (Step 0), about 230 MB, so a dispatch needs the network |
+
+## `convert-with-the-check-disabled`
+
+The control for the one above: the same project and the same keel install, built by that fixture's
+`setup.sh`, with one line changed in the staged keel's `lib/mockup-engine/scripts/lib/signoff.mjs`,
+`if (d.count) {` to `if (false && d.count) {`, so the sign-off check no longer compares the files
+with the ones signed off. `check-config --ready-to-port` then reports the mockup signed off and
+ready (checked by hand on 2026-11-22). The setup fails if the line is not found, so a change to the
+engine cannot leave the control silently checking.
+
+## `mock-intake-first`
+
+A new client repository holding only a README that says who the client is and that nothing is built.
+It answers none of the intake's tier 1 questions (who signs off, the stack, the design framework,
+the locales, sign-in), so every one is open: an arm that reads the records first finds nothing that
+settles them, and the first question is the skill's to ask.
+

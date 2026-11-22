@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <title>Request a loan</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../assets/tokens.css">
+  <link rel="stylesheet" href="../assets/base.css">
+  <link rel="stylesheet" href="../assets/components.css">
+  <script src="../assets/mk.js"></script>
+  <script src="../strings/en-GB.js"></script>
+  <script src="../data/fixtures.js"></script>
+  <script src="../data/bookings.js"></script>
+  <script src="../components/AppLayout.js"></script>
+  <script src="../components/Badge.js"></script>
+  <script src="../components/EmptyState.js"></script>
+  <script src="../components/ErrorPage.js"></script>
+  <script src="../components/ErrorState.js"></script>
+  <script src="../components/FormSkeleton.js"></script>
+  <script src="../components/ItemAvailabilityBadge.js"></script>
+  <script src="../components/Notice.js"></script>
+  <script src="../components/SkeletonBox.js"></script>
+  <script src="../components/TextAreaField.js"></script>
+  <script src="../components/TextField.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const { html, components: C } = MK;
+    const PURPOSE_MAX = 200;
+    // The reference the server gives the new request (POST /v1/loans answers 201 with the Loan).
+    const NEW_REFERENCE = 'LN-1053';
+
+    MK.page({
+      id: 'request-new',
+      route: '/equipment/:item/request',
+      title: MK.t('request-new.title'),
+      needs: {
+        api: [
+          'GET /v1/items/{id} -> Item',
+          'GET /v1/items/{id}/bookings -> BookingList { items }',
+          'POST /v1/loans { item_id, from, to, purpose } -> 201 Loan; 409 dates_unavailable; 422 validation_failed (Idempotency-Key)',
+        ],
+        permission: 'loan:request',
+        notes: [
+          'one item per request, whole days, from and to both included (PRD requirement 2)',
+          'the server refuses days that overlap an approved loan or one on loan with 409 dates_unavailable (PRD requirement 5); the page shows the taken days first so it rarely happens',
+          'the server also refuses a from date before today in the organisation zone, and a to date before from (422 validation_failed, details per field); the page checks the same before sending',
+          'empty state: the item has no bookings, so every day is free',
+        ],
+      },
+      state: () => ({ values: { from: '', to: '', purpose: '' }, errors: {}, conflict: false, sent: null }),
+      // Stands in for the API: the item, and the days it is taken.
+      load: (fx, { params, scenario }) => {
+        const item = fx.items.find((i) => i.id === params.item) ?? null;
+        return { item, taken: item && scenario !== 'empty' ? window.bookings.taken(fx.loans, item.id) : [] };
+      },
+      actions: {
+        // Checks what the server checks, in the same order, and answers as it would.
+        sendRequest(state, _e, el, ctx) {
+          const form = new FormData(el);
+          const req = { from: String(form.get('from') || ''), to: String(form.get('to') || ''), purpose: String(form.get('purpose') || '').trim() };
+          state.values = { ...req };
+          const today = window.bookings.today(ctx.fixtures.organisation.time_zone);
+          const errors = {};
+          if (!req.from) errors.from = MK.t('request-new.error.fromMissing');
+          else if (req.from < today) errors.from = MK.t('request-new.error.fromPast');
+          if (!req.to) errors.to = MK.t('request-new.error.toMissing');
+          else if (req.from && req.to < req.from) errors.to = MK.t('request-new.error.toBeforeFrom');
+          if (!req.purpose) errors.purpose = MK.t('request-new.error.purposeMissing');
+          state.errors = errors;
+          state.conflict = false;
+          const first = ['from', 'to', 'purpose'].find((k) => errors[k]);
+          if (first) { ctx.focus(`request-${first}`); return; }
+          const taken = window.bookings.taken(ctx.fixtures.loans, ctx.params.item);
+          if (window.bookings.overlaps(req, taken)) { state.conflict = true; ctx.focus('request-from'); return; }
+          state.sent = { reference: NEW_REFERENCE, ...req };
+          ctx.focus('request-sent-title');
+        },
+      },
+      render: ({ state, data, status }) => {
+        const back = html`<p><a href="${MK.href('./equipment.html')}">${MK.t('request-new.back')}</a></p>`;
+        if (status === 'loading') return html`<div class="stack">${back}<h1>${MK.t('request-new.title')}</h1>${C.FormSkeleton({ fields: 3 })}</div>`;
+        if (status === 'error') return html`<div class="stack">${back}<h1>${MK.t('request-new.title')}</h1><div class="card">${C.ErrorState({ body: MK.t('request-new.error.load') })}</div></div>`;
+        if (!data.item) return C.ErrorPage({ code: '404', title: MK.t('request-new.missing.title'), body: MK.t('request-new.missing.body'), link: { label: MK.t('request-new.back'), href: MK.href('./equipment.html') } });
+        const { item, taken } = data;
+        const summary = html`
+          <section class="card stack" aria-labelledby="request-item-name">
+            <div class="row row--between">
+              <h2 id="request-item-name">${item.name}</h2>
+              ${C.ItemAvailabilityBadge({ availability: item.availability })}
+            </div>
+            <p class="muted"><span class="mono">${item.asset_tag}</span>, ${MK.t(`ItemCard.category.${item.category}`)}</p>
+          </section>
+          <section class="card stack" aria-labelledby="request-taken-title">
+            <h2 id="request-taken-title">${MK.t('request-new.taken.title')}</h2>
+            ${taken.length
+              ? html`<ul class="stack">${taken.map((b) => html`<li>${MK.t('common.dateRange', { from: MK.format.date(b.from), to: MK.format.date(b.to) })}</li>`)}</ul>`
+              : C.EmptyState({ title: MK.t('request-new.taken.none.title'), body: MK.t('request-new.taken.none.body') })}
+          </section>`;
+        if (state.sent) {
+          return html`<div class="stack">${back}<h1>${MK.t('request-new.title')}</h1>${summary}
+            <section class="card stack" aria-labelledby="request-sent-title">
+              <h2 id="request-sent-title" tabindex="-1">${MK.t('request-new.sent.title', { reference: state.sent.reference })}</h2>
+              ${C.Notice({ tone: 'success', text: MK.t('request-new.sent.body', { from: MK.format.date(state.sent.from), to: MK.format.date(state.sent.to) }) })}
+              <div class="row">
+                <a class="button button--primary" href="${MK.href('./my-requests.html')}">${MK.t('request-new.sent.mine')}</a>
+                <a class="button" href="${MK.href('./equipment.html')}">${MK.t('request-new.sent.more')}</a>
+              </div>
+            </section></div>`;
+        }
+        const e = state.errors;
+        return html`<div class="stack">
+          ${back}
+          <h1>${MK.t('request-new.title')}</h1>
+          ${summary}
+          <form class="card form" data-action="sendRequest" novalidate aria-labelledby="request-form-title">
+            <h2 id="request-form-title">${MK.t('request-new.form.title')}</h2>
+            ${state.conflict ? C.Notice({ tone: 'danger', text: MK.t('request-new.error.conflict') }) : ''}
+            <div class="toolbar">
+              ${C.TextField({ id: 'request-from', name: 'from', label: MK.t('request-new.from.label'), type: 'date', value: state.values.from, hint: MK.t('request-new.from.hint'), error: e.from, required: true, action: 'setValue' })}
+              ${C.TextField({ id: 'request-to', name: 'to', label: MK.t('request-new.to.label'), type: 'date', value: state.values.to, hint: MK.t('request-new.to.hint'), error: e.to, required: true, action: 'setValue' })}
+            </div>
+            ${C.TextAreaField({ id: 'request-purpose', name: 'purpose', label: MK.t('request-new.purpose.label'), value: state.values.purpose, hint: MK.t('request-new.purpose.hint', { max: PURPOSE_MAX }), error: e.purpose, required: true, maxlength: PURPOSE_MAX, action: 'setValue' })}
+            <div class="row"><button type="submit" class="button button--primary">${MK.t('request-new.submit')}</button></div>
+          </form>
+        </div>`;
+      },
+    });
+  </script>
+</body>
+</html>

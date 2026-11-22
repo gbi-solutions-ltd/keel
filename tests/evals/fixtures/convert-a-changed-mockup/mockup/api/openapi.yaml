@@ -1,0 +1,395 @@
+openapi: 3.1.0
+info:
+  title: Equipment loans API
+  version: 0.2.1-draft
+  description: >
+    DRAFT contract drafted from the equipment-loans mockup (the needs.api lines of its pages and
+    data/fixtures.js), to be agreed with the backend at sign-off (intake question 11). Served by the
+    backend for frontend on the same origin under /api; the browser holds only the session cookie
+    (docs/architecture/frontend.md). Business dates are whole days in the organisation's zone,
+    Europe/Dublin; instants are RFC 3339 in UTC.
+servers:
+  - url: /api
+security:
+  - sessionCookie: []
+tags:
+  - name: session
+  - name: items
+  - name: loans
+paths:
+  /v1/session:
+    get:
+      tags: [session]
+      operationId: getSession
+      description: >
+        Who is signed in, their role and its permissions, and their organisation. Assembled by the
+        server; the mockup reads the same facts from the session, roles and organisation fixtures.
+      responses:
+        '200':
+          description: The current session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/items:
+    get:
+      tags: [items]
+      operationId: listItems
+      summary: The equipment catalogue, searched and filtered
+      description: >
+        Needs equipment:read. Ordered by name. q matches, in any case, the name, the asset tag and
+        the description joined with spaces. availability is computed for today in the organisation's
+        zone. Cursor paged with no total; a cursor is good only for the q and category that made it,
+        and one this list did not give is refused with 400 invalid_cursor.
+      parameters:
+        - { name: q, in: query, required: false, description: Search text; empty is no search., schema: { type: string } }
+        - { name: category, in: query, required: false, description: One kind of equipment; absent is every kind., schema: { $ref: '#/components/schemas/ItemCategory' } }
+        - { name: cursor, in: query, required: false, description: The next_cursor of the page before. Opaque., schema: { type: string, minLength: 1 } }
+        - { name: limit, in: query, required: false, description: 'Items per page, capped at 100. The mockup shows 12.', schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: One page of items
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ItemPage' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/items/{id}:
+    get:
+      tags: [items]
+      operationId: getItem
+      description: Needs equipment:read. 404 not_found for an unknown id.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The item
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Item' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/items/{id}/bookings:
+    get:
+      tags: [items]
+      operationId: listItemBookings
+      description: >
+        Needs equipment:read. The days the item is taken: every loan of it that is approved or on
+        loan, ordered by from, without who asked. Days in the past may be left out. Not paged: an
+        item has few bookings at once.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The item's bookings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookingList' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/loans:
+    get:
+      tags: [loans]
+      operationId: listLoans
+      summary: Every loan request, for a coordinator
+      description: >
+        Needs loan:manage (403 forbidden otherwise). Newest request first (requested_at
+        descending), optionally one status. Cursor paged with no total.
+      parameters:
+        - { name: status, in: query, required: false, description: One status; absent is every status., schema: { $ref: '#/components/schemas/LoanStatus' } }
+        - { name: cursor, in: query, required: false, schema: { type: string, minLength: 1 } }
+        - { name: limit, in: query, required: false, description: 'Loans per page, capped at 100. The mockup shows 10.', schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: One page of loans
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoanPage' }
+        default: { $ref: '#/components/responses/Error' }
+    post:
+      tags: [loans]
+      operationId: requestLoan
+      summary: Request a loan of one item for whole days
+      description: >
+        Needs loan:request. from and to are both included. Refused with 422 validation_failed
+        (details.fields: from_in_past, to_before_from, purpose_missing) and with 409
+        dates_unavailable when any day overlaps a loan of the item that is approved or on loan (PRD
+        requirement 5). The new loan is requested. One Idempotency-Key per intent: a retry with the
+        same body replays the first answer; the same key with another body is 422
+        idempotency_key_reused.
+      parameters:
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, minLength: 1 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoanRequest' }
+      responses:
+        '201':
+          description: The request, as created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Loan' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/me/loans:
+    get:
+      tags: [loans]
+      operationId: listMyLoans
+      summary: The signed-in person's own requests
+      description: Needs loan:request. Newest request first. Cursor paged with no total.
+      parameters:
+        - { name: cursor, in: query, required: false, schema: { type: string, minLength: 1 } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: One page of the person's loans
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoanPage' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/loans/{id}/approve:
+    post:
+      tags: [loans]
+      operationId: approveLoan
+      description: >
+        Needs loan:manage. Only while requested (409 invalid_transition otherwise). Refused with
+        409 dates_unavailable when the days overlap another loan of the item that is approved or on
+        loan.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The loan, now approved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Loan' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/loans/{id}/decline:
+    post:
+      tags: [loans]
+      operationId: declineLoan
+      description: >
+        Needs loan:manage. Only while requested (409 invalid_transition otherwise). The reason is
+        required (422 validation_failed, details.fields: reason_missing) and is shown to the person
+        who asked, as decline_reason (decision D-1, round 2).
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeclineRequest' }
+      responses:
+        '200':
+          description: The loan, now declined
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Loan' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/loans/{id}/hand-out:
+    post:
+      tags: [loans]
+      operationId: handOutLoan
+      description: Needs loan:manage. Only once approved (409 invalid_transition otherwise). The item is collected.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The loan, now on loan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Loan' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/loans/{id}/return:
+    post:
+      tags: [loans]
+      operationId: returnLoan
+      description: Needs loan:manage. Only while on loan (409 invalid_transition otherwise). The item is back.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The loan, now returned
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Loan' }
+        default: { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session
+  responses:
+    Error:
+      description: >
+        Error envelope. Callers branch on error.code, never on error.message. Codes this API uses:
+        unauthenticated (401), forbidden (403), not_found (404), invalid_cursor (400),
+        validation_failed (422), idempotency_key_reused (422), dates_unavailable (409),
+        invalid_transition (409), maintenance (503, details.until).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+  schemas:
+    Organisation:
+      x-mockup-fixture: organisation
+      type: object
+      additionalProperties: false
+      required: [id, name, time_zone]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        time_zone: { type: string, description: IANA zone the business days are counted in. }
+    Role:
+      x-mockup-fixture: roles.*
+      type: object
+      additionalProperties: false
+      required: [label, permissions]
+      properties:
+        label: { type: string }
+        permissions:
+          type: array
+          items: { $ref: '#/components/schemas/Permission' }
+    Permission:
+      type: string
+      enum: ['equipment:read', 'loan:request', 'loan:manage']
+    Session:
+      type: object
+      additionalProperties: false
+      required: [user_id, name, role, role_label, permissions, organisation]
+      properties:
+        user_id: { type: string }
+        name: { type: string }
+        role: { type: string, enum: [staff, coordinator] }
+        role_label: { type: string }
+        permissions:
+          type: array
+          description: Permission strings, never roles. The UI uses them for display only; the server enforces.
+          items: { $ref: '#/components/schemas/Permission' }
+        organisation: { $ref: '#/components/schemas/Organisation' }
+    ItemCategory:
+      type: string
+      enum: [laptop, camera, projector, audio]
+    Availability:
+      type: object
+      additionalProperties: false
+      required: [status, due_back_on]
+      properties:
+        status: { type: string, enum: [free, on_loan] }
+        due_back_on:
+          type: [string, 'null']
+          format: date
+          description: The last day of the current loan; null when free.
+    Item:
+      x-mockup-fixture: items
+      type: object
+      additionalProperties: false
+      required: [id, asset_tag, name, category, description, availability]
+      properties:
+        id: { type: string }
+        asset_tag: { type: string }
+        name: { type: string }
+        category: { $ref: '#/components/schemas/ItemCategory' }
+        description: { type: string }
+        availability: { $ref: '#/components/schemas/Availability' }
+    ItemPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Item' }
+        next_cursor: { type: [string, 'null'], description: null on the last page. There is no total. }
+    Booking:
+      type: object
+      additionalProperties: false
+      required: [from, to]
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+    BookingList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Booking' }
+    LoanStatus:
+      type: string
+      enum: [requested, approved, declined, on_loan, returned]
+    LoanAction:
+      type: string
+      enum: [approve, decline, hand_out, return]
+    ItemSummary:
+      type: object
+      additionalProperties: false
+      required: [id, asset_tag, name]
+      properties:
+        id: { type: string }
+        asset_tag: { type: string }
+        name: { type: string }
+    Person:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+    Loan:
+      x-mockup-fixture: loans
+      type: object
+      additionalProperties: false
+      required: [id, reference, item, requester, from, to, purpose, status, decline_reason, requested_at, allowed_actions]
+      properties:
+        id: { type: string }
+        reference: { type: string }
+        item: { $ref: '#/components/schemas/ItemSummary' }
+        requester: { $ref: '#/components/schemas/Person' }
+        from: { type: string, format: date, description: 'The first day, included.' }
+        to: { type: string, format: date, description: 'The last day, included.' }
+        purpose: { type: string, minLength: 1, maxLength: 200 }
+        status: { $ref: '#/components/schemas/LoanStatus' }
+        decline_reason:
+          type: [string, 'null']
+          maxLength: 200
+          description: The coordinator's reason, set when the loan is declined and null otherwise. Seen by the requester.
+        requested_at: { type: string, format: date-time }
+        allowed_actions:
+          type: array
+          description: What the signed-in person may do to this loan now, computed by the server from their permissions and the loan's status. The UI shows a control only for a listed action.
+          items: { $ref: '#/components/schemas/LoanAction' }
+    LoanPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Loan' }
+        next_cursor: { type: [string, 'null'] }
+    LoanRequest:
+      type: object
+      additionalProperties: false
+      required: [item_id, from, to, purpose]
+      properties:
+        item_id: { type: string }
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        purpose: { type: string, minLength: 1, maxLength: 200 }
+    DeclineRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 200 }
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            request_id: { type: string }
+            details: { type: object, additionalProperties: true }

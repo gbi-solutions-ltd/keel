@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <title>Down for maintenance</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../assets/tokens.css">
+  <link rel="stylesheet" href="../assets/base.css">
+  <link rel="stylesheet" href="../assets/components.css">
+  <script src="../assets/mk.js"></script>
+  <script src="../strings/en-GB.js"></script>
+  <script src="../data/fixtures.js"></script>
+  <script src="../components/AppLayout.js"></script>
+  <script src="../components/ErrorPage.js"></script>
+  <script src="../components/Notice.js"></script>
+  <script src="../components/PlainLayout.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const { html } = MK;
+    // system-pages module: shown instead of the app while the API answers 503 maintenance
+    // (details.until). It asks the API again each minute; the first other answer brings the app back.
+    MK.page({
+      id: 'maintenance',
+      route: '*:maintenance',
+      title: MK.t('maintenance.title'),
+      layout: 'PlainLayout',
+      needs: { permission: 'public', notes: ['Previewed in the app with ?system=maintenance; until comes from the 503 answer, details.until'] },
+      render: () => html`
+        <div class="stack">
+          <h1>${MK.t('maintenance.title')}</h1>
+          <p>${MK.t('maintenance.body', { until: MK.format.dateTime(window.FIXTURES.system.maintenance_until) })}</p>
+          <p class="muted">${MK.t('maintenance.retry')}</p>
+        </div>`,
+    });
+  </script>
+</body>
+</html>

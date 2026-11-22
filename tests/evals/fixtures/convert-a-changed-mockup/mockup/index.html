@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Equipment loans mockup</title>
+  <link rel="stylesheet" href="assets/tokens.css">
+  <link rel="stylesheet" href="assets/base.css">
+  <style>
+    main { max-width: 760px; margin: 0 auto; padding: var(--space-8) var(--space-4); }
+    li { margin-bottom: var(--space-2); }
+  </style>
+</head>
+<body>
+  <!-- Client-facing index of every screen, state and role. Not converted. -->
+  <main class="stack">
+    <h1>Equipment loans mockup</h1>
+    <p class="muted">Every screen, its states, and what each role sees. All people, items and dates
+      are sample data. Use the "preview as" box in the corner of any screen to switch between Staff
+      and Coordinator.</p>
+
+    <h2>Equipment (both roles)</h2>
+    <ul>
+      <li><a href="pages/equipment.html">Catalogue, as Staff</a> |
+        <a href="pages/equipment.html?state=empty">empty</a> |
+        <a href="pages/equipment.html?state=loading">loading</a> |
+        <a href="pages/equipment.html?state=error">error</a> |
+        <a href="pages/equipment.html?q=projector">searched</a></li>
+      <li><a href="pages/equipment.html?as=coordinator">Catalogue, as Coordinator (no request button)</a></li>
+      <li><a href="pages/equipment.html?system=offline">Offline banner</a></li>
+    </ul>
+
+    <h2>Request a loan (Staff)</h2>
+    <ul>
+      <li><a href="pages/request-new.html?item=itm_07">Request the portable projector (booked on some days)</a> |
+        <a href="pages/request-new.html?item=itm_07&amp;state=empty">empty (not booked)</a> |
+        <a href="pages/request-new.html?item=itm_07&amp;state=loading">loading</a> |
+        <a href="pages/request-new.html?item=itm_07&amp;state=error">error</a></li>
+      <li><a href="pages/request-new.html?item=itm_05">Request the compact camera (never booked)</a></li>
+      <li>Try: send the form empty, put the last day before the first, ask for 27 to 28 November
+        (already booked), or 30 November to 1 December (sent).</li>
+      <li><a href="pages/request-new.html?item=itm_07&amp;as=coordinator">as Coordinator (no access)</a></li>
+    </ul>
+
+    <h2>My requests (Staff)</h2>
+    <ul>
+      <li><a href="pages/my-requests.html">My requests</a> |
+        <a href="pages/my-requests.html?state=empty">empty</a> |
+        <a href="pages/my-requests.html?state=loading">loading</a> |
+        <a href="pages/my-requests.html?state=error">error</a></li>
+      <li>LN-1048 shows the reason a coordinator gave for declining it.</li>
+      <li><a href="pages/my-requests.html?as=coordinator">as Coordinator (no access)</a></li>
+    </ul>
+
+    <h2>Requests (Coordinator)</h2>
+    <ul>
+      <li><a href="pages/requests.html?as=coordinator">Every request</a> |
+        <a href="pages/requests.html?as=coordinator&amp;state=empty">empty</a> |
+        <a href="pages/requests.html?as=coordinator&amp;state=loading">loading</a> |
+        <a href="pages/requests.html?as=coordinator&amp;state=error">error</a></li>
+      <li>Try: filter by status, approve LN-1051, approve LN-1052 (refused: the projector is
+        already booked), decline LN-1050 (asks for a reason, which the staff member then sees), hand out LN-1047, mark LN-1046 returned.</li>
+      <li><a href="pages/requests.html">as Staff (no access)</a></li>
+    </ul>
+
+    <h2>System pages</h2>
+    <ul>
+      <li><a href="pages/not-found.html">Page not found</a> |
+        <a href="pages/server-error.html">A page that failed to show</a> |
+        <a href="pages/maintenance.html">Down for maintenance</a></li>
+    </ul>
+
+    <h2>Roles</h2>
+    <ul>
+      <li>Staff: see the equipment, request a loan, see their own requests</li>
+      <li>Coordinator: see the equipment and every request; approve, decline, hand out, record returns</li>
+    </ul>
+  </main>
+</body>
+</html>

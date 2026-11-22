@@ -220,7 +220,7 @@ keel/
 │   ├── validate-skills.sh
 │   ├── withheld.sh
 │   ├── fixtures/                       # per-stack detection fixtures, and an APEX capture
-│   ├── evals/                          # 21 scenarios, 21 fixtures, results.md
+│   ├── evals/                          # 24 scenarios, 24 fixtures, results.md
 │   └── plugin-evals/                   # 2 pilot cases for `claude plugin eval`, run by hand
 │
 ├── .github/

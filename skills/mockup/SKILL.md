@@ -16,19 +16,19 @@ decided here, with the client, or written down as deferred with an owner.
 
 Reasons: [references/rationale.mock.md](references/rationale.md).
 
-## Step 0: The toolchain
-
-`<engine>` is the folder `keel mockup-engine path` prints; `templates/` below is its folder. Run
-`node <engine>/scripts/toolchain.mjs --project <repo root>` first. It prints `S=<folder>`: run
-every script below as `node <S>/<script>`. On exit 2, show its reasons; when it prints an install
-command, show it and ask before running it: it downloads the locked packages and the pinned
-browser into the project's git-ignored `.mockup-engine/` (about 230 MB), and nowhere else.
-
 ## Step 1: Intake, before the first screen
 
 Follow [references/intake.md](references/intake.md): read existing records, then ask each
 unanswered tier 1 question, one per message, recommended answer first. Tier 2: ask, or defer with
 an owner and a date. Write the `project` block and the brief.
+
+## Before the first command: the toolchain
+
+`<engine>` is the folder `keel mockup-engine path` prints; `templates/` below is its folder. Run
+`node <engine>/scripts/toolchain.mjs --project <repo root>` before Step 2; the intake needs none of it. It prints `S=<folder>`: run
+every script below as `node <S>/<script>`. On exit 2, show its reasons; when it prints an install
+command, show it and ask before running it: it downloads the locked packages and the pinned
+browser into the project's git-ignored `.mockup-engine/` (about 230 MB), and nowhere else.
 
 ## Step 2: Build
 
