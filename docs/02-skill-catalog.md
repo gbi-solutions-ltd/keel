@@ -290,6 +290,35 @@ consent. A plan approved for a pull request runs on through `review-code` and `s
 
 ## 4. Build
 
+### `mockup`
+
+**Trigger:** a client mockup or prototype of a web app, a screen or a state, or a change to one
+under review.
+**Reads:** existing records for the project's decisions (intake), the starter and the opted-in
+modules in `lib/mockup-engine/templates/`.
+**Writes:** a plain HTML mockup that is framework shaped, its `mockup.config.json`,
+`docs/behaviours.json`, and the sign-off record that freezes it by hash.
+**Does:** asks the intake's questions before the first screen, builds to the conventions, runs
+the engine's checks (inventory, quality, spill, behaviours, a pinned baseline), and signs off.
+
+### `convert-mockup`
+
+**Trigger:** turning a signed-off mockup into a React, Vue or Next.js app, in a new or an
+existing repository, and taking it through the production bar.
+**Reads:** the sign-off package.
+**Writes:** `<docs_root>/mockups/<name>/conversion-plan.md` and its component map, the app, and
+`gaps.md`.
+**Does:** stops for approval of the plan, scaffolds from `lib/mockup-engine/templates/app-scaffold`,
+ports slice by slice (a slice may go to the `keel-port-worker` agent), and verifies against the
+mockup until the visual diff, the DOM oracle and the quality check pass, without raising a
+threshold. Then the production bar: headers, performance, contract drift, a staging run, gaps owned
+and dated, a security audit and a deploy.
+
+**The engine is Node, installed per project.** Both skills start with
+`lib/mockup-engine/scripts/toolchain.mjs`: an LTS Node of a tested line, and the project's own copy
+of the engine, its locked packages and its hashed browser, downloaded only after the user agrees
+(`lib/mockup-engine/DEPENDENCIES.md`).
+
 ### `tdd`
 
 **Trigger:** writing implementation code for any feature, bugfix or behaviour change, or a plan

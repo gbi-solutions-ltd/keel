@@ -3,7 +3,7 @@
 A house standard operating procedure for AI-assisted software delivery, packaged as a
 Claude Code plugin plus a thin per-project bootstrap.
 
-**Status:** installable, 25 skills built, `keel` CLI and session hook working. **Not 1.0.0:**
+**Status:** installable, 27 skills built, `keel` CLI and session hook working. **Not 1.0.0:**
 that needs two pilots and a verified install from a second machine.
 
 ## Install
@@ -138,7 +138,7 @@ a ten-year-old service, and whether the engineer remembers to ask for them or no
 
 ## Skills
 
-25 skills, each developed by running it against a real repository, not by writing it and hoping.
+27 skills, each developed by running it against a real repository, not by writing it and hoping.
 [`docs/02-skill-catalog.md`](docs/02-skill-catalog.md) has the full spec per skill: trigger, reads,
 writes. `CHANGELOG.md` has what each build run found, including the defects a skill caught in the
 repository it was tested against (a savepoint collision that leaves merchant wallets debited, a
@@ -147,9 +147,9 @@ worker leak, a broken lint command in this repo's own profile) and the modes sti
 | Stage | Skills |
 | --- | --- |
 | Discover | `repo-snapshot`, `apex-export`, `apex-port-plan`, `write-prd` |
-| Define | `write-user-stories`, `design-database`, `design-architecture` |
+| Define | `write-user-stories`, `design-database`, `design-architecture`, `mockup` |
 | Plan | `write-plan`, `execute-plan` |
-| Build | `tdd`, `coding-standards`, `debug` |
+| Build | `tdd`, `coding-standards`, `debug`, `convert-mockup` |
 | Verify | `review-code`, `security-audit`, `refactor`, `optimize-performance` |
 | Ship | `setup-deployment`, `ship` |
 | Document | `write-docs` |
@@ -208,7 +208,7 @@ Read in order. Each doc is self-contained but they build on each other.
 | Doc | What it answers |
 | ----- | ----------------- |
 | [`docs/01-architecture.md`](docs/01-architecture.md) | How the pieces fit together and why it is shaped this way. **Start here.** |
-| [`docs/02-skill-catalog.md`](docs/02-skill-catalog.md) | The 25 skills, their triggers, inputs, and outputs |
+| [`docs/02-skill-catalog.md`](docs/02-skill-catalog.md) | The 27 skills, their triggers, inputs, and outputs |
 | [`docs/03-install-and-distribution.md`](docs/03-install-and-distribution.md) | Install options compared, the recommendation, and the `keel` CLI spec |
 | [`docs/04-plugin-strategy.md`](docs/04-plugin-strategy.md) | Verdict on each of the nine third-party plugins and how skills call them |
 | [`docs/05-token-and-memory-design.md`](docs/05-token-and-memory-design.md) | Prompt caching, context budget, project memory |
@@ -218,7 +218,7 @@ Read in order. Each doc is self-contained but they build on each other.
 | [`docs/runbooks/cutting-a-release.md`](docs/runbooks/cutting-a-release.md) | How a release is cut: the eval gate, the version-bump pull request, the tag and the GitHub release, in the one public repository |
 | [`docs/runbooks/going-public.md`](docs/runbooks/going-public.md) | What publishing this repository required in 2026-08, each step annotated, and why development moved into it on 2026-10-22 |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to contribute: branches and pull requests, sign-off, review, and why the order of adding a skill matters. Security reports: [`SECURITY.md`](SECURITY.md) |
-| [`SOURCES.md`](SOURCES.md) | Attribution, per skill, for the four MIT projects this is built from |
+| [`SOURCES.md`](SOURCES.md) | Attribution, per skill, for the four MIT projects this is built from, and the one library it ships unchanged |
 
 Templates that ship into every installed project:
 
