@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'">
+<title>CSP and focus</title>
+<link rel="stylesheet" href="page.css">
+</head>
+<body>
+<main>
+  <h1>CSP and focus</h1>
+  <div class="field">
+    <label for="search">Search</label>
+    <div class="wrap"><input id="search" type="text"><span class="frame" aria-hidden="true"></span></div>
+  </div>
+  <p><button id="ringed" type="button">Ringed</button></p>
+  <p><button id="layered" type="button"><span class="overlay"></span>Layered</button></p>
+  <p><button id="after" type="button">After</button></p>
+  <div class="late-field"><label for="late">Late</label><input id="late" type="text"></div>
+  <p><button id="bare" type="button">Bare</button></p>
+  <script src="late.js"></script>
+</main>
+</body>
+</html>

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>check-behaviours fixture</title>
+  <style>
+    body { margin: 0; }
+    #panel { width: 272px; height: 100px; }
+    #offscreen { position: fixed; left: 0; top: 0; width: 272px; height: 100px; transform: translateX(-100%); }
+    #hidden { display: none; }
+    #wide { position: absolute; left: 370px; top: 200px; width: 60px; height: 20px; }
+    @media (min-width: 761px) { #panel { width: 400px; } }
+    #box { position: relative; width: 200px; height: 40px; }
+    #box-in { position: absolute; left: 10px; top: 10px; width: 50px; height: 20px; }
+    #box-spill { position: absolute; left: 180px; top: 10px; width: 50px; height: 20px; }
+    #box-gone { display: none; }
+    #under, #over, #alone { position: fixed; top: 400px; width: 100px; height: 40px; }
+    #under, #over { left: 500px; }
+    #over { z-index: 2; background: #fff; }
+    #alone { left: 700px; }
+    .fit { width: 100px; }
+    #fit-over { white-space: nowrap; }
+    #fit-gone { display: none; }
+    #fit-sel-cut { width: 60px; }
+  </style>
+  <script src="../assets/mk-stub.js"></script>
+</head>
+<body>
+  <!-- Test fixture for check-behaviours.test.mjs: a static page that never throws. Its roles come from
+       a stand-in for mk.js's MK.inspect(), since this mockup's config lists none. -->
+  <h1>Fixture page</h1>
+  <div id="panel">Panel</div>
+  <div id="offscreen">Off canvas</div>
+  <div id="hidden">Hidden text</div>
+  <div id="wide">Wide</div>
+  <div id="box"><span id="box-in">In</span><span id="box-spill">Spill</span><span id="box-gone">Gone</span></div>
+  <div id="under">Under</div><div id="over">Over</div><div id="alone">Alone</div>
+  <div class="fit" id="fit-ok">Short</div><div class="fit" id="fit-over">A line far wider than one hundred pixels</div><div class="fit" id="fit-gone">Gone</div>
+  <select id="fit-sel-ok" aria-label="Wide enough"><option>Short</option><option selected>A long chosen option</option></select><select id="fit-sel-cut" aria-label="Too narrow"><option>A long chosen option</option></select>
+  <button type="button" onclick="document.querySelector('h1').textContent = 'Clicked'">Press</button>
+</body>
+</html>

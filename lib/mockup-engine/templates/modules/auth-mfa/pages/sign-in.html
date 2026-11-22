@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Sign in</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../assets/tokens.css">
+  <link rel="stylesheet" href="../assets/base.css">
+  <link rel="stylesheet" href="../assets/components.css">
+  <script src="../assets/mk.js"></script>
+  <script src="../strings/en-GB.js"></script>
+  <script src="../data/fixtures.js"></script>
+  <script src="../components/AppLayout.js"></script>
+  <script src="../components/AuthLayout.js"></script>
+  <script src="../components/Badge.js"></script>
+  <script src="../components/DataTable.js"></script>
+  <script src="../components/Dialog.js"></script>
+  <script src="../components/EmptyState.js"></script>
+  <script src="../components/ErrorPage.js"></script>
+  <script src="../components/ErrorState.js"></script>
+  <script src="../components/FactorRow.js"></script>
+  <script src="../components/InvoiceStatusBadge.js"></script>
+  <script src="../components/MoneyField.js"></script>
+  <script src="../components/Notice.js"></script>
+  <script src="../components/OneTimeCodeField.js"></script>
+  <script src="../components/Pagination.js"></script>
+  <script src="../components/PermissionGrid.js"></script>
+  <script src="../components/RadioGroup.js"></script>
+  <script src="../components/RecoveryCodes.js"></script>
+  <script src="../components/SelectField.js"></script>
+  <script src="../components/SkeletonBox.js"></script>
+  <script src="../components/StepUpDialog.js"></script>
+  <script src="../components/Stepper.js"></script>
+  <script src="../components/TableSkeleton.js"></script>
+  <script src="../components/TextField.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const { html, components: C } = MK;
+
+    MK.page({
+      id: 'sign-in',
+      route: '/sign-in',
+      title: 'Sign in',
+      layout: 'AuthLayout',
+      needs: {
+        api: ['POST /v1/auth/sign-in { email, password } -> { status: signed_in | mfa_required, challenge_id }; 429 account_locked { retry_after_seconds }'],
+        permission: 'public',
+        notes: ['Lockout length and threshold are set by the server; copy says the wait it returns'],
+      },
+      state: { email: '', password: '', error: null },
+      actions: {
+        setEmail(state, _e, el) { state.email = el.value; return false; },
+        setPassword(state, _e, el) { state.password = el.value; return false; },
+        // Stands in for the API. The mock refuses one password and locks on another, so both
+        // errors can be designed.
+        signIn(state, _e, _el, ctx) {
+          // ?state=error: the API is failing (5xx or network), which is not the user's mistake.
+          if (ctx.params.state === 'error') {
+            state.error = 'We could not sign you in just now. Please try again in a moment.';
+            ctx.focus('sign-in-email');
+            return;
+          }
+          if (state.password === 'locked-out') {
+            state.error = 'Too many attempts. Try again in 15 minutes, or reset your password.';
+            ctx.focus('sign-in-email');
+            return;
+          }
+          if (state.password === 'wrong-password' || !state.email || !state.password) {
+            state.error = 'Email or password is incorrect.';
+            ctx.focus('sign-in-email');
+            return;
+          }
+          ctx.navigate('./sign-in-verify.html?challenge=ch_demo');
+          return false;
+        },
+      },
+      render: ({ state }) => html`
+        <div class="form">
+          <h1>Sign in</h1>
+          ${state.error ? C.Notice({ tone: 'danger', text: state.error }) : ''}
+          <form class="form" data-action="signIn" novalidate>
+            ${C.TextField({ id: 'sign-in-email', label: 'Email', type: 'email', autocomplete: 'username', value: state.email, action: 'setEmail' })}
+            ${C.TextField({ id: 'sign-in-password', label: 'Password', type: 'password', autocomplete: 'current-password', value: state.password, action: 'setPassword' })}
+            <button type="submit" class="button button--primary">Sign in</button>
+          </form>
+          <a href="${MK.href('./forgot-password.html')}">Forgot your password?</a>
+        </div>`,
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Who can do what</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../assets/tokens.css">
+  <link rel="stylesheet" href="../assets/base.css">
+  <link rel="stylesheet" href="../assets/components.css">
+  <script src="../assets/mk.js"></script>
+  <script src="../strings/en-GB.js"></script>
+  <script src="../data/fixtures.js"></script>
+  <script src="../data/grid.js"></script>
+  <script src="../components/AppLayout.js"></script>
+  <script src="../components/ErrorPage.js"></script>
+  <script src="../components/ErrorState.js"></script>
+  <script src="../components/PermissionGrid.js"></script>
+  <script src="../components/SkeletonBox.js"></script>
+  <script src="../components/TableSkeleton.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const { html, components: C } = MK;
+    const GRID = 'access-grid';
+
+    MK.page({
+      id: 'access',
+      route: '/settings/access',
+      title: MK.t('access.title'),
+      needs: {
+        api: ['GET /v1/roles -> Role[] { name, label, permissions }', 'GET /v1/permissions -> { [permission]: label }'],
+        permission: 'role:read',
+        notes: ['Roles are fixed: this page shows them, it does not edit them'],
+      },
+      // The grid's active cell: the one Tab stop inside it
+      state: { cell: { row: 0, col: 0 } },
+      load: (fx) => {
+        const roles = Object.values(fx.roles);
+        return {
+          columns: roles.map((r) => ({ label: r.label })),
+          rows: Object.entries(fx.permissions).map(([perm, label]) => ({ label, cells: roles.map((r) => r.permissions.includes(perm)) })),
+        };
+      },
+      actions: {
+        // Arrow keys, Home and End move the active cell (data/grid.js); any other key is left to
+        // the browser, and returning false skips the re-render.
+        gridKey(state, e, el, ctx) {
+          const next = window.gridMove(state.cell, e, { rows: Number(el.dataset.rows), cols: Number(el.dataset.cols) });
+          if (!next) return false;
+          e.preventDefault();
+          state.cell = next;
+          ctx.focus(`${GRID}-${next.row}-${next.col}`);
+          return undefined;
+        },
+        gridClick(state, _e, el) { state.cell = { row: Number(el.dataset.row), col: Number(el.dataset.col) }; },
+      },
+      render: ({ state, data, status }) => {
+        let content;
+        if (status === 'loading') content = C.TableSkeleton({ columns: [MK.t('access.loading.permission'), MK.t('access.loading.role'), MK.t('access.loading.role'), MK.t('access.loading.role')], rows: 4 });
+        else if (status === 'error') content = C.ErrorState({ body: MK.t('access.error') });
+        else content = C.PermissionGrid({ id: GRID, caption: MK.t('access.grid.caption'), columns: data.columns, rows: data.rows, active: state.cell, keyAction: 'gridKey', clickAction: 'gridClick' });
+        return html`
+          <div class="stack">
+            <h1>${MK.t('access.title')}</h1>
+            <p class="muted">${MK.t('access.intro')}</p>
+            <div class="card">${content}</div>
+          </div>`;
+      },
+    });
+  </script>
+</body>
+</html>

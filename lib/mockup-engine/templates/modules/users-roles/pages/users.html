@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Users</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../assets/tokens.css">
+  <link rel="stylesheet" href="../assets/base.css">
+  <link rel="stylesheet" href="../assets/components.css">
+  <script src="../assets/mk.js"></script>
+  <script src="../strings/en-GB.js"></script>
+  <script src="../data/fixtures.js"></script>
+  <script src="../components/AppLayout.js"></script>
+  <script src="../components/Badge.js"></script>
+  <script src="../components/DataTable.js"></script>
+  <script src="../components/DetailList.js"></script>
+  <script src="../components/Dialog.js"></script>
+  <script src="../components/EmptyState.js"></script>
+  <script src="../components/ErrorPage.js"></script>
+  <script src="../components/ErrorState.js"></script>
+  <script src="../components/FilterTabs.js"></script>
+  <script src="../components/InvoiceStatusBadge.js"></script>
+  <script src="../components/MoneyField.js"></script>
+  <script src="../components/Notice.js"></script>
+  <script src="../components/Pagination.js"></script>
+  <script src="../components/PermissionGrid.js"></script>
+  <script src="../components/RadioGroup.js"></script>
+  <script src="../components/RoleCard.js"></script>
+  <script src="../components/SelectField.js"></script>
+  <script src="../components/SkeletonBox.js"></script>
+  <script src="../components/TableSkeleton.js"></script>
+  <script src="../components/TextField.js"></script>
+  <script src="../components/UserStatusBadge.js"></script>
+  <script src="../components/UserTable.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const { html, components: C } = MK;
+    const PAGE_SIZE = 10;
+    const STATUSES = [
+      { value: 'all', label: 'All' },
+      { value: 'active', label: 'Active' },
+      { value: 'invited', label: 'Invited' },
+      { value: 'deactivated', label: 'Deactivated' },
+    ];
+    const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    MK.page({
+      id: 'users',
+      route: '/settings/users',
+      title: 'Users',
+      needs: {
+        api: [
+          'GET /v1/users?status=&cursor=&limit= -> UserPage { items, next_cursor, prev_cursor }, by name',
+          'GET /v1/roles -> RoleList (labels for the role column and the invite form)',
+          'POST /v1/users/invitations { name, email, role } -> User; 409 email_taken',
+        ],
+        permission: 'user:read',
+        uses: ['user:manage'],
+        notes: ['Search by name or email not designed; lists are small', 'Bulk invite not designed'],
+      },
+      state: { status: 'all', page: 1, invited: [], dialog: false, form: { name: '', email: '', role: 'auditor' }, errors: {}, notice: null },
+      load: (fx, { scenario, state }) => {
+        const all = scenario === 'empty' ? [] : [...fx.users, ...state.invited].sort((a, b) => a.name.localeCompare(b.name));
+        const rows = all.filter((u) => state.status === 'all' || u.status === state.status);
+        const start = (state.page - 1) * PAGE_SIZE;
+        return { all, items: rows.slice(start, start + PAGE_SIZE), hasPrev: state.page > 1, hasNext: start + PAGE_SIZE < rows.length };
+      },
+      actions: {
+        setStatus(state, _e, el) { state.status = el.dataset.value; state.page = 1; },
+        nextPage(state) { state.page += 1; },
+        prevPage(state) { state.page -= 1; },
+        openInvite(state, _e, _el, ctx) { state.dialog = true; state.form = { name: '', email: '', role: 'auditor' }; state.errors = {}; ctx.focus('invite-name'); },
+        closeInvite(state, _e, _el, ctx) { state.dialog = false; ctx.focus('invite-open'); },
+        setName(state, _e, el) { state.form.name = el.value; return false; },
+        setEmail(state, _e, el) { state.form.email = el.value; return false; },
+        setRole(state, _e, el) { state.form.role = el.value; },
+        sendInvite(state, _e, _el, ctx) {
+          const f = state.form;
+          const errors = {};
+          if (!f.name.trim()) errors.name = 'Enter their name.';
+          if (!EMAIL.test(f.email.trim())) errors.email = 'Enter an email address, like name@example.com.';
+          else if ([...ctx.fixtures.users, ...state.invited].some((u) => u.email === f.email.trim().toLowerCase())) errors.email = 'Someone with this email is already a user.';
+          state.errors = errors;
+          if (Object.keys(errors).length) { ctx.focus(errors.name ? 'invite-name' : 'invite-email'); return; }
+          const email = f.email.trim().toLowerCase();
+          state.invited.push({
+            id: `usr_new_${state.invited.length + 1}`, name: f.name.trim(), email, role: f.role, status: 'invited',
+            last_active_at: null, created_at: '2026-10-25T09:00:00Z',
+            invitation: { sent_at: '2026-10-25T09:00:00Z', expires_at: '2026-11-01T09:00:00Z', expired: false },
+            allowed_actions: ['change_role', 'resend_invite', 'revoke_invite'], protected_reason: null,
+          });
+          state.dialog = false;
+          state.notice = `Invitation sent to ${email}. It works for 7 days.`;
+          ctx.focus('invite-open');
+        },
+      },
+      render: ({ state, data, status }) => {
+        const fx = window.FIXTURES;
+        const roles = fx.roles;
+        const header = html`
+          <div class="row row--between">
+            <h1>Users</h1>
+            <div class="row">
+              <a href="${MK.href('./roles.html')}">Roles and permissions</a>
+              ${MK.can('user:manage') ? html`<button type="button" id="invite-open" class="button button--primary" data-action="openInvite">Invite user</button>` : ''}
+            </div>
+          </div>
+          ${state.notice ? C.Notice({ tone: 'success', text: state.notice }) : ''}
+          <div class="toolbar">${C.FilterTabs({ label: 'Filter by status', action: 'setStatus', value: state.status, options: STATUSES })}</div>`;
+        let content;
+        if (status === 'loading') content = C.TableSkeleton({ columns: ['Name', 'Role', 'Status', 'Last active'], rows: 8 });
+        else if (status === 'error') content = C.ErrorState({ body: 'We could not load users. Please refresh.' });
+        else if (!data.items.length) content = state.status === 'all'
+          ? C.EmptyState({ title: 'No users yet', body: 'Invite the people who work with you.' })
+          : C.EmptyState({ title: 'No users match', body: 'Try another status.' });
+        else content = html`
+          ${C.UserTable({ users: data.items, roles })}
+          ${C.Pagination({ page: state.page, hasPrev: data.hasPrev, nextCursor: data.hasNext ? String(state.page + 1) : null, prevAction: 'prevPage', nextAction: 'nextPage' })}`;
+        const dialog = state.dialog ? C.Dialog({
+          id: 'invite',
+          title: 'Invite a user',
+          cancelAction: 'closeInvite',
+          body: html`
+            <form class="form" id="invite-form" data-action="sendInvite" novalidate>
+              ${C.TextField({ id: 'invite-name', label: 'Name', autocomplete: 'off', value: state.form.name, error: state.errors.name, action: 'setName' })}
+              ${C.TextField({ id: 'invite-email', label: 'Email', type: 'email', autocomplete: 'off', value: state.form.email, error: state.errors.email, action: 'setEmail' })}
+              ${C.RadioGroup({ name: 'invite-role', legend: 'Role', value: state.form.role, action: 'setRole', options: Object.entries(roles).map(([value, r]) => ({ value, label: r.label })) })}
+              <p class="muted">They get an email with a link that works for 7 days.</p>
+            </form>`,
+          actions: html`
+            <button type="button" class="button" data-action="closeInvite">Cancel</button>
+            <button type="submit" form="invite-form" class="button button--primary">Send invitation</button>`,
+        }) : '';
+        return html`<div class="stack">${header}<div class="card">${content}</div>${dialog}</div>`;
+      },
+    });
+  </script>
+</body>
+</html>

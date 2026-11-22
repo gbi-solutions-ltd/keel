@@ -1,0 +1,23 @@
+[
+  {
+    "name": "not-found",
+    "page": "pages/not-found.html",
+    "route": "/no-such-page"
+  },
+  {
+    "name": "maintenance",
+    "page": "pages/maintenance.html",
+    "route": "/dashboard?system=maintenance",
+    "expectStatus": [
+      503
+    ]
+  },
+  {
+    "name": "server-error",
+    "page": "pages/server-error.html",
+    "route": "/notifications?system=crash",
+    "expectConsole": [
+      "Preview of a render failure"
+    ]
+  }
+]

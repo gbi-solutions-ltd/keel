@@ -1,0 +1,165 @@
+{
+  "name": "starter",
+  "modules": [],
+  "checklist": {},
+  "viewports": [
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "desktop",
+      "width": 1440,
+      "height": 900
+    }
+  ],
+  "screens": [
+    {
+      "name": "invoices",
+      "page": "pages/invoices.html",
+      "route": "/invoices",
+      "states": [
+        "default",
+        "empty",
+        "loading",
+        "error"
+      ]
+    },
+    {
+      "name": "invoices-sorted",
+      "page": "pages/invoices.html",
+      "route": "/invoices",
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Amount"
+          }
+        }
+      ]
+    },
+    {
+      "name": "invoices-page-2",
+      "page": "pages/invoices.html",
+      "route": "/invoices",
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Next page"
+          }
+        }
+      ]
+    },
+    {
+      "name": "invoices-minimum",
+      "page": "pages/invoices.html",
+      "route": "/invoices",
+      "steps": [
+        {
+          "fill": {
+            "label": "Minimum amount (USD)",
+            "value": "10000"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Apply"
+          }
+        }
+      ]
+    },
+    {
+      "name": "invoices-overdue",
+      "page": "pages/invoices.html",
+      "route": "/invoices",
+      "steps": [
+        {
+          "select": {
+            "label": "Status",
+            "value": "overdue"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Apply"
+          }
+        }
+      ]
+    },
+    {
+      "name": "invoices-no-match",
+      "page": "pages/invoices.html",
+      "route": "/invoices",
+      "steps": [
+        {
+          "fill": {
+            "label": "Search",
+            "value": "no such customer"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Apply"
+          }
+        }
+      ]
+    },
+    {
+      "name": "invoices-searched",
+      "page": "pages/invoices.html?q=clinic",
+      "route": "/invoices?q=clinic"
+    },
+    {
+      "name": "access",
+      "page": "pages/access.html",
+      "route": "/settings/access",
+      "states": [
+        "default",
+        "loading",
+        "error"
+      ]
+    },
+    {
+      "name": "access-keyboard",
+      "page": "pages/access.html",
+      "route": "/settings/access",
+      "steps": [
+        {
+          "click": {
+            "role": "gridcell",
+            "name": "Yes"
+          }
+        },
+        {
+          "press": "ArrowDown"
+        },
+        {
+          "press": "End"
+        }
+      ]
+    },
+    {
+      "name": "access-as-clerk",
+      "page": "pages/access.html",
+      "route": "/settings/access",
+      "role": "clerk"
+    }
+  ],
+  "diff": {
+    "pixelThreshold": 0.1,
+    "boxTolerancePx": 4
+  },
+  "quality": {
+    "targetMinPx": 44
+  },
+  "spill": {
+    "scrollAllowed": [
+      ".permission-grid"
+    ]
+  }
+}

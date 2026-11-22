@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Roles and permissions</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../assets/tokens.css">
+  <link rel="stylesheet" href="../assets/base.css">
+  <link rel="stylesheet" href="../assets/components.css">
+  <script src="../assets/mk.js"></script>
+  <script src="../strings/en-GB.js"></script>
+  <script src="../data/fixtures.js"></script>
+  <script src="../components/AppLayout.js"></script>
+  <script src="../components/Badge.js"></script>
+  <script src="../components/DataTable.js"></script>
+  <script src="../components/DetailList.js"></script>
+  <script src="../components/Dialog.js"></script>
+  <script src="../components/EmptyState.js"></script>
+  <script src="../components/ErrorPage.js"></script>
+  <script src="../components/ErrorState.js"></script>
+  <script src="../components/FilterTabs.js"></script>
+  <script src="../components/InvoiceStatusBadge.js"></script>
+  <script src="../components/MoneyField.js"></script>
+  <script src="../components/Notice.js"></script>
+  <script src="../components/Pagination.js"></script>
+  <script src="../components/PermissionGrid.js"></script>
+  <script src="../components/RadioGroup.js"></script>
+  <script src="../components/RoleCard.js"></script>
+  <script src="../components/SelectField.js"></script>
+  <script src="../components/SkeletonBox.js"></script>
+  <script src="../components/TableSkeleton.js"></script>
+  <script src="../components/TextField.js"></script>
+  <script src="../components/UserStatusBadge.js"></script>
+  <script src="../components/UserTable.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const { html, components: C } = MK;
+
+    MK.page({
+      id: 'roles',
+      route: '/settings/roles',
+      title: 'Roles and permissions',
+      needs: {
+        api: ['GET /v1/roles -> RoleList { items: Role { id, label, description, permissions: { id, label }[], user_count } }'],
+        permission: 'user:read',
+        notes: ['Roles are fixed in this version; editing roles is a checklist item for later'],
+      },
+      load: (fx) => ({
+        roles: Object.entries(fx.roles).map(([id, r]) => ({
+          id, label: r.label, description: r.description,
+          permissions: r.permissions.map((p) => ({ id: p, label: fx.permission_labels[p] })),
+          userCount: fx.users.filter((u) => u.role === id && (u.status === 'active' || u.status === 'invited')).length,
+        })),
+      }),
+      render: ({ data, status }) => {
+        const back = html`<a href="${MK.href('./users.html')}">&larr; Users</a>`;
+        const intro = html`
+          <h1>Roles and permissions</h1>
+          <p class="muted">Each user has one role. Roles are set by the provider; contact support to change what a role can do.</p>`;
+        if (status === 'loading') return html`<div class="stack">${back}${intro}${Array.from({ length: 3 }, () => html`<div class="card" role="status"><span class="visually-hidden">Loading</span>${C.SkeletonBox({ shape: 'title' })}${C.SkeletonBox({ shape: 'text' })}${C.SkeletonBox({ shape: 'text' })}</div>`)}</div>`;
+        if (status === 'error') return html`<div class="stack">${back}${intro}<div class="card">${C.ErrorState({ body: 'We could not load roles. Please refresh.' })}</div></div>`;
+        return html`<div class="stack">${back}${intro}${data.roles.map((r) => C.RoleCard(r))}</div>`;
+      },
+    });
+  </script>
+</body>
+</html>

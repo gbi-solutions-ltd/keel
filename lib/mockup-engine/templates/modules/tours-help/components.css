@@ -1,0 +1,14 @@
+/* tours-help: append to assets/components.css */
+
+/* ShortcutList */
+.shortcut-list { margin: 0; display: grid; gap: var(--space-2); }
+.shortcut-list__row { display: grid; grid-template-columns: minmax(8rem, 12rem) 1fr; align-items: center; gap: var(--space-3); font-size: var(--text-sm); }
+.shortcut-list__row dt, .shortcut-list__row dd { margin: 0; }
+.shortcut-list__key { display: inline-block; min-width: 1.75em; padding: 0 var(--space-1); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg); font-family: var(--font-mono); font-size: var(--text-xs); text-align: center; }
+
+/* TourList */
+.tour-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.tour-list__item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding-bottom: var(--space-3); border-bottom: 1px solid var(--color-border); }
+.tour-list__item:last-child { padding-bottom: 0; border-bottom: 0; }
+.tour-list__title { font-size: var(--text-md); }
+.tour-list__description { margin: 0; font-size: var(--text-sm); }

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>mk.js test page</title></head>
+<body>
+<div id="app"></div>
+<script>
+  window.FIXTURES = {
+    session: { user_id: 'u1', role: 'admin' },
+    roles: { admin: { label: 'Admin', permissions: ['x:read'] }, clerk: { label: 'Clerk', permissions: [] } },
+  };
+  window.LOG = [];
+</script>
+<script>if (location.pathname.endsWith('params.html')) window.SHELL_STATE = ({ params }) => ({ banner: params.banner === 'on' });</script>
+<script src="../../../../templates/mockup-starter/assets/mk.js"></script>
+<script>
+  const { html } = MK;
+  MK.component('TestLayout', ({ params, shell, children }) => html`<div class="test-layout" data-params="${JSON.stringify(params || null)}" data-shell="${JSON.stringify(shell || null)}">${children}</div>`, { layer: 'layout' });
+  MK.shell({
+    layout: 'TestLayout',
+    state: window.SHELL_STATE || { banner: false },
+    load: (_fx, { params, state }) => ({ flag: params?.flag ?? null, banner: state.banner }),
+    keys: { 'mod+k': 'hit', 'mod+enter': 'hit', 'mod+d': 'hit', 'mod+shift+x': 'hit', 'alt+n': 'hit', '/': 'hit', 'escape': 'hit' },
+    actions: { hit(_s, e) { window.LOG.push([e.key, e.ctrlKey, e.metaKey, e.shiftKey, e.altKey].join(',')); return false; } },
+  });
+  MK.page({
+    id: 'test', route: '/test', title: 'mk.js test page',
+    needs: { permission: 'public' },
+    state: { note: '', more: false, pick: 'b', tick: 0 },
+    render: ({ state }) => html`
+      <label for="note">Note</label>
+      <textarea id="note" data-action="setNote" data-on="input">${state.note}</textarea>
+      <label for="pick">Pick</label>
+      <select id="pick" data-action="setPick">
+        ${['a', 'b', ...(state.more ? ['c', 'd'] : [])].map((v) => html`<option value="${v}" ${v === state.pick ? 'selected' : ''}>${v}</option>`)}
+      </select>
+      <button id="more" type="button" data-action="grow">More</button>
+      <button id="rerender" type="button" data-action="rerender">Re-render</button>
+      <input id="field" aria-label="Field">
+      <output id="tick">${state.tick}</output>`,
+    actions: {
+      setNote(state, _e, el) { state.note = el.value; },
+      setPick(state, _e, el) { state.pick = el.value; },
+      grow(state) { state.more = true; state.pick = 'd'; },
+      rerender(state) { state.tick += 1; },
+    },
+  });
+</script>
+</body>
+</html>

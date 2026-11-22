@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>check-behaviours modal fixture</title>
+  <style>
+    body { margin: 0; }
+    dialog { width: 600px; height: 400px; }
+    .note { position: fixed; right: 20px; bottom: 20px; width: 160px; height: 30px; margin: 0; background: #222; color: #fff; }
+    #note-in { bottom: 60px; }
+  </style>
+</head>
+<body>
+  <!-- Test fixture for check-behaviours.test.mjs (onTop): a modal dialog, a fixed note outside it (in the
+       page, so inert and skipped by hit testing while the dialog is open) and one inside it. -->
+  <h1>Modal fixture</h1>
+  <p class="note" id="note-out" role="status">Outside the dialog</p>
+  <dialog id="d"><p>Modal</p><p class="note" id="note-in" role="status">Inside the dialog</p></dialog>
+  <script>document.getElementById('d').showModal();</script>
+</body>
+</html>

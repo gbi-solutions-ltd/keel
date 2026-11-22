@@ -1,0 +1,9 @@
+{
+  "name": "app-mode shard fixture",
+  "viewports": [{ "name": "desktop", "width": 800, "height": 600 }],
+  "screens": [
+    { "name": "invoices", "page": "invoices.html", "route": "/invoices.html" },
+    { "name": "orders", "page": "orders.html", "route": "/orders.html", "steps": [{ "click": { "role": "button", "name": "Show" }, "settleLayout": true }] }
+  ],
+  "diff": { "maxMismatchPercent": 0.2, "pixelThreshold": 0.1 }
+}

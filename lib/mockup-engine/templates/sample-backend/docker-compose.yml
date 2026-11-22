@@ -1,0 +1,65 @@
+# The backend with its own Postgres and a mail catcher (Mailpit: it receives every message and
+# shows them at http://127.0.0.1:${MAIL_UI_PORT}). Every port is published on 127.0.0.1 only.
+# No dev routes and no seed here: for a local staging run, add docker-compose.dev.yml.
+#   cp .env.example .env && docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+#   docker compose down        (this project only; add -v to drop the data)
+services:
+  db:
+    image: postgres:16.15-alpine@sha256:aa6cb33cf4c19c765cefcf48d96176258800870a9a1e930ad126200f9d825139
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set it in .env}
+      POSTGRES_OWNER_PASSWORD: ${POSTGRES_OWNER_PASSWORD:?set it in .env}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?set it in .env}
+    ports: ["127.0.0.1:${DB_PORT:-56432}:5432"]
+    volumes:
+      - db:/var/lib/postgresql/data
+      - ./lib/db-roles.sh:/docker-entrypoint-initdb.d/10-roles.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  mail:
+    image: axllent/mailpit:v1.27@sha256:e22dce5b36f93c77082e204a3942fb6b283b7896e057458400a4c88344c3df68
+    ports: ["127.0.0.1:${SMTP_PORT:-56025}:1025", "127.0.0.1:${MAIL_UI_PORT:-56825}:8025"]
+  # Runs the migrations as the schema's owner, grants the application's role, and exits. Only this
+  # service holds the owner's password.
+  migrate:
+    build: .
+    command: ["node", "server.mjs", "--migrate-only"]
+    restart: "no"
+    depends_on:
+      db: { condition: service_healthy }
+    env_file:
+      - path: .env.api
+        required: false
+    environment:
+      MIGRATE_DATABASE_URL: postgres://backend_owner:${POSTGRES_OWNER_PASSWORD}@db:5432/postgres
+      APP_DB_ROLE: backend_app
+  api:
+    build: .
+    # The backend's own secrets (an encryption key, say), for this container only: .env.api,
+    # never committed, optional. The database's superuser password never reaches it.
+    env_file:
+      - path: .env.api
+        required: false
+    depends_on:
+      db: { condition: service_healthy }
+      mail: { condition: service_started }
+      migrate: { condition: service_completed_successfully }
+    environment:
+      # The server runs as backend_app only (lib/db-roles.sh); the migrate service ran the rest.
+      DATABASE_URL: postgres://backend_app:${POSTGRES_APP_PASSWORD}@db:5432/postgres
+      MIGRATIONS: external
+      SMTP_URL: smtp://mail:1025
+      STATIC_DIR: /srv/public
+      HEADERS_FILE: /srv/security-headers.json
+      CLOCK: ${CLOCK:-}
+      # The app's origin when it is served from another one (skills/convert-mockup/references/api-integration.md).
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+    ports: ["127.0.0.1:${API_PORT:-4300}:4300"]
+    volumes:
+      - ${APP_DIR:?set it in .env}/dist:/srv/public:ro
+      - ${APP_DIR}/security-headers.json:/srv/security-headers.json:ro
+volumes:
+  db:

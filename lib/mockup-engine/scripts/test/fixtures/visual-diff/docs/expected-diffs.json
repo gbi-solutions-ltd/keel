@@ -1,0 +1,8 @@
+{
+  "rules": [
+    { "viewport": "mobile", "mask": { "x": 0, "y": 0, "w": 390, "h": 40 }, "reason": "Fixture: the top bar row moved on purpose." }
+  ],
+  "screens": [
+    { "name": "home", "viewport": "desktop", "maxMismatchPercent": 6, "reason": "Fixture: a limit over the 5% cap, so the file is invalid." }
+  ]
+}

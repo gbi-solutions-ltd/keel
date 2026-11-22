@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Signed out</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../assets/tokens.css">
+  <link rel="stylesheet" href="../assets/base.css">
+  <link rel="stylesheet" href="../assets/components.css">
+  <script src="../assets/mk.js"></script>
+  <script src="../strings/en-GB.js"></script>
+  <script src="../data/fixtures.js"></script>
+  <script src="../components/AppLayout.js"></script>
+  <script src="../components/AuthLayout.js"></script>
+  <script src="../components/Badge.js"></script>
+  <script src="../components/DataTable.js"></script>
+  <script src="../components/Dialog.js"></script>
+  <script src="../components/EmptyState.js"></script>
+  <script src="../components/ErrorPage.js"></script>
+  <script src="../components/ErrorState.js"></script>
+  <script src="../components/InvoiceStatusBadge.js"></script>
+  <script src="../components/MoneyField.js"></script>
+  <script src="../components/Notice.js"></script>
+  <script src="../components/Pagination.js"></script>
+  <script src="../components/PermissionGrid.js"></script>
+  <script src="../components/SelectField.js"></script>
+  <script src="../components/SessionTimeoutDialog.js"></script>
+  <script src="../components/SkeletonBox.js"></script>
+  <script src="../components/TableSkeleton.js"></script>
+  <script src="../components/TextField.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const { html } = MK;
+    const COPY = {
+      idle: { title: 'You were signed out', body: 'You were inactive for a while, so we signed you out to protect your account.' },
+      expired: { title: 'Your session has ended', body: 'For your security, sessions end after a while. Sign in again to carry on.' },
+      manual: { title: 'You are signed out', body: 'Close this tab if you are on a shared computer.' },
+    };
+
+    MK.page({
+      id: 'signed-out',
+      route: '/signed-out', // ?reason=idle | expired | manual
+      title: 'Signed out',
+      layout: 'AuthLayout',
+      needs: { permission: 'public' },
+      render: ({ params }) => {
+        const c = COPY[params.reason] || COPY.manual;
+        // ?minutes= comes from the shell: the idle timeout is the server's setting.
+        const minutes = Number(params.minutes);
+        const body = params.reason === 'idle' && Number.isInteger(minutes) && minutes > 0
+          ? `You were inactive for ${minutes} minutes, so we signed you out to protect your account.` : c.body;
+        return html`
+          <div class="form">
+            <h1>${c.title}</h1>
+            <p>${body}</p>
+            <a class="button button--primary" href="${MK.href('./sign-in.html')}">Sign in again</a>
+          </div>`;
+      },
+    });
+  </script>
+</body>
+</html>

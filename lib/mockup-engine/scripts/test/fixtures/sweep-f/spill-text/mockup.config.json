@@ -1,0 +1,5 @@
+{
+  "name": "spill --text fixture",
+  "viewports": [{ "name": "desktop", "width": 800, "height": 600 }],
+  "screens": [{ "name": "label", "page": "label.html" }]
+}

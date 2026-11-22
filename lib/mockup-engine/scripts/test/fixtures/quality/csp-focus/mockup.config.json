@@ -1,0 +1,5 @@
+{
+  "name": "quality csp and focus fixture",
+  "viewports": [{ "name": "desktop", "width": 800, "height": 600 }],
+  "screens": [{ "name": "csp-focus", "page": "index.html", "route": "/" }]
+}

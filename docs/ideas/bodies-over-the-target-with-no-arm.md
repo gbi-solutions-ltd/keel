@@ -24,7 +24,7 @@ WARN  write-prd: body is 793 words, over the 700 target (ceiling 900). ADR-0001 
 OK    25 skills validated, descriptions about 1130 tokens, 7 warning(s)
 ```
 
-Seven bodies are over the target. `CONTRIBUTING.md:45-52` names two of them as covered:
+Seven bodies are over the target. `CONTRIBUTING.md:49-56` names two of them as covered:
 `coding-standards` at 795 on the audit arm of 2026-09-03, and `write-docs` at 756 on the arm of
 2026-09-02. This record is about the other five.
 
@@ -43,7 +43,7 @@ made 700 an enforced warning, and it priced the room: "A skill body over 700 wor
 passing eval arm at that length, recorded in `tests/evals/results.md`, so the room is taken against
 observed behaviour rather than against an assertion."
 
-`CONTRIBUTING.md:45-52` states how that obligation transfers, and the sentence is load bearing here:
+`CONTRIBUTING.md:49-56` states how that obligation transfers, and the sentence is load bearing here:
 
 > **An arm discharges the length it was run at, not the body it was run against**, so a body that
 > grows past the length of its last passing arm owes a new one.
@@ -191,7 +191,7 @@ the tense they were written; nothing in them is rewritten to point one way.
 Recorded as a dated clarification in the Decision section of
 [`ADR-0001`](../decisions/ADR-0001-skill-body-word-ceiling.md), because the ambiguous sentence is
 that ADR's own, which is what open question 1 above says. `CONTRIBUTING.md` carries the operational
-consequence and no longer names the question. Its line references above, `CONTRIBUTING.md:45-52`
+consequence and no longer names the question. Its line references above, `CONTRIBUTING.md:49-56`
 and `:48-51`, describe that file as it stood on 2026-09-03 and are left as written.
 
 **What the ruling closes.** `tdd` at 793 and `execute-plan` at 884 are discharged. Re-verified for

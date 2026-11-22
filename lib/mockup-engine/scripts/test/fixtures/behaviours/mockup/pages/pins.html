@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>pins</title></head>
+<body>
+  <!-- Test fixture for check-behaviours.test.mjs: shows the clock, the first Math.random() and the time zone. -->
+  <h1>Fixture page</h1>
+  <p id="now"></p><p id="random"></p><p id="zone"></p>
+  <script>
+    document.getElementById('now').textContent = 'now ' + new Date().toISOString();
+    document.getElementById('random').textContent = 'random ' + Math.random();
+    document.getElementById('zone').textContent = 'zone ' + Intl.DateTimeFormat().resolvedOptions().timeZone;
+  </script>
+</body>
+</html>

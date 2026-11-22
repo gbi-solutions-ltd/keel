@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sheet fixture</title>
+<style>
+  html { scroll-behavior: smooth; }
+  body { margin: 0; height: 2400px; font: 16px sans-serif; color: #000; background: #fff; }
+  a { position: absolute; width: 16px; height: 16px; display: block; background: #036; }
+  a:focus { outline: 2px solid #000; }
+  /* under the fixed side sheet, wherever they scroll to: one pair in view, one below the fold */
+  #g { left: 500px; top: 100px; } #h { left: 510px; top: 100px; }
+  #i { left: 500px; top: 1800px; } #j { left: 510px; top: 1800px; }
+  /* off screen: no scroll brings them into view */
+  #k { left: -9999px; top: 300px; } #l { left: -9989px; top: 300px; }
+  /* open, below the fold: still judged and crowded */
+  #m { left: 100px; top: 1800px; } #n { left: 110px; top: 1800px; }
+  .sheet { position: fixed; left: 400px; top: 0; width: 400px; height: 100vh; background: #eee; z-index: 2; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Sheet</h1>
+  <a id="g" href="#g" aria-label="Sheet G"></a>
+  <a id="h" href="#h" aria-label="Sheet H"></a>
+  <a id="i" href="#i" aria-label="Sheet I"></a>
+  <a id="j" href="#j" aria-label="Sheet J"></a>
+  <a id="k" href="#k" aria-label="Away K"></a>
+  <a id="l" href="#l" aria-label="Away L"></a>
+  <a id="m" href="#m" aria-label="Open M"></a>
+  <a id="n" href="#n" aria-label="Open N"></a>
+  <div class="sheet" role="dialog" aria-label="Order details"></div>
+</main>
+</body>
+</html>

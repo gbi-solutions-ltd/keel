@@ -1,0 +1,15 @@
+{
+  "$comment": "The pinned browser's SHA-256 per platform (scripts/lib/browsers.mjs folderHash: every file of the headless shell's folder, sorted, each with its hash). Measured from Playwright's own download for the pinned version; a platform with no entry runs and is reported unverified. Moves with playwright in scripts/package.json, re-measured on each platform that can be.",
+  "playwright": "1.63.0",
+  "chromium-headless-shell": {
+    "revision": "1243",
+    "browserVersion": "153.0.8010.12",
+    "platforms": {
+      "mac-arm64": {
+        "files": 18,
+        "sha256": "4fb104939a6528e28405fe70b351c167a2840abc0b8da6187558157365d7c433",
+        "measured": "2026-11-22: a fresh download and the copy installed on 2026-11-12 hash the same"
+      }
+    }
+  }
+}

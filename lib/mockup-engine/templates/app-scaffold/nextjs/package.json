@@ -1,0 +1,73 @@
+{
+  "name": "<app>",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^24.18.0 || ^26.13.0",
+    "npm": ">=11.16.0"
+  },
+  "scripts": {
+    "generate": "orval",
+    "import:mockup": "node <engine>/scripts/import-mockup.mjs --mockup <mockup> --app . --stack nextjs --i18n i18next --flat --only fixtures,css,nav,strings",
+    "import:check": "node <engine>/scripts/import-mockup.mjs --mockup <mockup> --app . --stack nextjs --i18n i18next --flat --only fixtures,css,nav,strings,contract --check",
+    "predev": "npm run generate",
+    "dev": "next dev",
+    "prebuild": "npm run generate",
+    "build": "next build",
+    "prebuild:mocked": "npm run generate",
+    "build:mocked": "MOCKS=true next build",
+    "start": "next start",
+    "start:mocked": "MOCKS=true next start",
+    "pretypecheck": "npm run generate",
+    "typecheck": "tsc --noEmit -p .",
+    "lint": "biome ci . && node scripts/check-frontend.mjs src",
+    "format:fix": "biome check --write .",
+    "pretest": "npm run generate",
+    "test": "vitest run",
+    "audit": "npm audit --audit-level=high"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "1.10.0",
+    "@opentelemetry/core": "3.1.0",
+    "@opentelemetry/exporter-logs-otlp-http": "0.301.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.301.0",
+    "@opentelemetry/instrumentation": "0.301.0",
+    "@opentelemetry/instrumentation-fetch": "0.301.0",
+    "@opentelemetry/resources": "3.1.0",
+    "@opentelemetry/sdk-logs": "3.1.0",
+    "@opentelemetry/sdk-trace": "3.1.0",
+    "@opentelemetry/semantic-conventions": "1.44.0",
+    "@tanstack/react-query": "5.107.1",
+    "next": "16.4.5",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.6",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.8",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.2.1",
+    "jsdom": "31.0.0",
+    "msw": "3.0.4",
+    "orval": "8.47.0",
+    "typescript": "7.0.2",
+    "undici": "7.30.2",
+    "vitest": "5.1.0"
+  },
+  "overrides": {
+    "@scalar/json-magic": {
+      "undici": "7.30.2"
+    }
+  },
+  "allowScripts": {
+    "esbuild": false,
+    "fsevents": false,
+    "sharp": false,
+    "@tailwindcss/oxide": false
+  }
+}

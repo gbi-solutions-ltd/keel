@@ -116,6 +116,7 @@ allowed_executable() {
         tests/*.sh)          return 0 ;;   # `*` matches `/` here, so this covers tests/evals/ too
         .githooks/*)         return 0 ;;   # keel guard install wrote here until 2026-09-26; a plugin repo that committed it on that advice is not flagged for it
         .claude/keel-nudge)  return 0 ;;   # written by `keel init`, committed so a plugin-less session is told so
+        lib/mockup-engine/templates/sample-backend/lib/db-roles.sh) return 0 ;;   # the postgres image runs an executable init script and sources a non-executable one, whose set -eu would then apply to the image's own entrypoint
         *)                   return 1 ;;
     esac
 }

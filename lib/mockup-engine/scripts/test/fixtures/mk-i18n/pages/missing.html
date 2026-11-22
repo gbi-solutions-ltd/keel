@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>missing string fixture</title></head>
+<body>
+<div id="app"></div>
+<script>window.FIXTURES = {};</script>
+<script src="../../../../../templates/mockup-starter/assets/mk.js"></script>
+<script src="../strings/en-GB.js"></script>
+<script>
+  MK.page({ id: 'missing', route: '/missing', render: () => MK.html`<p id="m">${MK.t('orders.nope')}</p>` });
+</script>
+</body>
+</html>

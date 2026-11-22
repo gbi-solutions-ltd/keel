@@ -1,0 +1,11 @@
+node_modules/
+dist/
+dist-mocked/
+src/api/generated/
+.env*
+!.env.example
+!.env.mocked
+*.pem
+*.key
+.mockup-engine/
+coverage/

@@ -1,0 +1,78 @@
+{
+  "name": "<app>",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^24.18.0 || ^26.13.0",
+    "npm": ">=11.16.0"
+  },
+  "scripts": {
+    "generate": "orval",
+    "import:mockup": "node <engine>/scripts/import-mockup.mjs --mockup <mockup> --app . --stack vue --only fixtures,css,nav,strings",
+    "import:check": "node <engine>/scripts/import-mockup.mjs --mockup <mockup> --app . --stack vue --only fixtures,css,nav,strings,contract --check",
+    "predev": "npm run generate",
+    "dev": "vite",
+    "prebuild": "npm run generate",
+    "build": "npm run typecheck:only && vite build",
+    "prebuild:mocked": "npm run generate",
+    "build:mocked": "npm run typecheck:only && vite build --mode mocked",
+    "preview": "vite preview",
+    "preview:mocked": "vite preview --mode mocked",
+    "pretypecheck": "npm run generate",
+    "typecheck": "npm run typecheck:only",
+    "typecheck:only": "vue-tsc --noEmit -p tsconfig.app.json && vue-tsc --noEmit -p tsconfig.vitest.json && vue-tsc --noEmit -p tsconfig.node.json",
+    "lint": "biome ci . && node scripts/check-frontend.mjs src",
+    "format": "biome format .",
+    "format:fix": "biome check --write .",
+    "pretest": "npm run generate",
+    "test": "vitest run",
+    "audit": "npm audit --audit-level=high"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "1.10.0",
+    "@opentelemetry/core": "3.1.0",
+    "@opentelemetry/exporter-logs-otlp-http": "0.301.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.301.0",
+    "@opentelemetry/instrumentation": "0.301.0",
+    "@opentelemetry/instrumentation-fetch": "0.301.0",
+    "@opentelemetry/resources": "3.1.0",
+    "@opentelemetry/sdk-logs": "3.1.0",
+    "@opentelemetry/sdk-trace": "3.1.0",
+    "@opentelemetry/semantic-conventions": "1.44.0",
+    "@tanstack/vue-query": "5.107.1",
+    "vue": "3.5.45",
+    "vue-i18n": "11.4.18",
+    "vue-router": "5.4.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.6",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/user-event": "14.6.8",
+    "@testing-library/vue": "8.1.0",
+    "@tsconfig/node24": "24.0.5",
+    "@types/node": "26.6.6",
+    "@vitejs/plugin-vue": "6.0.10",
+    "@vue/tsconfig": "0.9.1",
+    "jsdom": "31.0.0",
+    "msw": "3.0.4",
+    "orval": "8.47.0",
+    "typescript": "6.0.3",
+    "undici": "7.30.2",
+    "vite": "8.3.6",
+    "vitest": "5.1.0",
+    "vue-tsc": "3.3.14"
+  },
+  "overrides": {
+    "@scalar/json-magic": {
+      "undici": "7.30.2"
+    },
+    "minimatch": "11.0.5",
+    "glob": "14.0.4"
+  },
+  "allowScripts": {
+    "esbuild": false,
+    "fsevents": false,
+    "vue-demi": false
+  }
+}

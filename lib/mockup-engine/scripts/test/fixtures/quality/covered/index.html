@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Target fixture</title>
+<style>
+  body { margin: 0; height: 2400px; font: 16px sans-serif; color: #000; background: #fff; }
+  a { position: absolute; width: 16px; height: 16px; display: block; background: #036; }
+  a:focus { outline: 2px solid #000; }
+  #a { left: 100px; top: 100px; } #b { left: 110px; top: 100px; }
+  #c { left: 300px; top: 100px; } #d { left: 310px; top: 100px; }
+  #e { left: 100px; top: 2000px; } #f { left: 110px; top: 2000px; }
+  /* covers a only: b, c and d stay on top at their centres */
+  .popover { position: fixed; left: 90px; top: 90px; width: 22px; height: 40px; background: #eee; z-index: 2; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Targets</h1>
+  <a id="a" href="#a" aria-label="Covered A"></a>
+  <a id="b" href="#b" aria-label="Beside B"></a>
+  <a id="c" href="#c" aria-label="Open C"></a>
+  <a id="d" href="#d" aria-label="Open D"></a>
+  <a id="e" href="#e" aria-label="Below E"></a>
+  <a id="f" href="#f" aria-label="Below F"></a>
+  <div class="popover" role="dialog" aria-label="Tour step"></div>
+</main>
+</body>
+</html>

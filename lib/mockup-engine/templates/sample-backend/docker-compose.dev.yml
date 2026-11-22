@@ -1,0 +1,12 @@
+# For a local staging run only, on top of docker-compose.yml: the dev routes (the stand-in
+# sign-in, POST /__sample/reset, GET /__sample/stats) and the seed (an empty database is filled
+# with the design's data and its seeded password). The base file publishes the port on 127.0.0.1
+# only, which is what DEV_PUBLISHED_ON_LOOPBACK states. Never deploy with this file.
+services:
+  api:
+    environment:
+      DEV: "1"
+      DEV_PUBLISHED_ON_LOOPBACK: "1"
+      # The dev reset rebuilds the schema, which only its owner may do: local runs only.
+      MIGRATE_DATABASE_URL: postgres://backend_owner:${POSTGRES_OWNER_PASSWORD}@db:5432/postgres
+      APP_DB_ROLE: backend_app

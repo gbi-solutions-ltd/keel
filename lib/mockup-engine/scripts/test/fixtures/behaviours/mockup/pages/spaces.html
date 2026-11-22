@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>check-behaviours fixture: spaces</title>
+  <script src="../assets/mk-stub.js"></script>
+</head>
+<body>
+  <!-- Test fixture for check-behaviours.test.mjs: rendered text whose spaces are not plain spaces.
+       Intl puts a no-break space (U+00A0) after a currency code; times carry a narrow no-break space
+       (U+202F) before AM; a pre keeps a run of spaces and a line break. -->
+  <h1>Spaces</h1>
+  <p id="amount"></p>
+  <p>Due&#x202F;9:00&#x202F;AM</p>
+  <pre>Total     due
+  today</pre>
+  <script>
+    document.getElementById('amount').textContent = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'UGX', currencyDisplay: 'code', maximumFractionDigits: 0 }).format(1250000);
+  </script>
+</body>
+</html>

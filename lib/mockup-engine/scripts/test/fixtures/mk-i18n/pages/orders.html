@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>i18n fixture</title></head>
+<body>
+<div id="app"></div>
+<script>window.FIXTURES = { session: { user_id: 'u1', role: 'admin' }, roles: { admin: { label: 'Admin', permissions: [] } } };</script>
+<script src="../../../../../templates/mockup-starter/assets/mk.js"></script>
+<script src="../strings/en-GB.js"></script>
+<script src="../strings/fr-FR.js"></script>
+<script src="../strings/ar.js"></script>
+<script>
+  const { html, t } = MK;
+  MK.page({
+    id: 'orders', route: '/orders', title: 'Orders',
+    render: () => html`<main>
+      <h1 id="title">${t('orders.title')}</h1>
+      <p id="one">${t('orders.count', { count: 1 })}</p>
+      <p id="many">${t('orders.count', { count: 3 })}</p>
+      <p id="greet">${t('orders.greeting', { name: 'Ada' })}</p>
+      <p id="fallback">${t('orders.only-here')}</p>
+      <p id="date">${MK.format.date('2026-03-05')}</p>
+      <p id="count">${MK.format.count(1234567)}</p>
+      <a id="link" href="${MK.href('./orders.html?x=1')}">again</a>
+    </main>`,
+  });
+</script>
+</body>
+</html>

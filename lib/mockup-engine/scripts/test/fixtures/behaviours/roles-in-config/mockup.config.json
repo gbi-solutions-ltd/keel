@@ -1,0 +1,5 @@
+{
+  "name": "check-behaviours fixture with roles in its config",
+  "roles": ["clerk", "finmgr"],
+  "viewports": [{ "name": "desktop", "width": 1440, "height": 900 }]
+}
