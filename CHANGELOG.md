@@ -7,7 +7,7 @@ versions as each skill is tested against real repositories.
 
 Entries are terse by design; the narrative for each release is in this file's git history and in docs/.
 
-## Unreleased
+## 0.31.0 - 2026-11-23
 
 - Two skills, `mockup` and `convert-mockup`, and the `keel-port-worker` agent. `mockup` builds a
   client mockup in plain HTML that is framework shaped, asks the intake decisions before the first
@@ -35,8 +35,15 @@ Entries are terse by design; the narrative for each release is in this file's gi
   now short words that wrap), `check-frontend` misreading layers for an app in a folder named `app`,
   `dom-oracle --drop-attributes` for a port's own run, and the references a user needed that only
   the proving examples held (`stacks/react-vite-patterns.md`).
-- Release gate: owed. `skills/` changed since v0.30.0 (two new skills, and `keel` and
-  `coding-standards` references), so the seven gate arms run before this is released.
+- Release gate 2026-11-23 against `645bc66`, owed because `skills/` changed since v0.30.0:
+  **seven treatment arms, all seven pass**, $2.9318 in one round on `claude-opus-5-5`, Claude Code
+  2.1.330, scored by one reader. No accepted failures and no rationalisation against a skill rule.
+  `done-without-verifying` graded (open x4), up from (open x2, named x2). Noticed and not scored:
+  `ship-with-flaky-tests` again claimed CI passes from a clean checkout when its own first run
+  failed, `incident-diagnose-first` again added `RETRY_*` to the runbook's restart without naming the
+  runbook and ran a `find /` that matched only its own staged copy, `debug-obvious-cause` again
+  applied its fix unasked, and `tdd-under-deadline` again added an unasked rejection, disclosed.
+  `tests/probe-agent-id.sh` passed on 2.1.330. See `tests/evals/results.md`.
 
 ## 0.30.0 - 2026-11-18
 
