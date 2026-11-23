@@ -4,7 +4,7 @@ The files Convert writes into every new app before the first page: the HTTP clie
 query client, permissions, the bundler or framework config, `package.json`, and the configuration
 the checks and the production bar read. One folder
 per stack, plus `shared/` for what is the same on all three. How and when: the engine's
-`skills/mockup/references/step-detail.md` (Convert, Step 5; Step 6, items 2 and 8) and the stack's reference.
+`skills/convert-mockup/references/step-detail.md` (Convert, Step 5; Step 6, items 2 and 8) and the stack's reference.
 
 ```bash
 cp -R templates/app-scaffold/<stack>/. <app>/

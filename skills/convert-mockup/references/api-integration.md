@@ -33,6 +33,11 @@ drafting, because the draft becomes the real contract more often than not:
 - Every collection is cursor paginated from the first version (`next_cursor`, a capped `limit`).
 - Errors use the keel envelope, `{ error: { code, message, request_id, details } }`, as one
   `default` response on every operation. Callers branch on `code`.
+- The app scaffold's held files import from the generated client by name, so the draft gives
+  them those names: the envelope's schema is `ErrorEnvelope`; every operation has a tag (Orval
+  splits the client by tag); `getSession` is tagged `session` and returns `Session` with
+  `user_id` and a required `permissions` array of a `Permission` enum. A draft without them fails
+  the port's first typecheck and needs a new sign-off round.
 - Money, where there is any, is an integer `amount` in minor units plus a `currency`; instants are
   `format: date-time`.
 - A write that must not happen twice takes an `Idempotency-Key`, one per intent: the same details
