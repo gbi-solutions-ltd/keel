@@ -1218,8 +1218,8 @@ printing them as zero has failed that requirement.
 `tests/evals/fixtures/README.md` states its own rule, that what a fixture seeds is recorded there,
 and `tests/test-eval-harness.sh` cases 12 to 16 each pin one load bearing property of one fixture.
 
-Insert this **before** the `## What none of them contain` heading at
-`tests/evals/fixtures/README.md:153`, so it sits with the other per-fixture sections rather than
+Insert this **before** the `## What none of them contain` heading in
+`tests/evals/fixtures/README.md`, so it sits with the other per-fixture sections rather than
 after the closing material:
 
 ````markdown
