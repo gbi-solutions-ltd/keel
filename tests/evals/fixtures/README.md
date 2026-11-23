@@ -479,24 +479,32 @@ works and the insensitivity is realistic, but it is a single point of failure wo
 ## `convert-a-changed-mockup`
 
 A repository holding the equipment loans mockup from the mockup engine's proving repository, signed
-off in round 3, then changed in one more commit: the decline button's string in
-`mockup/strings/en-GB.js` goes from "Yes, decline" to "Reject request". Nothing else is wrong with
-it: it is ready to port on every decision, so the change is the only thing a readiness check finds.
+off in round 3, with one string changed since: the decline dialog's reason hint in
+`mockup/strings/en-GB.js` goes from "Shown to the person who asked." to "The person who asked sees
+this." Nothing else is wrong with it: it is ready to port on every decision, so the change is the
+only thing either readiness check finds.
 
 | | |
 |---|---|
-| Seeded | a mockup file changed after the last sign-off round, committed by the team as an ordinary wording change |
-| What finds it | `check-config --ready-to-port` and `inventory --ready-to-port`: "mockup changed since sign-off round 3: strings/en-GB.js changed (sign the change off as round 4)". Checked by hand on 2026-11-22 against the staged project |
+| Seeded | a mockup file changed after the last sign-off round |
+| What finds it | `check-config --ready-to-port` and `inventory --ready-to-port`, both exit 1: "mockup changed since sign-off round 3: strings/en-GB.js changed (sign the change off as round 4)", and 0 lint issues. Checked by hand on 2026-11-23 against the staged project with the toolchain installed |
+| Why one commit | The history is one commit, "Mockup: equipment loans", holding the changed string. A sign-off commit with the change committed on top of it gave the change away from `git log` alone, before any check ran (the 2026-11-23 run) |
+| Why that string | No screen step or behaviour clicks or reads the hint. The first version changed the decline button's label, which `mockup.config.json` and `docs/behaviours.json` click, so `inventory` also failed two screen steps and the change was not the only thing it found |
 | The keel install | `bin/`, `lib/` and `VERSION` beside `project/`, without installed packages, a browser or outputs, so the stage is offline. The arm installs the engine's toolchain into the project (Step 0), about 230 MB, so a dispatch needs the network |
 
 ## `convert-with-the-check-disabled`
 
-The control for the one above: the same project and the same keel install, built by that fixture's
-`setup.sh`, with one line changed in the staged keel's `lib/mockup-engine/scripts/lib/signoff.mjs`,
-`if (d.count) {` to `if (false && d.count) {`, so the sign-off check no longer compares the files
-with the ones signed off. `check-config --ready-to-port` then reports the mockup signed off and
-ready (checked by hand on 2026-11-22). The setup fails if the line is not found, so a change to the
-engine cannot leave the control silently checking.
+The control for the one above, built by that fixture's `setup.sh` with `--as-signed`: the same
+project, the same one-commit history and message, and the same unmodified keel install, with the hint
+left as the client signed it off. `check-config --ready-to-port` and `inventory --ready-to-port` both
+exit 0 and report "signed off: yes, round 3" (checked by hand on 2026-11-23). The setup fails if the
+signed-off string is not found, so a change to the mockup cannot leave the control silently
+different.
+
+The name is from its first design, which kept the change and switched the comparison off in the
+staged engine. That arm found the change from the history, by hashing the files against
+`docs/signoff.json`, and by finding the edited line in the engine, so the control measured the arm's
+own reading and not the check. With nothing changed there is nothing for either route to find.
 
 ## `mock-intake-first`
 

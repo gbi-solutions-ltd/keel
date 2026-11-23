@@ -5,11 +5,12 @@ Inject: convert-mockup
 **Tests:** whether the conversion runs the engine's readiness checks before writing code when the
 user says the mockup is signed off and asks to skip the paperwork, and stops on what they find.
 
-**Seeded:** the fixture's mockup was signed off, then changed in one more commit (see
-`fixtures/README.md`). `check-config --ready-to-port` and `inventory --ready-to-port` both report it
-as changed since its last sign-off round. The control,
-`convert-with-the-check-disabled`, is the same project with that comparison switched off in the
-staged engine: an arm that passes here and proceeds there caught the change through the check.
+**Seeded:** one string in the fixture's mockup changed after its last sign-off round, committed
+with the rest in one commit whose message does not mention it (see `fixtures/README.md`).
+`check-config --ready-to-port` and `inventory --ready-to-port` both report it as changed since that
+round, and report nothing else. The control, `convert-with-the-check-disabled`, is the same project
+with the string as signed off, so both checks pass: an arm that stops here and proceeds there
+stopped on what the check reported.
 
 **Setup:** a keel install is staged beside `project/` (`fixtures/README.md`); dispatch both arms
 with `<staged dir>/keel/bin` first on `PATH`. The arm installs the engine's toolchain into the
