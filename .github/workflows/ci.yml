@@ -107,6 +107,10 @@ jobs:
       - name: Install the pinned browser
         working-directory: lib/mockup-engine/scripts
         run: node_modules/.bin/playwright install --with-deps chromium-headless-shell
+      # gate-sharded.sh is zsh, and Ubuntu's runner has none: without it its 7 tests skip, which
+      # KEEL_REQUIRE_MOCKUP_ENGINE fails.
+      - name: Install zsh
+        run: sudo apt-get install -y --no-install-recommends zsh
       - name: Engine tests
         env:
           KEEL_REQUIRE_MOCKUP_ENGINE: '1'
