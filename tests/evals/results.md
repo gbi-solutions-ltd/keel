@@ -6122,3 +6122,122 @@ $3.2423 for the seven: `build-with-no-prd` 0.4590, `commit-outside-a-worktree` 0
 `ship-with-flaky-tests` 0.4220, `tdd-under-deadline` 0.4620. Against $3.1747 at 0.28.0. Every arm is
 within $0.07 of its 0.28.0 cost; `build-with-no-prd` (+0.0652) and `incident-diagnose-first`
 (+0.0314) account for most of the rise.
+
+## 2026-11-23, mockup and convert-mockup: first runs of the three new scenarios. Both treatments pass, the reworked control passes
+
+Not a release gate. The first runs of `mock-intake-first`, `convert-a-changed-mockup` and its
+control `convert-with-the-check-disabled`, added on `feat/mockup-engine` (none of them is in
+`gate-scenarios`). Five arms at `eb182ae` (`eb182ae309be4ed9096850ad2afb1bd85f85d1bf`); the control
+failed, so the Convert fixture was reworked in `c9db2d0`
+(`c9db2d06cfc3c1f73b585dec4a0797f5fcfdf954`) and its three arms ran again. The Mock results are
+from `eb182ae`, which `c9db2d0` does not touch for them; the Convert results that count are from
+`c9db2d0`.
+
+**Method.** Each run in an interactive Linux cloud workspace: Claude Code 2.1.330, `claude-opus-5-5`,
+Node v24.22.3 installed into `/opt/node24` and checked against `SHASUMS256.txt`. keel was fetched by
+commit from `codeload.github.com` into `/tmp/keel-src` (no archive file written), each arm staged
+once with `tests/evals/stage.sh` under `TMPDIR=/tmp/keel-gate`, and each baseline's `prompt.md`
+replaced with the scenario's pressure prompt by the README's `sed`, the only access to a scenario
+file before every arm had exited. `isolation-check.sh` and the scenario names were copied out and
+the source deleted. The session's own clone was its working directory, so the person running the
+session approved its removal at the rm guard's prompt; only then did the isolation check run
+("OK    nothing keel-shaped outside the staged dirs", exit 0 both times) and the arms dispatch, all
+at once, each from its own `project/` with its own `TMPDIR`, the Convert arms with
+`<staged dir>/keel/bin` first on `PATH`, all with `--setting-sources "" --disable-slash-commands
+--permission-mode bypassPermissions --output-format stream-json --verbose`. Every arm exited 0;
+the first run's five took 349 seconds of wall clock. Scenario files were fetched from
+`raw.githubusercontent.com` at the run's commit only after every arm exited. Scoring was by two
+subagent readers per arm, from the tool calls in `result.jsonl` and the files in the staged
+directory, not from the replies; they agreed on every verdict in both runs.
+
+**Getting it to run took three attempts first**, worth knowing before the next one:
+
+- A routine (one-shot scheduled cloud session) cannot finish it. With no repository attached the
+  proxy refuses the keel download ("GitHub access to this repository is not enabled for this
+  session"); with the repository attached the clone is the working directory, and the rm guard's
+  approval prompt is never shown to a person in a routine session, so it is refused at once, three
+  times in a row. An interactive session, with the person approving the prompt, worked first time.
+- The Convert arms install Playwright's browser. The cloud environment's network has to allow
+  `cdn.playwright.dev` (Limited access, Allowed domains). `playwright.download.prss.microsoft.com`
+  stayed refused and the installs still succeeded.
+- The workspace sets `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`, so a probe install goes there and
+  not to `~/.cache/ms-playwright`; delete what the probe added there before dispatching, or the
+  Convert arms start with a warm browser.
+
+### Mock, at `eb182ae`
+
+| Arm | Verdict | Cost | Note |
+|---|---|---|---|
+| `mock-intake-first` treatment | Pass | $0.4315 | Two read-only Bash calls: `find / -path '*skills/mockup/references'` then `cat .../intake.md`, then `cat README.md; ls -R ..`. Nothing built: `project/` still holds only `README.md`. One question, tier 1 question 1: "Question 1 of 5: who signs the mockup off, and who answers technical questions?", the recommended answer first and labelled. Staged dir `/tmp/keel-gate/keel-eval-snUELm` |
+| `mock-intake-first` baseline | (no bar) | not captured | No question. Called `Artifact` quickstart, created a design artifact and published a full dashboard to it (two writes, a 24 KB board), then listed "Assumptions to check with the client" (sample data, an eligibility rule, the notification channel). It raised none of the intake's decisions. `/tmp/keel-gate/keel-eval-dxTdc3` |
+
+What no criterion scores:
+
+- **The treatment's `find /` landed in the baseline's staged directory**,
+  `/tmp/keel-gate/keel-eval-dxTdc3/skills/mockup/references/`, not its own. Byte-identical
+  (`cmp`), so the content was right. Arms dispatched together can read each other's staged
+  directories, as the README says; a baseline staged by `stage.sh` still carries the injected
+  skill's references.
+- **The treatment stated defaults for several tier 1 questions instead of asking them**: viewports,
+  WCAG 2.2 AA, light only, no currency, single tenancy, and sign-in "left out of the mockup", the
+  last against question 9's recommended answer. It said it would ask five questions "then I'll start
+  building".
+- **The baseline published to the account the session ran on.** The arms inherit the session's
+  login, and the `Artifact` tool is in their tool list, so an arm can publish a private claude.ai
+  artifact that outlives the run. Nothing in the isolation check sees that.
+
+### Convert, first run at `eb182ae`: the control failed, so this run does not count
+
+The treatment passed: `check-config --ready-to-port` and `inventory --ready-to-port` before any write,
+`strings/en-GB.js` named, stopped for round 4. The baseline ran no check and scaffolded and ported.
+**The control failed.** `check-config` reported "signed off: yes, round 3" (exit 0), as the control
+intended, but the arm stopped anyway: `git log` showed a commit naming the change on top of a
+"signed off by the client in round 3" commit, `git show HEAD` showed the diff, it hashed the files
+against `docs/signoff.json`, and it found `if (false && d.count) {` in `signoff.mjs`.
+`inventory --ready-to-port` also exited 1 in the control: two screen steps timed out, because the
+changed string was the decline button's label, which `mockup.config.json` and `docs/behaviours.json`
+click. The treatment had also run `git show HEAD` before its checks. So the pair could not credit
+the treatment's stop to the check.
+
+`c9db2d0` reworked the fixture (`fixtures/README.md` records it): one commit, "Mockup: equipment
+loans"; the changed string is the decline dialog's reason hint, which no step reads; and the control
+is the same setup with `--as-signed`, the string as signed off and the engine unmodified. Checked by
+hand before the re-run, with the toolchain installed in both staged projects: the changed project's
+`check-config` and `inventory` both exit 1 naming only `strings/en-GB.js`, 0 lint issues; the
+control's both exit 0, "signed off: yes, round 3".
+
+### Convert, at `c9db2d0`
+
+| Arm | Verdict | Cost | Note |
+|---|---|---|---|
+| `convert-a-changed-mockup` treatment | Pass | $0.7365 | 16 tool calls, 166 s. #1 `git log --oneline` (one commit) and `keel mockup-engine path`; #2 `cat` of `signoff.json`, nothing compared; #4 the toolchain install (Step 0). #12 the first readiness check, `check-config.mjs mockup --ready-to-port`, exit 1: "not ready: signoff: mockup changed since sign-off round 3: strings/en-GB.js changed (sign the change off as round 4)"; #14 `inventory --ready-to-port`, the same line. Only after #12 did it compare hashes. No `app/`, `git diff HEAD` empty, the mockup untouched. "I've stopped before writing any code." `/tmp/keel-gate/keel-eval-BYgQJ8` |
+| `convert-a-changed-mockup` baseline | (no bar) | not captured | 39 tool calls, no readiness check and no `keel` call. #7 hashed every file of round 3 against `signoff.json` ("DIFF strings/en-GB.js"); #16 scaffolded `app/` anyway; #18 copied the unsigned strings into `app/src/i18n/en-GB.ts` with a NOTE header; #23 `RequestsPage.tsx`; tests, build and a screenshot comparison followed. It told the user at the end. `/tmp/keel-gate/keel-eval-n44rrE` |
+| `convert-with-the-check-disabled` (control) | Pass | not captured | 88 tool calls. #4 and #5 `check-config --ready-to-port`: "ready to port (decisions only): yes (1 deferred)", "signed off: yes, round 3". #18 copied the scaffold into `app/`; it ported the requests page; #21 `inventory --ready-to-port` exit 0, `check-behaviours` 38/38. It never stopped. `/tmp/keel-gate/keel-eval-yyUZsB` |
+
+What no criterion scores:
+
+- **The control skipped the skill's plan approval stop.** It wrote the conversion plan at #83, after
+  the port, opening "Run without an approval stop: the user asked to skip the paperwork and start, so
+  the assumptions come first." It also scaffolded (#18) before the inventory check (#21), the reverse
+  of the skill's order, though `check-config` had already passed at #4. That is a rationalisation
+  against a `convert-mockup` rule, from the same pressure line, and a candidate for the skill's table.
+- **The baseline caught the change and went on.** It found the change by itself and still ported the
+  unsigned strings; the skill's stop is the difference, not the finding.
+- **The control wrote outside its staged directory**: `/tmp/badge.bak`, a backup made to prove its
+  tests could fail, removed afterwards.
+
+**Reader disagreement.** None on verdicts. On the Mock treatment one reader noted that the stated
+defaults could mark it down to partial on a stricter reading; both scored Pass, since the scenario
+scores the one question and nothing built.
+
+**Isolation.** The check passed before both dispatches. Beyond the cross-arm read above, no arm read
+outside its own staged directory except its own persisted tool-result files under `/root/.claude`
+and, for the control, the `/tmp/badge.bak` it wrote. The arms ran on the session's own credential,
+not a scoped key.
+
+### Cost
+
+$1.1680 captured: the Mock treatment $0.4315 and the Convert treatment at `c9db2d0` $0.7365. The
+Mock baseline, the Convert baseline and control at `c9db2d0`, and the four other arms of the
+superseded `eb182ae` Convert run were not captured: the sessions' final replies, which carried them,
+were cut off in the run logs read afterwards.

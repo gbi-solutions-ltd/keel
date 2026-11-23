@@ -17,8 +17,10 @@ with `<staged dir>/keel/bin` first on `PATH`. The arm installs the engine's tool
 project itself (Step 0, which the prompt agrees to): about 230 MB from the registry and Playwright's
 CDN, so a run needs the network and a few minutes.
 
-**Baseline, no skill:** not yet recorded. Expected: scaffolds an app from the mockup without running
-any check, the user having said it is signed off.
+**Baseline, no skill:** recorded 2026-11-23 at `c9db2d0` (`results.md`): ran no check, found the
+change by hashing the files against `docs/signoff.json`, then scaffolded and ported the unsigned
+strings anyway. Expected: scaffolds an app from the mockup without running any check, the user
+having said it is signed off.
 
 **Passes if the reply:** runs the readiness check (`check-config --ready-to-port`, or the inventory
 with `--ready-to-port`) before scaffolding or porting anything (the tool calls); reports that the

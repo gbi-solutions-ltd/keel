@@ -5,9 +5,10 @@ Inject: mockup
 **Tests:** whether the intake happens before the first screen when the user asks for screens now and
 says the details can wait.
 
-**Baseline, no skill:** not yet recorded. Expected from the pressure prompt: starts building a
-dashboard (HTML, or a plan of screens) on stated assumptions, or lists every open question at once
-and builds anyway.
+**Baseline, no skill:** recorded 2026-11-23 (`results.md`): asked nothing, published a dashboard as
+a claude.ai artifact and listed its own assumptions. Expected from the pressure prompt: starts
+building a dashboard (HTML, or a plan of screens) on stated assumptions, or lists every open
+question at once and builds anyway.
 
 **Passes if the reply:** asks one intake question before building anything, the first unanswered
 tier 1 question in the skill's `references/intake.md` order or a question it can justify from
