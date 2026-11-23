@@ -11,7 +11,9 @@ design framework routes on this stack: `examples/tailwind-react/` (in the provin
 
 Apply [../frontend-defaults.md](../frontend-defaults.md) and
 [../api-integration.md](../api-integration.md) throughout; this file adds only what is specific to
-the stack.
+the stack. The code it describes (the test setup, `renderApp`, the money field, the grid, the tests
+every app writes) is in [react-vite-patterns.md](react-vite-patterns.md), taken from the proven
+ports.
 
 ## Libraries
 
@@ -73,6 +75,9 @@ Tests never sit beside app files: `src/` holds only what ships, so a reader, a b
 coverage report see the app alone. Tests import their subject as `@/lib/format` (a Vite alias and
 a `paths` entry in `tsconfig.json`) and their helpers relatively. `check-frontend` rule
 `test-location` fails a test, spec, `__tests__`, `__mocks__` or `test/` folder inside `src/`.
+`tests/support/setup.ts` and `tests/support/render.tsx` are in react-vite-patterns.md:
+[the setup](react-vite-patterns.md#test-setup) and
+[`renderApp`](react-vite-patterns.md#rendering-the-app-in-a-test).
 
 ## Mapping
 
@@ -100,8 +105,8 @@ a `paths` entry in `tsconfig.json`) and their helpers relatively. `check-fronten
 | `status === 'loading'`, `'error'` | `query.isPending`, `query.isError` |
 | `title` | `document.title` in an effect |
 | Action marked `data-todo` | same element, a handler that logs `[todo]`, a `TODO(mockup)` comment naming the gap |
-| `MoneyField` with `data/money.js`, the shell's `moneyInput` and its `MK.onRender` caret hook | `lib/money.ts`; a controlled input whose `onChange` counts the digits before the caret, writes the regrouped value and calls `setSelectionRange` in the handler itself (an effect loses the caret when the value does not change), then reports the digits; a hidden input carries `name` and the minor units (`examples/starter-react` (in the proving repository)) |
-| ARIA grid: `PermissionGrid` with `data/grid.js`, the page's `cell` state, `gridKey` and `gridClick` | `lib/grid.ts`; the active cell in the grid component's `useState`, roving `tabIndex`, `onKeyDown` on the table calling `gridMove` and `preventDefault`, focus by ref in an effect after a handled key only (never on mount); a cell's `onClick` sets it (`examples/starter-react` (in the proving repository)) |
+| `MoneyField` with `data/money.js`, the shell's `moneyInput` and its `MK.onRender` caret hook | `lib/money.ts`; a controlled input whose `onChange` counts the digits before the caret, writes the regrouped value and calls `setSelectionRange` in the handler itself (an effect loses the caret when the value does not change), then reports the digits; a hidden input carries `name` and the minor units ([the code](react-vite-patterns.md#money-field-caret)) |
+| ARIA grid: `PermissionGrid` with `data/grid.js`, the page's `cell` state, `gridKey` and `gridClick` | `lib/grid.ts`; the active cell in the grid component's `useState`, roving `tabIndex`, `onKeyDown` on the table calling `gridMove` and `preventDefault`, focus by ref in an effect after a handled key only (never on mount); a cell's `onClick` sets it ([the code](react-vite-patterns.md#permission-grid-roving-focus)) |
 | `window.listQuery(rows, { search, filters, sort, cursor, limit })` in `load` | the query state in `useState` (a state function becomes the initialiser), with the `next_cursor` of each page followed; a pure mapping onto the generated hook's params (`q`, `min_amount`, `sort`, `cursor`, `limit`, empty values left out), `placeholderData: keepPreviousData`; the helper itself, ported unchanged, runs in the mock API (`examples/starter-react` (in the proving repository)) |
 
 ## Gotchas found while proving the example
@@ -114,8 +119,30 @@ or Vite's.
   `sed`, or the edit silently misses: the visual diff caught exactly that as a 72px height change.
 - **`vite preview` reads `process.env`** for the telemetry origin in `connect-src` only if the
   config reads it explicitly.
-- `StrictMode` runs effects twice in development. Harmless for the diff; keep side effects out of
-  render.
+- **`StrictMode` runs effects twice in development, and keeps refs between the two runs.** Keep side
+  effects out of render. A "first run" ref breaks: the layout skipped the `h1` focus on the first
+  run with one, so the second run saw it cleared and focused the heading on every fresh dev load.
+  No gate caught it: the heading's outline is removed by design, and the tests did not render under
+  `StrictMode`. Compare with the last path instead (`lastPath.current === pathname`), and turn
+  `StrictMode` on in the tests with `configure({ reactStrictMode: true })` in `setup.ts`, plus a
+  test that the first load leaves focus on `document.body`
+  ([the code](react-vite-patterns.md#focus-on-the-page-heading)).
+- **The mockup's own markup trips two Biome recommended rules**, and both are expected:
+  `<form role="search">` (`lint/a11y/useSemanticElements`) and a scrolling table `section` with
+  `tabIndex={0}` (`lint/a11y/noNoninteractiveTabindex`). Keep the markup, which the visual diff
+  and the DOM oracle compare, and suppress each with a reason on the line before, as the examples
+  do:
+
+  ```tsx
+  // biome-ignore lint/a11y/useSemanticElements: the mockup's form role="search" is the landmark; a <search> wrapper would change the markup
+  <form className="stack" role="search" aria-label="Filter invoices" onSubmit={applyFilters}>
+
+  // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable region must be reachable by keyboard (WCAG 2.1.1)
+  <section data-component="DataTable" className={s['data-table']} aria-label={caption} tabIndex={0}>
+  ```
+
+  A `//` comment works where the element is the root of an expression (after `return (`); inside
+  JSX children it is `{/* biome-ignore ... */}`.
 - **A global utility inside a CSS Module is hashed away** unless written `:global(.numeric)`. The
   splitter that turns `components.css` into modules does this; if a module is written by hand,
   check it.
@@ -140,7 +167,8 @@ and `src/locales/index.ts` with `LOCALES`, `DEFAULT_LOCALE` and `messages`. The 
 - **Sets `<html lang dir>`** from the active locale on start and on every change, as mk.js does.
 - **Formats through the active locale**: `lib/format.ts` takes the locale i18next reports, so dates,
   numbers and money change with it, as `MK.format` does. Test it against `MK.format` itself, loaded
-  in a vm, and every key at counts 0, 1, 2 and 5 against `MK.t`: that is what proves the strings.
+  in a vm, and every key at counts 0, 1, 2 and 5 against `MK.t`: that is what proves the strings
+  ([the test, and its gotchas](react-vite-patterns.md#format-helpers-against-the-mockup-runtime)).
 - **Honours `?locale=<code>` and `?locale=pseudo` where mocks run** (dev and the mocked build), never
   in production. Pseudo is built at start as a resource set: each message of the default locale
   through the same accenting and padding as mk.js's `pseudoize`. Not an i18next post-processor: it

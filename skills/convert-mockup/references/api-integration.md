@@ -25,14 +25,16 @@ paging, money as a decimal string. Follow it. The mutator then parses that error
 from an `X-Request-ID` header, a Blob for a non-JSON success), money is formatted from the string and
 never through `parseFloat`, and each departure from these defaults is a row in the conversion plan.
 
-**Drafting from the mockup.** Each `needs.api` line becomes an operation; each fixture entity
-becomes a schema, with its JSDoc `@typedef` giving the enums. Apply keel's `api-contracts.md` while
+**Drafting from the mockup.** Each `needs.api` line becomes an operation, and so does whatever
+the shell shows (the user's name, the role's label, the organisation): no page lists those, so
+read the layout. Each fixture entity becomes a schema, with its JSDoc `@typedef` giving the enums. Apply keel's `api-contracts.md` while
 drafting, because the draft becomes the real contract more often than not:
 
 - Path versioning, `/v1/...`.
 - Every collection is cursor paginated from the first version (`next_cursor`, a capped `limit`).
 - Errors use the keel envelope, `{ error: { code, message, request_id, details } }`, as one
-  `default` response on every operation. Callers branch on `code`.
+  `default` response on every operation, `details` an object (`type: object`), never left
+  untyped. Callers branch on `code`.
 - The app scaffold's held files import from the generated client by name, so the draft gives
   them those names: the envelope's schema is `ErrorEnvelope`; every operation has a tag (Orval
   splits the client by tag); `getSession` is tagged `session` and returns `Session` with

@@ -61,7 +61,10 @@ line: back to the `mockup` skill's sign-off (its Step 5).
 ## Convert, Step 3: the contract
 
 Confirm the contract is the signed-off one (the gate already checked its hash and fixtures) and
-read its operations against each page's `needs.api`; Step 6 imports it.
+read its operations against each page's `needs.api`, and against what the shell shows (its `load`
+and the layout's props: the user's name, the role's label, the organisation). A value the shell
+shows that no operation serves is a contract gap: a new sign-off round, or a gap entry and an
+expected difference. Step 6 imports the contract.
 
 ## Convert, Step 5: scaffold and bind the standards
 
@@ -70,7 +73,17 @@ as [its README](../../../lib/mockup-engine/templates/app-scaffold/README.md) say
 unchanged and which are skeletons, and what to fill in in each (`package.json`'s name and import
 paths, the budget, the flows, the ports). Into an existing repo, copy only what it lacks and merge
 the rest (that README's "Existing repo", and [existing-repo.md](existing-repo.md)). Then see
-`typecheck`, `lint`, `test` and `audit` each fail on a planted defect before porting.
+`typecheck`, `lint`, `test` and `audit` each fail on a planted defect before the first page.
+
+The bare scaffold cannot typecheck or test: `generate` needs the contract, and the held
+`permissions.tsx` imports two composites and the i18n library. The minimum first, from Step 6: item
+1 (tokens and globals), item 2 (the contract, `npm run generate`), the strings and i18n setup (item
+10), the `ErrorState` and `ForbiddenPage` composites, `tests/support/setup.ts` and one test. Then
+plant: a type error, an unused import (Biome), an inline style (`check-frontend`), a failing
+assertion, and a known vulnerable version in the lockfile only (the audit). Revert each.
+
+`keel:coding-standards` seed mode runs on the scaffolded app as on a project with no code: the
+scaffold is configuration, not the app's code.
 
 ## Convert, Step 6: the port, in order
 
@@ -105,7 +118,8 @@ the rest (that README's "Existing repo", and [existing-repo.md](existing-repo.md
    byte-copied, as the Vue reference does, because splitting it changes the cascade. Otherwise,
    for CSS Modules, `node S/split-css.mjs <mockup> src/components --inventory
    <app>/.mockup-engine/inventory/inventory.json` (Step 2's) writes each `/* Name */` block as
-   that component's module, unchanged except for global utilities wrapped as `:global(.name)`; it
+   that component's module (the `src/styles/components.css` copy `import-mockup` writes stays, not
+   imported: `import:check` keeps it level with the mockup), unchanged except for global utilities wrapped as `:global(.name)`; it
    exits 1 when a block is not written (its component has no layer in the inventory), when rules
    sit before the first block, or when nothing is written. Never copy blocks by hand. With a design framework chosen at intake the mockup is already
    built in it: `utility-css` and `css-library` ports keep the same classes on the same CSS;
@@ -145,7 +159,8 @@ the rest (that README's "Existing repo", and [existing-repo.md](existing-repo.md
     locale switch and `<html lang dir>` as the stack file says
     ([react-vite.md](stacks/react-vite.md#strings-and-locales), [vue.md](stacks/vue.md#libraries),
     [nextjs.md](stacks/nextjs.md#libraries)); honour `?locale=<code>` and `?locale=pseudo` where
-    mocks run, never in production. The pseudo-locale spill run is Step 2's
+    mocks run, never in production (not needed with one locale and
+    `project.i18n.expansionCheck` off). The pseudo-locale spill run is Step 2's
     (`spill-check --locale pseudo` on the mockup); in the app, a test renders every key through the
     app's library and through `MK.t` and compares.
 
@@ -185,11 +200,14 @@ mockup mounts on `#app`, and `--app-root` (or `domOracle.appRoot`) names the app
 it differs. A link to a mockup page compares as the page's `MK.page` route, with each `:param`
 filled from the link's query key of the same name. Where the app keeps the mockup's class names
 (Vue with the global sheet, `utility-css`, `css-library`), compare them. A React port on CSS
-Modules hashes every class name: add `class` to `domOracle.dropAttributes`, with the mk.js plumbing
-the app does not emit (`data-on`, `data-value`, `data-id`, `data-modal`), and the structure,
-attributes, text and routes are still compared. Proven on `examples/equipment-loans-app` (in the proving repository): what is
+Modules hashes every class name: drop `class` with `--drop-attributes`, with every `data-*` the
+mockup's markup carries for mk.js that the app does not emit (`data-on`, `data-value`, `data-id`,
+`data-modal`, and the components' own, such as `data-field`, `data-cursor`, `data-row`; list them
+from the mockup's markup). The flag adds to the signed-off config's `domOracle.dropAttributes`,
+which Convert does not edit. The structure, attributes, text and routes are still compared. Proven on `examples/equipment-loans-app` (in the proving repository): what is
 left is what the app adds on purpose (its live-region announcer) and copy written during
-conversion; read each, and record them as expected.
+conversion; read each, give each a gap entry, and record them as expected by keeping that run's
+report and passing it as `--reference` on every later run (exit 1 only when a case gets worse).
 
 The visual diff, the DOM oracle and the behaviours read the config's `pins` when `--clock` and
 `--seed` are not passed (and `timezoneId` for `--tz`); pass others only to override them: a dated

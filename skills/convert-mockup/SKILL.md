@@ -57,8 +57,9 @@ plan goes to `keel:write-plan` and `keel:execute-plan`.
 
 Scaffold per [templates/app-scaffold/README.md](../../lib/mockup-engine/templates/app-scaffold/README.md) and the stack
 reference. Without `<docs_root>/standards.md`, run **REQUIRED SUB-SKILL:** `keel:coding-standards`
-in seed mode. Wire `typecheck`, `lint` (Biome, then `check-frontend.mjs`), `test` and the audit,
-and see each fail on a planted defect before porting.
+in seed mode (the scaffold's files do not count as existing code). Wire `typecheck`, `lint`
+(Biome, then `check-frontend.mjs`), `test` and the audit, and see each fail on a planted defect
+before the first page: the minimum to get there is in the step detail.
 
 ## Step 6: Port
 

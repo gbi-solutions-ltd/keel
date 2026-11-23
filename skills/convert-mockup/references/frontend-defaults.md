@@ -19,7 +19,8 @@ Example paths are relative to `examples/paydesk-react/` (in the proving reposito
 (`vite.config.ts` or `next.config.ts` and `proxy.ts`, `package.json`, the env files) and the files
 the checks read (`biome.json`, `orval.config.ts`, `security-headers.json`, `perf-budget.json`,
 `staging-flows.json`) come from the app scaffold, `templates/app-scaffold/<stack>/`, not from the
-example.
+example. The example code a port needs beyond the scaffold (the test setup, the tests every app
+writes, the focus and input patterns) is in [stacks/react-vite-patterns.md](stacks/react-vite-patterns.md).
 
 ## The checks, and what each one holds
 
@@ -27,7 +28,7 @@ example.
 |---|---|
 | `npm run typecheck` | Strict types, generated client matches the contract |
 | `npm run lint` | Biome (format, lint, a11y, `noDangerouslySetInnerHtml`) then `scripts/check-frontend.mjs` |
-| `npm test` | Vitest, from `tests/` at the app root (never inside `src/`: rule `test-location`). `tests/sweep/` holds the cross-cutting checks: every data page in its error, empty and loading states, sessions that end, maintenance recovery, off-site links, idempotency on retry, failures shown in our copy. On React and Vite, the scaffold's `npm run test:coverage` reports coverage by file. Also: behaviour, error copy, permissions per role, sorting and paging requests, saved columns, exports, the palette, CSRF, CSV rules, redaction, fixtures against the contract |
+| `npm test` | Vitest, from `tests/` at the app root (never inside `src/`: rule `test-location`). `tests/sweep/` holds the cross-cutting checks: every data page in its error, empty and loading states, sessions that end, maintenance recovery, off-site links, idempotency on retry, failures shown in our copy. On React and Vite, the scaffold's `npm run test:coverage` reports coverage by file. Also: behaviour, error copy, permissions per role, sorting and paging requests, saved columns, exports, the palette, CSRF, CSV rules, redaction, fixtures against the contract ([the fixtures test](stacks/react-vite-patterns.md#fixtures-against-the-contract)) |
 | `scripts/visual-diff.mjs` | The app matches the signed-off mockup, every screen, state, role, interaction and viewport |
 | `scripts/quality-check.mjs` | axe WCAG 2.2 AA (its `color-contrast` rule is the contrast check, its `target-size` rule the 24px target check), no horizontal scroll down to 320px, a 44px touch warning on mobile, visible focus, no dashes, no console or CSP errors |
 | `npm audit --audit-level=high` | No high severity advisory, or a recorded exception |
@@ -76,7 +77,8 @@ clears a kit's own inline value, so nothing is rendered).
 - Native elements first: `button`, `a`, `table` with `caption` and `scope`, `fieldset` and `legend`
   for a group of controls. Biome's a11y rules catch most misuse.
 - `:focus-visible` outline in `base.css`, never removed without a replacement. Route changes move
-  focus to the new `h1` (`AppLayout.tsx`). Held by `quality-check` rule `focus`.
+  focus to the new `h1` (`AppLayout.tsx`, with a global rule for the focused heading:
+  [the code](stacks/react-vite-patterns.md#focus-on-the-page-heading)). Held by `quality-check` rule `focus`.
 - Loading announces itself (each skeleton has `role="status"` and hidden text); failures use
   `role="alert"`.
 - Dialogs are native `<dialog>` elements opened with `showModal()`; focus returns to whatever opened
@@ -115,7 +117,8 @@ clears a kit's own inline value, so nothing is rendered).
   rule `token-storage`. No token in a URL: rule `token-in-url`.
 - **CSRF**: double submit, when we draft the contract (a backend's contract may use an Origin check
   instead; it wins, see [api-integration.md](api-integration.md)). The server sets a readable `csrf_token` cookie; `apiFetch` copies it to
-  `X-CSRF-Token` on every state-changing method; the server compares. Tested in `http.test.ts`. The
+  `X-CSRF-Token` on every state-changing method; the server compares. Tested in `http.test.ts`, which the app writes (the scaffold ships none:
+  [an example](stacks/react-vite-patterns.md#the-http-and-telemetry-tests)). The
   server half is a gap until the backend confirms it.
 - **XSS**: no `dangerouslySetInnerHTML`, `v-html`, `:innerHTML` binding or `innerHTML` assignment.
   Biome and rule `unsafe-html`.
@@ -156,7 +159,8 @@ clears a kit's own inline value, so nothing is rendered).
   environment on the resource.
 - **Redaction at the boundary**, in one function: query strings, digit runs of seven or more (phone
   and account numbers, last four kept), and anything shaped like a token. Applied to messages,
-  stacks and span URLs. Tested in `telemetry.test.ts`.
+  stacks and span URLs. Tested in `telemetry.test.ts`, which the app writes
+  ([an example](stacks/react-vite-patterns.md#the-http-and-telemetry-tests)).
 - **Fetch spans propagate `traceparent` to our own origin only**, so a browser error joins the
   backend trace and no third party receives the header.
 
@@ -245,8 +249,14 @@ Contract first, client generated: [api-integration.md](api-integration.md).
 
 Found on the React example and true of Vue and Next.js too; each stack file adds its own.
 
-- **MSW 3** renamed the start option to `onUnhandledFrame`, and its Vite plugin emits the worker
-  into every build unless it is only added when mocks are on.
+- **MSW 3** replaced 2.x's `onUnhandledRequest` with `onUnhandledFrame` (a frame is a request or a
+  WebSocket connection no handler matched): `'bypass'`, `'warn'` (the default), `'error'`, or a
+  callback `({ frame, defaults })`. It is one shared option with two call sites: in the browser,
+  `setupWorker(...handlers).start({ onUnhandledFrame: 'bypass', quiet: true })` in
+  `mocks/browser.ts`, so the app's own assets and the telemetry collector pass through; in Node,
+  `server.listen({ onUnhandledFrame: 'error' })` in `tests/support/setup.ts`, so a request no
+  handler answers fails the test. The old name is gone from the types, so `tsc` flags it. Its Vite
+  plugin emits the worker into every build unless it is only added when mocks are on.
 - **OpenTelemetry**: take every package from one line; the newest of each by name mixes 2.x and
   3.x. The 3.x line (late 2026) deprecates `sdk-trace-web` and `sdk-trace-base` for
   `@opentelemetry/sdk-trace` (a `TracerProvider` with `StackContextManager`, no
@@ -276,15 +286,18 @@ Found on the React example and true of Vue and Next.js too; each stack file adds
   the real network and fail with `ECONNREFUSED`, so a loading-state test sees an error instead
   (8 runs in 8 on 24, none on 22 or 25). `tests/support/setup.ts` gives each test a new connection
   pool that never reuses a connection (`undici` as a pinned dev dependency) and releases every held
-  request after each test (`releaseHeldRequests`); either alone still failed 2 or 3 runs in 20.
+  request after each test (`releaseHeldRequests`); either alone still failed 2 or 3 runs in 20
+  ([the code](stacks/react-vite-patterns.md#test-setup)).
   Run the suite on every Node version the team uses.
 - **jsdom has no modal dialogs and no `matchMedia`.** The test setup stands in for `showModal()`
   (open, focus the first control) and Escape (a cancelable `cancel`), and stubs `matchMedia` as a
-  phone-sized, reduced-motion browser; the real behaviour is checked in Chromium by the visual
-  diff and the quality check.
+  phone-sized, reduced-motion browser ([the code](stacks/react-vite-patterns.md#test-setup)); the real behaviour is
+  checked in Chromium by the visual diff and the quality check. jsdom also gives a `td` in a
+  `role="grid"` table the role `cell`, where Chromium says `gridcell`.
 - **Test isolation.** Mock state, module-level stores (maintenance, session ended) and the preview
   role outlive a test unless `afterEach` rebuilds the handlers and resets each store. Render with
-  the app's own query client, retries off, so its error handling is under test too.
+  the app's own query client, retries off, so its error handling is under test too
+  ([`renderApp`](stacks/react-vite-patterns.md#rendering-the-app-in-a-test)).
 - **Unmounted routes have nothing to refetch.** While the maintenance page replaces the routes,
   `refetchQueries` finds no active query, so the check calls the generated `getSession()` itself.
 - **A status message exists twice: on screen, and in the live region**, repeated for screen
