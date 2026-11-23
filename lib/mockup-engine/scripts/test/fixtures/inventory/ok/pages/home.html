@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Home</title></head>
+<body>
+<div id="app"></div>
+<script>
+  // A stand-in for mk.js: just enough of MK.inspect() for the inventory.
+  const q = new URLSearchParams(location.search);
+  const state = q.get('state') || 'default';
+  const role = q.get('as') || 'admin';
+  const app = document.getElementById('app');
+  const used = ['Home'];
+  // guest lacks the page's permission and sees a forbidden page, with no skeleton or ErrorState
+  const allowed = role !== 'guest';
+  if (allowed && state === 'loading') used.push('TableSkeleton');
+  if (allowed && state === 'error') used.push('ErrorState');
+  // anchor a on every render, b only in the empty state, c only for role x, d only after Open
+  let html = '<section data-component="Home"><p data-tour="a">Always</p>';
+  if (state === 'empty') html += '<p data-tour="b">Nothing yet</p>';
+  if (role === 'x') { html += '<div data-component="XOnly" data-tour="c">Only for x</div>'; used.push('XOnly'); }
+  html += '<button type="button" id="open">Open</button></section>';
+  app.innerHTML = html;
+  document.getElementById('open').addEventListener('click', () => {
+    const p = document.createElement('p');
+    p.dataset.tour = 'd';
+    p.textContent = 'Opened';
+    app.firstChild.appendChild(p);
+  });
+  window.HELP = { tours: [{ id: 'home', route: '/home', permission: 'home.read', steps: ['a', 'b', 'c', 'd', 'e'].map((target) => ({ target, body: target })) }] };
+  window.MK = {
+    inspect: () => ({
+      page: { id: 'home', route: '/home', title: 'Home', loads: true, needs: { permission: 'home.read' } },
+      componentsUsed: used,
+      componentsRegistered: [],
+      componentMeta: {},
+      roles: { admin: { label: 'Admin', permissions: ['home.read'] }, x: { label: 'X', permissions: ['home.read'] }, guest: { label: 'Guest', permissions: [] } },
+      shell: null,
+    }),
+    can: (permission) => allowed || permission === 'public',
+  };
+</script>
+</body>
+</html>

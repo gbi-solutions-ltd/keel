@@ -1,0 +1,13 @@
+node_modules/
+.next/
+.next-mocked/
+src/api/generated/
+next-env.d.ts
+tsconfig.tsbuildinfo
+AGENTS.md
+.env*
+!.env.example
+*.pem
+*.key
+.mockup-engine/
+coverage/

@@ -1,0 +1,12 @@
+{
+  "name": "spill-check fixture",
+  "timezoneId": "Africa/Kampala",
+  "locale": "fr-FR",
+  "spill": {
+    "cards": [".tile"],
+    "scrollAllowed": [".wide-table"]
+  },
+  "screens": [
+    { "name": "cases", "page": "pages/cases.html", "route": "/cases" }
+  ]
+}

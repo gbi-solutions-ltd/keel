@@ -1,0 +1,47 @@
+{
+  "name": "mockup-engine-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Inventory, visual diff, quality and frontend checks for the mockup-engine skill",
+  "engines": {
+    "node": "^24.18.0 || ^26.13.0",
+    "npm": ">=11.16.0"
+  },
+  "scripts": {
+    "check-config": "node check-config.mjs",
+    "inventory": "node inventory.mjs",
+    "diff": "node visual-diff.mjs",
+    "oracle": "node dom-oracle.mjs",
+    "quality": "node quality-check.mjs",
+    "check-frontend": "node check-frontend.mjs",
+    "spill": "node spill-check.mjs",
+    "import-mockup": "node import-mockup.mjs",
+    "vendor-library": "node vendor-library.mjs",
+    "signoff": "node signoff.mjs",
+    "headers": "node headers.mjs",
+    "contract-diff": "node contract-diff.mjs",
+    "check-links": "node check-links.mjs",
+    "perf-budget": "node perf-budget.mjs",
+    "staging-run": "node staging-run.mjs",
+    "production-bar": "node production-bar.mjs",
+    "check-behaviours": "node check-behaviours.mjs",
+    "merge-shards": "node merge-shards.mjs",
+    "split-css": "node split-css.mjs",
+    "toolchain": "node toolchain.mjs",
+    "check-lock": "node check-lock.mjs",
+    "release-age": "node release-age.mjs",
+    "test": "node --test \"test/*.test.mjs\""
+  },
+  "dependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "pixelmatch": "7.2.0",
+    "playwright": "1.63.0",
+    "pngjs": "7.0.0",
+    "yaml": "2.9.1"
+  },
+  "overrides": {
+    "playwright-core": "1.63.0"
+  }
+}

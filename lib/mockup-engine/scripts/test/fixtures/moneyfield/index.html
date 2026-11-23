@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><title>MoneyField test page</title>
+  <script src="../../../../templates/mockup-starter/assets/mk.js"></script>
+  <script src="../../../../templates/mockup-starter/strings/en-GB.js"></script>
+  <script>
+    window.FIXTURES = {
+      organisation: { name: 'Test' },
+      session: { user_id: 'u1', role: 'admin' },
+      roles: { admin: { label: 'Admin', permissions: [] } },
+    };
+    window.SUBMITTED = null;
+  </script>
+  <script src="../../../../templates/mockup-starter/data/money.js"></script>
+  <script src="../../../../templates/mockup-starter/components/AppLayout.js"></script>
+  <script src="../../../../templates/mockup-starter/components/MoneyField.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+  // Two money fields in one form: UGX (no minor unit) and USD (two decimals), using the starter's
+  // MoneyField and the shell's moneyInput action and caret hook, as a page would.
+  MK.page({
+    id: 'moneyfield-test', route: '/test', title: 'MoneyField test page',
+    needs: { permission: 'public' },
+    state: { values: { ugx_amount: '', usd_amount: '' } },
+    actions: {
+      submit(_state, _e, el) { window.SUBMITTED = Object.fromEntries(new FormData(el)); return false; },
+    },
+    render: ({ state }) => MK.html`
+      <form data-action="submit">
+        ${MK.components.MoneyField({ id: 'ugx', name: 'ugx_amount', label: 'Amount', currency: 'UGX', value: state.values.ugx_amount, hint: 'Whole shillings' })}
+        ${MK.components.MoneyField({ id: 'usd', name: 'usd_amount', label: 'Fee', currency: 'USD', value: state.values.usd_amount })}
+        <button type="submit" id="send">Send</button>
+      </form>`,
+  });
+</script>
+</body>
+</html>

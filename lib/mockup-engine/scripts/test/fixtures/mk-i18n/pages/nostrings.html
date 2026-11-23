@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>no strings fixture</title></head>
+<body>
+<div id="app"></div>
+<script>window.FIXTURES = {};</script>
+<script src="../../../../../templates/mockup-starter/assets/mk.js"></script>
+<script>
+  MK.page({ id: 'plain', route: '/plain', render: () => MK.html`<p id="date">${MK.format.date('2026-03-05')}</p><p id="money">${MK.format.money(125000000, 'UGX')}</p>` });
+</script>
+</body>
+</html>

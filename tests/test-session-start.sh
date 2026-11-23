@@ -322,15 +322,21 @@ size_of() {   # size_of <cwd>
 # 13: two characters for the newline escape() renders as `\n`, five for `keel `, and six for the
 # version string itself. The worst is now 1279, 355 tokens, one inside NFR-01.
 #
+# Re-measured 2026-11-22 when mockup and convert-mockup were added to the router. Naming them costs
+# 25 characters ("; mockup then convert-mockup" on the Porting line, its "or" becoming a ";"), paid
+# for in the same edit: "for a rough idea" dropped after "shape-idea before write-prd", which
+# already says it, and "Unsure: use the keel skill to route." to "Unsure: use the keel skill.". No
+# skill name was dropped. Every form fell by 1 and the worst is now 1278.
+#
 # THESE FIVE NUMBERS DEPEND ON THE LENGTH OF ./VERSION, and that is deliberate. CLAUDE_PLUGIN_ROOT
 # is unset here, so the hook falls back to this repository and prints its real version, six
 # characters today. A bump to a seven character version moves all five by one and fails this block,
 # which is correct: it genuinely spends one of the six characters NFR-01 has left, and the point of
 # asserting exact sizes rather than an upper bound is that spending them is a deliberate act with a
 # re-measurement. Update the numbers, do not pin the version.
-for spec in "b:1279:terse and technical" "g:1278:terse and plain" \
-            "c:1077:verbose and technical" "h:1268:verbose and plain" \
-            "s:1077:terse and technical with the keel terse style"; do
+for spec in "b:1278:terse and technical" "g:1277:terse and plain" \
+            "c:1076:verbose and technical" "h:1267:verbose and plain" \
+            "s:1076:terse and technical with the keel terse style"; do
     dir="${spec%%:*}"; rest="${spec#*:}"; want="${rest%%:*}"; label="${rest#*:}"
     got="$(size_of "$tmp/$dir")"
     if [ "$got" = "$want" ]; then

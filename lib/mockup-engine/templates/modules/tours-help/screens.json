@@ -1,0 +1,13 @@
+[
+  {
+    "name": "help",
+    "page": "pages/help.html",
+    "route": "/help"
+  },
+  {
+    "name": "help-as-support",
+    "page": "pages/help.html",
+    "route": "/help",
+    "role": "auditor"
+  }
+]

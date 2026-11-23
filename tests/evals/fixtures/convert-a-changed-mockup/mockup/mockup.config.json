@@ -1,0 +1,519 @@
+{
+  "name": "equipment-loans",
+  "timezoneId": "Europe/Dublin",
+  "pins": {
+    "clock": "2026-11-23T09:00:00Z",
+    "seed": 20261123
+  },
+  "project": {
+    "people": {
+      "signsOff": "the client's operations manager",
+      "technicalOwner": "the engine maintainer"
+    },
+    "designFramework": {
+      "kind": "none"
+    },
+    "i18n": {
+      "locales": [
+        "en-GB"
+      ],
+      "defaultLocale": "en-GB",
+      "rtl": false,
+      "expansionCheck": false
+    },
+    "tenancy": "single",
+    "browsers": "last 2 versions, not dead",
+    "accessibility": "wcag22-aa",
+    "currency": "none",
+    "theming": "light",
+    "auth": {
+      "signIn": "idp-hosted",
+      "provider": "the organisation's OIDC identity provider, behind the BFF"
+    },
+    "contract": {
+      "source": "drafted",
+      "location": "api/openapi.yaml"
+    },
+    "target": {
+      "kind": "new-repo",
+      "path": "../../equipment-loans-app"
+    },
+    "stack": {
+      "name": "react-vite",
+      "decidedBy": "design-architecture",
+      "record": "../docs/decisions/ADR-0001-frontend-stack.md"
+    },
+    "deploy": {
+      "deferred": {
+        "owner": "the platform team",
+        "by": "2027-01-15",
+        "reason": "hosting not chosen"
+      }
+    },
+    "telemetry": {
+      "backend": "none"
+    }
+  },
+  "modules": [
+    "system-pages"
+  ],
+  "checklist": {
+    "approvals": "designed",
+    "user-management": "not-needed",
+    "roles-admin": "later",
+    "audit-log": "not-needed",
+    "notifications": "not-needed",
+    "settings": "not-needed",
+    "developer-access": "not-needed",
+    "session-timeout": "later",
+    "password-reset": "not-needed",
+    "onboarding": "not-needed",
+    "bulk-actions": "not-needed",
+    "saved-views": "not-needed",
+    "file-upload": "not-needed",
+    "print": "not-needed",
+    "privacy": "later"
+  },
+  "viewports": [
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "desktop",
+      "width": 1440,
+      "height": 900
+    }
+  ],
+  "screens": [
+    {
+      "name": "equipment",
+      "page": "pages/equipment.html",
+      "route": "/equipment",
+      "states": [
+        "default",
+        "empty",
+        "loading",
+        "error"
+      ]
+    },
+    {
+      "name": "equipment-as-coordinator",
+      "page": "pages/equipment.html",
+      "route": "/equipment",
+      "role": "coordinator"
+    },
+    {
+      "name": "equipment-searched",
+      "page": "pages/equipment.html",
+      "route": "/equipment",
+      "steps": [
+        {
+          "fill": {
+            "label": "Search",
+            "value": "projector"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Search"
+          }
+        }
+      ]
+    },
+    {
+      "name": "equipment-no-match",
+      "page": "pages/equipment.html",
+      "route": "/equipment",
+      "steps": [
+        {
+          "fill": {
+            "label": "Search",
+            "value": "tuba"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Search"
+          }
+        }
+      ]
+    },
+    {
+      "name": "equipment-cameras",
+      "page": "pages/equipment.html",
+      "route": "/equipment",
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Cameras"
+          }
+        }
+      ]
+    },
+    {
+      "name": "equipment-page-2",
+      "page": "pages/equipment.html",
+      "route": "/equipment",
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Next page"
+          }
+        }
+      ]
+    },
+    {
+      "name": "equipment-offline",
+      "page": "pages/equipment.html?system=offline",
+      "route": "/equipment?system=offline"
+    },
+    {
+      "name": "request",
+      "page": "pages/request-new.html?item=itm_07",
+      "route": "/equipment/itm_07/request",
+      "states": [
+        "default",
+        "empty",
+        "loading",
+        "error"
+      ]
+    },
+    {
+      "name": "request-not-booked",
+      "page": "pages/request-new.html?item=itm_05",
+      "route": "/equipment/itm_05/request"
+    },
+    {
+      "name": "request-errors",
+      "page": "pages/request-new.html?item=itm_07",
+      "route": "/equipment/itm_07/request",
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Send request"
+          }
+        }
+      ]
+    },
+    {
+      "name": "request-dates-reversed",
+      "page": "pages/request-new.html?item=itm_07",
+      "route": "/equipment/itm_07/request",
+      "steps": [
+        {
+          "fill": {
+            "label": "From",
+            "value": "2026-12-04"
+          }
+        },
+        {
+          "fill": {
+            "label": "To",
+            "value": "2026-12-02"
+          }
+        },
+        {
+          "fill": {
+            "label": "Purpose",
+            "value": "Community choir rehearsal"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Send request"
+          }
+        }
+      ]
+    },
+    {
+      "name": "request-conflict",
+      "page": "pages/request-new.html?item=itm_07",
+      "route": "/equipment/itm_07/request",
+      "steps": [
+        {
+          "fill": {
+            "label": "From",
+            "value": "2026-11-27"
+          }
+        },
+        {
+          "fill": {
+            "label": "To",
+            "value": "2026-11-28"
+          }
+        },
+        {
+          "fill": {
+            "label": "Purpose",
+            "value": "Community choir rehearsal"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Send request"
+          }
+        }
+      ],
+      "expectStatus": [
+        409
+      ]
+    },
+    {
+      "name": "request-sent",
+      "page": "pages/request-new.html?item=itm_07",
+      "route": "/equipment/itm_07/request",
+      "steps": [
+        {
+          "fill": {
+            "label": "From",
+            "value": "2026-11-30"
+          }
+        },
+        {
+          "fill": {
+            "label": "To",
+            "value": "2026-12-01"
+          }
+        },
+        {
+          "fill": {
+            "label": "Purpose",
+            "value": "Community choir rehearsal"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Send request"
+          }
+        }
+      ]
+    },
+    {
+      "name": "request-as-coordinator",
+      "page": "pages/request-new.html?item=itm_07",
+      "route": "/equipment/itm_07/request",
+      "role": "coordinator"
+    },
+    {
+      "name": "my-requests",
+      "page": "pages/my-requests.html",
+      "route": "/loans/mine",
+      "states": [
+        "default",
+        "empty",
+        "loading",
+        "error"
+      ]
+    },
+    {
+      "name": "my-requests-as-coordinator",
+      "page": "pages/my-requests.html",
+      "route": "/loans/mine",
+      "role": "coordinator"
+    },
+    {
+      "name": "requests",
+      "page": "pages/requests.html",
+      "route": "/requests",
+      "role": "coordinator",
+      "states": [
+        "default",
+        "empty",
+        "loading",
+        "error"
+      ]
+    },
+    {
+      "name": "requests-as-staff",
+      "page": "pages/requests.html",
+      "route": "/requests",
+      "role": "staff"
+    },
+    {
+      "name": "requests-requested",
+      "page": "pages/requests.html",
+      "route": "/requests",
+      "role": "coordinator",
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Requested"
+          }
+        }
+      ]
+    },
+    {
+      "name": "requests-page-2",
+      "page": "pages/requests.html",
+      "route": "/requests",
+      "role": "coordinator",
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Next page"
+          }
+        }
+      ]
+    },
+    {
+      "name": "requests-approved",
+      "page": "pages/requests.html",
+      "route": "/requests",
+      "role": "coordinator",
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Approve LN-1051"
+          }
+        }
+      ]
+    },
+    {
+      "name": "requests-approve-conflict",
+      "page": "pages/requests.html",
+      "route": "/requests",
+      "role": "coordinator",
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Approve LN-1052"
+          }
+        }
+      ],
+      "expectStatus": [
+        409
+      ]
+    },
+    {
+      "name": "requests-decline-dialog",
+      "page": "pages/requests.html",
+      "route": "/requests",
+      "role": "coordinator",
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Decline LN-1050"
+          }
+        }
+      ]
+    },
+    {
+      "name": "requests-decline-no-reason",
+      "page": "pages/requests.html",
+      "route": "/requests",
+      "role": "coordinator",
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Decline LN-1050"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Yes, decline"
+          }
+        }
+      ]
+    },
+    {
+      "name": "requests-declined",
+      "page": "pages/requests.html",
+      "route": "/requests",
+      "role": "coordinator",
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Decline LN-1050"
+          }
+        },
+        {
+          "fill": {
+            "label": "Reason for declining",
+            "value": "The projector is needed for the board that day."
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Yes, decline"
+          }
+        }
+      ]
+    },
+    {
+      "name": "requests-handed-out",
+      "page": "pages/requests.html",
+      "route": "/requests",
+      "role": "coordinator",
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Hand out LN-1047"
+          }
+        }
+      ]
+    },
+    {
+      "name": "requests-returned",
+      "page": "pages/requests.html",
+      "route": "/requests",
+      "role": "coordinator",
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Mark returned LN-1046"
+          }
+        }
+      ]
+    },
+    {
+      "name": "not-found",
+      "page": "pages/not-found.html",
+      "route": "/no-such-page"
+    },
+    {
+      "name": "server-error",
+      "page": "pages/server-error.html",
+      "route": "/equipment?system=crash",
+      "expectConsole": [
+        "Preview of a render failure"
+      ]
+    },
+    {
+      "name": "maintenance",
+      "page": "pages/maintenance.html",
+      "route": "/equipment?system=maintenance",
+      "expectStatus": [
+        503
+      ]
+    }
+  ],
+  "diff": {
+    "maxMismatchPercent": 0,
+    "pixelThreshold": 0.1,
+    "boxTolerancePx": 4
+  },
+  "quality": {
+    "targetMinPx": 44
+  }
+}

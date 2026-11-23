@@ -1,0 +1,311 @@
+[
+  {
+    "name": "users",
+    "page": "pages/users.html",
+    "route": "/settings/users",
+    "states": [
+      "default",
+      "empty",
+      "loading",
+      "error"
+    ]
+  },
+  {
+    "name": "users-invited",
+    "page": "pages/users.html",
+    "route": "/settings/users",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Invited"
+        }
+      }
+    ]
+  },
+  {
+    "name": "users-page-2",
+    "page": "pages/users.html",
+    "route": "/settings/users",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Next page"
+        }
+      }
+    ]
+  },
+  {
+    "name": "users-invite",
+    "page": "pages/users.html",
+    "route": "/settings/users",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Invite user"
+        }
+      }
+    ]
+  },
+  {
+    "name": "users-invite-errors",
+    "page": "pages/users.html",
+    "route": "/settings/users",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Invite user"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Send invitation"
+        }
+      }
+    ]
+  },
+  {
+    "name": "users-invite-taken",
+    "page": "pages/users.html",
+    "route": "/settings/users",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Invite user"
+        }
+      },
+      {
+        "fill": {
+          "label": "Name",
+          "value": "Grace Again"
+        }
+      },
+      {
+        "fill": {
+          "label": "Email",
+          "value": "grace@example.com"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Send invitation"
+        }
+      }
+    ],
+    "expectStatus": [
+      409
+    ]
+  },
+  {
+    "name": "users-invite-sent",
+    "page": "pages/users.html",
+    "route": "/settings/users",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Invite user"
+        }
+      },
+      {
+        "fill": {
+          "label": "Name",
+          "value": "Nora Achan"
+        }
+      },
+      {
+        "fill": {
+          "label": "Email",
+          "value": "nora@example.com"
+        }
+      },
+      {
+        "click": {
+          "role": "radio",
+          "name": "Clerk"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Send invitation"
+        }
+      }
+    ]
+  },
+  {
+    "name": "users-as-finance",
+    "page": "pages/users.html",
+    "route": "/settings/users",
+    "role": "clerk"
+  },
+  {
+    "name": "user",
+    "page": "pages/user-detail.html?id=usr_1003",
+    "route": "/settings/users/usr_1003",
+    "states": [
+      "default",
+      "loading",
+      "error"
+    ]
+  },
+  {
+    "name": "user-last-admin",
+    "page": "pages/user-detail.html?id=usr_1001",
+    "route": "/settings/users/usr_1001"
+  },
+  {
+    "name": "user-change-role",
+    "page": "pages/user-detail.html?id=usr_1003",
+    "route": "/settings/users/usr_1003",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Change role"
+        }
+      },
+      {
+        "click": {
+          "role": "radio",
+          "name": "Auditor"
+        }
+      }
+    ]
+  },
+  {
+    "name": "user-role-changed",
+    "page": "pages/user-detail.html?id=usr_1003",
+    "route": "/settings/users/usr_1003",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Change role"
+        }
+      },
+      {
+        "click": {
+          "role": "radio",
+          "name": "Auditor"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Save role"
+        }
+      }
+    ]
+  },
+  {
+    "name": "user-deactivate",
+    "page": "pages/user-detail.html?id=usr_1003",
+    "route": "/settings/users/usr_1003",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Deactivate"
+        }
+      }
+    ]
+  },
+  {
+    "name": "user-deactivated",
+    "page": "pages/user-detail.html?id=usr_1003",
+    "route": "/settings/users/usr_1003",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Deactivate"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Yes, deactivate"
+        }
+      }
+    ]
+  },
+  {
+    "name": "user-reactivated",
+    "page": "pages/user-detail.html?id=usr_1002",
+    "route": "/settings/users/usr_1002",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Reactivate"
+        }
+      }
+    ]
+  },
+  {
+    "name": "user-invitation-expired",
+    "page": "pages/user-detail.html?id=usr_1010",
+    "route": "/settings/users/usr_1010"
+  },
+  {
+    "name": "user-invitation-resent",
+    "page": "pages/user-detail.html?id=usr_1010",
+    "route": "/settings/users/usr_1010",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Resend invitation"
+        }
+      }
+    ]
+  },
+  {
+    "name": "user-invitation-revoked",
+    "page": "pages/user-detail.html?id=usr_1009",
+    "route": "/settings/users/usr_1009",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Revoke invitation"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Yes, revoke"
+        }
+      }
+    ]
+  },
+  {
+    "name": "roles",
+    "page": "pages/roles.html",
+    "route": "/settings/roles",
+    "states": [
+      "default",
+      "loading",
+      "error"
+    ]
+  },
+  {
+    "name": "user-as-support",
+    "page": "pages/user-detail.html?id=usr_1003",
+    "route": "/settings/users/usr_1003",
+    "role": "auditor"
+  },
+  {
+    "name": "roles-as-finance",
+    "page": "pages/roles.html",
+    "route": "/settings/roles",
+    "role": "clerk"
+  }
+]

@@ -5085,6 +5085,23 @@ cmd_ci_review() {
     esac
 }
 
+# mockup-engine: where the mockup and convert-mockup skills find their engine, and its preflight.
+# The engine is Node (lib/mockup-engine); this only finds it and hands over, so keel itself still
+# needs no Node, and nothing here downloads: the install is the engine's own command, which the
+# skills run only after the user agrees (lib/mockup-engine/DEPENDENCIES.md).
+cmd_mockup_engine() {
+    local engine="$HERE/lib/mockup-engine"
+    [ -f "$engine/scripts/toolchain.mjs" ] || die "incomplete install: $engine/scripts/toolchain.mjs not found"
+    case "${1:-}" in
+        path) printf '%s\n' "$engine" ;;
+        check)
+            command -v node >/dev/null 2>&1 \
+              || die "mockup-engine needs Node, an LTS release of line 24 or 26, and none is on PATH"
+            exec node "$engine/scripts/toolchain.mjs" --project "${2:-.}" ;;
+        *) die "unknown mockup-engine command '${1:-}'. Usage: keel mockup-engine path|check [<project>]" ;;
+    esac
+}
+
 case "${1:-}" in
     init)        shift; cmd_init "$@" ;;
     new)         shift; cmd_new "$@" ;;
@@ -5095,6 +5112,7 @@ case "${1:-}" in
     guard)       shift; cmd_guard "$@" ;;
     ci-review)   shift; cmd_ci_review "$@" ;;
     plan)        shift; cmd_plan "$@" ;;
+    mockup-engine) shift; cmd_mockup_engine "$@" ;;
     version)     cat "$HERE/VERSION" 2>/dev/null || echo unknown ;;
     ""|-h|--help)
         say "keel <command>"; say ""
@@ -5118,6 +5136,7 @@ case "${1:-}" in
         say "  plan report <plan> [--json]   when a plan was planned and delivered, its lead time, and the commits that reworked it, from git"
         say "  plan risk [--staged | --range <a>..<b> | <path>...]   which review loop a change gets, from hard_block_paths: light only when the last line is 'loop: light' and the exit is 0"
         say "  plan batches <plan> [--json]   which of a plan's tasks may run at the same time, from their Depends on and Files lines, and why the rest may not"
+        say "  mockup-engine path|check [<project>]   the mockup skills' engine folder, and its preflight: the runtime, and the project's install of the engine"
         say "  version" ;;
     *) die "unknown command '$1'. Try 'keel --help'." ;;
 esac

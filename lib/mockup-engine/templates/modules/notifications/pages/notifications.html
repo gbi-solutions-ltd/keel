@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Notifications</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../assets/tokens.css">
+  <link rel="stylesheet" href="../assets/base.css">
+  <link rel="stylesheet" href="../assets/components.css">
+  <script src="../assets/mk.js"></script>
+  <script src="../strings/en-GB.js"></script>
+  <script src="../data/fixtures.js"></script>
+  <script src="../components/AppLayout.js"></script>
+  <script src="../components/AccountMenu.js"></script>
+  <script src="../components/Badge.js"></script>
+  <script src="../components/DataTable.js"></script>
+  <script src="../components/EmptyState.js"></script>
+  <script src="../components/ErrorPage.js"></script>
+  <script src="../components/ErrorState.js"></script>
+  <script src="../components/FilterTabs.js"></script>
+  <script src="../components/InvoiceStatusBadge.js"></script>
+  <script src="../components/MoneyField.js"></script>
+  <script src="../components/NotificationList.js"></script>
+  <script src="../components/NotificationMenu.js"></script>
+  <script src="../components/Pagination.js"></script>
+  <script src="../components/PermissionGrid.js"></script>
+  <script src="../components/SelectField.js"></script>
+  <script src="../components/SkeletonBox.js"></script>
+  <script src="../components/TableSkeleton.js"></script>
+  <script src="../components/TextField.js"></script>
+  <script src="../components/ToggleList.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const { html, components: C, format } = MK;
+    const FILTERS = [{ value: 'all', label: 'All' }, { value: 'unread', label: 'Unread' }];
+
+    MK.page({
+      id: 'notifications',
+      route: '/notifications',
+      title: 'Notifications',
+      needs: {
+        api: [
+          'GET /v1/me/notifications?unread=&cursor=&limit= -> NotificationPage { items, next_cursor, prev_cursor, unread_count }',
+          'POST /v1/me/notifications/{id}/read and POST /v1/me/notifications/read-all -> 204',
+        ],
+        permission: 'authenticated',
+        notes: ['Notifications are kept 90 days; to confirm', 'Real-time delivery (push or polling interval) to decide'],
+      },
+      state: { filter: 'all', read: [], readAllPage: false },
+      load: (fx, { scenario, state }) => {
+        const all = (scenario === 'empty' ? [] : fx.notifications).map((n) => ({ ...n, read: n.read || state.readAllPage || state.readAll || state.read.includes(n.id) }));
+        return { unread: all.filter((n) => !n.read).length, items: all.filter((n) => state.filter === 'all' || !n.read) };
+      },
+      actions: {
+        setFilter(state, _e, el) { state.filter = el.dataset.value; },
+        markRead(state, _e, el, ctx) { state.read.push(el.dataset.value); ctx.focus('notifications-heading'); },
+        markAllRead(state, _e, _el, ctx) { state.readAllPage = true; state.readAll = true; ctx.focus('notifications-heading'); },
+      },
+      render: ({ state, data, status }) => {
+        const header = html`
+          <div class="row row--between">
+            <h1 id="notifications-heading" tabindex="-1">Notifications</h1>
+            <div class="row">
+              <a href="${MK.href('./notification-settings.html')}">Notification settings</a>
+              ${data?.unread ? html`<button type="button" class="button" data-action="markAllRead">Mark all as read</button>` : ''}
+            </div>
+          </div>
+          <div class="toolbar">${C.FilterTabs({ label: 'Show', action: 'setFilter', value: state.filter, options: FILTERS })}</div>`;
+        let content;
+        if (status === 'loading') content = html`<div role="status"><span class="visually-hidden">Loading</span>${Array.from({ length: 4 }, () => html`${C.SkeletonBox({ shape: 'text' })}${C.SkeletonBox({ shape: 'text' })}`)}</div>`;
+        else if (status === 'error') content = C.ErrorState({ body: 'We could not load your notifications. Please refresh.' });
+        else if (!data.items.length) content = state.filter === 'unread'
+          ? C.EmptyState({ title: 'You are all caught up', body: 'New notifications will appear here.' })
+          : C.EmptyState({ title: 'No notifications yet', body: 'Exports, sign-ins and changes to your team will appear here.' });
+        else content = C.NotificationList({
+          markAction: 'markRead',
+          items: data.items.map((n) => ({ id: n.id, title: n.title, body: n.body, time: format.dateTime(n.created_at), href: n.link && window.pageFor(n.link), read: n.read })),
+        });
+        return html`<div class="stack">${header}<div class="card">${content}</div></div>`;
+      },
+    });
+  </script>
+</body>
+</html>

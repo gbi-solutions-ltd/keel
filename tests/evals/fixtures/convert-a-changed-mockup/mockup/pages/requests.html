@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <title>Requests</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../assets/tokens.css">
+  <link rel="stylesheet" href="../assets/base.css">
+  <link rel="stylesheet" href="../assets/components.css">
+  <script src="../assets/mk.js"></script>
+  <script src="../strings/en-GB.js"></script>
+  <script src="../data/fixtures.js"></script>
+  <script src="../data/list-query.js"></script>
+  <script src="../data/bookings.js"></script>
+  <script src="../components/AppLayout.js"></script>
+  <script src="../components/Badge.js"></script>
+    <script src="../components/Dialog.js"></script>
+  <script src="../components/EmptyState.js"></script>
+  <script src="../components/ErrorPage.js"></script>
+  <script src="../components/ErrorState.js"></script>
+  <script src="../components/FilterTabs.js"></script>
+  <script src="../components/LoanStatusBadge.js"></script>
+  <script src="../components/CardListSkeleton.js"></script>
+  <script src="../components/LoanList.js"></script>
+  <script src="../components/Notice.js"></script>
+  <script src="../components/Pagination.js"></script>
+  <script src="../components/SkeletonBox.js"></script>
+  <script src="../components/TextAreaField.js"></script>
+  </head>
+<body>
+  <div id="app"></div>
+  <script>
+    const { html, components: C } = MK;
+    const PAGE_SIZE = 10;
+    const REASON_MAX = 200;
+    const STATUSES = ['', 'requested', 'approved', 'on_loan', 'declined', 'returned'];
+    // What each action makes of a loan, as the server answers it: the new status and what may follow.
+    const AFTER = {
+      approve: { status: 'approved', allowed_actions: ['hand_out'] },
+      decline: { status: 'declined', allowed_actions: [] }, // plus the decline_reason given
+      hand_out: { status: 'on_loan', allowed_actions: ['return'] },
+      return: { status: 'returned', allowed_actions: [] },
+    };
+    // The loans as the server holds them after this visit's actions.
+    const current = (fx, changes) => fx.loans.map((l) => (changes[l.id] ? { ...l, ...changes[l.id] } : l));
+
+    MK.page({
+      id: 'requests',
+      route: '/requests',
+      title: MK.t('requests.title'),
+      needs: {
+        api: [
+          'GET /v1/loans?status=&cursor=&limit= -> LoanPage { items, next_cursor }',
+          'POST /v1/loans/{id}/approve -> Loan; 409 dates_unavailable; 409 invalid_transition',
+          'POST /v1/loans/{id}/decline { reason } -> Loan; 422 validation_failed; 409 invalid_transition',
+          'POST /v1/loans/{id}/hand-out -> Loan; 409 invalid_transition',
+          'POST /v1/loans/{id}/return -> Loan; 409 invalid_transition',
+        ],
+        permission: 'loan:manage',
+        uses: ['loan:manage'],
+        notes: [
+          'every request, newest request first, filtered by status (PRD requirement 3); cursor paged, limit 10 here, no total',
+          'allowed_actions come from the server: approve and decline while requested, hand out once approved, return while on loan (PRD requirements 3 and 4)',
+          'approving refuses days that overlap an approved loan or one on loan with 409 dates_unavailable (PRD requirement 5); LN-1052 shows it',
+          'declining asks for a short reason (up to 200 characters), which the staff member sees on their request (decision D-1, round 2)',
+        ],
+      },
+      state: () => ({ status: '', cursors: [], changes: {}, declining: null, notice: null, values: { decline_reason: '' }, reasonError: null }),
+      // Stands in for the API: every loan, this visit's changes, the status filter, newest first, and
+      // only the actions the role may take.
+      load: (fx, { scenario, state, session }) => {
+        const loans = scenario === 'empty' ? [] : current(fx, state.changes)
+          .map((l) => ({ ...l, allowed_actions: l.allowed_actions.filter((a) => session.permissions.includes(fx.action_permissions[a])) }));
+        return window.listQuery(loans, { filters: { status: state.status }, sort: '-requested_at', cursor: state.cursors[state.cursors.length - 1], limit: PAGE_SIZE });
+      },
+      actions: {
+        setStatus(state, _e, el) { state.status = el.dataset.value; state.cursors = []; state.notice = null; },
+        nextPage(state, _e, el) { state.cursors = [...state.cursors, el.dataset.cursor]; },
+        prevPage(state) { state.cursors = state.cursors.slice(0, -1); },
+        approve(state, _e, el, ctx) {
+          const loan = current(ctx.fixtures, state.changes).find((l) => l.id === el.dataset.id);
+          const taken = window.bookings.taken(current(ctx.fixtures, state.changes), loan.item.id, { except: loan.id });
+          if (window.bookings.overlaps(loan, taken)) {
+            state.notice = { tone: 'danger', text: MK.t('requests.notice.conflict', { reference: loan.reference, item: loan.item.name }) };
+            ctx.focus(el.id);
+            return;
+          }
+          state.changes = { ...state.changes, [loan.id]: AFTER.approve };
+          state.notice = { tone: 'success', text: MK.t('requests.notice.approved', { reference: loan.reference }) };
+          ctx.focus(`loan-hand_out-${loan.id}`);
+        },
+        askDecline(state, _e, el, ctx) {
+          state.declining = el.dataset.id;
+          state.values = { ...state.values, decline_reason: '' };
+          state.reasonError = null;
+          ctx.focus('decline-reason');
+        },
+        cancelDecline(state, _e, _el, ctx) { const id = state.declining; state.declining = null; state.reasonError = null; ctx.focus(`loan-decline-${id}`); },
+        // The server refuses an empty reason with 422 validation_failed; the dialog checks first.
+        confirmDecline(state, _e, el, ctx) {
+          const reason = String(new FormData(el).get('decline_reason') || '').trim();
+          state.values = { ...state.values, decline_reason: reason };
+          if (!reason) { state.reasonError = MK.t('requests.decline.reason.missing'); ctx.focus('decline-reason'); return; }
+          const loan = ctx.fixtures.loans.find((l) => l.id === state.declining);
+          state.changes = { ...state.changes, [loan.id]: { ...AFTER.decline, decline_reason: reason } };
+          state.reasonError = null;
+          state.declining = null;
+          state.notice = { tone: 'success', text: MK.t('requests.notice.declined', { reference: loan.reference }) };
+          ctx.focus('requests-title');
+        },
+        handOut(state, _e, el, ctx) {
+          const loan = ctx.fixtures.loans.find((l) => l.id === el.dataset.id);
+          state.changes = { ...state.changes, [loan.id]: AFTER.hand_out };
+          state.notice = { tone: 'success', text: MK.t('requests.notice.handedOut', { reference: loan.reference }) };
+          ctx.focus(`loan-return-${loan.id}`);
+        },
+        markReturned(state, _e, el, ctx) {
+          const loan = ctx.fixtures.loans.find((l) => l.id === el.dataset.id);
+          state.changes = { ...state.changes, [loan.id]: AFTER.return };
+          state.notice = { tone: 'success', text: MK.t('requests.notice.returned', { reference: loan.reference }) };
+          ctx.focus('requests-title');
+        },
+      },
+      render: ({ state, data, status }) => {
+        let content;
+        if (status === 'loading') content = C.CardListSkeleton({ count: 6, layout: 'list' });
+        else if (status === 'error') content = html`<div class="card">${C.ErrorState({ body: MK.t('requests.error') })}</div>`;
+        else if (!data.rows.length) content = html`<div class="card">${state.status
+          ? C.EmptyState({ title: MK.t('requests.noMatch.title'), body: MK.t('requests.noMatch.body') })
+          : C.EmptyState({ title: MK.t('requests.empty.title'), body: MK.t('requests.empty.body') })}</div>`;
+        else content = html`
+          ${C.LoanList({ label: MK.t('requests.list.label'), loans: data.rows, showRequester: true, actionNames: { approve: 'approve', decline: 'askDecline', hand_out: 'handOut', return: 'markReturned' } })}
+          ${C.Pagination({ page: state.cursors.length + 1, hasPrev: state.cursors.length > 0, nextCursor: data.next_cursor, prevAction: 'prevPage', nextAction: 'nextPage' })}`;
+        const declining = state.declining && window.FIXTURES.loans.find((l) => l.id === state.declining);
+        return html`<div class="stack">
+          <h1 id="requests-title" tabindex="-1">${MK.t('requests.title')}</h1>
+          <p class="muted">${MK.t('requests.intro')}</p>
+          ${C.FilterTabs({ label: MK.t('requests.filter.label'), value: state.status, action: 'setStatus', options: STATUSES.map((s) => ({ value: s, label: MK.t(`requests.filter.${s || 'all'}`) })) })}
+          ${state.notice ? C.Notice(state.notice) : ''}
+          ${content}
+          ${declining ? C.Dialog({
+            id: 'decline',
+            title: MK.t('requests.decline.title', { reference: declining.reference }),
+            body: html`<p>${MK.t('requests.decline.body', { name: declining.requester.name, item: declining.item.name })}</p>
+              <form id="decline-form" class="form" data-action="confirmDecline" novalidate>
+                ${C.TextAreaField({ id: 'decline-reason', name: 'decline_reason', label: MK.t('requests.decline.reason.label'), value: state.values.decline_reason, hint: MK.t('requests.decline.reason.hint', { max: REASON_MAX }), error: state.reasonError, required: true, maxlength: REASON_MAX, rows: 3, action: 'setValue' })}
+              </form>`,
+            cancelAction: 'cancelDecline',
+            actions: html`<button type="button" id="decline-cancel" class="button" data-action="cancelDecline">${MK.t('requests.decline.cancel')}</button>
+              <button type="submit" form="decline-form" class="button button--danger">${MK.t('requests.decline.confirm')}</button>`,
+          }) : ''}
+        </div>`;
+      },
+    });
+  </script>
+</body>
+</html>

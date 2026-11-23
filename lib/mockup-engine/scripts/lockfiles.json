@@ -1,0 +1,26 @@
+{
+  "$comment": "Every lockfile the engine owns, checked by check-lock.mjs (DEPENDENCIES.md). toolchain: the engine's own (the others are what the scaffold seeds an app with, each a copy of its proven example's lockfile), installed with no install scripts. packages: the exact count, raised in the commit that adds one, with its reason. duplicates: the names allowed at two versions. prereleases: a name allowed at a prerelease, to the reason.",
+  "lockfiles": {
+    ".": {
+      "toolchain": true,
+      "packages": 13,
+      "duplicates": []
+    },
+    "../templates/sample-backend": {
+      "toolchain": true,
+      "packages": 69,
+      "duplicates": [
+        "fast-uri"
+      ]
+    },
+    "../templates/app-scaffold/react-vite": {
+      "packages": 343
+    },
+    "../templates/app-scaffold/vue": {
+      "packages": 461
+    },
+    "../templates/app-scaffold/nextjs": {
+      "packages": 374
+    }
+  }
+}

@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>User</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../assets/tokens.css">
+  <link rel="stylesheet" href="../assets/base.css">
+  <link rel="stylesheet" href="../assets/components.css">
+  <script src="../assets/mk.js"></script>
+  <script src="../strings/en-GB.js"></script>
+  <script src="../data/fixtures.js"></script>
+  <script src="../components/AppLayout.js"></script>
+  <script src="../components/Badge.js"></script>
+  <script src="../components/DataTable.js"></script>
+  <script src="../components/DetailList.js"></script>
+  <script src="../components/Dialog.js"></script>
+  <script src="../components/EmptyState.js"></script>
+  <script src="../components/ErrorPage.js"></script>
+  <script src="../components/ErrorState.js"></script>
+  <script src="../components/FilterTabs.js"></script>
+  <script src="../components/InvoiceStatusBadge.js"></script>
+  <script src="../components/MoneyField.js"></script>
+  <script src="../components/Notice.js"></script>
+  <script src="../components/Pagination.js"></script>
+  <script src="../components/PermissionGrid.js"></script>
+  <script src="../components/RadioGroup.js"></script>
+  <script src="../components/RoleCard.js"></script>
+  <script src="../components/SelectField.js"></script>
+  <script src="../components/SkeletonBox.js"></script>
+  <script src="../components/TableSkeleton.js"></script>
+  <script src="../components/TextField.js"></script>
+  <script src="../components/UserStatusBadge.js"></script>
+  <script src="../components/UserTable.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const { html, components: C, format } = MK;
+    const PROTECTED = {
+      self: 'You cannot change your own role or deactivate yourself. Another administrator can.',
+      last_admin: 'This is the only active administrator, so their role cannot change and they cannot be deactivated. Invite or reactivate another administrator first.',
+    };
+    // What the server returns after each action, applied here as the mock API would.
+    const AFTER = {
+      deactivate: (u) => ({ ...u, status: 'deactivated', allowed_actions: ['reactivate'] }),
+      reactivate: (u) => ({ ...u, status: 'active', allowed_actions: ['change_role', 'deactivate'] }),
+      resend: (u) => ({ ...u, invitation: { sent_at: '2026-10-25T09:00:00Z', expires_at: '2026-11-01T09:00:00Z', expired: false } }),
+      revoke: (u) => ({ ...u, status: 'revoked', invitation: undefined, allowed_actions: [] }),
+    };
+
+    MK.page({
+      id: 'user-detail',
+      route: '/settings/users/:id', // the mockup passes params as ?id=usr_1003
+      title: 'User',
+      needs: {
+        api: [
+          'GET /v1/users/{id} -> User (allowed_actions and protected_reason for this viewer)',
+          'PUT /v1/users/{id}/role { role } -> User; 409 last_admin',
+          'POST /v1/users/{id}/deactivate and /reactivate -> User',
+          'POST /v1/users/{id}/invitation (resend) and DELETE /v1/users/{id}/invitation (revoke) -> User',
+        ],
+        permission: 'user:read',
+        uses: ['user:manage'],
+        notes: ['Removing a user entirely is not offered: deactivation keeps the audit trail'],
+      },
+      state: { user: null, dialog: null, role: null, notice: null },
+      load: (fx, { params, state }) => {
+        const base = fx.users.find((u) => u.id === params.id) || null;
+        const u = state.user || base;
+        if (!u) return { user: null };
+        return { user: { ...u, allowed_actions: u.allowed_actions.filter((a) => MK.can(fx.action_permissions[a])) } };
+      },
+      actions: {
+        open(state, _e, el, ctx) {
+          state.dialog = el.dataset.value;
+          state.user = state.user || ctx.fixtures.users.find((u) => u.id === ctx.params.id);
+          state.role = state.user.role;
+          if (state.dialog !== 'role') ctx.focus('dialog-cancel');
+        },
+        close(state, _e, _el, ctx) { const from = state.dialog; state.dialog = null; ctx.focus(`action-${from}`); },
+        setRole(state, _e, el) { state.role = el.value; },
+        saveRole(state, _e, _el, ctx) {
+          const label = ctx.fixtures.roles[state.role].label;
+          state.user = { ...state.user, role: state.role };
+          state.dialog = null;
+          state.notice = `${state.user.name}'s role is now ${label}.`;
+          ctx.focus('action-role');
+        },
+        confirm(state, _e, _el, ctx) {
+          const which = state.dialog;
+          state.user = AFTER[which](state.user);
+          state.dialog = null;
+          state.notice = which === 'deactivate'
+            ? `${state.user.name} is deactivated and signed out everywhere.`
+            : `The invitation to ${state.user.email} is revoked.`;
+          ctx.focus('user-heading');
+        },
+        reactivate(state, _e, _el, ctx) {
+          state.user = AFTER.reactivate(state.user || ctx.fixtures.users.find((u) => u.id === ctx.params.id));
+          state.notice = `${state.user.name} can sign in again.`;
+          ctx.focus('user-heading');
+        },
+        resend(state, _e, _el, ctx) {
+          state.user = AFTER.resend(state.user || ctx.fixtures.users.find((u) => u.id === ctx.params.id));
+          state.notice = `A new invitation is on its way to ${state.user.email}. It works for 7 days.`;
+        },
+      },
+      render: ({ state, data, status }) => {
+        const fx = window.FIXTURES;
+        const back = html`<a href="${MK.href('./users.html')}">&larr; All users</a>`;
+        if (status === 'loading') return html`
+          <div class="stack">${back}
+            <div class="card" role="status">
+              <span class="visually-hidden">Loading</span>
+              ${C.SkeletonBox({ shape: 'title' })}
+              ${Array.from({ length: 5 }, () => C.SkeletonBox({ shape: 'text' }))}
+            </div>
+          </div>`;
+        if (status === 'error') return html`<div class="stack">${back}<div class="card">${C.ErrorState({ body: 'We could not load this user. Please refresh.' })}</div></div>`;
+        const u = data.user;
+        if (!u) return C.ErrorPage({ code: '404', title: 'User not found', body: 'They may have been removed, or the link is wrong.' });
+        const roleLabel = fx.roles[u.role]?.label ?? u.role;
+        const first = u.name.split(' ')[0];
+        const acts = u.allowed_actions;
+        const statusText = u.status === 'invited'
+          ? (u.invitation.expired ? `Invitation expired on ${format.dateTime(u.invitation.expires_at)}` : `Invited; the link works until ${format.dateTime(u.invitation.expires_at)}`)
+          : { active: 'Active', deactivated: 'Deactivated: cannot sign in', revoked: 'Invitation revoked' }[u.status];
+        const buttons = [
+          acts.includes('change_role') && html`<button type="button" class="button" id="action-role" data-action="open" data-value="role">Change role</button>`,
+          acts.includes('resend_invite') && html`<button type="button" class="button" data-action="resend">Resend invitation</button>`,
+          acts.includes('revoke_invite') && html`<button type="button" class="button" id="action-revoke" data-action="open" data-value="revoke">Revoke invitation</button>`,
+          acts.includes('reactivate') && html`<button type="button" class="button" data-action="reactivate">Reactivate</button>`,
+          acts.includes('deactivate') && html`<button type="button" class="button" id="action-deactivate" data-action="open" data-value="deactivate">Deactivate</button>`,
+        ].filter(Boolean);
+        let dialog = '';
+        if (state.dialog === 'role') dialog = C.Dialog({
+          id: 'role-dialog', title: `Change ${first}'s role`, cancelAction: 'close',
+          body: html`
+            ${C.RadioGroup({ name: 'role', legend: 'Role', value: state.role, action: 'setRole', options: Object.entries(fx.roles).map(([value, r]) => ({ value, label: r.label })) })}
+            <p class="muted">${fx.roles[state.role].description}</p>`,
+          actions: html`
+            <button type="button" class="button" id="dialog-cancel" data-action="close">Cancel</button>
+            <button type="button" class="button button--primary" data-action="saveRole" ${state.role === u.role ? MK.raw('disabled') : ''}>Save role</button>`,
+        });
+        if (state.dialog === 'deactivate') dialog = C.Dialog({
+          id: 'deactivate-dialog', title: `Deactivate ${u.name}?`, cancelAction: 'close',
+          body: html`<p>They are signed out at once and cannot sign in until an administrator reactivates them. Their history stays in the audit log.</p>`,
+          actions: html`
+            <button type="button" class="button" id="dialog-cancel" data-action="close">Cancel</button>
+            <button type="button" class="button button--danger" data-action="confirm">Yes, deactivate</button>`,
+        });
+        if (state.dialog === 'revoke') dialog = C.Dialog({
+          id: 'revoke-dialog', title: `Revoke ${first}'s invitation?`, cancelAction: 'close',
+          body: html`<p>The link in the email stops working. You can invite them again later.</p>`,
+          actions: html`
+            <button type="button" class="button" id="dialog-cancel" data-action="close">Cancel</button>
+            <button type="button" class="button button--danger" data-action="confirm">Yes, revoke</button>`,
+        });
+        return html`
+          <div class="stack">
+            ${back}
+            <div class="row row--between">
+              <h1 id="user-heading" tabindex="-1">${u.name}</h1>
+              ${C.UserStatusBadge({ status: u.status, invitationExpired: u.invitation?.expired })}
+            </div>
+            ${state.notice ? C.Notice({ tone: 'success', text: state.notice }) : ''}
+            ${u.protected_reason && MK.can('user:manage') ? C.Notice({ tone: 'info', text: PROTECTED[u.protected_reason] }) : ''}
+            <div class="card">
+              ${C.DetailList({ items: [
+                { label: 'Email', value: u.email },
+                { label: 'Role', value: roleLabel },
+                { label: 'Status', value: statusText },
+                { label: 'Last active', value: u.last_active_at ? format.dateTime(u.last_active_at) : 'Never' },
+                { label: 'Added', value: format.dateTime(u.created_at) },
+              ] })}
+            </div>
+            ${buttons.length ? html`<div class="row">${buttons}</div>` : ''}
+            ${dialog}
+          </div>`;
+      },
+    });
+  </script>
+</body>
+</html>

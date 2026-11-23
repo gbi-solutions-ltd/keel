@@ -1,0 +1,2321 @@
+{
+  "rounds": [
+    {
+      "round": 1,
+      "by": "the client's operations manager",
+      "date": "2026-11-20",
+      "note": "Round 1: the operations manager saw every screen and state, both roles (staff, coordinator) and both viewports (mobile, desktop). Contract api/openapi.yaml is 0.1.0-draft, backend agreement open (brief).",
+      "technicalOwner": "the engine maintainer",
+      "pins": {
+        "clock": "2026-11-23T09:00:00Z",
+        "seed": 20261123,
+        "timezoneId": "Europe/Dublin",
+        "locale": "en-GB"
+      },
+      "viewports": [
+        "mobile",
+        "desktop"
+      ],
+      "screens": [
+        {
+          "name": "equipment",
+          "state": "default",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment",
+          "state": "empty",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment",
+          "state": "loading",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment",
+          "state": "error",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment-as-coordinator",
+          "state": "default",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment-searched",
+          "state": "default",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment-no-match",
+          "state": "default",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment-cameras",
+          "state": "default",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment-page-2",
+          "state": "default",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment-offline",
+          "state": "default",
+          "route": "/equipment?system=offline"
+        },
+        {
+          "name": "request",
+          "state": "default",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request",
+          "state": "empty",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request",
+          "state": "loading",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request",
+          "state": "error",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request-not-booked",
+          "state": "default",
+          "route": "/equipment/itm_05/request"
+        },
+        {
+          "name": "request-errors",
+          "state": "default",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request-dates-reversed",
+          "state": "default",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request-conflict",
+          "state": "default",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request-sent",
+          "state": "default",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request-as-coordinator",
+          "state": "default",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "my-requests",
+          "state": "default",
+          "route": "/loans/mine"
+        },
+        {
+          "name": "my-requests",
+          "state": "empty",
+          "route": "/loans/mine"
+        },
+        {
+          "name": "my-requests",
+          "state": "loading",
+          "route": "/loans/mine"
+        },
+        {
+          "name": "my-requests",
+          "state": "error",
+          "route": "/loans/mine"
+        },
+        {
+          "name": "my-requests-as-coordinator",
+          "state": "default",
+          "route": "/loans/mine"
+        },
+        {
+          "name": "requests",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests",
+          "state": "empty",
+          "route": "/requests"
+        },
+        {
+          "name": "requests",
+          "state": "loading",
+          "route": "/requests"
+        },
+        {
+          "name": "requests",
+          "state": "error",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-as-staff",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-requested",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-page-2",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-approved",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-approve-conflict",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-decline-dialog",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-declined",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-handed-out",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-returned",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "not-found",
+          "state": "default",
+          "route": "/no-such-page"
+        },
+        {
+          "name": "server-error",
+          "state": "default",
+          "route": "/equipment?system=crash"
+        },
+        {
+          "name": "maintenance",
+          "state": "default",
+          "route": "/equipment?system=maintenance"
+        }
+      ],
+      "contract": {
+        "path": "api/openapi.yaml",
+        "version": "0.1.0-draft",
+        "sha256": "45661681ee000a611ee578d59005e7b7caed7d7d5ff9424073fd18464933f6f0",
+        "mapped": [
+          {
+            "schema": "Organisation",
+            "fixture": "organisation",
+            "count": 1
+          },
+          {
+            "schema": "Role",
+            "fixture": "roles.*",
+            "count": 2
+          },
+          {
+            "schema": "Item",
+            "fixture": "items",
+            "count": 14
+          },
+          {
+            "schema": "Loan",
+            "fixture": "loans",
+            "count": 14
+          }
+        ]
+      },
+      "config": {
+        "name": "equipment-loans",
+        "timezoneId": "Europe/Dublin",
+        "pins": {
+          "clock": "2026-11-23T09:00:00Z",
+          "seed": 20261123
+        },
+        "modules": [
+          "system-pages"
+        ],
+        "checklist": {
+          "approvals": "designed",
+          "user-management": "not-needed",
+          "roles-admin": "later",
+          "audit-log": "not-needed",
+          "notifications": "not-needed",
+          "settings": "not-needed",
+          "developer-access": "not-needed",
+          "session-timeout": "later",
+          "password-reset": "not-needed",
+          "onboarding": "not-needed",
+          "bulk-actions": "not-needed",
+          "saved-views": "not-needed",
+          "file-upload": "not-needed",
+          "print": "not-needed",
+          "privacy": "later"
+        },
+        "viewports": [
+          {
+            "name": "mobile",
+            "width": 390,
+            "height": 844
+          },
+          {
+            "name": "desktop",
+            "width": 1440,
+            "height": 900
+          }
+        ],
+        "screens": [
+          {
+            "name": "equipment",
+            "page": "pages/equipment.html",
+            "route": "/equipment",
+            "states": [
+              "default",
+              "empty",
+              "loading",
+              "error"
+            ]
+          },
+          {
+            "name": "equipment-as-coordinator",
+            "page": "pages/equipment.html",
+            "route": "/equipment",
+            "role": "coordinator"
+          },
+          {
+            "name": "equipment-searched",
+            "page": "pages/equipment.html",
+            "route": "/equipment",
+            "steps": [
+              {
+                "fill": {
+                  "label": "Search",
+                  "value": "projector"
+                }
+              },
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Search"
+                }
+              }
+            ]
+          },
+          {
+            "name": "equipment-no-match",
+            "page": "pages/equipment.html",
+            "route": "/equipment",
+            "steps": [
+              {
+                "fill": {
+                  "label": "Search",
+                  "value": "tuba"
+                }
+              },
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Search"
+                }
+              }
+            ]
+          },
+          {
+            "name": "equipment-cameras",
+            "page": "pages/equipment.html",
+            "route": "/equipment",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Cameras"
+                }
+              }
+            ]
+          },
+          {
+            "name": "equipment-page-2",
+            "page": "pages/equipment.html",
+            "route": "/equipment",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Next page"
+                }
+              }
+            ]
+          },
+          {
+            "name": "equipment-offline",
+            "page": "pages/equipment.html?system=offline",
+            "route": "/equipment?system=offline"
+          },
+          {
+            "name": "request",
+            "page": "pages/request-new.html?item=itm_07",
+            "route": "/equipment/itm_07/request",
+            "states": [
+              "default",
+              "empty",
+              "loading",
+              "error"
+            ]
+          },
+          {
+            "name": "request-not-booked",
+            "page": "pages/request-new.html?item=itm_05",
+            "route": "/equipment/itm_05/request"
+          },
+          {
+            "name": "request-errors",
+            "page": "pages/request-new.html?item=itm_07",
+            "route": "/equipment/itm_07/request",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Send request"
+                }
+              }
+            ]
+          },
+          {
+            "name": "request-dates-reversed",
+            "page": "pages/request-new.html?item=itm_07",
+            "route": "/equipment/itm_07/request",
+            "steps": [
+              {
+                "fill": {
+                  "label": "From",
+                  "value": "2026-12-04"
+                }
+              },
+              {
+                "fill": {
+                  "label": "To",
+                  "value": "2026-12-02"
+                }
+              },
+              {
+                "fill": {
+                  "label": "Purpose",
+                  "value": "Community choir rehearsal"
+                }
+              },
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Send request"
+                }
+              }
+            ]
+          },
+          {
+            "name": "request-conflict",
+            "page": "pages/request-new.html?item=itm_07",
+            "route": "/equipment/itm_07/request",
+            "steps": [
+              {
+                "fill": {
+                  "label": "From",
+                  "value": "2026-11-27"
+                }
+              },
+              {
+                "fill": {
+                  "label": "To",
+                  "value": "2026-11-28"
+                }
+              },
+              {
+                "fill": {
+                  "label": "Purpose",
+                  "value": "Community choir rehearsal"
+                }
+              },
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Send request"
+                }
+              }
+            ]
+          },
+          {
+            "name": "request-sent",
+            "page": "pages/request-new.html?item=itm_07",
+            "route": "/equipment/itm_07/request",
+            "steps": [
+              {
+                "fill": {
+                  "label": "From",
+                  "value": "2026-11-30"
+                }
+              },
+              {
+                "fill": {
+                  "label": "To",
+                  "value": "2026-12-01"
+                }
+              },
+              {
+                "fill": {
+                  "label": "Purpose",
+                  "value": "Community choir rehearsal"
+                }
+              },
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Send request"
+                }
+              }
+            ]
+          },
+          {
+            "name": "request-as-coordinator",
+            "page": "pages/request-new.html?item=itm_07",
+            "route": "/equipment/itm_07/request",
+            "role": "coordinator"
+          },
+          {
+            "name": "my-requests",
+            "page": "pages/my-requests.html",
+            "route": "/loans/mine",
+            "states": [
+              "default",
+              "empty",
+              "loading",
+              "error"
+            ]
+          },
+          {
+            "name": "my-requests-as-coordinator",
+            "page": "pages/my-requests.html",
+            "route": "/loans/mine",
+            "role": "coordinator"
+          },
+          {
+            "name": "requests",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "states": [
+              "default",
+              "empty",
+              "loading",
+              "error"
+            ]
+          },
+          {
+            "name": "requests-as-staff",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "staff"
+          },
+          {
+            "name": "requests-requested",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Requested"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-page-2",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Next page"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-approved",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Approve LN-1051"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-approve-conflict",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Approve LN-1052"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-decline-dialog",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Decline LN-1050"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-declined",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Decline LN-1050"
+                }
+              },
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Yes, decline"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-handed-out",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Hand out LN-1047"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-returned",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Mark returned LN-1046"
+                }
+              }
+            ]
+          },
+          {
+            "name": "not-found",
+            "page": "pages/not-found.html",
+            "route": "/no-such-page"
+          },
+          {
+            "name": "server-error",
+            "page": "pages/server-error.html",
+            "route": "/equipment?system=crash",
+            "expectConsole": [
+              "Preview of a render failure"
+            ]
+          },
+          {
+            "name": "maintenance",
+            "page": "pages/maintenance.html",
+            "route": "/equipment?system=maintenance",
+            "expectStatus": [
+              503
+            ]
+          }
+        ],
+        "project": {
+          "people": {
+            "signsOff": "the client's operations manager",
+            "technicalOwner": "the engine maintainer"
+          },
+          "designFramework": {
+            "kind": "none"
+          },
+          "i18n": {
+            "locales": [
+              "en-GB"
+            ],
+            "defaultLocale": "en-GB",
+            "rtl": false,
+            "expansionCheck": false
+          },
+          "tenancy": "single",
+          "browsers": "last 2 versions, not dead",
+          "accessibility": "wcag22-aa",
+          "currency": "none",
+          "theming": "light",
+          "auth": {
+            "signIn": "idp-hosted",
+            "provider": "the organisation's OIDC identity provider, behind the BFF"
+          }
+        }
+      },
+      "files": {
+        "assets/base.css": "9304d4812418963bc03eaaa60e2ac889060b0af70cafa2aef02d8f5eb657f861",
+        "assets/components.css": "729dac8bf0bef3e4638562c6378b91567e1101c0f552b0f476f78e32d83e68d1",
+        "assets/mk.js": "458adabf5f52efc92cd130e49ab08fe9142c4bdbd8f0f47a35a837efd28567d5",
+        "assets/tokens.css": "5808400664656dc02cc1a2cbd927f2d256da80872e778cbad74378671ee43774",
+        "components/AppLayout.js": "58632ced9efd4f1ec3198f431ad8b508de8a970098bdf577cadebc6f338ebed6",
+        "components/Badge.js": "e3bb22f1fce786489f47cc1a35d93a2c19288ffb3ee1556ec38b7fdedafbbfce",
+        "components/CardListSkeleton.js": "1bda442a27d94fc1e32f85fe3a198bfe0f3609ad3d53e1871ae236804361afd2",
+        "components/Dialog.js": "de83d59e212f3b5c5439f772961f98b580d18d60dfadadda6d99fff9e3b7ca95",
+        "components/EmptyState.js": "66477aec8b7b2dbcbe6715203b882046d8722276ca7bec6b8874a7a169467b04",
+        "components/ErrorPage.js": "ad486ac872e9a97b6ed17c6e281bbe68c6b27af8afd0a52d802226440ab90b10",
+        "components/ErrorState.js": "a28a8436c75b82b5c5f879d5cf962445e2e0e9636ddf2d47a5322afa4e4dcbe8",
+        "components/FilterTabs.js": "16dcfccb1abfa8b0d81745c7671972246be7818cb8086f2c9117fdb960bd122e",
+        "components/FormSkeleton.js": "680bd150d5a239e8d014a810b29da7c3a0e0f7de980ee6c8cd1885513b2459a0",
+        "components/ItemAvailabilityBadge.js": "be5cad4c21182dcf79239e763a42971ba151ef9cf32f214eb6d9f8e8fb12b21a",
+        "components/ItemCard.js": "437417602c0988b89a02e87462be6df0d2c9e023e44c4214bf1230961b84923d",
+        "components/ItemCardList.js": "6de1a0ad8e85d3ddd45b3699bcfa34817544e7d311930460bbd33ed9a0bc8152",
+        "components/LoanList.js": "f74afd2dd4bfccee13277b72019fdfc1dfffb3f9e137761915b7eabc57be3ee3",
+        "components/LoanStatusBadge.js": "ab1fd4d8cb76458991705dbe6df6fc74145db95ac9d4add94861316520a5664c",
+        "components/Notice.js": "980a24c20b155cf382ee02a00b95b2f23d7fa5a56c43dcb643f5a412659d390c",
+        "components/Pagination.js": "3c1704e9f8388f338c83c1fea155e2551a3dba7d5c72d8ba5df1dda81d70b42e",
+        "components/PlainLayout.js": "0a5873eff3bf1dd23f1e6b8daf008f1694449c9d665d850aa9697a0b888c9c35",
+        "components/SkeletonBox.js": "9cacb0244d711dca480396ba9c3a3f4502826f394a8b5970de620deca039c228",
+        "components/TextAreaField.js": "8fa9f3f4d66d1bac883aea7a7a46c392d11d8f706b536749422ce7ae978b2307",
+        "components/TextField.js": "1928416c94a774a4cb791244c37ded6a15321da777ba0d5aaf1926a6a1f2bbd7",
+        "data/bookings.js": "f3f9ce150dc1601a259164b9d88409d607abfe6a47bc292f082434458cea2091",
+        "data/fixtures.js": "10abdbbd41b9264676f157970bfecdfcb6e4f4ed99de4ce086d157639966e1a1",
+        "data/list-query.js": "8691b169afb86e88bd99cf1e32423f4cab0e27a9c583fa810d923fda55375d54",
+        "docs/behaviours.json": "0d3ff147295303883cfce06197c194bab7fe91026c97210695f54cd261d99c3b",
+        "index.html": "8229ed4edb229b530f0059f1a6072a4284eeda5dd46ff6d4440878cdfcad274d",
+        "pages/equipment.html": "75059acef26a5af51f71c5be4badc9f44013ac5fc09a5db9519edf99cf2d64ea",
+        "pages/maintenance.html": "52cef22a71a85b46a3e2b57132aa3a20a4cd5e7b9565ec7d3ca095cf28f40d56",
+        "pages/my-requests.html": "622b111eec54ea7a4b90831efb037795c53792df91ff8df60cffafe8041276b3",
+        "pages/not-found.html": "0e9e81b77227b2a7f7132953f8cce422ed87f8ed8ccc6a8952b3ce201686a585",
+        "pages/request-new.html": "fe65cde29bacc54f378db9581460c1216afd0f335f51ac9ab042ad7701d62de0",
+        "pages/requests.html": "4a30c93737681a6ef480ac33cc0cdaea16c54e0b09872f06dc70b7d37c7b6ff7",
+        "pages/server-error.html": "b0e2c495b9700c7f6a8cc1befd9a29da9bdeff6262096677dac7b91f2fc4f004",
+        "strings/en-GB.js": "a8b7d0f38e062319453eedecc5c1a7e143e4c3a141877730bd64688b91c375d4"
+      }
+    },
+    {
+      "round": 2,
+      "by": "the client's operations manager",
+      "date": "2026-11-21",
+      "note": "Round 2: D-1 (a declined request carries the coordinator's reason, shown to the staff member and to coordinators; contract 0.2.0-draft adds decline_reason and the decline body) and D-2 (coordinators do not borrow through the app; no screen change). The operations manager saw the changed screens (decline dialog, declining with no reason, the declined request on Requests, LN-1048's reason on My requests) on phone and desktop.",
+      "technicalOwner": "the engine maintainer",
+      "pins": {
+        "clock": "2026-11-23T09:00:00Z",
+        "seed": 20261123,
+        "timezoneId": "Europe/Dublin",
+        "locale": "en-GB"
+      },
+      "viewports": [
+        "mobile",
+        "desktop"
+      ],
+      "screens": [
+        {
+          "name": "equipment",
+          "state": "default",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment",
+          "state": "empty",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment",
+          "state": "loading",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment",
+          "state": "error",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment-as-coordinator",
+          "state": "default",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment-searched",
+          "state": "default",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment-no-match",
+          "state": "default",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment-cameras",
+          "state": "default",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment-page-2",
+          "state": "default",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment-offline",
+          "state": "default",
+          "route": "/equipment?system=offline"
+        },
+        {
+          "name": "request",
+          "state": "default",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request",
+          "state": "empty",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request",
+          "state": "loading",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request",
+          "state": "error",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request-not-booked",
+          "state": "default",
+          "route": "/equipment/itm_05/request"
+        },
+        {
+          "name": "request-errors",
+          "state": "default",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request-dates-reversed",
+          "state": "default",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request-conflict",
+          "state": "default",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request-sent",
+          "state": "default",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request-as-coordinator",
+          "state": "default",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "my-requests",
+          "state": "default",
+          "route": "/loans/mine"
+        },
+        {
+          "name": "my-requests",
+          "state": "empty",
+          "route": "/loans/mine"
+        },
+        {
+          "name": "my-requests",
+          "state": "loading",
+          "route": "/loans/mine"
+        },
+        {
+          "name": "my-requests",
+          "state": "error",
+          "route": "/loans/mine"
+        },
+        {
+          "name": "my-requests-as-coordinator",
+          "state": "default",
+          "route": "/loans/mine"
+        },
+        {
+          "name": "requests",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests",
+          "state": "empty",
+          "route": "/requests"
+        },
+        {
+          "name": "requests",
+          "state": "loading",
+          "route": "/requests"
+        },
+        {
+          "name": "requests",
+          "state": "error",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-as-staff",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-requested",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-page-2",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-approved",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-approve-conflict",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-decline-dialog",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-decline-no-reason",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-declined",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-handed-out",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-returned",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "not-found",
+          "state": "default",
+          "route": "/no-such-page"
+        },
+        {
+          "name": "server-error",
+          "state": "default",
+          "route": "/equipment?system=crash"
+        },
+        {
+          "name": "maintenance",
+          "state": "default",
+          "route": "/equipment?system=maintenance"
+        }
+      ],
+      "contract": {
+        "path": "api/openapi.yaml",
+        "version": "0.2.0-draft",
+        "sha256": "9271ec781ea7d942b94570aa89e568622ad438af3e7e3302019b92cd95cb9165",
+        "mapped": [
+          {
+            "schema": "Organisation",
+            "fixture": "organisation",
+            "count": 1
+          },
+          {
+            "schema": "Role",
+            "fixture": "roles.*",
+            "count": 2
+          },
+          {
+            "schema": "Item",
+            "fixture": "items",
+            "count": 14
+          },
+          {
+            "schema": "Loan",
+            "fixture": "loans",
+            "count": 14
+          }
+        ]
+      },
+      "changedSinceLast": {
+        "changed": [
+          "components/LoanList.js",
+          "data/fixtures.js",
+          "docs/behaviours.json",
+          "index.html",
+          "pages/requests.html",
+          "strings/en-GB.js"
+        ],
+        "added": [],
+        "removed": [],
+        "config": [
+          "screens"
+        ],
+        "contract": true
+      },
+      "config": {
+        "name": "equipment-loans",
+        "timezoneId": "Europe/Dublin",
+        "pins": {
+          "clock": "2026-11-23T09:00:00Z",
+          "seed": 20261123
+        },
+        "modules": [
+          "system-pages"
+        ],
+        "checklist": {
+          "approvals": "designed",
+          "user-management": "not-needed",
+          "roles-admin": "later",
+          "audit-log": "not-needed",
+          "notifications": "not-needed",
+          "settings": "not-needed",
+          "developer-access": "not-needed",
+          "session-timeout": "later",
+          "password-reset": "not-needed",
+          "onboarding": "not-needed",
+          "bulk-actions": "not-needed",
+          "saved-views": "not-needed",
+          "file-upload": "not-needed",
+          "print": "not-needed",
+          "privacy": "later"
+        },
+        "viewports": [
+          {
+            "name": "mobile",
+            "width": 390,
+            "height": 844
+          },
+          {
+            "name": "desktop",
+            "width": 1440,
+            "height": 900
+          }
+        ],
+        "screens": [
+          {
+            "name": "equipment",
+            "page": "pages/equipment.html",
+            "route": "/equipment",
+            "states": [
+              "default",
+              "empty",
+              "loading",
+              "error"
+            ]
+          },
+          {
+            "name": "equipment-as-coordinator",
+            "page": "pages/equipment.html",
+            "route": "/equipment",
+            "role": "coordinator"
+          },
+          {
+            "name": "equipment-searched",
+            "page": "pages/equipment.html",
+            "route": "/equipment",
+            "steps": [
+              {
+                "fill": {
+                  "label": "Search",
+                  "value": "projector"
+                }
+              },
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Search"
+                }
+              }
+            ]
+          },
+          {
+            "name": "equipment-no-match",
+            "page": "pages/equipment.html",
+            "route": "/equipment",
+            "steps": [
+              {
+                "fill": {
+                  "label": "Search",
+                  "value": "tuba"
+                }
+              },
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Search"
+                }
+              }
+            ]
+          },
+          {
+            "name": "equipment-cameras",
+            "page": "pages/equipment.html",
+            "route": "/equipment",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Cameras"
+                }
+              }
+            ]
+          },
+          {
+            "name": "equipment-page-2",
+            "page": "pages/equipment.html",
+            "route": "/equipment",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Next page"
+                }
+              }
+            ]
+          },
+          {
+            "name": "equipment-offline",
+            "page": "pages/equipment.html?system=offline",
+            "route": "/equipment?system=offline"
+          },
+          {
+            "name": "request",
+            "page": "pages/request-new.html?item=itm_07",
+            "route": "/equipment/itm_07/request",
+            "states": [
+              "default",
+              "empty",
+              "loading",
+              "error"
+            ]
+          },
+          {
+            "name": "request-not-booked",
+            "page": "pages/request-new.html?item=itm_05",
+            "route": "/equipment/itm_05/request"
+          },
+          {
+            "name": "request-errors",
+            "page": "pages/request-new.html?item=itm_07",
+            "route": "/equipment/itm_07/request",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Send request"
+                }
+              }
+            ]
+          },
+          {
+            "name": "request-dates-reversed",
+            "page": "pages/request-new.html?item=itm_07",
+            "route": "/equipment/itm_07/request",
+            "steps": [
+              {
+                "fill": {
+                  "label": "From",
+                  "value": "2026-12-04"
+                }
+              },
+              {
+                "fill": {
+                  "label": "To",
+                  "value": "2026-12-02"
+                }
+              },
+              {
+                "fill": {
+                  "label": "Purpose",
+                  "value": "Community choir rehearsal"
+                }
+              },
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Send request"
+                }
+              }
+            ]
+          },
+          {
+            "name": "request-conflict",
+            "page": "pages/request-new.html?item=itm_07",
+            "route": "/equipment/itm_07/request",
+            "steps": [
+              {
+                "fill": {
+                  "label": "From",
+                  "value": "2026-11-27"
+                }
+              },
+              {
+                "fill": {
+                  "label": "To",
+                  "value": "2026-11-28"
+                }
+              },
+              {
+                "fill": {
+                  "label": "Purpose",
+                  "value": "Community choir rehearsal"
+                }
+              },
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Send request"
+                }
+              }
+            ]
+          },
+          {
+            "name": "request-sent",
+            "page": "pages/request-new.html?item=itm_07",
+            "route": "/equipment/itm_07/request",
+            "steps": [
+              {
+                "fill": {
+                  "label": "From",
+                  "value": "2026-11-30"
+                }
+              },
+              {
+                "fill": {
+                  "label": "To",
+                  "value": "2026-12-01"
+                }
+              },
+              {
+                "fill": {
+                  "label": "Purpose",
+                  "value": "Community choir rehearsal"
+                }
+              },
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Send request"
+                }
+              }
+            ]
+          },
+          {
+            "name": "request-as-coordinator",
+            "page": "pages/request-new.html?item=itm_07",
+            "route": "/equipment/itm_07/request",
+            "role": "coordinator"
+          },
+          {
+            "name": "my-requests",
+            "page": "pages/my-requests.html",
+            "route": "/loans/mine",
+            "states": [
+              "default",
+              "empty",
+              "loading",
+              "error"
+            ]
+          },
+          {
+            "name": "my-requests-as-coordinator",
+            "page": "pages/my-requests.html",
+            "route": "/loans/mine",
+            "role": "coordinator"
+          },
+          {
+            "name": "requests",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "states": [
+              "default",
+              "empty",
+              "loading",
+              "error"
+            ]
+          },
+          {
+            "name": "requests-as-staff",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "staff"
+          },
+          {
+            "name": "requests-requested",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Requested"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-page-2",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Next page"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-approved",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Approve LN-1051"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-approve-conflict",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Approve LN-1052"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-decline-dialog",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Decline LN-1050"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-decline-no-reason",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Decline LN-1050"
+                }
+              },
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Yes, decline"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-declined",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Decline LN-1050"
+                }
+              },
+              {
+                "fill": {
+                  "label": "Reason for declining",
+                  "value": "The projector is needed for the board that day."
+                }
+              },
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Yes, decline"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-handed-out",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Hand out LN-1047"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-returned",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Mark returned LN-1046"
+                }
+              }
+            ]
+          },
+          {
+            "name": "not-found",
+            "page": "pages/not-found.html",
+            "route": "/no-such-page"
+          },
+          {
+            "name": "server-error",
+            "page": "pages/server-error.html",
+            "route": "/equipment?system=crash",
+            "expectConsole": [
+              "Preview of a render failure"
+            ]
+          },
+          {
+            "name": "maintenance",
+            "page": "pages/maintenance.html",
+            "route": "/equipment?system=maintenance",
+            "expectStatus": [
+              503
+            ]
+          }
+        ],
+        "project": {
+          "people": {
+            "signsOff": "the client's operations manager",
+            "technicalOwner": "the engine maintainer"
+          },
+          "designFramework": {
+            "kind": "none"
+          },
+          "i18n": {
+            "locales": [
+              "en-GB"
+            ],
+            "defaultLocale": "en-GB",
+            "rtl": false,
+            "expansionCheck": false
+          },
+          "tenancy": "single",
+          "browsers": "last 2 versions, not dead",
+          "accessibility": "wcag22-aa",
+          "currency": "none",
+          "theming": "light",
+          "auth": {
+            "signIn": "idp-hosted",
+            "provider": "the organisation's OIDC identity provider, behind the BFF"
+          }
+        }
+      },
+      "files": {
+        "assets/base.css": "9304d4812418963bc03eaaa60e2ac889060b0af70cafa2aef02d8f5eb657f861",
+        "assets/components.css": "729dac8bf0bef3e4638562c6378b91567e1101c0f552b0f476f78e32d83e68d1",
+        "assets/mk.js": "458adabf5f52efc92cd130e49ab08fe9142c4bdbd8f0f47a35a837efd28567d5",
+        "assets/tokens.css": "5808400664656dc02cc1a2cbd927f2d256da80872e778cbad74378671ee43774",
+        "components/AppLayout.js": "58632ced9efd4f1ec3198f431ad8b508de8a970098bdf577cadebc6f338ebed6",
+        "components/Badge.js": "e3bb22f1fce786489f47cc1a35d93a2c19288ffb3ee1556ec38b7fdedafbbfce",
+        "components/CardListSkeleton.js": "1bda442a27d94fc1e32f85fe3a198bfe0f3609ad3d53e1871ae236804361afd2",
+        "components/Dialog.js": "de83d59e212f3b5c5439f772961f98b580d18d60dfadadda6d99fff9e3b7ca95",
+        "components/EmptyState.js": "66477aec8b7b2dbcbe6715203b882046d8722276ca7bec6b8874a7a169467b04",
+        "components/ErrorPage.js": "ad486ac872e9a97b6ed17c6e281bbe68c6b27af8afd0a52d802226440ab90b10",
+        "components/ErrorState.js": "a28a8436c75b82b5c5f879d5cf962445e2e0e9636ddf2d47a5322afa4e4dcbe8",
+        "components/FilterTabs.js": "16dcfccb1abfa8b0d81745c7671972246be7818cb8086f2c9117fdb960bd122e",
+        "components/FormSkeleton.js": "680bd150d5a239e8d014a810b29da7c3a0e0f7de980ee6c8cd1885513b2459a0",
+        "components/ItemAvailabilityBadge.js": "be5cad4c21182dcf79239e763a42971ba151ef9cf32f214eb6d9f8e8fb12b21a",
+        "components/ItemCard.js": "437417602c0988b89a02e87462be6df0d2c9e023e44c4214bf1230961b84923d",
+        "components/ItemCardList.js": "6de1a0ad8e85d3ddd45b3699bcfa34817544e7d311930460bbd33ed9a0bc8152",
+        "components/LoanList.js": "67ef959b787f0081c97470159d6be989d6d88cd8778402a4f465fcc62870cea0",
+        "components/LoanStatusBadge.js": "ab1fd4d8cb76458991705dbe6df6fc74145db95ac9d4add94861316520a5664c",
+        "components/Notice.js": "980a24c20b155cf382ee02a00b95b2f23d7fa5a56c43dcb643f5a412659d390c",
+        "components/Pagination.js": "3c1704e9f8388f338c83c1fea155e2551a3dba7d5c72d8ba5df1dda81d70b42e",
+        "components/PlainLayout.js": "0a5873eff3bf1dd23f1e6b8daf008f1694449c9d665d850aa9697a0b888c9c35",
+        "components/SkeletonBox.js": "9cacb0244d711dca480396ba9c3a3f4502826f394a8b5970de620deca039c228",
+        "components/TextAreaField.js": "8fa9f3f4d66d1bac883aea7a7a46c392d11d8f706b536749422ce7ae978b2307",
+        "components/TextField.js": "1928416c94a774a4cb791244c37ded6a15321da777ba0d5aaf1926a6a1f2bbd7",
+        "data/bookings.js": "f3f9ce150dc1601a259164b9d88409d607abfe6a47bc292f082434458cea2091",
+        "data/fixtures.js": "6dad61117cf541cb0542882c2306fbe8b4ad094df427c5604e447e2509b9f346",
+        "data/list-query.js": "8691b169afb86e88bd99cf1e32423f4cab0e27a9c583fa810d923fda55375d54",
+        "docs/behaviours.json": "fac4c9ad854f6fbba89500185d910c8f4a85062d3b57aae9f673b71ebcbab10d",
+        "index.html": "5397caff9cbae57bfc6ef011c358fc30d8c876d9c28b25851b08bdd92c9128d2",
+        "pages/equipment.html": "75059acef26a5af51f71c5be4badc9f44013ac5fc09a5db9519edf99cf2d64ea",
+        "pages/maintenance.html": "52cef22a71a85b46a3e2b57132aa3a20a4cd5e7b9565ec7d3ca095cf28f40d56",
+        "pages/my-requests.html": "622b111eec54ea7a4b90831efb037795c53792df91ff8df60cffafe8041276b3",
+        "pages/not-found.html": "0e9e81b77227b2a7f7132953f8cce422ed87f8ed8ccc6a8952b3ce201686a585",
+        "pages/request-new.html": "fe65cde29bacc54f378db9581460c1216afd0f335f51ac9ab042ad7701d62de0",
+        "pages/requests.html": "beb7ff99b1f3b6640325012811aec357e1a51b3a8d63ef0ea6e3ec8bf69734b8",
+        "pages/server-error.html": "b0e2c495b9700c7f6a8cc1befd9a29da9bdeff6262096677dac7b91f2fc4f004",
+        "strings/en-GB.js": "98b9c34d7aecde90f78bd7bb0b956dc463e2f95dc8e38177c150db63c6ddfcba"
+      }
+    },
+    {
+      "round": 3,
+      "by": "the engine maintainer",
+      "date": "2026-11-20",
+      "note": "Round 3: contract 0.2.1-draft, a YAML fix only: four descriptions quoted (GET /v1/items and GET /v1/loans limit, Loan.from, Loan.to), which an unquoted comma had split into stray keys. No screen, field or behaviour changed; contract-diff against round 2: 0 breaking, 0 additive. Signed by the technical owner: nothing for the client to see.",
+      "technicalOwner": "the engine maintainer",
+      "pins": {
+        "clock": "2026-11-23T09:00:00Z",
+        "seed": 20261123,
+        "timezoneId": "Europe/Dublin",
+        "locale": "en-GB"
+      },
+      "viewports": [
+        "mobile",
+        "desktop"
+      ],
+      "screens": [
+        {
+          "name": "equipment",
+          "state": "default",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment",
+          "state": "empty",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment",
+          "state": "loading",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment",
+          "state": "error",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment-as-coordinator",
+          "state": "default",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment-searched",
+          "state": "default",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment-no-match",
+          "state": "default",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment-cameras",
+          "state": "default",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment-page-2",
+          "state": "default",
+          "route": "/equipment"
+        },
+        {
+          "name": "equipment-offline",
+          "state": "default",
+          "route": "/equipment?system=offline"
+        },
+        {
+          "name": "request",
+          "state": "default",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request",
+          "state": "empty",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request",
+          "state": "loading",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request",
+          "state": "error",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request-not-booked",
+          "state": "default",
+          "route": "/equipment/itm_05/request"
+        },
+        {
+          "name": "request-errors",
+          "state": "default",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request-dates-reversed",
+          "state": "default",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request-conflict",
+          "state": "default",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request-sent",
+          "state": "default",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "request-as-coordinator",
+          "state": "default",
+          "route": "/equipment/itm_07/request"
+        },
+        {
+          "name": "my-requests",
+          "state": "default",
+          "route": "/loans/mine"
+        },
+        {
+          "name": "my-requests",
+          "state": "empty",
+          "route": "/loans/mine"
+        },
+        {
+          "name": "my-requests",
+          "state": "loading",
+          "route": "/loans/mine"
+        },
+        {
+          "name": "my-requests",
+          "state": "error",
+          "route": "/loans/mine"
+        },
+        {
+          "name": "my-requests-as-coordinator",
+          "state": "default",
+          "route": "/loans/mine"
+        },
+        {
+          "name": "requests",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests",
+          "state": "empty",
+          "route": "/requests"
+        },
+        {
+          "name": "requests",
+          "state": "loading",
+          "route": "/requests"
+        },
+        {
+          "name": "requests",
+          "state": "error",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-as-staff",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-requested",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-page-2",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-approved",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-approve-conflict",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-decline-dialog",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-decline-no-reason",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-declined",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-handed-out",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "requests-returned",
+          "state": "default",
+          "route": "/requests"
+        },
+        {
+          "name": "not-found",
+          "state": "default",
+          "route": "/no-such-page"
+        },
+        {
+          "name": "server-error",
+          "state": "default",
+          "route": "/equipment?system=crash"
+        },
+        {
+          "name": "maintenance",
+          "state": "default",
+          "route": "/equipment?system=maintenance"
+        }
+      ],
+      "contract": {
+        "path": "api/openapi.yaml",
+        "version": "0.2.1-draft",
+        "sha256": "a440019ebf855d2fee90bddd242fc9e580ac8ac3099f290ec053fdd51c25173c",
+        "mapped": [
+          {
+            "schema": "Organisation",
+            "fixture": "organisation",
+            "count": 1
+          },
+          {
+            "schema": "Role",
+            "fixture": "roles.*",
+            "count": 2
+          },
+          {
+            "schema": "Item",
+            "fixture": "items",
+            "count": 14
+          },
+          {
+            "schema": "Loan",
+            "fixture": "loans",
+            "count": 14
+          }
+        ]
+      },
+      "changedSinceLast": {
+        "changed": [],
+        "added": [],
+        "removed": [],
+        "config": [],
+        "contract": true
+      },
+      "config": {
+        "name": "equipment-loans",
+        "timezoneId": "Europe/Dublin",
+        "pins": {
+          "clock": "2026-11-23T09:00:00Z",
+          "seed": 20261123
+        },
+        "modules": [
+          "system-pages"
+        ],
+        "checklist": {
+          "approvals": "designed",
+          "user-management": "not-needed",
+          "roles-admin": "later",
+          "audit-log": "not-needed",
+          "notifications": "not-needed",
+          "settings": "not-needed",
+          "developer-access": "not-needed",
+          "session-timeout": "later",
+          "password-reset": "not-needed",
+          "onboarding": "not-needed",
+          "bulk-actions": "not-needed",
+          "saved-views": "not-needed",
+          "file-upload": "not-needed",
+          "print": "not-needed",
+          "privacy": "later"
+        },
+        "viewports": [
+          {
+            "name": "mobile",
+            "width": 390,
+            "height": 844
+          },
+          {
+            "name": "desktop",
+            "width": 1440,
+            "height": 900
+          }
+        ],
+        "screens": [
+          {
+            "name": "equipment",
+            "page": "pages/equipment.html",
+            "route": "/equipment",
+            "states": [
+              "default",
+              "empty",
+              "loading",
+              "error"
+            ]
+          },
+          {
+            "name": "equipment-as-coordinator",
+            "page": "pages/equipment.html",
+            "route": "/equipment",
+            "role": "coordinator"
+          },
+          {
+            "name": "equipment-searched",
+            "page": "pages/equipment.html",
+            "route": "/equipment",
+            "steps": [
+              {
+                "fill": {
+                  "label": "Search",
+                  "value": "projector"
+                }
+              },
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Search"
+                }
+              }
+            ]
+          },
+          {
+            "name": "equipment-no-match",
+            "page": "pages/equipment.html",
+            "route": "/equipment",
+            "steps": [
+              {
+                "fill": {
+                  "label": "Search",
+                  "value": "tuba"
+                }
+              },
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Search"
+                }
+              }
+            ]
+          },
+          {
+            "name": "equipment-cameras",
+            "page": "pages/equipment.html",
+            "route": "/equipment",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Cameras"
+                }
+              }
+            ]
+          },
+          {
+            "name": "equipment-page-2",
+            "page": "pages/equipment.html",
+            "route": "/equipment",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Next page"
+                }
+              }
+            ]
+          },
+          {
+            "name": "equipment-offline",
+            "page": "pages/equipment.html?system=offline",
+            "route": "/equipment?system=offline"
+          },
+          {
+            "name": "request",
+            "page": "pages/request-new.html?item=itm_07",
+            "route": "/equipment/itm_07/request",
+            "states": [
+              "default",
+              "empty",
+              "loading",
+              "error"
+            ]
+          },
+          {
+            "name": "request-not-booked",
+            "page": "pages/request-new.html?item=itm_05",
+            "route": "/equipment/itm_05/request"
+          },
+          {
+            "name": "request-errors",
+            "page": "pages/request-new.html?item=itm_07",
+            "route": "/equipment/itm_07/request",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Send request"
+                }
+              }
+            ]
+          },
+          {
+            "name": "request-dates-reversed",
+            "page": "pages/request-new.html?item=itm_07",
+            "route": "/equipment/itm_07/request",
+            "steps": [
+              {
+                "fill": {
+                  "label": "From",
+                  "value": "2026-12-04"
+                }
+              },
+              {
+                "fill": {
+                  "label": "To",
+                  "value": "2026-12-02"
+                }
+              },
+              {
+                "fill": {
+                  "label": "Purpose",
+                  "value": "Community choir rehearsal"
+                }
+              },
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Send request"
+                }
+              }
+            ]
+          },
+          {
+            "name": "request-conflict",
+            "page": "pages/request-new.html?item=itm_07",
+            "route": "/equipment/itm_07/request",
+            "steps": [
+              {
+                "fill": {
+                  "label": "From",
+                  "value": "2026-11-27"
+                }
+              },
+              {
+                "fill": {
+                  "label": "To",
+                  "value": "2026-11-28"
+                }
+              },
+              {
+                "fill": {
+                  "label": "Purpose",
+                  "value": "Community choir rehearsal"
+                }
+              },
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Send request"
+                }
+              }
+            ]
+          },
+          {
+            "name": "request-sent",
+            "page": "pages/request-new.html?item=itm_07",
+            "route": "/equipment/itm_07/request",
+            "steps": [
+              {
+                "fill": {
+                  "label": "From",
+                  "value": "2026-11-30"
+                }
+              },
+              {
+                "fill": {
+                  "label": "To",
+                  "value": "2026-12-01"
+                }
+              },
+              {
+                "fill": {
+                  "label": "Purpose",
+                  "value": "Community choir rehearsal"
+                }
+              },
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Send request"
+                }
+              }
+            ]
+          },
+          {
+            "name": "request-as-coordinator",
+            "page": "pages/request-new.html?item=itm_07",
+            "route": "/equipment/itm_07/request",
+            "role": "coordinator"
+          },
+          {
+            "name": "my-requests",
+            "page": "pages/my-requests.html",
+            "route": "/loans/mine",
+            "states": [
+              "default",
+              "empty",
+              "loading",
+              "error"
+            ]
+          },
+          {
+            "name": "my-requests-as-coordinator",
+            "page": "pages/my-requests.html",
+            "route": "/loans/mine",
+            "role": "coordinator"
+          },
+          {
+            "name": "requests",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "states": [
+              "default",
+              "empty",
+              "loading",
+              "error"
+            ]
+          },
+          {
+            "name": "requests-as-staff",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "staff"
+          },
+          {
+            "name": "requests-requested",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Requested"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-page-2",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Next page"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-approved",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Approve LN-1051"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-approve-conflict",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Approve LN-1052"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-decline-dialog",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Decline LN-1050"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-decline-no-reason",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Decline LN-1050"
+                }
+              },
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Yes, decline"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-declined",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Decline LN-1050"
+                }
+              },
+              {
+                "fill": {
+                  "label": "Reason for declining",
+                  "value": "The projector is needed for the board that day."
+                }
+              },
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Yes, decline"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-handed-out",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Hand out LN-1047"
+                }
+              }
+            ]
+          },
+          {
+            "name": "requests-returned",
+            "page": "pages/requests.html",
+            "route": "/requests",
+            "role": "coordinator",
+            "steps": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "Mark returned LN-1046"
+                }
+              }
+            ]
+          },
+          {
+            "name": "not-found",
+            "page": "pages/not-found.html",
+            "route": "/no-such-page"
+          },
+          {
+            "name": "server-error",
+            "page": "pages/server-error.html",
+            "route": "/equipment?system=crash"
+          },
+          {
+            "name": "maintenance",
+            "page": "pages/maintenance.html",
+            "route": "/equipment?system=maintenance"
+          }
+        ],
+        "project": {
+          "people": {
+            "signsOff": "the client's operations manager",
+            "technicalOwner": "the engine maintainer"
+          },
+          "designFramework": {
+            "kind": "none"
+          },
+          "i18n": {
+            "locales": [
+              "en-GB"
+            ],
+            "defaultLocale": "en-GB",
+            "rtl": false,
+            "expansionCheck": false
+          },
+          "tenancy": "single",
+          "browsers": "last 2 versions, not dead",
+          "accessibility": "wcag22-aa",
+          "currency": "none",
+          "theming": "light",
+          "auth": {
+            "signIn": "idp-hosted",
+            "provider": "the organisation's OIDC identity provider, behind the BFF"
+          }
+        }
+      },
+      "files": {
+        "assets/base.css": "9304d4812418963bc03eaaa60e2ac889060b0af70cafa2aef02d8f5eb657f861",
+        "assets/components.css": "729dac8bf0bef3e4638562c6378b91567e1101c0f552b0f476f78e32d83e68d1",
+        "assets/mk.js": "458adabf5f52efc92cd130e49ab08fe9142c4bdbd8f0f47a35a837efd28567d5",
+        "assets/tokens.css": "5808400664656dc02cc1a2cbd927f2d256da80872e778cbad74378671ee43774",
+        "components/AppLayout.js": "58632ced9efd4f1ec3198f431ad8b508de8a970098bdf577cadebc6f338ebed6",
+        "components/Badge.js": "e3bb22f1fce786489f47cc1a35d93a2c19288ffb3ee1556ec38b7fdedafbbfce",
+        "components/CardListSkeleton.js": "1bda442a27d94fc1e32f85fe3a198bfe0f3609ad3d53e1871ae236804361afd2",
+        "components/Dialog.js": "de83d59e212f3b5c5439f772961f98b580d18d60dfadadda6d99fff9e3b7ca95",
+        "components/EmptyState.js": "66477aec8b7b2dbcbe6715203b882046d8722276ca7bec6b8874a7a169467b04",
+        "components/ErrorPage.js": "ad486ac872e9a97b6ed17c6e281bbe68c6b27af8afd0a52d802226440ab90b10",
+        "components/ErrorState.js": "a28a8436c75b82b5c5f879d5cf962445e2e0e9636ddf2d47a5322afa4e4dcbe8",
+        "components/FilterTabs.js": "16dcfccb1abfa8b0d81745c7671972246be7818cb8086f2c9117fdb960bd122e",
+        "components/FormSkeleton.js": "680bd150d5a239e8d014a810b29da7c3a0e0f7de980ee6c8cd1885513b2459a0",
+        "components/ItemAvailabilityBadge.js": "be5cad4c21182dcf79239e763a42971ba151ef9cf32f214eb6d9f8e8fb12b21a",
+        "components/ItemCard.js": "437417602c0988b89a02e87462be6df0d2c9e023e44c4214bf1230961b84923d",
+        "components/ItemCardList.js": "6de1a0ad8e85d3ddd45b3699bcfa34817544e7d311930460bbd33ed9a0bc8152",
+        "components/LoanList.js": "67ef959b787f0081c97470159d6be989d6d88cd8778402a4f465fcc62870cea0",
+        "components/LoanStatusBadge.js": "ab1fd4d8cb76458991705dbe6df6fc74145db95ac9d4add94861316520a5664c",
+        "components/Notice.js": "980a24c20b155cf382ee02a00b95b2f23d7fa5a56c43dcb643f5a412659d390c",
+        "components/Pagination.js": "3c1704e9f8388f338c83c1fea155e2551a3dba7d5c72d8ba5df1dda81d70b42e",
+        "components/PlainLayout.js": "0a5873eff3bf1dd23f1e6b8daf008f1694449c9d665d850aa9697a0b888c9c35",
+        "components/SkeletonBox.js": "9cacb0244d711dca480396ba9c3a3f4502826f394a8b5970de620deca039c228",
+        "components/TextAreaField.js": "8fa9f3f4d66d1bac883aea7a7a46c392d11d8f706b536749422ce7ae978b2307",
+        "components/TextField.js": "1928416c94a774a4cb791244c37ded6a15321da777ba0d5aaf1926a6a1f2bbd7",
+        "data/bookings.js": "f3f9ce150dc1601a259164b9d88409d607abfe6a47bc292f082434458cea2091",
+        "data/fixtures.js": "6dad61117cf541cb0542882c2306fbe8b4ad094df427c5604e447e2509b9f346",
+        "data/list-query.js": "8691b169afb86e88bd99cf1e32423f4cab0e27a9c583fa810d923fda55375d54",
+        "docs/behaviours.json": "fac4c9ad854f6fbba89500185d910c8f4a85062d3b57aae9f673b71ebcbab10d",
+        "index.html": "5397caff9cbae57bfc6ef011c358fc30d8c876d9c28b25851b08bdd92c9128d2",
+        "pages/equipment.html": "75059acef26a5af51f71c5be4badc9f44013ac5fc09a5db9519edf99cf2d64ea",
+        "pages/maintenance.html": "52cef22a71a85b46a3e2b57132aa3a20a4cd5e7b9565ec7d3ca095cf28f40d56",
+        "pages/my-requests.html": "622b111eec54ea7a4b90831efb037795c53792df91ff8df60cffafe8041276b3",
+        "pages/not-found.html": "0e9e81b77227b2a7f7132953f8cce422ed87f8ed8ccc6a8952b3ce201686a585",
+        "pages/request-new.html": "fe65cde29bacc54f378db9581460c1216afd0f335f51ac9ab042ad7701d62de0",
+        "pages/requests.html": "beb7ff99b1f3b6640325012811aec357e1a51b3a8d63ef0ea6e3ec8bf69734b8",
+        "pages/server-error.html": "b0e2c495b9700c7f6a8cc1befd9a29da9bdeff6262096677dac7b91f2fc4f004",
+        "strings/en-GB.js": "98b9c34d7aecde90f78bd7bb0b956dc463e2f95dc8e38177c150db63c6ddfcba"
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "flows": [
+    {
+      "name": "sign in, then the first page loads its session",
+      "path": "/",
+      "steps": [
+        { "fill": { "label": "<the sign-in form's first label>", "value": "<a staging user>" } },
+        { "fill": { "label": "<the sign-in form's second label>", "value": "<that user's staging secret>" } },
+        { "click": { "role": "button", "name": "<the sign-in button's name>" } }
+      ],
+      "expect": { "path": "/<the page a signed-in user lands on>", "request": "GET /api/v1/session" },
+      "allowStatus": [401]
+    },
+    {
+      "name": "<area>: read",
+      "path": "/<the area's list page>",
+      "expect": { "text": "<a value the seed data shows there>", "request": "GET /api/v1/<list-path>" }
+    },
+    {
+      "name": "<area>: write (one that can repeat: a toggle, or data reset before the run)",
+      "path": "/<the page with the write>",
+      "steps": [{ "click": { "role": "button", "name": "<the control that writes>" } }],
+      "expect": { "text": "<the confirmation in our copy>", "request": "POST /api/v1/<write-path>" }
+    }
+  ]
+}

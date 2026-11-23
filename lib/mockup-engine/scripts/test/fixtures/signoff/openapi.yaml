@@ -1,0 +1,56 @@
+openapi: 3.1.0
+info:
+  title: Starter invoices
+  version: 0.1.0-draft
+paths:
+  /v1/invoices:
+    get:
+      operationId: listInvoices
+      responses:
+        '200':
+          description: A page of invoices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoicePage'
+components:
+  schemas:
+    Money:
+      type: integer
+      minimum: 0
+      description: Integer minor units
+    Invoice:
+      x-mockup-fixture: invoices
+      type: object
+      additionalProperties: false
+      required: [id, number, customer_name, amount, currency, status, issued_on, due_on]
+      properties:
+        id: { type: string, pattern: '^inv_' }
+        number: { type: string }
+        customer_name: { type: string, minLength: 1 }
+        amount: { $ref: '#/components/schemas/Money' }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        status: { type: string, enum: [open, paid, overdue, void] }
+        issued_on: { type: string, format: date }
+        due_on: { type: [string, 'null'], format: date }
+    InvoicePage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Invoice' } }
+        next_cursor: { type: [string, 'null'] }
+    Organisation:
+      x-mockup-fixture: organisation
+      type: object
+      required: [id, name, currency]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+    Role:
+      x-mockup-fixture: roles.*
+      type: object
+      required: [label, permissions]
+      properties:
+        label: { type: string }
+        permissions: { type: array, items: { type: string } }

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <title>My requests</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../assets/tokens.css">
+  <link rel="stylesheet" href="../assets/base.css">
+  <link rel="stylesheet" href="../assets/components.css">
+  <script src="../assets/mk.js"></script>
+  <script src="../strings/en-GB.js"></script>
+  <script src="../data/fixtures.js"></script>
+  <script src="../data/list-query.js"></script>
+  <script src="../components/AppLayout.js"></script>
+  <script src="../components/Badge.js"></script>
+    <script src="../components/EmptyState.js"></script>
+  <script src="../components/ErrorPage.js"></script>
+  <script src="../components/ErrorState.js"></script>
+  <script src="../components/LoanStatusBadge.js"></script>
+  <script src="../components/CardListSkeleton.js"></script>
+  <script src="../components/LoanList.js"></script>
+  <script src="../components/Notice.js"></script>
+  <script src="../components/Pagination.js"></script>
+  <script src="../components/SkeletonBox.js"></script>
+  </head>
+<body>
+  <div id="app"></div>
+  <script>
+    const { html, components: C } = MK;
+    const PAGE_SIZE = 10;
+
+    MK.page({
+      id: 'my-requests',
+      route: '/loans/mine',
+      title: MK.t('my-requests.title'),
+      needs: {
+        api: ['GET /v1/me/loans?cursor=&limit= -> LoanPage { items, next_cursor }'],
+        permission: 'loan:request',
+        notes: [
+          'only the signed-in person\'s own requests, newest request first; cursor paged, limit 10 here, no total',
+          'every status shows (PRD requirement 2): requested, approved, declined, on loan, returned',
+          'no action on a staff member\'s own request is designed: cancelling a request is an open question in the brief',
+        ],
+      },
+      state: { cursors: [] },
+      // Stands in for the API: the signed-in person's loans, newest first, actions the role may take.
+      load: (fx, { scenario, state, session }) => {
+        const mine = scenario === 'empty' ? [] : fx.loans
+          .filter((l) => l.requester.id === session.user_id)
+          .map((l) => ({ ...l, allowed_actions: l.allowed_actions.filter((a) => session.permissions.includes(fx.action_permissions[a])) }));
+        return window.listQuery(mine, { sort: '-requested_at', cursor: state.cursors[state.cursors.length - 1], limit: PAGE_SIZE });
+      },
+      actions: {
+        nextPage(state, _e, el) { state.cursors = [...state.cursors, el.dataset.cursor]; },
+        prevPage(state) { state.cursors = state.cursors.slice(0, -1); },
+      },
+      render: ({ state, data, status }) => {
+        let content;
+        if (status === 'loading') content = C.CardListSkeleton({ count: 5, layout: 'list' });
+        else if (status === 'error') content = html`<div class="card">${C.ErrorState({ body: MK.t('my-requests.error') })}</div>`;
+        else if (!data.rows.length) content = html`<div class="card">${C.EmptyState({ title: MK.t('my-requests.empty.title'), body: MK.t('my-requests.empty.body') })}</div>`;
+        else content = html`
+          ${C.LoanList({ label: MK.t('my-requests.list.label'), loans: data.rows })}
+          ${C.Pagination({ page: state.cursors.length + 1, hasPrev: state.cursors.length > 0, nextCursor: data.next_cursor, prevAction: 'prevPage', nextAction: 'nextPage' })}`;
+        return html`<div class="stack">
+          <div class="row row--between">
+            <h1>${MK.t('my-requests.title')}</h1>
+            <a class="button button--primary" href="${MK.href('./equipment.html')}">${MK.t('my-requests.new')}</a>
+          </div>
+          <p class="muted">${MK.t('my-requests.intro')}</p>
+          ${content}
+        </div>`;
+      },
+    });
+  </script>
+</body>
+</html>

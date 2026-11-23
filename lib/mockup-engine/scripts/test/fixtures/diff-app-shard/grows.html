@@ -1,0 +1,10 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Grows</title><style>body { margin: 0; padding-top: 1200px } p { margin: 0; height: 20px }</style></head>
+<body><div id="log"></div><script>
+  // Taller than the viewport, then grows by a line a frame for about 300ms, then stops (?forever keeps growing)
+  const forever = location.search.includes('forever');
+  const start = performance.now();
+  (function grow() {
+    const p = document.createElement('p'); p.textContent = 'line'; document.getElementById('log').append(p);
+    if (forever || performance.now() - start < 300) requestAnimationFrame(grow);
+  })();
+</script></body></html>

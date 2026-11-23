@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <title>Page not found</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../assets/tokens.css">
+  <link rel="stylesheet" href="../assets/base.css">
+  <link rel="stylesheet" href="../assets/components.css">
+  <script src="../assets/mk.js"></script>
+  <script src="../strings/en-GB.js"></script>
+  <script src="../data/fixtures.js"></script>
+  <script src="../components/AppLayout.js"></script>
+  <script src="../components/ErrorPage.js"></script>
+  <script src="../components/Notice.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // system-pages module: any route the app does not know.
+    MK.page({
+      id: 'not-found',
+      route: '*',
+      title: MK.t('not-found.title'),
+      needs: { permission: 'public' },
+      render: () => MK.components.ErrorPage({
+        code: '404',
+        title: MK.t('not-found.title'),
+        body: MK.t('not-found.body'),
+        link: { label: MK.t('not-found.link'), href: MK.href('./equipment.html') },
+      }),
+    });
+  </script>
+</body>
+</html>

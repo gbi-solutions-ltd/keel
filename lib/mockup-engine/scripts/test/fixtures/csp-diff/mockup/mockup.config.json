@@ -1,0 +1,6 @@
+{
+  "name": "csp enforcement fixture",
+  "viewports": [{ "name": "desktop", "width": 600, "height": 400 }],
+  "screens": [{ "name": "panel", "page": "page.html", "route": "/page.html" }],
+  "diff": { "maxMismatchPercent": 0, "pixelThreshold": 0.1 }
+}

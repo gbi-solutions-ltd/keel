@@ -1,0 +1,17 @@
+body { font: 16px/1.5 system-ui, sans-serif; margin: 24px; color: #111; background: #fff; }
+.wrap { position: relative; display: inline-block; }
+input { border: 0; outline: none; padding: 12px; font: inherit; min-height: 44px; }
+.frame { position: absolute; inset: 0; border: 1px solid #555; border-radius: 4px; pointer-events: none; }
+.wrap:focus-within .frame { border: 2px solid #1565c0; }
+button { min-height: 44px; min-width: 44px; padding: 8px 16px; font: inherit; border: 1px solid #555; background: #fff; color: #111; }
+#ringed:focus-visible { outline: 2px solid #1565c0; outline-offset: 2px; }
+#bare:focus { outline: none; }
+/* A kit that shows focus in a layer of the control (Vuetify: a child overlay's opacity, an ::after border) */
+#layered, #after { position: relative; }
+#layered:focus, #after:focus { outline: none; }
+#layered .overlay { position: absolute; inset: 0; background: currentColor; opacity: 0; }
+#layered:focus-visible .overlay { opacity: 0.12; }
+#after::after { content: ""; position: absolute; inset: 0; border: 2px solid currentColor; opacity: 0; }
+#after:focus-visible::after { opacity: 0.25; }
+.late-field input { border: 1px solid #555; outline: none; padding: 12px; min-height: 44px; }
+.late-field--focused input { border: 2px solid #1565c0; }

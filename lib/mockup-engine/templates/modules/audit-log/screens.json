@@ -1,0 +1,127 @@
+[
+  {
+    "name": "audit",
+    "page": "pages/audit.html",
+    "route": "/audit",
+    "states": [
+      "default",
+      "empty",
+      "loading",
+      "error"
+    ]
+  },
+  {
+    "name": "audit-sign-in",
+    "page": "pages/audit.html",
+    "route": "/audit",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Sign-in"
+        }
+      }
+    ]
+  },
+  {
+    "name": "audit-by-person",
+    "page": "pages/audit.html",
+    "route": "/audit",
+    "steps": [
+      {
+        "select": {
+          "label": "Who",
+          "value": "Grace Atim"
+        }
+      }
+    ]
+  },
+  {
+    "name": "audit-columns",
+    "page": "pages/audit.html",
+    "route": "/audit",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Columns"
+        }
+      },
+      {
+        "click": {
+          "role": "checkbox",
+          "name": "Request ID"
+        }
+      }
+    ]
+  },
+  {
+    "name": "audit-page-3",
+    "page": "pages/audit.html",
+    "route": "/audit",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Next page"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Next page"
+        }
+      }
+    ]
+  },
+  {
+    "name": "audit-export",
+    "page": "pages/audit.html",
+    "route": "/audit",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Export"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "CSV"
+        }
+      }
+    ]
+  },
+  {
+    "name": "audit-as-finance",
+    "page": "pages/audit.html",
+    "route": "/audit",
+    "role": "clerk"
+  },
+  {
+    "name": "audit-as-support",
+    "page": "pages/audit.html",
+    "route": "/audit",
+    "role": "auditor"
+  },
+  {
+    "name": "audit-filtered-link",
+    "page": "pages/audit.html",
+    "route": "/audit",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Users"
+        }
+      },
+      {
+        "select": {
+          "label": "Who",
+          "value": "The system (automatic)"
+        }
+      }
+    ]
+  }
+]

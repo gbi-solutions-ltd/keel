@@ -1,0 +1,8 @@
+{
+  "name": "app-mode HTTP fixture",
+  "viewports": [{ "name": "desktop", "width": 600, "height": 400 }],
+  "screens": [
+    { "name": "loaded", "page": "loaded.html", "route": "/loaded.html" }
+  ],
+  "diff": { "maxMismatchPercent": 0.2, "pixelThreshold": 0.1 }
+}

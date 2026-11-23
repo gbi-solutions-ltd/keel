@@ -7,6 +7,37 @@ versions as each skill is tested against real repositories.
 
 Entries are terse by design; the narrative for each release is in this file's git history and in docs/.
 
+## Unreleased
+
+- Two skills, `mockup` and `convert-mockup`, and the `keel-port-worker` agent. `mockup` builds a
+  client mockup in plain HTML that is framework shaped, asks the intake decisions before the first
+  screen, checks the mockup (accessibility, spill, behaviours, a pinned visual baseline), and signs it
+  off by hash with a drafted API contract. `convert-mockup` turns a signed-off mockup into a React
+  (Vite), Vue or Next.js app that matches it pixel for pixel, plans and stops for approval first,
+  and takes the app through a production bar (headers, budget, contract drift, a staging run against
+  a sample backend, gaps owned and dated).
+- Their engine, `lib/mockup-engine/`, is Node: it needs an LTS Node of line 24 (from 24.18.0) or 26
+  (from 26.13.0) and npm 11.16 or later, for these two skills only; the rest of keel stays bash.
+  `keel mockup-engine path|check` finds it and runs its preflight. The engine installs into the
+  project's git-ignored `.mockup-engine/` (about 230 MB with its pinned browser, hash checked), from
+  a committed lockfile with no install scripts, and only after the user agrees; npm's cache and logs
+  stay there too. Policy: `lib/mockup-engine/DEPENDENCIES.md`.
+- Routing: the session hook, the `keel` router, the cheat sheet and the catalog name the two skills.
+  `coding-standards` gains frontend rules (responsive layout, permission-aware UI, exports, no silent
+  failure, sign-in) and an observability note.
+- CI runs the engine's suite on Node 24.18.0 and 26.13.1, advisory.
+- Evals: `mock-intake-first`, `convert-a-changed-mockup` and its control
+  `convert-with-the-check-disabled`, first run 2026-11-23 (all pass; `tests/evals/results.md`).
+  They are not gate scenarios.
+- A first-use run on a clean HOME (preflight, install, a signed-off starter and its React port at the
+  gate) fixed: npm writing to the user's home, the starter's check output showing as untracked, the
+  pseudo-locale's padding (one unbreakable run that made the starter fail its own expansion check;
+  now short words that wrap), `check-frontend` misreading layers for an app in a folder named `app`,
+  `dom-oracle --drop-attributes` for a port's own run, and the references a user needed that only
+  the proving examples held (`stacks/react-vite-patterns.md`).
+- Release gate: owed. `skills/` changed since v0.30.0 (two new skills, and `keel` and
+  `coding-standards` references), so the seven gate arms run before this is released.
+
 ## 0.30.0 - 2026-11-18
 
 - Release gate: the 0.29.0 gate transfers. `git diff --stat v0.29.0..HEAD -- skills/ tests/evals/`

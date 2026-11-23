@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Starter mockup</title>
+  <link rel="stylesheet" href="assets/tokens.css">
+  <link rel="stylesheet" href="assets/base.css">
+  <style>
+    main { max-width: 760px; margin: 0 auto; padding: var(--space-8) var(--space-4); }
+    li { margin-bottom: var(--space-2); }
+  </style>
+</head>
+<body>
+  <!-- Client-facing index of every screen, state and role. Not converted. -->
+  <main class="stack">
+    <h1>Starter mockup</h1>
+    <p class="muted">Every screen, its states, and what each role sees. Data is sample data. Use the
+      "preview as" box in the corner of any screen to switch role.</p>
+    <h2>Invoices</h2>
+    <ul>
+      <li><a href="pages/invoices.html">List</a> |
+        <a href="pages/invoices.html?state=empty">empty</a> |
+        <a href="pages/invoices.html?state=loading">loading</a> |
+        <a href="pages/invoices.html?state=error">error</a> |
+        <a href="pages/invoices.html?q=clinic">searched</a></li>
+    </ul>
+    <h2>Settings</h2>
+    <ul>
+      <li><a href="pages/access.html">Who can do what</a> |
+        <a href="pages/access.html?state=loading">loading</a> |
+        <a href="pages/access.html?state=error">error</a> |
+        <a href="pages/access.html?as=clerk">as Clerk (no access)</a></li>
+    </ul>
+    <h2>Roles</h2>
+    <ul>
+      <li>Manager: invoices, create, void, who can do what</li>
+      <li>Clerk: invoices, create</li>
+      <li>Auditor: invoices, who can do what</li>
+    </ul>
+  </main>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Set up an authenticator app</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../assets/tokens.css">
+  <link rel="stylesheet" href="../assets/base.css">
+  <link rel="stylesheet" href="../assets/components.css">
+  <script src="../assets/mk.js"></script>
+  <script src="../strings/en-GB.js"></script>
+  <script src="../data/fixtures.js"></script>
+  <script src="../components/AppLayout.js"></script>
+  <script src="../components/AuthLayout.js"></script>
+  <script src="../components/Badge.js"></script>
+  <script src="../components/DataTable.js"></script>
+  <script src="../components/Dialog.js"></script>
+  <script src="../components/EmptyState.js"></script>
+  <script src="../components/ErrorPage.js"></script>
+  <script src="../components/ErrorState.js"></script>
+  <script src="../components/FactorRow.js"></script>
+  <script src="../components/InvoiceStatusBadge.js"></script>
+  <script src="../components/MoneyField.js"></script>
+  <script src="../components/Notice.js"></script>
+  <script src="../components/OneTimeCodeField.js"></script>
+  <script src="../components/Pagination.js"></script>
+  <script src="../components/PermissionGrid.js"></script>
+  <script src="../components/RadioGroup.js"></script>
+  <script src="../components/RecoveryCodes.js"></script>
+  <script src="../components/SelectField.js"></script>
+  <script src="../components/SkeletonBox.js"></script>
+  <script src="../components/StepUpDialog.js"></script>
+  <script src="../components/Stepper.js"></script>
+  <script src="../components/TableSkeleton.js"></script>
+  <script src="../components/TextField.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const { html, components: C } = MK;
+    const STEPS = ['Scan the code', 'Enter a code', 'Save your recovery codes'];
+
+    MK.page({
+      id: 'security-authenticator',
+      route: '/account/security/authenticator',
+      title: 'Set up an authenticator app',
+      needs: {
+        api: ['GET /v1/me/mfa/totp/{enrolment_id} -> TotpEnrolment', 'POST /v1/me/mfa/totp/verify { enrolment_id, code } -> { recovery_codes }'],
+        permission: 'authenticated',
+      },
+      state: { step: 1, code: '', error: null, saved: false },
+      load: (fx) => ({ enrolment: fx.auth.totp_enrolment, codes: fx.auth.recovery_codes }),
+      actions: {
+        next(state, _e, _el, ctx) { state.step = 2; ctx.focus('totp-code'); },
+        setCode(state, _e, el) { state.code = el.value; return false; },
+        verify(state, _e, _el, ctx) {
+          if (!state.code || state.code === '000000') { state.error = 'That code is not right. Check the time on your phone is set automatically, then try the newest code.'; ctx.focus('totp-code'); return; }
+          state.step = 3; state.error = null;
+        },
+        setSaved(state, _e, el) { state.saved = el.checked; },
+        done(_s, _e, _el, ctx) { ctx.navigate('./security.html'); return false; },
+      },
+      render: ({ state, data, status }) => {
+        const back = html`<a href="${MK.href('./security.html')}">&larr; Account security</a>`;
+        if (status === 'loading') return html`<div class="stack">${back}<div class="card" role="status"><span class="visually-hidden">Loading</span>${C.SkeletonBox({ shape: 'title' })}${C.SkeletonBox({ shape: 'chart' })}</div></div>`;
+        if (status === 'error') return html`<div class="stack">${back}<div class="card">${C.ErrorState({ title: 'This setup has expired', body: 'Start again from Account security.' })}</div></div>`;
+        const e = data.enrolment;
+        let body;
+        if (state.step === 1) body = html`
+          <p>Open your authenticator app, add an account, and scan this code.</p>
+          <img class="qr" src="${e.qr_image}" width="192" height="192" alt="QR code to add this app to your authenticator app">
+          <p class="muted">Cannot scan it? Enter this key instead:</p>
+          <p class="mono">${e.secret.match(/.{1,4}/g).join(' ')}</p>
+          <div><button type="button" class="button button--primary" data-action="next">Next</button></div>`;
+        else if (state.step === 2) body = html`
+          <p>Enter the six-digit code your app shows for this app.</p>
+          <form class="form" data-action="verify" novalidate>
+            ${C.OneTimeCodeField({ id: 'totp-code', label: 'Code', error: state.error, action: 'setCode' })}
+            <div><button type="submit" class="button button--primary">Verify</button></div>
+          </form>`;
+        else body = html`
+          ${C.Notice({ tone: 'success', text: 'Your authenticator app is set up.' })}
+          ${C.RecoveryCodes({ codes: data.codes })}
+          <label class="checkbox-row"><input type="checkbox" data-action="setSaved" ${state.saved ? MK.raw('checked') : ''}> I have saved my recovery codes</label>
+          <div><button type="button" class="button button--primary" data-action="done" ${state.saved ? '' : MK.raw('disabled')}>Done</button></div>`;
+        return html`
+          <div class="stack">
+            ${back}
+            <h1>Set up an authenticator app</h1>
+            <div class="card form">
+              ${C.Stepper({ step: state.step, total: 3, label: STEPS[state.step - 1] })}
+              ${body}
+            </div>
+          </div>`;
+      },
+    });
+  </script>
+</body>
+</html>

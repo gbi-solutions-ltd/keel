@@ -1,0 +1,888 @@
+[
+  {
+    "id": "equipment-staff-can-request",
+    "page": "pages/equipment.html",
+    "expect": [
+      {
+        "selector": ".item-card",
+        "count": 12
+      },
+      {
+        "selector": ".item-card__action",
+        "count": 12
+      },
+      {
+        "text": "Page 1"
+      }
+    ]
+  },
+  {
+    "id": "equipment-coordinator-cannot-request",
+    "page": "pages/equipment.html",
+    "role": "coordinator",
+    "expect": [
+      {
+        "selector": ".item-card",
+        "count": 12
+      },
+      {
+        "selector": ".item-card__action",
+        "count": 0
+      },
+      {
+        "noText": "My requests"
+      },
+      {
+        "text": "Requests"
+      }
+    ]
+  },
+  {
+    "id": "equipment-on-loan-says-until-when",
+    "page": "pages/equipment.html",
+    "expect": [
+      {
+        "text": "On loan until 26 Nov 2026"
+      },
+      {
+        "text": "Free today"
+      }
+    ]
+  },
+  {
+    "id": "equipment-search",
+    "page": "pages/equipment.html",
+    "steps": [
+      {
+        "fill": {
+          "label": "Search",
+          "value": "projector"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Search"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "selector": ".item-card",
+        "count": 3
+      },
+      {
+        "text": "Short-throw projector"
+      }
+    ]
+  },
+  {
+    "id": "equipment-no-match",
+    "page": "pages/equipment.html",
+    "steps": [
+      {
+        "fill": {
+          "label": "Search",
+          "value": "tuba"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Search"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "text": "No equipment matches"
+      },
+      {
+        "selector": ".item-card",
+        "count": 0
+      }
+    ]
+  },
+  {
+    "id": "equipment-category",
+    "page": "pages/equipment.html",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Cameras"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "selector": ".item-card",
+        "count": 3
+      },
+      {
+        "attr": {
+          "selector": ".filter-tabs__tab[data-value=camera]",
+          "name": "aria-pressed",
+          "value": "true"
+        }
+      }
+    ]
+  },
+  {
+    "id": "equipment-page-2",
+    "page": "pages/equipment.html",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Next page"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "selector": ".item-card",
+        "count": 2
+      },
+      {
+        "text": "Page 2"
+      }
+    ]
+  },
+  {
+    "id": "equipment-long-name-fits-320",
+    "page": "pages/equipment.html",
+    "viewport": {
+      "width": 320,
+      "height": 800
+    },
+    "expect": [
+      {
+        "fits": ".item-card__name"
+      },
+      {
+        "fits": ".item-card"
+      },
+      {
+        "text": "Video camera kit with tripod"
+      }
+    ],
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Next page"
+        }
+      }
+    ]
+  },
+  {
+    "id": "equipment-offline-banner",
+    "page": "pages/equipment.html?system=offline",
+    "viewport": "mobile",
+    "expect": [
+      {
+        "visible": ".app-layout__banner .notice"
+      },
+      {
+        "text": "You are offline."
+      }
+    ]
+  },
+  {
+    "id": "request-shows-taken-days",
+    "page": "pages/request-new.html?item=itm_07",
+    "expect": [
+      {
+        "text": "27 Nov 2026 to 28 Nov 2026"
+      },
+      {
+        "text": "Days already booked"
+      }
+    ]
+  },
+  {
+    "id": "request-not-booked-is-empty-state",
+    "page": "pages/request-new.html?item=itm_05",
+    "expect": [
+      {
+        "text": "Not booked yet"
+      }
+    ]
+  },
+  {
+    "id": "request-fields-required",
+    "page": "pages/request-new.html?item=itm_07",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Send request"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "text": "Enter the first day you need it."
+      },
+      {
+        "text": "Enter the last day you need it."
+      },
+      {
+        "text": "Say what you need it for."
+      },
+      {
+        "attr": {
+          "selector": "#request-from",
+          "name": "aria-invalid",
+          "value": "true"
+        }
+      },
+      {
+        "attr": {
+          "selector": "#request-from",
+          "name": "aria-describedby",
+          "value": "request-from-hint request-from-error"
+        }
+      }
+    ]
+  },
+  {
+    "id": "request-from-not-in-past",
+    "page": "pages/request-new.html?item=itm_07",
+    "steps": [
+      {
+        "fill": {
+          "label": "From",
+          "value": "2026-11-20"
+        }
+      },
+      {
+        "fill": {
+          "label": "To",
+          "value": "2026-11-21"
+        }
+      },
+      {
+        "fill": {
+          "label": "Purpose",
+          "value": "Rehearsal"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Send request"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "text": "The first day cannot be before today."
+      }
+    ]
+  },
+  {
+    "id": "request-to-not-before-from",
+    "page": "pages/request-new.html?item=itm_07",
+    "steps": [
+      {
+        "fill": {
+          "label": "From",
+          "value": "2026-12-04"
+        }
+      },
+      {
+        "fill": {
+          "label": "To",
+          "value": "2026-12-02"
+        }
+      },
+      {
+        "fill": {
+          "label": "Purpose",
+          "value": "Rehearsal"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Send request"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "text": "The last day cannot be before the first day."
+      },
+      {
+        "attr": {
+          "selector": "#request-from",
+          "name": "aria-invalid",
+          "value": null
+        }
+      }
+    ]
+  },
+  {
+    "id": "request-taken-days-refused",
+    "page": "pages/request-new.html?item=itm_07",
+    "steps": [
+      {
+        "fill": {
+          "label": "From",
+          "value": "2026-11-28"
+        }
+      },
+      {
+        "fill": {
+          "label": "To",
+          "value": "2026-11-30"
+        }
+      },
+      {
+        "fill": {
+          "label": "Purpose",
+          "value": "Rehearsal"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Send request"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "text": "This item is already booked for some of those days."
+      },
+      {
+        "selector": "form .notice--danger",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "id": "request-sent",
+    "page": "pages/request-new.html?item=itm_07",
+    "steps": [
+      {
+        "fill": {
+          "label": "From",
+          "value": "2026-11-30"
+        }
+      },
+      {
+        "fill": {
+          "label": "To",
+          "value": "2026-12-01"
+        }
+      },
+      {
+        "fill": {
+          "label": "Purpose",
+          "value": "Rehearsal"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Send request"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "text": "Request LN-1053 sent"
+      },
+      {
+        "text": "You asked for 30 Nov 2026 to 01 Dec 2026."
+      },
+      {
+        "selector": "form",
+        "count": 0
+      }
+    ]
+  },
+  {
+    "id": "request-refused-to-coordinator",
+    "page": "pages/request-new.html?item=itm_07",
+    "role": "coordinator",
+    "expect": [
+      {
+        "text": "You do not have access to this page"
+      },
+      {
+        "selector": "form",
+        "count": 0
+      }
+    ]
+  },
+  {
+    "id": "my-requests-only-own",
+    "page": "pages/my-requests.html",
+    "expect": [
+      {
+        "selector": ".loan-list__item",
+        "count": 5
+      },
+      {
+        "noText": "Tomasz Wilk"
+      },
+      {
+        "text": "Requested"
+      },
+      {
+        "text": "Approved"
+      },
+      {
+        "text": "Declined"
+      },
+      {
+        "text": "On loan"
+      },
+      {
+        "text": "Returned"
+      }
+    ]
+  },
+  {
+    "id": "my-requests-no-requester-or-actions",
+    "page": "pages/my-requests.html",
+    "expect": [
+      {
+        "selector": ".loan-list__item",
+        "count": 5
+      },
+      {
+        "noText": "Requested by"
+      },
+      {
+        "selector": ".loan-list button",
+        "count": 0
+      }
+    ]
+  },
+  {
+    "id": "my-requests-newest-first",
+    "page": "pages/my-requests.html",
+    "expect": [
+      {
+        "selector": ".loan-list__item:first-child .badge--warning",
+        "count": 1
+      },
+      {
+        "selector": ".loan-list__item:last-child .badge--neutral",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "id": "my-requests-refused-to-coordinator",
+    "page": "pages/my-requests.html",
+    "role": "coordinator",
+    "expect": [
+      {
+        "text": "You do not have access to this page"
+      },
+      {
+        "selector": ".loan-list",
+        "count": 0
+      }
+    ]
+  },
+  {
+    "id": "requests-first-page",
+    "page": "pages/requests.html",
+    "role": "coordinator",
+    "expect": [
+      {
+        "selector": ".loan-list__item",
+        "count": 10
+      },
+      {
+        "text": "Page 1"
+      },
+      {
+        "text": "Ciarán Ó Súilleabháin-Fitzgerald"
+      }
+    ]
+  },
+  {
+    "id": "requests-refused-to-staff",
+    "page": "pages/requests.html",
+    "expect": [
+      {
+        "text": "You do not have access to this page"
+      },
+      {
+        "selector": ".loan-list",
+        "count": 0
+      }
+    ]
+  },
+  {
+    "id": "requests-filter-requested",
+    "page": "pages/requests.html",
+    "role": "coordinator",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Requested"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "selector": ".loan-list__item",
+        "count": 4
+      },
+      {
+        "selector": ".loan-list .badge--warning",
+        "count": 4
+      }
+    ]
+  },
+  {
+    "id": "requests-actions-follow-status",
+    "page": "pages/requests.html",
+    "role": "coordinator",
+    "expect": [
+      {
+        "selector": "#loan-approve-ln_1051",
+        "count": 1
+      },
+      {
+        "selector": "#loan-hand_out-ln_1047",
+        "count": 1
+      },
+      {
+        "selector": "#loan-return-ln_1046",
+        "count": 1
+      },
+      {
+        "selector": "#loan-approve-ln_1047",
+        "count": 0
+      }
+    ]
+  },
+  {
+    "id": "requests-approve",
+    "page": "pages/requests.html",
+    "role": "coordinator",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Approve LN-1051"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "text": "LN-1051 approved."
+      },
+      {
+        "selector": "#loan-hand_out-ln_1051",
+        "count": 1
+      },
+      {
+        "selector": "#loan-approve-ln_1051",
+        "count": 0
+      }
+    ]
+  },
+  {
+    "id": "requests-approve-refused-when-taken",
+    "page": "pages/requests.html",
+    "role": "coordinator",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Approve LN-1052"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "text": "Could not approve LN-1052"
+      },
+      {
+        "selector": "#loan-approve-ln_1052",
+        "count": 1
+      },
+      {
+        "selector": ".notice--danger",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "id": "requests-decline-asks-first",
+    "page": "pages/requests.html",
+    "role": "coordinator",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Decline LN-1050"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "selector": "dialog[open]",
+        "count": 1
+      },
+      {
+        "onTop": "#decline-cancel"
+      },
+      {
+        "text": "Decline LN-1050?"
+      },
+      {
+        "attr": {
+          "selector": "#decline-reason",
+          "name": "maxlength",
+          "value": "200"
+        }
+      }
+    ]
+  },
+  {
+    "id": "requests-decline-cancel-keeps-it",
+    "page": "pages/requests.html",
+    "role": "coordinator",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Decline LN-1050"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Keep the request"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "selector": "dialog",
+        "count": 0
+      },
+      {
+        "selector": "#loan-decline-ln_1050",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "id": "requests-decline-needs-reason",
+    "page": "pages/requests.html",
+    "role": "coordinator",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Decline LN-1050"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Yes, decline"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "selector": "dialog[open]",
+        "count": 1
+      },
+      {
+        "text": "Give a short reason."
+      },
+      {
+        "attr": {
+          "selector": "#decline-reason",
+          "name": "aria-invalid",
+          "value": "true"
+        }
+      },
+      {
+        "selector": "#loan-decline-ln_1050",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "id": "requests-declined",
+    "page": "pages/requests.html",
+    "role": "coordinator",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Decline LN-1050"
+        }
+      },
+      {
+        "fill": {
+          "label": "Reason for declining",
+          "value": "The projector is needed for the board that day."
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Yes, decline"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "selector": "dialog",
+        "count": 0
+      },
+      {
+        "text": "LN-1050 declined."
+      },
+      {
+        "selector": "#loan-decline-ln_1050",
+        "count": 0
+      },
+      {
+        "text": "Reason for declining The projector is needed for the board that day."
+      }
+    ]
+  },
+  {
+    "id": "requests-hand-out",
+    "page": "pages/requests.html",
+    "role": "coordinator",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Hand out LN-1047"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "text": "LN-1047 is now on loan."
+      },
+      {
+        "selector": "#loan-return-ln_1047",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "id": "requests-return",
+    "page": "pages/requests.html",
+    "role": "coordinator",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Mark returned LN-1046"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "text": "LN-1046 recorded as returned."
+      },
+      {
+        "selector": "#loan-return-ln_1046",
+        "count": 0
+      }
+    ]
+  },
+  {
+    "id": "requests-page-2",
+    "page": "pages/requests.html",
+    "role": "coordinator",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Next page"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "selector": ".loan-list__item",
+        "count": 4
+      },
+      {
+        "text": "Page 2"
+      }
+    ]
+  },
+  {
+    "id": "requests-cards-fit-320",
+    "page": "pages/requests.html",
+    "role": "coordinator",
+    "viewport": {
+      "width": 320,
+      "height": 800
+    },
+    "expect": [
+      {
+        "fits": ".loan-list__item"
+      },
+      {
+        "fits": ".loan-list__actions"
+      },
+      {
+        "text": "Ciarán Ó Súilleabháin-Fitzgerald"
+      }
+    ]
+  },
+  {
+    "id": "maintenance-says-when",
+    "page": "pages/maintenance.html",
+    "expect": [
+      {
+        "text": "We expect to be back by 23 Nov 2026, 11:00."
+      }
+    ]
+  },
+  {
+    "id": "not-found-links-to-equipment",
+    "page": "pages/not-found.html",
+    "expect": [
+      {
+        "text": "Page not found"
+      },
+      {
+        "attr": {
+          "selector": ".error-page a",
+          "name": "href",
+          "value": "./equipment.html"
+        }
+      }
+    ]
+  },
+  {
+    "id": "my-requests-shows-decline-reason",
+    "page": "pages/my-requests.html",
+    "expect": [
+      {
+        "text": "Reason for declining LT-014 is kept for the board on those days."
+      },
+      {
+        "selector": ".loan-list__detail--wide",
+        "count": 6
+      }
+    ]
+  }
+]

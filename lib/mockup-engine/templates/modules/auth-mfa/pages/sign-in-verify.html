@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Confirm it is you</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../assets/tokens.css">
+  <link rel="stylesheet" href="../assets/base.css">
+  <link rel="stylesheet" href="../assets/components.css">
+  <script src="../assets/mk.js"></script>
+  <script src="../strings/en-GB.js"></script>
+  <script src="../data/fixtures.js"></script>
+  <script src="../components/AppLayout.js"></script>
+  <script src="../components/AuthLayout.js"></script>
+  <script src="../components/Badge.js"></script>
+  <script src="../components/DataTable.js"></script>
+  <script src="../components/Dialog.js"></script>
+  <script src="../components/EmptyState.js"></script>
+  <script src="../components/ErrorPage.js"></script>
+  <script src="../components/ErrorState.js"></script>
+  <script src="../components/FactorRow.js"></script>
+  <script src="../components/InvoiceStatusBadge.js"></script>
+  <script src="../components/MoneyField.js"></script>
+  <script src="../components/Notice.js"></script>
+  <script src="../components/OneTimeCodeField.js"></script>
+  <script src="../components/Pagination.js"></script>
+  <script src="../components/PermissionGrid.js"></script>
+  <script src="../components/RadioGroup.js"></script>
+  <script src="../components/RecoveryCodes.js"></script>
+  <script src="../components/SelectField.js"></script>
+  <script src="../components/SkeletonBox.js"></script>
+  <script src="../components/StepUpDialog.js"></script>
+  <script src="../components/Stepper.js"></script>
+  <script src="../components/TableSkeleton.js"></script>
+  <script src="../components/TextField.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const { html, components: C } = MK;
+    const LABELS = { totp: 'Authenticator app', email: 'Code by email', sms: 'Code by text message', recovery_code: 'Recovery code' };
+
+    MK.page({
+      id: 'sign-in-verify',
+      route: '/sign-in/verify',
+      title: 'Confirm it is you',
+      layout: 'AuthLayout',
+      needs: {
+        api: [
+          'GET /v1/auth/challenges/{id} -> MfaChallenge',
+          'POST /v1/auth/challenges/{id}/send { method } (email, sms)',
+          'POST /v1/auth/challenges/{id}/verify { method, code } -> signed in, or invalid_code with attempts_remaining',
+        ],
+        permission: 'public',
+        notes: ['Lockout after repeated wrong codes: duration and copy to confirm'],
+      },
+      state: { method: null, sent: false, code: '', error: null },
+      load: (fx) => ({ challenge: fx.auth.challenge }),
+      actions: {
+        setMethod(state, _e, el) { state.method = el.value; state.sent = false; state.error = null; },
+        sendCode(state, _e, _el, ctx) { state.sent = true; ctx.focus('verify-code'); },
+        setCode(state, _e, el) { state.code = el.value; return false; },
+        // The mock refuses 000000 so the error can be designed.
+        verify(state, _e, _el, ctx) {
+          if (!state.code || state.code === '000000') {
+            state.error = 'That code is not right. 4 attempts left.';
+            ctx.focus('verify-code');
+            return;
+          }
+          ctx.navigate('./dashboard.html');
+          return false;
+        },
+      },
+      render: ({ state, data, status }) => {
+        if (status === 'loading') return html`<div class="form" role="status"><span class="visually-hidden">Loading</span>${C.SkeletonBox({ shape: 'title' })}${C.SkeletonBox({ shape: 'text' })}${C.SkeletonBox({ shape: 'text' })}</div>`;
+        if (status === 'error') return C.ErrorState({ title: 'This sign-in has expired', body: 'Start again from the sign-in page.' });
+        const ch = data.challenge;
+        const method = state.method || ch.methods[0];
+        const needsSend = method === 'email' || method === 'sms';
+        const destination = method === 'email' ? ch.email_destination : ch.sms_destination;
+        return html`
+          <div class="form">
+            <h1>Confirm it is you</h1>
+            <p class="muted">Your organisation asks for a second step when you sign in.</p>
+            ${C.RadioGroup({ name: 'method', legend: 'How do you want to confirm?', value: method, options: ch.methods.map((m) => ({ value: m, label: LABELS[m] })), action: 'setMethod' })}
+            ${needsSend ? (state.sent
+              ? C.Notice({ tone: 'info', text: `We sent a code to ${destination}. It works for 10 minutes.` })
+              : html`<button type="button" class="button" data-action="sendCode">Send code</button>`) : ''}
+            <form class="form" data-action="verify" novalidate>
+              ${C.OneTimeCodeField({ id: 'verify-code', label: method === 'recovery_code' ? 'Recovery code' : 'Code', recovery: method === 'recovery_code', error: state.error, action: 'setCode' })}
+              <button type="submit" class="button button--primary">Verify</button>
+            </form>
+            <a href="${MK.href('./sign-in.html')}">Back to sign in</a>
+          </div>`;
+      },
+    });
+  </script>
+</body>
+</html>

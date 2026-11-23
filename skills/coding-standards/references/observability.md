@@ -101,6 +101,39 @@ you cannot filter by tenant is a trace you will not use during an incident.
 Propagate context across a queue. A job whose trace starts at the worker has lost the reason it
 exists.
 
+## In the browser
+
+A browser is the one runtime whose failures nobody sees unless it reports them. A service that
+throws writes a log line; a page that throws shows a blank screen to one user, who leaves.
+
+- **The same OpenTelemetry pipeline as the services**, exporting OTLP to the configured backend. No
+  vendor SDK in application code. *Why: the same reason as the services. It also means a browser
+  error and the backend error it caused land in one store.*
+- **Off unless the collector endpoint is configured, and loaded on demand.** *Why: development
+  should send nothing, and a build without telemetry should not pay for an SDK it never starts.*
+- **Report once, at the boundary that handled the error**: the framework's error boundary, the data
+  layer's error hook, and the window's `error` and `unhandledrejection` events. *Why: the same as
+  never logging and rethrowing on a server. Three reports of one failure hide which one is real.*
+- **Every record carries `op`, `remediation`, `actor` and `request_id`**, exactly as a server log
+  line does, plus the page path. `actor` is the user id, never a name, phone number or email.
+  *Why: these are what make the paste into an agent CLI enough to start the right work, and
+  `request_id` from the error envelope joins the browser report to the server's.*
+- **Redact in one function, applied to messages, stacks and URLs**: query strings, long digit runs
+  (keep the last four), and anything shaped like a token. Test it. *Why: browser errors carry the
+  URL, and URLs carry filters, cursors and identifiers. A redaction at each call site is one somebody
+  forgets.*
+- **Propagate trace context to your own origin only.** *Why: a `traceparent` header sent to a third
+  party leaks request correlation to them and is often rejected by their CORS policy, which turns a
+  telemetry setting into an outage.*
+- **The collector's origin is in `connect-src`, and nothing else is added for telemetry.** *Why: a
+  CSP loosened for an analytics script is loosened for every script that gets onto the page.*
+
+Add to "What review looks for":
+
+- An error shown to the user and never reported, or reported at more than one layer.
+- A telemetry record with a name, phone number, email or raw URL query in it.
+- A vendor error or analytics SDK imported into application code.
+
 ## Error logs that trigger the right remediation
 
 **Not an industry convention, and the highest-leverage item here.**

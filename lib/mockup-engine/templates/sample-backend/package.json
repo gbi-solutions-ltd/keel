@@ -1,0 +1,25 @@
+{
+  "name": "sample-backend",
+  "private": true,
+  "type": "module",
+  "description": "A backend built from the signed-off contract, on Postgres, for the production bar's staging run.",
+  "engines": {
+    "node": "^24.18.0 || ^26.13.0",
+    "npm": ">=11.16.0"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node server.mjs --dev",
+    "test": "node --test --test-concurrency=4 test/*.test.mjs"
+  },
+  "dependencies": {
+    "@fastify/cookie": "11.1.5",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "fastify": "5.12.8",
+    "nodemailer": "10.3.1",
+    "openid-client": "6.8.9",
+    "pg": "8.23.1",
+    "yaml": "2.9.1"
+  }
+}

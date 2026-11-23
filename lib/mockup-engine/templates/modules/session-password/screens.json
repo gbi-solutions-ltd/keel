@@ -1,0 +1,167 @@
+[
+  {
+    "name": "forgot-password",
+    "page": "pages/forgot-password.html",
+    "route": "/forgot-password"
+  },
+  {
+    "name": "forgot-password-error",
+    "page": "pages/forgot-password.html",
+    "route": "/forgot-password",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Send link"
+        }
+      }
+    ]
+  },
+  {
+    "name": "forgot-password-sent",
+    "page": "pages/forgot-password.html",
+    "route": "/forgot-password",
+    "steps": [
+      {
+        "fill": {
+          "label": "Email",
+          "value": "amina@example.com"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Send link"
+        }
+      }
+    ]
+  },
+  {
+    "name": "reset-password",
+    "page": "pages/reset-password.html?token=rst_demo",
+    "route": "/reset-password?token=rst_demo",
+    "states": [
+      "default",
+      "loading",
+      "error"
+    ]
+  },
+  {
+    "name": "reset-password-short",
+    "page": "pages/reset-password.html?token=rst_demo",
+    "route": "/reset-password?token=rst_demo",
+    "steps": [
+      {
+        "fill": {
+          "label": "New password",
+          "value": "short"
+        }
+      },
+      {
+        "fill": {
+          "label": "Confirm new password",
+          "value": "short"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Change password"
+        }
+      }
+    ],
+    "expectStatus": [
+      400
+    ]
+  },
+  {
+    "name": "reset-password-mismatch",
+    "page": "pages/reset-password.html?token=rst_demo",
+    "route": "/reset-password?token=rst_demo",
+    "steps": [
+      {
+        "fill": {
+          "label": "New password",
+          "value": "river kettle orbit lamp"
+        }
+      },
+      {
+        "fill": {
+          "label": "Confirm new password",
+          "value": "river kettle orbit"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Change password"
+        }
+      }
+    ]
+  },
+  {
+    "name": "reset-password-done",
+    "page": "pages/reset-password.html?token=rst_demo",
+    "route": "/reset-password?token=rst_demo",
+    "steps": [
+      {
+        "fill": {
+          "label": "New password",
+          "value": "river kettle orbit lamp"
+        }
+      },
+      {
+        "fill": {
+          "label": "Confirm new password",
+          "value": "river kettle orbit lamp"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Change password"
+        }
+      }
+    ]
+  },
+  {
+    "name": "reset-password-expired",
+    "page": "pages/reset-password.html?token=rst_expired",
+    "route": "/reset-password?token=rst_expired",
+    "expectStatus": [
+      410
+    ]
+  },
+  {
+    "name": "signed-out-idle",
+    "page": "pages/signed-out.html?reason=idle&minutes=15",
+    "route": "/signed-out?reason=idle&minutes=15"
+  },
+  {
+    "name": "signed-out",
+    "page": "pages/signed-out.html?reason=manual",
+    "route": "/signed-out?reason=manual"
+  },
+  {
+    "name": "forgot-password-server-error",
+    "page": "pages/forgot-password.html?state=error",
+    "route": "/forgot-password?state=error",
+    "steps": [
+      {
+        "fill": {
+          "label": "Email",
+          "value": "amina@example.com"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Send link"
+        }
+      }
+    ],
+    "expectStatus": [
+      500
+    ]
+  }
+]

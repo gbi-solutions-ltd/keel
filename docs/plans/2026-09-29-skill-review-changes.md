@@ -2778,8 +2778,8 @@ proves.
 The second review found nothing blocking. Its four should-fix items and five considers were acted
 on, and three notes are recorded without a change.
 
-- **Should-fix 1**, `CHANGELOG.md:42` in `docs/ideas/keel-on-codex.md`, already wrong and moved by
-  every task: task 1, step 1.3 cites the 2026-09-04 gate entry by the phrase "Release gate
+- **Should-fix 1**, the citation of line 42 of `CHANGELOG.md` in `docs/ideas/keel-on-codex.md`,
+  already wrong and moved by every task: task 1, step 1.3 cites the 2026-09-04 gate entry by the phrase "Release gate
   2026-09-04 against", which passes `tests/validate-citations.sh` in simulation and fails it when
   misspelt; Files and `git add` name the file.
 - **Should-fix 2**, variables that do not survive a Bash call: one extraction command writes both

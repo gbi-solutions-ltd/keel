@@ -1,0 +1,14 @@
+/* audit-log: append to assets/components.css */
+
+/* ColumnMenu */
+.column-menu { display: inline-block; }
+
+/* ExportMenu */
+.export-menu { display: inline-block; }
+.export-menu__status { margin: var(--space-1) 0 0; font-size: var(--text-sm); max-width: 260px; }
+.export-menu__status:empty { display: none; }
+
+/* FilterTabs */
+.filter-tabs { display: flex; gap: var(--space-2); flex-wrap: wrap; margin: 0; padding: 0; border: 0; min-width: 0; }
+.filter-tabs__tab { min-height: var(--target-min); border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text-muted); border-radius: var(--radius-pill); padding: 0 var(--space-4); font-size: var(--text-sm); cursor: pointer; }
+.filter-tabs__tab[aria-pressed="true"] { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-primary-contrast); }

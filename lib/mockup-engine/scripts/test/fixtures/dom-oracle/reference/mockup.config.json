@@ -1,0 +1,9 @@
+{
+  "viewports": [{ "name": "desktop", "width": 800, "height": 600 }],
+  "screens": [
+    { "name": "orders", "page": "pages/orders.html", "route": "/orders" },
+    { "name": "invoices", "page": "pages/invoices.html", "route": "/invoices" },
+    { "name": "broken", "page": "pages/orders.html", "route": "/broken" },
+    { "name": "fresh", "page": "pages/orders.html", "route": "/orders" }
+  ]
+}

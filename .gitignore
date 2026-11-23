@@ -57,3 +57,14 @@ tests/plugin-evals/results/
 
 # docs/audits is a clone of a private repository holding the audits. It is never part of this tree.
 docs/audits/
+
+# The mockup engine (lib/mockup-engine). Its checks write their reports into .mockup-engine/ next
+# to what they check, and an install may put a browser beside it: neither is source. The app
+# scaffold's .env.mocked files are: they hold the mocked build's preview settings, never a secret,
+# and every app the scaffold seeds starts from them, so `.env.*` above must not swallow them.
+.mockup-engine/
+lib/mockup-engine/browsers/
+!lib/mockup-engine/templates/app-scaffold/*/.env.mocked
+# A mockup engine test fixture: a library's build output, which vendor-library.mjs must be able to
+# copy when asked (dist/ above would drop it from every clone).
+!lib/mockup-engine/scripts/test/fixtures/vendor-library/lib/dist/

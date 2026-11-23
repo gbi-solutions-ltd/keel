@@ -200,9 +200,11 @@ into `project/` at staging time. A scenario without one gets an empty directory.
 **A fixture whose skill runs `keel` stages an install of it beside `project/`**, at
 `<staged dir>/keel/`, from its `setup.sh`: `bin/`, `lib/` and `VERSION` copied from this tree. Put
 `<staged dir>/keel/bin` first on `PATH` for both arms of that scenario, so the baseline has the same
-tools. `implement-a-small-change` and `run-a-short-path-plan` are the two, added 2026-10-17: the
+tools. `implement-a-small-change` and `run-a-short-path-plan` are two, added 2026-10-17: the
 short path reads a missing `keel` as a sensitive change and refuses, which is right and is not what
-either scenario measures. Every other scenario runs with no `keel`, and says so where it matters.
+either scenario measures. `convert-a-changed-mockup` and `convert-with-the-check-disabled` are the
+others, added 2026-11-22: the convert-mockup skill finds its engine through `keel mockup-engine
+path`. Every other scenario runs with no `keel`, and says so where it matters.
 
 **A fixture that needs more than files carries a `setup.sh`**, run after the copy with the staged
 `project/` as its working directory. A setup that exits non-zero fails the stage and prints no path,

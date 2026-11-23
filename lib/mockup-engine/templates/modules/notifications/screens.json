@@ -1,0 +1,75 @@
+[
+  {
+    "name": "notifications",
+    "page": "pages/notifications.html",
+    "route": "/notifications",
+    "states": [
+      "default",
+      "empty",
+      "loading",
+      "error"
+    ]
+  },
+  {
+    "name": "notifications-unread",
+    "page": "pages/notifications.html",
+    "route": "/notifications",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Unread"
+        }
+      }
+    ]
+  },
+  {
+    "name": "notifications-marked",
+    "page": "pages/notifications.html",
+    "route": "/notifications",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Mark as read: Your CSV export is ready"
+        }
+      }
+    ]
+  },
+  {
+    "name": "notifications-all-read",
+    "page": "pages/notifications.html",
+    "route": "/notifications",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Mark all as read"
+        }
+      }
+    ]
+  },
+  {
+    "name": "notification-settings",
+    "page": "pages/notification-settings.html",
+    "route": "/account/notifications",
+    "states": [
+      "default",
+      "loading",
+      "error"
+    ]
+  },
+  {
+    "name": "notification-settings-saved",
+    "page": "pages/notification-settings.html",
+    "route": "/account/notifications",
+    "steps": [
+      {
+        "click": {
+          "role": "checkbox",
+          "name": "An export is ready"
+        }
+      }
+    ]
+  }
+]

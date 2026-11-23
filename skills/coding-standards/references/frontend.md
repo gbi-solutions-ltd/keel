@@ -89,6 +89,39 @@ Enforce what a tool can: an accessibility linter for the framework in use, plus 
 CI. Be honest about what that catches, which is roughly a third of real defects, all of them the
 mechanical third. Tabbing through the page catches the rest, and it takes a minute.
 
+## Responsive layout: the narrow screen is the design, not the afterthought
+
+The failure is a layout designed at desktop width and squeezed down with `max-width` queries. It
+looks right at the two widths someone checked and breaks at every width between, and for an
+audience mostly on phones, the broken one is the common one.
+
+- **Mobile first.** Base rules are the narrow layout; `min-width` queries add the wider one. *Why: a
+  rule added for a wider screen can only make that screen better. A rule taken away for a narrower
+  one has to anticipate every element it might squeeze, and it is the one that misses.*
+- **One breakpoint list, in the token file**, written literally in queries because a custom property
+  cannot appear in a media query. *Why: breakpoints chosen per component drift until two cards side
+  by side change layout at different widths.*
+- **No horizontal page scroll at any width down to 320px.** Wide content, a table above all, scrolls
+  inside its own container. *Why: a page that scrolls sideways hides content the user does not know
+  is there, and 320px is a real phone held in a real hand, not a test fixture.*
+- **Touch targets at least 24 by 24 CSS pixels, or spaced so a 24px circle on each touches no other**
+  (WCAG 2.5.8), **and 44px for controls on a touch screen.** *Why: below that, a tap lands on the
+  neighbour. On a payment screen the neighbour can be the wrong amount.*
+- **The narrow layout is signed off as explicitly as the wide one.** *Why: a client who approves only
+  a desktop screenshot has approved nothing about the screen most of their users see.*
+
+Enforce it: a browser check across every screen at each signed-off width and at 320px, failing on
+horizontal overflow and on crowded undersized targets. mockup-engine's `quality-check.mjs` does
+this: crowding through axe's `target-size` rule (on every target, covered ones included), and the
+44px touch size as a warning, skipping targets that are covered or off screen.
+
+Add to "What review looks for":
+
+- A `max-width` media query where a `min-width` one would do.
+- A breakpoint value that is not in the token file's list.
+- A fixed width on a container, or a table with no scrolling container.
+- An interactive element under 24px with a neighbour inside 24px.
+
 ## Security
 
 The browser is a hostile environment and the frontend is the part an attacker can read.
@@ -123,6 +156,69 @@ and be sceptical of a dependency added for one function.
 **Headers**, set by the server but a frontend concern because the frontend breaks when they are wrong:
 `Content-Security-Policy` without `unsafe-inline`, `X-Content-Type-Options: nosniff`,
 `Referrer-Policy`, and `Strict-Transport-Security`.
+
+## Permission-aware UI
+
+keel's `authorisation.md` makes the server the enforcer. These are the rules for what the UI shows.
+
+- **One route table holds each page's permission, and the menu is built from it.** *Why: a menu kept
+  beside the routes drifts until it links to a page the route refuses.*
+- **Per-record actions come from the API** (`allowed_actions` on the record), never from a rule
+  recomputed in the browser. *Why: "can this payment be refunded by this user" depends on
+  permissions, state and separation of duties; a second copy of that policy in the UI drifts from
+  the first, and the drift is invisible until someone clicks.*
+- **Hide by default; disable with an explanation only when the user must know the action exists.**
+  *Why: a disabled control with no reason reads as a fault and generates support tickets.*
+- **Every role is reviewed.** Mockups preview each role, and visual tests run per role. *Why: the
+  role that sees least is the one nobody looked at.*
+
+Add to "What review looks for":
+
+- A menu item or link not derived from the route table.
+- A per-record permission rule evaluated in frontend code.
+
+## Reports and exports
+
+- **Exports are built server side for the whole filtered result**, as a background job with its own
+  permission and an audit record. *Why: a browser export contains only the visible page, and it is
+  the one path by which bulk data leaves with no server-side record.*
+- **CSV cells starting with `=`, `+`, `-` or `@` are prefixed with a quote**, and files are UTF-8
+  with a byte order mark. *Why: a spreadsheet runs a cell that starts with a formula character
+  (CSV injection), and Excel misreads UTF-8 without the mark.*
+- **Filters and sort live in the URL.** *Why: a report view that cannot be linked gets screenshotted
+  and the screenshot goes stale.*
+
+## No silent failure
+
+- **Every write's failure is shown, in our copy, where the user is looking.** Why: a mutation
+  with no error handler leaves the screen claiming a change that did not happen. Check: a test
+  per mutation that fails it and looks for the message; a sweep test for every data page's error
+  state.
+- **Only a 401 is the user's mistake.** A 5xx or network failure on sign-in is not "wrong
+  password". Why: the wrong message sends users to reset a password that was fine. Check: a test.
+- **Links that come from data are checked to be app paths before they are links.** Why: a stored
+  URL is an open redirect waiting for one bad record. Check: a unit test of the guard.
+
+## Sign-in and second factors in the browser
+
+- **The browser holds no token.** Sign-in, second steps and step-ups go to the app's own API, which
+  sets an `HttpOnly` session cookie. Why: a token in script is one XSS away from theft, and the
+  identity provider can change without touching the UI. Check: `check-frontend` rules
+  `token-storage` and `token-in-url`.
+- **The server decides when a step-up is needed** and says so with `401 step_up_required`; one
+  generic guard asks for the code and retries. Why: a client-side rule for "sensitive actions"
+  drifts from the server's and is bypassable anyway. Check: a test per guarded action.
+- **Authenticator app and email codes at least; SMS only on request, labelled less secure;
+  recovery codes shown once.** Why: SIM swap makes SMS the weakest factor, and a lost device
+  without recovery codes is a support ticket. Check: the module's page tests.
+- **The last factor cannot be removed while MFA is required** (`409 last_factor`), and the UI says
+  why. Why: otherwise a user locks themselves out in two clicks. Check: a test.
+- **An idle session is warned, then ends on a page that says why.** The server owns the timeout
+  and the session carries it (`idle_timeout_seconds`); the browser mirrors it only to warn. Why: a
+  session that dies silently turns the next click into an unexplained error. Check: a hook test.
+- **A password reset request answers the same for any address**, and the server, not the browser,
+  judges a password. Why: a different answer reveals who has an account, and a browser rule is a
+  copy that drifts. Check: a test that an unknown address gets the same page.
 
 ## What review looks for
 

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Audit log</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../assets/tokens.css">
+  <link rel="stylesheet" href="../assets/base.css">
+  <link rel="stylesheet" href="../assets/components.css">
+  <script src="../assets/mk.js"></script>
+  <script src="../strings/en-GB.js"></script>
+  <script src="../data/fixtures.js"></script>
+  <script src="../components/AppLayout.js"></script>
+  <script src="../components/AuditTable.js"></script>
+  <script src="../components/Badge.js"></script>
+  <script src="../components/ColumnMenu.js"></script>
+  <script src="../components/DataTable.js"></script>
+  <script src="../components/EmptyState.js"></script>
+  <script src="../components/ErrorPage.js"></script>
+  <script src="../components/ErrorState.js"></script>
+  <script src="../components/ExportMenu.js"></script>
+  <script src="../components/FilterTabs.js"></script>
+  <script src="../components/InvoiceStatusBadge.js"></script>
+  <script src="../components/MoneyField.js"></script>
+  <script src="../components/Pagination.js"></script>
+  <script src="../components/PermissionGrid.js"></script>
+  <script src="../components/SelectField.js"></script>
+  <script src="../components/SkeletonBox.js"></script>
+  <script src="../components/TableSkeleton.js"></script>
+  <script src="../components/TextField.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const { html, components: C } = MK;
+    const PAGE_SIZE = 10;
+    const CATEGORIES = [
+      { value: 'all', label: 'All' },
+      { value: 'auth', label: 'Sign-in' },
+      { value: 'user', label: 'Users' },
+      { value: 'export', label: 'Exports' },
+      { value: 'refund', label: 'Refunds' },
+    ];
+    const COLUMN_CHOICES = [
+      { key: 'occurred_at', label: 'Time', locked: true },
+      { key: 'actor', label: 'Who' },
+      { key: 'action', label: 'Action', locked: true },
+      { key: 'target', label: 'Target' },
+      { key: 'details', label: 'Details' },
+      { key: 'outcome', label: 'Outcome' },
+      { key: 'ip', label: 'IP address' },
+      { key: 'request_id', label: 'Request ID' },
+    ];
+
+    MK.page({
+      id: 'audit',
+      route: '/audit',
+      title: 'Audit log',
+      needs: {
+        api: [
+          'GET /v1/audit-events?category=&actor=&cursor=&limit= -> AuditEventPage, newest first',
+          'GET /v1/audit-events/actors -> AuditActorList (for the filter)',
+          'GET /v1/preferences/table:audit and PUT, as for the list pages',
+          'POST /v1/exports { report: audit, format, filters, columns } -> Export',
+        ],
+        permission: 'audit:read',
+        notes: ['Retention period to confirm (shown nowhere yet)', 'Date range filter not designed'],
+      },
+      state: { category: 'all', actor: 'all', page: 1, hidden: ['ip', 'request_id'], columnMenuOpen: false, exportMenuOpen: false, exportJob: null },
+      load: (fx, { scenario, state }) => {
+        const rows = (scenario === 'empty' ? [] : fx.audit_events)
+          .filter((e) => state.category === 'all' || e.action.startsWith(`${state.category}.`))
+          .filter((e) => state.actor === 'all' || (e.actor.type === 'user' ? e.actor.id === state.actor : e.actor.type === state.actor));
+        const start = (state.page - 1) * PAGE_SIZE;
+        const seen = new Map();
+        for (const e of fx.audit_events) if (e.actor.type === 'user') seen.set(e.actor.id, e.actor.name);
+        const actors = [...seen].map(([id, name]) => ({ value: id, label: name })).sort((a, b) => a.label.localeCompare(b.label));
+        return { items: rows.slice(start, start + PAGE_SIZE), hasPrev: state.page > 1, hasNext: start + PAGE_SIZE < rows.length, actors };
+      },
+      actions: {
+        setCategory(state, _e, el) { state.category = el.dataset.value; state.page = 1; },
+        setActor(state, _e, el) { state.actor = el.value; state.page = 1; },
+        nextPage(state) { state.page += 1; },
+        prevPage(state) { state.page -= 1; },
+        toggleColumnMenu(state) { state.columnMenuOpen = !state.columnMenuOpen; state.exportMenuOpen = false; },
+        toggleColumn(state, _e, el) {
+          const k = el.dataset.value;
+          state.hidden = el.checked ? state.hidden.filter((h) => h !== k) : [...state.hidden, k];
+        },
+        toggleExportMenu(state) { state.exportMenuOpen = !state.exportMenuOpen; state.columnMenuOpen = false; },
+        exportAs(state, _e, el) {
+          const format = el.dataset.value;
+          state.exportMenuOpen = false;
+          state.exportJob = { format, status: 'ready', href: '../data/exports/audit.csv', filename: `audit.${format}` };
+        },
+      },
+      render: ({ state, data, status }) => {
+        const filtered = state.category !== 'all' || state.actor !== 'all';
+        const actorOptions = [{ value: 'all', label: 'Everyone' }, ...(data?.actors ?? []), { value: 'system', label: 'The system (automatic)' }, { value: 'anonymous', label: 'Not signed in' }];
+        const toolbar = html`
+          <div class="toolbar">
+            ${C.FilterTabs({ label: 'Filter by kind', action: 'setCategory', value: state.category, options: CATEGORIES })}
+            ${C.SelectField({ id: 'actor-filter', label: 'Who', value: state.actor, options: actorOptions, action: 'setActor' })}
+            <div class="toolbar__end">
+              ${C.ColumnMenu({ columns: COLUMN_CHOICES, hidden: state.hidden, open: state.columnMenuOpen, menuAction: 'toggleColumnMenu', toggleAction: 'toggleColumn' })}
+              ${C.ExportMenu({ open: state.exportMenuOpen, menuAction: 'toggleExportMenu', exportAction: 'exportAs', job: state.exportJob })}
+            </div>
+          </div>`;
+        let content;
+        if (status === 'loading') content = C.TableSkeleton({ columns: COLUMN_CHOICES.filter((c) => !state.hidden.includes(c.key)).map((c) => c.label), rows: 8 });
+        else if (status === 'error') content = C.ErrorState({ body: 'We could not load the audit log. Please refresh.' });
+        else if (!data.items.length) content = filtered
+          ? C.EmptyState({ title: 'No events match', body: 'Try another kind or person.' })
+          : C.EmptyState({ title: 'Nothing recorded yet', body: 'Sign-ins and changes to the account appear here.' });
+        else content = html`
+          ${C.AuditTable({ events: data.items, hidden: state.hidden })}
+          ${C.Pagination({ page: state.page, hasPrev: data.hasPrev, nextCursor: data.hasNext ? String(state.page + 1) : null, prevAction: 'prevPage', nextAction: 'nextPage' })}`;
+        return html`
+          <div class="stack">
+            <div class="stack">
+              <h1>Audit log</h1>
+              <p class="muted">Who did what, and when. Entries cannot be changed or deleted.</p>
+            </div>
+            ${toolbar}
+            <div class="card">${content}</div>
+          </div>`;
+      },
+    });
+  </script>
+</body>
+</html>

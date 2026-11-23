@@ -1,0 +1,8 @@
+{
+  "name": "visual-diff fixture",
+  "viewports": [{ "name": "mobile", "width": 390, "height": 844 }, { "name": "desktop", "width": 1440, "height": 900 }],
+  "screens": [
+    { "name": "home", "page": "index.html", "route": "/", "states": ["default", "empty"] }
+  ],
+  "diff": { "maxMismatchPercent": 0.2, "pixelThreshold": 0.1 }
+}

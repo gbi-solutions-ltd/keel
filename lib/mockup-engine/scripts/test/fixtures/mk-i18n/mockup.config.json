@@ -1,0 +1,11 @@
+{
+  "name": "mk-i18n",
+  "timezoneId": "Europe/Paris",
+  "project": { "i18n": { "locales": ["en-GB", "fr-FR", "ar"], "defaultLocale": "en-GB", "rtl": true } },
+  "viewports": [{ "name": "desktop", "width": 800, "height": 600 }],
+  "screens": [
+    { "name": "orders", "page": "pages/orders.html", "route": "/orders" },
+    { "name": "orders-fr", "page": "pages/orders.html", "route": "/orders", "locale": "fr-FR" },
+    { "name": "orders-pseudo", "page": "pages/orders.html", "route": "/orders", "locale": "pseudo" }
+  ]
+}

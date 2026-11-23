@@ -22,6 +22,8 @@ If nothing fires and you expected it to, say `/keel` and describe the task.
 | "export APEX app 100", "read this Oracle APEX application" | `apex-export` | `docs/apex/APP-<id>/` |
 | "should we port this APEX app", "scope the APEX migration" | `apex-port-plan` | `docs/apex/APP-<id>/PORT-ASSESSMENT.md` |
 | "should we port this service", "scope a rewrite", "move this off Spring Boot" | `port-assess` | `docs/port/<service>-assessment.md` |
+| "mock up a screen for the client", "prototype this app", "the client wants a change to the mockup" | `mockup` | a mockup folder, signed off in `docs/signoff.json` |
+| "convert the signed-off mockup to Vue", "build the app from the mockup" | `convert-mockup` | `docs/mockups/<name>/conversion-plan.md`, then the app and `gaps.md` |
 | "I have an idea", "is this worth building", "help me think this through" | `shape-idea` | `docs/ideas/<slug>.md` |
 | "I want to build X", "write requirements", "we need a PRD", "spec this out" | `write-prd` | `docs/prd/<slug>.md` |
 | "break this into stories", "create tickets", "write epics" | `write-user-stories` | `docs/stories/<slug>.md` |

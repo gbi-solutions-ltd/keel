@@ -102,6 +102,8 @@ Mostly language-independent.
 | Structured logging | The ecosystem's own: pino, structlog, slog, Logback with a JSON encoder, Serilog, Monolog | none | Never a bespoke wrapper. `../../coding-standards/references/observability.md` sets what a log line must carry; these are what carry it |
 | Migrations | The framework's own, and never hand-rolled SQL in a deploy script | none | Every framework has one, it is already wired to the connection config, and its state table is the thing a hand-rolled script lacks |
 | Pre-commit orchestration | The `pre-commit` framework, or `keel guard install` in a keel project | Husky with lint-staged on JS | Language-independent and it pins each hook's version. `lint-staged` is right where the only hooks are JS formatters |
+| API client for a TypeScript frontend with an OpenAPI contract | Orval | openapi-typescript with openapi-fetch | Generates the typed client, the framework's query hooks, MSW mock handlers and Zod schemas from one document, so the client, the mocks and the runtime validation cannot drift from the contract or from each other. openapi-typescript is the right answer when only types are wanted and the project already has its own fetching layer |
+| Product tours in a TypeScript frontend | driver.js | Shepherd.js | MIT, no dependencies, about 8.5 kB gzipped with its stylesheet, styles through the CSSOM so it runs under a CSP without `unsafe-inline`, and its popover is a labelled dialog with focus kept inside. Shepherd is the runner-up for tours that need richer step content, at a larger size |
 
 **If a stack is not in these tables**, say so in the document and name what you would look for
 instead: whether the ecosystem has one obvious default, whether it is in the toolchain already, and

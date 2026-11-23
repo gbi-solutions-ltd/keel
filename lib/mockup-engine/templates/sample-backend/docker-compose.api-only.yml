@@ -1,0 +1,10 @@
+# The API without the app's build: for an app served by its own server in front of this backend
+# (a server-rendered app, which proxies /api and the sign-in to it). On top of docker-compose.yml
+# (and docker-compose.dev.yml for a local run): nothing is mounted and no static file is served.
+# The base file still interpolates APP_DIR, so set it to the app; it is not mounted.
+services:
+  api:
+    environment:
+      STATIC_DIR: ""
+      HEADERS_FILE: ""
+    volumes: !reset []

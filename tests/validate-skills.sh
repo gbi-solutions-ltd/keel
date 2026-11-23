@@ -28,7 +28,7 @@ set -uo pipefail; . "$(dirname "${BASH_SOURCE[0]}")/withheld.sh"
 # detail, linked from the step that needs it.
 #
 # ADR-0001 took coding-standards at 683 words as the floor of moving detail out. It is 18,
-# 22,916 and 645 today in reference files, reference words and body, so that floor did not hold,
+# 24,419 and 645 today in reference files, reference words and body, so that floor did not hold,
 # and tests/test-doc-claims.sh asserts the figures rather than leaving them to the next reader.
 CEILING_WORDS=700
 # How close a body has to be before the validator warns: from 671. Wide enough that a body reaches

@@ -1,0 +1,6 @@
+{
+  "name": "inventory clean fixture",
+  "screens": [
+    { "name": "home", "page": "pages/home.html", "route": "/home" }
+  ]
+}

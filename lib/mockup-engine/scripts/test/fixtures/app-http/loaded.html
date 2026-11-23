@@ -1,0 +1,9 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Loaded</title>
+<style>body { margin: 0; font: 48px/1.2 sans-serif; } p { margin: 24px; }</style></head>
+<body><main data-component="panel"><p id="protocol"></p><p id="data">waiting</p></main>
+<script>
+  // what a page shows depends on how it was loaded: file:// has another protocol and no fetch
+  document.getElementById('protocol').textContent = location.protocol;
+  fetch('data.json').then((r) => r.json()).then((d) => { document.getElementById('data').textContent = d.label; })
+    .catch(() => { document.getElementById('data').textContent = 'fetch failed'; });
+</script></body></html>

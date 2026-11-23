@@ -1,0 +1,594 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "mockup-engine/mockup-config.schema.json",
+  "title": "mockup.config.json",
+  "description": "What a mockup is (screens, viewports, modules, checklist), the decisions the production app is built from (project), and how the gate is tuned (diff, quality, spill, domOracle). Validated by scripts/inventory.mjs on every run; --ready-to-port adds the readiness rules (x-tier). Fields marked x-tier 1 change how the mockup is built and are asked at intake; x-tier 2 change only the port and may be deferred with an owner and a date.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "targetStack": {
+      "description": "Kept for older configs. project.stack.name is the decision; when both are set they must agree.",
+      "enum": [
+        "react-vite",
+        "vue",
+        "nextjs"
+      ]
+    },
+    "timezoneId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "IANA zone the checks render in, and the business time zone."
+    },
+    "locale": {
+      "type": "string",
+      "minLength": 2,
+      "description": "Browser locale for the checks. Defaults to project.i18n.defaultLocale, then en-GB."
+    },
+    "pins": {
+      "description": "The clock and seed the baselines were captured with. Every script uses them when --clock or --seed is not passed.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "clock": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "seed": {
+          "type": "integer"
+        }
+      }
+    },
+    "modules": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "checklist": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": [
+          "designed",
+          "later",
+          "not-needed"
+        ]
+      }
+    },
+    "roles": {
+      "description": "Used by older fixture configs; roles live in the mockup's fixtures."
+    },
+    "viewports": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "width",
+          "height"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "screens": {
+      "type": "array",
+      "minItems": 1,
+      "description": "At least one screen: a config with none has nothing to check or sign off. Leave the key out until the first screen exists.",
+      "items": {
+        "type": "object",
+        "description": "A screen, and the states it is captured in (scripts/lib/screens.mjs). Keys starting app (appName, appRoute) are app-side overrides and are allowed; any other unknown key is a typo.",
+        "required": [
+          "name",
+          "page"
+        ],
+        "additionalProperties": false,
+        "patternProperties": {
+          "^app[A-Z]": {}
+        },
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "page": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mockup file, with its query."
+          },
+          "route": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The app URL with params filled in."
+          },
+          "states": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1
+          },
+          "theme": {
+            "type": "string",
+            "minLength": 1
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "description": "Interactions run after the page settles: click, select, fill, press, type, wait, each optionally with settleLayout (scripts/lib/screens.mjs)."
+          },
+          "expectStatus": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "expectConsole": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "diff": {
+      "type": "object",
+      "description": "Gate tuning for visual-diff.mjs.",
+      "properties": {
+        "maxMismatchPercent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5,
+          "description": "App mode: the most a case may differ from the mockup, in percent. 0 for none, utility-css and css-library; a js-kit declares its tolerance here before porting (skills/mockup/references/design-frameworks.md)."
+        },
+        "baselineMaxMismatchPercent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5,
+          "description": "Baseline mode (the mockup against its own stored PNGs). Default: maxMismatchPercent capped at 0.2, so a js-kit tolerance never loosens the mockup's regression check."
+        },
+        "pixelThreshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "boxTolerancePx": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "quality": {
+      "type": "object",
+      "description": "Gate tuning for quality-check.mjs.",
+      "additionalProperties": false,
+      "properties": {
+        "targetMinPx": {
+          "type": "number",
+          "minimum": 0,
+          "description": "The smallest tap target on the mobile viewport before a warning (default 44)."
+        }
+      }
+    },
+    "spill": {
+      "type": "object",
+      "description": "Gate tuning for spill-check.mjs.",
+      "additionalProperties": false,
+      "properties": {
+        "cards": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Selectors of further card containers."
+        },
+        "scrollAllowed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Selectors allowed to scroll."
+        }
+      }
+    },
+    "domOracle": {
+      "type": "object",
+      "description": "Gate tuning for dom-oracle.mjs (scripts/lib/dom-oracle.mjs optionsFromConfig).",
+      "additionalProperties": false,
+      "properties": {
+        "root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "appRoot": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dropAttributes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "skipHiddenActions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "skipHiddenIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "opaqueComponents": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "project": {
+      "$ref": "#/$defs/project"
+    }
+  },
+  "$defs": {
+    "deferred": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deferred"
+      ],
+      "properties": {
+        "deferred": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "owner",
+            "by"
+          ],
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "by": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "format": "date",
+              "description": "The date the deferral ends (YYYY-MM-DD, a real date). check-config warns once it has passed."
+            },
+            "reason": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "project": {
+      "description": "The decisions the production app is built from. The reasons, who answered and the alternatives live in the brief (docs/mockups/<name>/brief.md); this block holds only what scripts and the conversion read.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "people": {
+          "x-tier": 1,
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "signsOff",
+            "technicalOwner"
+          ],
+          "properties": {
+            "signsOff": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Who signs the mockup off (a role or a name)."
+            },
+            "technicalOwner": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Who answers technical questions."
+            }
+          }
+        },
+        "designFramework": {
+          "x-tier": 1,
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "none",
+                "utility-css",
+                "css-library",
+                "js-kit"
+              ],
+              "description": "none: the mockup's own CSS. utility-css: Tailwind and the like. css-library: a design system shipped as CSS the mockup can load. js-kit: components that need a framework runtime (Material UI, Vuetify, shadcn/ui), approximated in the mockup and gated by tolerance."
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "owner": {
+              "enum": [
+                "public",
+                "client"
+              ]
+            },
+            "source": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Package name, repository or path."
+            }
+          }
+        },
+        "i18n": {
+          "x-tier": 1,
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "locales",
+            "defaultLocale"
+          ],
+          "properties": {
+            "locales": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 2
+              }
+            },
+            "defaultLocale": {
+              "type": "string",
+              "minLength": 2
+            },
+            "rtl": {
+              "type": "boolean",
+              "description": "Any locale is written right to left."
+            },
+            "expansionCheck": {
+              "type": "boolean",
+              "description": "Check layouts with text longer than the default locale's."
+            }
+          }
+        },
+        "tenancy": {
+          "x-tier": 1,
+          "enum": [
+            "single",
+            "multi"
+          ]
+        },
+        "browsers": {
+          "x-tier": 1,
+          "type": "string",
+          "minLength": 1,
+          "description": "A browserslist query, or 'evergreen'."
+        },
+        "accessibility": {
+          "x-tier": 1,
+          "enum": [
+            "wcag21-aa",
+            "wcag22-aa",
+            "wcag22-aaa"
+          ]
+        },
+        "currency": {
+          "x-tier": 1,
+          "type": "string",
+          "pattern": "^([A-Z]{3}|none|multiple)$"
+        },
+        "theming": {
+          "x-tier": 1,
+          "enum": [
+            "light",
+            "dark",
+            "light-and-dark-system",
+            "light-and-dark-choice"
+          ]
+        },
+        "auth": {
+          "x-tier": 1,
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "signIn"
+          ],
+          "properties": {
+            "signIn": {
+              "enum": [
+                "in-app",
+                "idp-hosted",
+                "none"
+              ]
+            },
+            "provider": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "contract": {
+          "x-tier": 2,
+          "oneOf": [
+            {
+              "$ref": "#/$defs/deferred"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source"
+              ],
+              "properties": {
+                "source": {
+                  "enum": [
+                    "drafted",
+                    "backend"
+                  ]
+                },
+                "location": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          ],
+          "description": "The API contract. Tier 2, but its deferral ends at sign-off (skills/mockup/references/signoff.md): signoff.mjs refuses while it is deferred. location is the file in the mockup (default api/openapi.yaml); a backend's document is vendored there, never a URL."
+        },
+        "target": {
+          "x-tier": 2,
+          "oneOf": [
+            {
+              "$ref": "#/$defs/deferred"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "new-repo",
+                    "existing-repo"
+                  ]
+                },
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          ],
+          "description": "The target repository. path is relative to the mockup folder (as every path in this config)."
+        },
+        "stack": {
+          "x-tier": 2,
+          "oneOf": [
+            {
+              "$ref": "#/$defs/deferred"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "decidedBy"
+              ],
+              "properties": {
+                "name": {
+                  "enum": [
+                    "react-vite",
+                    "vue",
+                    "nextjs"
+                  ]
+                },
+                "decidedBy": {
+                  "enum": [
+                    "design-architecture",
+                    "user"
+                  ]
+                },
+                "record": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The architecture record that chose it."
+                }
+              }
+            }
+          ],
+          "description": "The stack. record, when given, is the architecture record or ADR that chose it, relative to the mockup folder."
+        },
+        "deploy": {
+          "x-tier": 2,
+          "oneOf": [
+            {
+              "$ref": "#/$defs/deferred"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "handoff"
+              ],
+              "properties": {
+                "handoff": {
+                  "enum": [
+                    "setup-deployment",
+                    "existing-pipeline"
+                  ]
+                },
+                "notes": {
+                  "type": "string"
+                }
+              }
+            }
+          ]
+        },
+        "telemetry": {
+          "x-tier": 2,
+          "oneOf": [
+            {
+              "$ref": "#/$defs/deferred"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "backend"
+              ],
+              "properties": {
+                "backend": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "An OTLP backend, or 'none'."
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

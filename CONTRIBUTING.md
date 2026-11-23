@@ -10,7 +10,11 @@ tests/run-tests.sh
 ```
 
 Free, no dependencies, about four and a half minutes. Run it in the background and read the last
-line. It runs the skill validator, the CLI suite, the leak scanner, the documented-claims check, and
+line. One part needs more: the mockup engine's own suite (`tests/test-mockup-engine.sh`) runs
+only with an LTS Node of line 24 or 26, its locked packages (`npm ci --ignore-scripts` in
+`lib/mockup-engine/scripts`) and the pinned browser (`node_modules/.bin/playwright install
+chromium-headless-shell` there), and adds about ten minutes. Without them it prints SKIP and says
+why; CI's `mockup-engine` job runs it. It runs the skill validator, the CLI suite, the leak scanner, the documented-claims check, and
 the same lint CI runs. If it is red before you start, fix that first or you will not know what you
 broke.
 

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Home</title></head>
+<body>
+<div id="app"></div>
+<script>
+  // A stand-in for mk.js with nothing to lint: a page with a route and a permission, no tours, no
+  // modules, no loading. Its checklist is left undecided on purpose.
+  document.getElementById('app').innerHTML = '<section data-component="Home"><p>Clean</p></section>';
+  window.MK = {
+    inspect: () => ({
+      page: { id: 'home', route: '/home', title: 'Home', loads: false, needs: { permission: 'home.read' } },
+      componentsUsed: ['Home'],
+      componentsRegistered: [],
+      componentMeta: {},
+      roles: { admin: { label: 'Admin', permissions: ['home.read'] } },
+      shell: null,
+    }),
+    can: () => true,
+  };
+</script>
+</body>
+</html>

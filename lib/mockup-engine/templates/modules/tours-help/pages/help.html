@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Help</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../assets/tokens.css">
+  <link rel="stylesheet" href="../assets/base.css">
+  <link rel="stylesheet" href="../assets/components.css">
+  <link rel="stylesheet" href="../assets/vendor/driver.css">
+  <link rel="stylesheet" href="../assets/tours.css">
+  <script src="../assets/mk.js"></script>
+  <script src="../strings/en-GB.js"></script>
+  <script src="../data/fixtures.js"></script>
+  <script src="../data/help.js"></script>
+  <script src="../assets/vendor/driver.js.iife.js"></script>
+  <script src="../assets/tours.js"></script>
+  <script src="../components/AppLayout.js"></script>
+  <script src="../components/Badge.js"></script>
+  <script src="../components/DataTable.js"></script>
+  <script src="../components/EmptyState.js"></script>
+  <script src="../components/ErrorPage.js"></script>
+  <script src="../components/ErrorState.js"></script>
+  <script src="../components/InvoiceStatusBadge.js"></script>
+  <script src="../components/MoneyField.js"></script>
+  <script src="../components/Pagination.js"></script>
+  <script src="../components/PermissionGrid.js"></script>
+  <script src="../components/SelectField.js"></script>
+  <script src="../components/ShortcutList.js"></script>
+  <script src="../components/SkeletonBox.js"></script>
+  <script src="../components/TableSkeleton.js"></script>
+  <script src="../components/TextField.js"></script>
+  <script src="../components/TourList.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const { html, components: C } = MK;
+    const MAC = /Mac|iPhone|iPad/.test(navigator.platform);
+    // Page files by route, so a tour's link opens its page. The app links to the route itself.
+    const PAGE_FOR = { '/dashboard': './dashboard.html', '/invoices': './invoices.html' };
+
+    MK.page({
+      id: 'help',
+      route: '/help',
+      title: 'Help',
+      needs: {
+        permission: 'authenticated',
+        notes: ['Help articles and search are not designed; contact details are static copy'],
+      },
+      render: ({ session }) => {
+        const tours = MK.tours.list(session).map((t) => ({ ...t, href: MK.href(`${PAGE_FOR[t.route]}?tour=${t.id}`) }));
+        const { contact } = window.HELP;
+        return html`
+          <div class="stack">
+            <h1>Help</h1>
+            <section class="card stack" aria-labelledby="tours-heading">
+              <div class="stack">
+                <h2 id="tours-heading">Page tours</h2>
+                <p class="muted">A short walk through a page. Each one starts by itself the first time you open its page on a larger screen.</p>
+              </div>
+              ${tours.length ? C.TourList({ tours }) : html`<p class="muted">There are no tours for the pages you can open.</p>`}
+            </section>
+            <section class="card stack" aria-labelledby="keys-heading">
+              <h2 id="keys-heading">Keyboard shortcuts</h2>
+              ${C.ShortcutList({ shortcuts: [
+                { keys: [MAC ? '\u2318 K' : 'Ctrl K', '/'], label: 'Search pages and records' },
+                { keys: ['Esc'], label: 'Close a dialog, menu or tour' },
+                { keys: ['\u2190', '\u2192'], label: 'Back and next in a tour' },
+              ] })}
+            </section>
+            <section class="card stack" aria-labelledby="contact-heading">
+              <h2 id="contact-heading">Contact support</h2>
+              <p>Email <a href="mailto:${contact.email}">${contact.email}</a>. We reply ${contact.hours}.</p>
+            </section>
+          </div>`;
+      },
+    });
+  </script>
+</body>
+</html>

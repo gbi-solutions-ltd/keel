@@ -1,0 +1,382 @@
+[
+  {
+    "name": "sign-in",
+    "page": "pages/sign-in.html",
+    "route": "/sign-in"
+  },
+  {
+    "name": "sign-in-wrong-password",
+    "page": "pages/sign-in.html",
+    "route": "/sign-in",
+    "steps": [
+      {
+        "fill": {
+          "label": "Email",
+          "value": "amina@example.com"
+        }
+      },
+      {
+        "fill": {
+          "label": "Password",
+          "value": "wrong-password"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Sign in"
+        }
+      }
+    ],
+    "expectStatus": [
+      401
+    ]
+  },
+  {
+    "name": "verify",
+    "page": "pages/sign-in-verify.html?challenge=ch_demo",
+    "route": "/sign-in/verify?challenge=ch_demo",
+    "states": [
+      "default",
+      "loading",
+      "error"
+    ]
+  },
+  {
+    "name": "verify-by-email",
+    "page": "pages/sign-in-verify.html?challenge=ch_demo",
+    "route": "/sign-in/verify?challenge=ch_demo",
+    "steps": [
+      {
+        "click": {
+          "role": "radio",
+          "name": "Code by email"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Send code"
+        }
+      }
+    ]
+  },
+  {
+    "name": "verify-wrong-code",
+    "page": "pages/sign-in-verify.html?challenge=ch_demo",
+    "route": "/sign-in/verify?challenge=ch_demo",
+    "steps": [
+      {
+        "fill": {
+          "label": "Code",
+          "value": "000000"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Verify"
+        }
+      }
+    ],
+    "expectStatus": [
+      400
+    ]
+  },
+  {
+    "name": "security",
+    "page": "pages/security.html",
+    "route": "/account/security",
+    "states": [
+      "default",
+      "loading",
+      "error"
+    ]
+  },
+  {
+    "name": "security-sms-setup",
+    "page": "pages/security.html",
+    "route": "/account/security",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Set up text messages"
+        }
+      },
+      {
+        "fill": {
+          "label": "Mobile number",
+          "value": "+256 772 000 101"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Send code"
+        }
+      },
+      {
+        "fill": {
+          "label": "Code",
+          "value": "123456"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Confirm"
+        }
+      }
+    ],
+    "expectStatus": [
+      401
+    ]
+  },
+  {
+    "name": "security-new-codes",
+    "page": "pages/security.html",
+    "route": "/account/security",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Generate new codes"
+        }
+      },
+      {
+        "fill": {
+          "label": "Code",
+          "value": "123456"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Confirm"
+        }
+      }
+    ],
+    "expectStatus": [
+      401
+    ]
+  },
+  {
+    "name": "security-step-up-wrong-code",
+    "page": "pages/security.html",
+    "route": "/account/security",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Remove email codes"
+        }
+      },
+      {
+        "fill": {
+          "label": "Code",
+          "value": "000000"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Confirm"
+        }
+      }
+    ],
+    "expectStatus": [
+      400,
+      401
+    ]
+  },
+  {
+    "name": "security-removed",
+    "page": "pages/security.html",
+    "route": "/account/security",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Remove email codes"
+        }
+      },
+      {
+        "fill": {
+          "label": "Code",
+          "value": "123456"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Confirm"
+        }
+      }
+    ],
+    "expectStatus": [
+      401
+    ]
+  },
+  {
+    "name": "authenticator-scan",
+    "page": "pages/security-authenticator.html?enrolment=enr_demo",
+    "route": "/account/security/authenticator?enrolment=enr_demo"
+  },
+  {
+    "name": "authenticator-code",
+    "page": "pages/security-authenticator.html?enrolment=enr_demo",
+    "route": "/account/security/authenticator?enrolment=enr_demo",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Next"
+        }
+      }
+    ]
+  },
+  {
+    "name": "authenticator-done",
+    "page": "pages/security-authenticator.html?enrolment=enr_demo",
+    "route": "/account/security/authenticator?enrolment=enr_demo",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Next"
+        }
+      },
+      {
+        "fill": {
+          "label": "Code",
+          "value": "123456"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Verify"
+        }
+      }
+    ]
+  },
+  {
+    "name": "sign-in-locked",
+    "page": "pages/sign-in.html",
+    "route": "/sign-in",
+    "steps": [
+      {
+        "fill": {
+          "label": "Email",
+          "value": "amina@example.com"
+        }
+      },
+      {
+        "fill": {
+          "label": "Password",
+          "value": "locked-out"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Sign in"
+        }
+      }
+    ],
+    "expectStatus": [
+      429
+    ]
+  },
+  {
+    "name": "security-change-password",
+    "page": "pages/security.html",
+    "route": "/account/security",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Change password"
+        }
+      }
+    ]
+  },
+  {
+    "name": "security-password-wrong",
+    "page": "pages/security.html",
+    "route": "/account/security",
+    "steps": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Change password"
+        }
+      },
+      {
+        "fill": {
+          "label": "Current password",
+          "value": "wrong-password"
+        }
+      },
+      {
+        "fill": {
+          "label": "New password",
+          "value": "river kettle orbit lamp"
+        }
+      },
+      {
+        "fill": {
+          "label": "Confirm new password",
+          "value": "river kettle orbit lamp"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Save new password"
+        }
+      }
+    ],
+    "expectStatus": [
+      400
+    ]
+  },
+  {
+    "name": "authenticator",
+    "page": "pages/security-authenticator.html?enrolment=enr_demo",
+    "route": "/account/security/authenticator?enrolment=enr_demo",
+    "states": [
+      "loading",
+      "error"
+    ]
+  },
+  {
+    "name": "sign-in-server-error",
+    "page": "pages/sign-in.html?state=error",
+    "route": "/sign-in?state=error",
+    "steps": [
+      {
+        "fill": {
+          "label": "Email",
+          "value": "amina@example.com"
+        }
+      },
+      {
+        "fill": {
+          "label": "Password",
+          "value": "anything at all"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Sign in"
+        }
+      }
+    ],
+    "expectStatus": [
+      500
+    ]
+  }
+]

@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Account security</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../assets/tokens.css">
+  <link rel="stylesheet" href="../assets/base.css">
+  <link rel="stylesheet" href="../assets/components.css">
+  <script src="../assets/mk.js"></script>
+  <script src="../strings/en-GB.js"></script>
+  <script src="../data/fixtures.js"></script>
+  <script src="../components/AppLayout.js"></script>
+  <script src="../components/AuthLayout.js"></script>
+  <script src="../components/Badge.js"></script>
+  <script src="../components/DataTable.js"></script>
+  <script src="../components/Dialog.js"></script>
+  <script src="../components/EmptyState.js"></script>
+  <script src="../components/ErrorPage.js"></script>
+  <script src="../components/ErrorState.js"></script>
+  <script src="../components/FactorRow.js"></script>
+  <script src="../components/InvoiceStatusBadge.js"></script>
+  <script src="../components/MoneyField.js"></script>
+  <script src="../components/Notice.js"></script>
+  <script src="../components/OneTimeCodeField.js"></script>
+  <script src="../components/Pagination.js"></script>
+  <script src="../components/PermissionGrid.js"></script>
+  <script src="../components/RadioGroup.js"></script>
+  <script src="../components/RecoveryCodes.js"></script>
+  <script src="../components/SelectField.js"></script>
+  <script src="../components/SkeletonBox.js"></script>
+  <script src="../components/StepUpDialog.js"></script>
+  <script src="../components/Stepper.js"></script>
+  <script src="../components/TableSkeleton.js"></script>
+  <script src="../components/TextField.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const { html, components: C, format } = MK;
+    const TITLES = { totp: 'Authenticator app', email: 'Email codes', sms: 'Text messages (SMS)' };
+    const LABEL = { totp: 'Authenticator app', email: 'Email code' };
+    // Adding a method needs a step-up (the server's rule, security audit 2026-11-20 H-01), unless
+    // this visit already passed one or the account has no method yet to confirm with. The step-up
+    // dialog renders last, so it opens over the dialog it interrupts (adding a phone).
+    function askFirst(state, ctx, label, then) {
+      const sec = state.security || ctx.fixtures.auth.security;
+      if (state.elevated || !sec.factors.some((f) => f.enabled)) return false;
+      state.stepUp = { purpose: 'add', label, then, method: sec.factors.find((f) => f.enabled && f.method !== 'sms')?.method ?? 'totp', sent: false, code: '', error: null };
+      ctx.focus('step-up-code');
+      return true;
+    }
+    const OFF_TEXT = { totp: 'Your authenticator app is removed.', email: 'Email codes are off.', sms: 'Text messages are off.' };
+    const ON_TEXT = { email: 'Email codes are on.', sms: 'Text messages are on.' };
+
+    MK.page({
+      id: 'account-security',
+      route: '/account/security',
+      title: 'Account security',
+      needs: {
+        api: [
+          'GET /v1/me/security -> SecuritySettings',
+          'POST /v1/me/mfa/totp -> TotpEnrolment (then the authenticator page)',
+          'POST /v1/me/mfa/sms { phone } and POST /v1/me/mfa/sms/verify { code }',
+          'DELETE /v1/me/mfa/{method} (step-up required; 409 for the last method when MFA is required)',
+          'POST /v1/me/recovery-codes -> { codes } (step-up required)',
+          'POST /v1/auth/step-up { method, code }; POST /v1/auth/step-up/send { method }',
+          'PUT /v1/me/password { current_password, new_password } -> 204; 400 invalid_credentials | weak_password { reason, min_length }',
+        ],
+        permission: 'authenticated',
+        notes: ['Passkeys are recommended and not designed yet'],
+      },
+      state: { security: null, dialog: null, stepUp: null, enrol: null, password: null, notice: null, elevated: false },
+      load: (fx, { state }) => ({ security: state.security || fx.auth.security, codes: fx.auth.recovery_codes, emailDestination: fx.auth.challenge.email_destination }),
+      actions: {
+        startTotp(state, _e, _el, ctx) {
+          if (askFirst(state, ctx, 'set up an authenticator app', 'totp')) return;
+          ctx.navigate('./security-authenticator.html?enrolment=enr_demo'); return false;
+        },
+        remove(state, _e, el, ctx) {
+          state.dialog = 'step-up'; state.stepUp = { purpose: 'remove', target: el.dataset.value, method: 'totp', sent: false, code: '', error: null };
+          ctx.focus('step-up-code');
+        },
+        newCodes(state, _e, _el, ctx) {
+          state.dialog = 'step-up'; state.stepUp = { purpose: 'codes', method: 'totp', sent: false, code: '', error: null };
+          ctx.focus('step-up-code');
+        },
+        setStepUpMethod(state, _e, el) { state.stepUp.method = el.value; state.stepUp.sent = false; },
+        setStepUpCode(state, _e, el) { state.stepUp.code = el.value; return false; },
+        sendStepUpCode(state, _e, _el, ctx) { state.stepUp.sent = true; ctx.focus('step-up-code'); },
+        // Stands in for POST /v1/auth/step-up, then the change it was asked for. 000000 is refused.
+        confirmStepUp(state, _e, _el, ctx) {
+          if (!state.stepUp.code || state.stepUp.code === '000000') { state.stepUp.error = 'That code is not right. 4 attempts left.'; ctx.focus('step-up-code'); return; }
+          state.elevated = true;
+          if (state.stepUp.purpose === 'codes') { state.dialog = 'codes'; state.stepUp = null; return; }
+          // Adding a method: carry on with what was asked, as the app retries after a step-up.
+          if (state.stepUp.purpose === 'add') {
+            const then = state.stepUp.then; state.stepUp = null;
+            if (then === 'totp') { ctx.navigate('./security-authenticator.html?enrolment=enr_demo'); return false; }
+            if (then === 'email') { state.dialog = 'enrol'; state.enrol = { method: 'email', step: 'code', phone: '', code: '', error: null }; ctx.focus('enrol-code'); return; }
+            state.enrol = { ...state.enrol, step: 'code', error: null }; ctx.focus('enrol-code'); return;
+          }
+          const target = state.stepUp.target;
+          state.security = state.security || structuredClone(ctx.fixtures.auth.security);
+          state.security.factors = state.security.factors.map((f) => (f.method === target ? { method: f.method, enabled: false } : f));
+          state.notice = OFF_TEXT[target];
+          state.dialog = null; state.stepUp = null;
+          ctx.focus('security-heading');
+        },
+        startEnrol(state, _e, el, ctx) {
+          const method = el.dataset.value;
+          if (method === 'email' && askFirst(state, ctx, 'turn on email codes', 'email')) return;
+          state.dialog = 'enrol';
+          state.enrol = { method, step: method === 'sms' ? 'phone' : 'code', phone: '', code: '', error: null };
+          ctx.focus(method === 'sms' ? 'enrol-phone' : 'enrol-code');
+        },
+        setEnrolPhone(state, _e, el) { state.enrol.phone = el.value; return false; },
+        setEnrolCode(state, _e, el) { state.enrol.code = el.value; return false; },
+        enrolSend(state, _e, _el, ctx) {
+          const phone = state.enrol.phone.trim();
+          if (!/^\+?[0-9 ]{9,15}$/.test(phone)) { state.enrol.error = 'Enter a mobile number with its country code, such as +256 772 000 101.'; ctx.focus('enrol-phone'); return; }
+          state.enrol = { ...state.enrol, phone, error: null };
+          if (askFirst(state, ctx, 'add a phone number', 'sms')) return;
+          state.enrol.step = 'code'; ctx.focus('enrol-code');
+        },
+        enrolVerify(state, _e, _el, ctx) {
+          const { method, code, phone } = state.enrol;
+          if (!code || code === '000000') { state.enrol.error = 'That code is not right. 4 attempts left.'; ctx.focus('enrol-code'); return; }
+          state.security = state.security || structuredClone(ctx.fixtures.auth.security);
+          const destination = method === 'sms' ? `••• ${phone.replace(/\s/g, '').slice(-3)}` : ctx.fixtures.auth.challenge.email_destination;
+          state.security.factors = state.security.factors.map((f) => (f.method === method ? { method, enabled: true, destination } : f));
+          state.notice = ON_TEXT[method]; state.dialog = null; state.enrol = null;
+          ctx.focus('security-heading');
+        },
+        openPassword(state, _e, _el, ctx) { state.dialog = 'password'; state.password = { current: '', next: '', confirm: '', errors: {} }; ctx.focus('current-password'); },
+        setCurrent(state, _e, el) { state.password.current = el.value; return false; },
+        setNext(state, _e, el) { state.password.next = el.value; return false; },
+        setConfirm(state, _e, el) { state.password.confirm = el.value; return false; },
+        // Stands in for PUT /v1/me/password: wrong-password is not the current one; the server
+        // checks length and a common-password list, the browser only that the two new ones match.
+        savePassword(state, _e, _el, ctx) {
+          const p = state.password;
+          const min = ctx.fixtures.auth.password_policy.min_length;
+          const errors = {};
+          if (p.next && p.confirm !== p.next) errors.confirm = 'The passwords do not match.';
+          else if (!p.current || p.current === 'wrong-password') errors.current = 'That is not your current password.';
+          else if (p.next.length < min) errors.next = `Use at least ${min} characters.`;
+          else if (['password12345', 'service12345', '123456789012'].includes(p.next.toLowerCase())) errors.next = 'That password is too common. Choose another.';
+          p.errors = errors;
+          const first = ['current', 'next', 'confirm'].find((k) => errors[k]);
+          if (first) { ctx.focus({ current: 'current-password', next: 'new-password', confirm: 'confirm-password' }[first]); return; }
+          state.security = state.security || structuredClone(ctx.fixtures.auth.security);
+          state.security.password_changed_at = new Date().toISOString();
+          state.notice = 'Your password is changed. Your other devices are signed out.';
+          state.dialog = null; state.password = null;
+          ctx.focus('security-heading');
+        },
+        closeDialog(state, _e, _el, ctx) { state.dialog = null; state.stepUp = null; state.enrol = null; ctx.focus('security-heading'); },
+      },
+      render: ({ state, data, status }) => {
+        const header = html`<h1 id="security-heading" tabindex="-1">Account security</h1>`;
+        if (status === 'loading') return html`<div class="stack">${header}<div class="card" role="status"><span class="visually-hidden">Loading</span>${Array.from({ length: 3 }, () => html`${C.SkeletonBox({ shape: 'title' })}${C.SkeletonBox({ shape: 'text' })}`)}</div></div>`;
+        if (status === 'error') return html`<div class="stack">${header}<div class="card">${C.ErrorState({ body: 'We could not load your security settings. Please refresh.' })}</div></div>`;
+        const sec = data.security;
+        const on = sec.factors.filter((f) => f.enabled);
+        const last = sec.mfa_required && on.length === 1;
+        const row = (f) => {
+          if (!sec.methods_available.includes(f.method)) return '';
+          const detail = {
+            totp: f.enabled ? `On since ${format.date(f.added_at.slice(0, 10))}. The most secure option here.` : 'Codes from an app on your phone, such as Google Authenticator or Microsoft Authenticator. The most secure option here.',
+            email: f.enabled ? `Codes sent to ${f.destination}.` : 'Codes sent to your account email.',
+            sms: f.enabled ? `Codes sent to ${f.destination}. Less secure than an authenticator app.` : 'Less secure than an authenticator app: phone numbers can be taken over. Use it as a backup only.',
+          }[f.method];
+          if (f.enabled) return C.FactorRow({ title: TITLES[f.method], detail, on: true, actionLabel: `Remove ${TITLES[f.method].toLowerCase()}`, action: 'remove', value: f.method, disabledReason: last ? 'Add another method before removing this one.' : null });
+          if (f.method === 'totp') return C.FactorRow({ title: TITLES.totp, detail, on: false, actionLabel: 'Set up authenticator app', action: 'startTotp', value: 'totp' });
+          if (f.method === 'sms') return C.FactorRow({ title: TITLES.sms, detail, on: false, actionLabel: 'Set up text messages', action: 'startEnrol', value: 'sms' });
+          return C.FactorRow({ title: TITLES.email, detail, on: false, actionLabel: 'Turn on email codes', action: 'startEnrol', value: 'email' });
+        };
+        const stepUpMethods = on.filter((f) => f.method !== 'sms').map((f) => ({ value: f.method, label: LABEL[f.method] }));
+        return html`
+          <div class="stack">
+            ${header}
+            ${state.notice ? C.Notice({ tone: 'success', text: state.notice }) : ''}
+            ${sec.mfa_required ? C.Notice({ tone: 'info', text: 'Your organisation requires a second step when you sign in. Keep at least one method on.' }) : ''}
+            <section class="card stack" aria-labelledby="password-heading">
+              <h2 id="password-heading">Password</h2>
+              <p class="muted">Last changed on ${format.dateTime(sec.password_changed_at)}.</p>
+              <div><button type="button" class="button" data-action="openPassword">Change password</button></div>
+            </section>
+            <section class="card" aria-labelledby="methods-heading">
+              <h2 id="methods-heading">Sign-in methods</h2>
+              ${sec.factors.map(row)}
+            </section>
+            <section class="card stack" aria-labelledby="codes-heading">
+              <h2 id="codes-heading">Recovery codes</h2>
+              <p class="muted">${sec.recovery_codes_remaining} of 10 left. Use one to sign in if you lose your other methods.</p>
+              <div><button type="button" class="button" data-action="newCodes">Generate new codes</button></div>
+            </section>
+            ${state.dialog === 'codes' ? C.Dialog({
+              id: 'new-codes', title: 'Your new recovery codes', cancelAction: 'closeDialog',
+              body: html`${C.Notice({ tone: 'warning', text: 'Your old codes no longer work.' })}${C.RecoveryCodes({ codes: data.codes })}`,
+              actions: html`<button type="button" class="button button--primary" data-action="closeDialog">Done</button>`,
+            }) : ''}
+            ${state.dialog === 'password' ? C.Dialog({
+              id: 'password', title: 'Change your password', cancelAction: 'closeDialog',
+              body: html`
+                <form class="form" id="password-form" data-action="savePassword" novalidate>
+                  ${C.TextField({ id: 'current-password', label: 'Current password', type: 'password', autocomplete: 'current-password', value: state.password.current, error: state.password.errors.current, action: 'setCurrent' })}
+                  ${C.TextField({ id: 'new-password', label: 'New password', type: 'password', autocomplete: 'new-password', value: state.password.next, hint: `At least ${sec.password_min_length} characters. A few unrelated words make a strong one.`, error: state.password.errors.next, action: 'setNext' })}
+                  ${C.TextField({ id: 'confirm-password', label: 'Confirm new password', type: 'password', autocomplete: 'new-password', value: state.password.confirm, error: state.password.errors.confirm, action: 'setConfirm' })}
+                </form>`,
+              actions: html`<button type="button" class="button" data-action="closeDialog">Cancel</button><button type="submit" form="password-form" class="button button--primary">Save new password</button>`,
+            }) : ''}
+            ${state.dialog === 'enrol' ? C.Dialog({
+              id: 'enrol', title: state.enrol.method === 'sms' ? 'Set up text messages' : 'Turn on email codes', cancelAction: 'closeDialog',
+              body: state.enrol.step === 'phone'
+                ? html`<p>We will send a code to this number to check it.</p>${C.TextField({ id: 'enrol-phone', label: 'Mobile number', type: 'tel', autocomplete: 'tel', value: state.enrol.phone, hint: 'With the country code, such as +256 772 000 101.', error: state.enrol.error, action: 'setEnrolPhone' })}`
+                : html`${C.Notice({ tone: 'info', text: `We sent a code to ${state.enrol.method === 'sms' ? state.enrol.phone : data.emailDestination}.` })}${C.OneTimeCodeField({ id: 'enrol-code', label: 'Code', error: state.enrol.error, action: 'setEnrolCode' })}`,
+              actions: html`<button type="button" class="button" data-action="closeDialog">Cancel</button>${state.enrol.step === 'phone'
+                ? html`<button type="button" class="button button--primary" data-action="enrolSend">Send code</button>`
+                : html`<button type="button" class="button button--primary" data-action="enrolVerify">Verify</button>`}`,
+            }) : ''}
+            ${state.stepUp ? C.StepUpDialog({
+              purpose: { codes: 'generate new recovery codes', add: state.stepUp.label }[state.stepUp.purpose] ?? `remove ${TITLES[state.stepUp.target]?.toLowerCase()}`,
+              methods: stepUpMethods, method: state.stepUp.method, sent: state.stepUp.sent,
+              destination: sec.factors.find((f) => f.method === 'email')?.destination, error: state.stepUp.error,
+            }) : ''}
+          </div>`;
+      },
+    });
+  </script>
+</body>
+</html>

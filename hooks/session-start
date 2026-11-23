@@ -58,11 +58,11 @@ Discover and define: repo-snapshot, shape-idea, write-prd, write-user-stories, d
 Build: write-plan, execute-plan, tdd, debug, coding-standards.
 Verify: review-code, security-audit, refactor, optimize-performance.
 Ship: setup-deployment, ship, write-docs. Production is down: incident-response, before debug.
-Porting: port-assess, or apex-export then apex-port-plan.
-Meta: create-skill, context-budget. Unsure: use the keel skill to route.
+Porting: port-assess; apex-export then apex-port-plan; mockup then convert-mockup.
+Meta: create-skill, context-budget. Unsure: use the keel skill.
 
 Rules: process skills come first and may invoke others (debug before tdd for a bug, shape-idea
-before write-prd for a rough idea). Announce the skill in one line, then follow it.
+before write-prd). Announce the skill in one line, then follow it.
 Answer directly when none fits; forcing one is worse.
 
 Project facts, verify commands, and gates are in .keel/profile.json. Read it before running any

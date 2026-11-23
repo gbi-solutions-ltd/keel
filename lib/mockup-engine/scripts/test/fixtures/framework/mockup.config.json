@@ -1,0 +1,11 @@
+{
+  "name": "framework",
+  "timezoneId": "UTC",
+  "project": { "designFramework": { "kind": "css-library", "name": "kit", "version": "1.0.0", "owner": "client" } },
+  "viewports": [{ "name": "desktop", "width": 800, "height": 600 }],
+  "screens": [
+    { "name": "with", "page": "pages/with.html", "route": "/with" },
+    { "name": "without", "page": "pages/without.html", "route": "/without" },
+    { "name": "missing", "page": "pages/missing.html", "route": "/missing" }
+  ]
+}

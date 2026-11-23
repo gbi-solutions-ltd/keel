@@ -1,0 +1,4 @@
+{
+  "bundle": { "initialJsKb": 200, "initialCssKb": 30, "lazyChunkKb": 100 },
+  "vitals": { "lcpMs": 2500, "cls": 0.1, "gate": false }
+}

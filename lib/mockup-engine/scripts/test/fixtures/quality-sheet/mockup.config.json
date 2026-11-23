@@ -1,0 +1,8 @@
+{
+  "name": "quality sheet and shard fixture",
+  "viewports": [{ "name": "desktop", "width": 800, "height": 600 }],
+  "screens": [
+    { "name": "sheet", "page": "sheet.html", "route": "/sheet" },
+    { "name": "open", "page": "open.html", "route": "/open", "states": ["default", "empty"] }
+  ]
+}

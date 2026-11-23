@@ -16,6 +16,8 @@ Route to one skill and follow it. Do not do the work in this skill.
 | export an APEX app, read an Oracle APEX application, here is an app id and a connection | `apex-export` |
 | should we port this APEX app, scope an APEX migration, what would it cost to replace it | `apex-port-plan` |
 | should we port this service, scope a rewrite, move this off its stack, what would migrating cost | `port-assess` |
+| mock up or prototype a client's app or screen, change a mockup the client is reviewing | `mockup` |
+| turn a signed-off mockup into a React, Vue or Next.js app, take it through the production bar | `convert-mockup` |
 | I have an idea, is this worth building, help me think this through, talk this through with me | `shape-idea` |
 | I want to build X, write requirements, spec this out, we need a PRD | `write-prd` |
 | break this down, create tickets, write epics or stories | `write-user-stories` |

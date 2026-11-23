@@ -1,0 +1,11 @@
+{
+  "name": "inventory fixture",
+  "modules": ["tours-help"],
+  "screens": [
+    { "name": "home", "page": "pages/home.html", "route": "/home", "states": ["default", "empty"] },
+    { "name": "home-step", "page": "pages/home.html", "route": "/home", "steps": [{ "click": { "role": "button", "name": "Open" } }] },
+    { "name": "home-x", "page": "pages/home.html", "route": "/home", "role": "x" },
+    { "name": "home-x-again", "page": "pages/home.html?as=x", "route": "/home" },
+    { "name": "home-as-guest", "page": "pages/home.html", "route": "/home", "role": "guest" }
+  ]
+}
