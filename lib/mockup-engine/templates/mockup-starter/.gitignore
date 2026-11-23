@@ -1,0 +1,2 @@
+# The checks write their reports and baselines here; none of it belongs in git.
+.mockup-engine/
